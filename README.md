@@ -4,7 +4,8 @@ Schäfchen ist eine SaaS-fähige Progressive Web App für Handwerksbetriebe. Die
 
 ## Projektstand
 
-Phase 0 (Fachkonzept und ER-Modell) ist abgeschlossen. Die technische Umsetzung hat mit der lokalen Projektbasis und der ersten Datenbankmigration begonnen.
+Phase 0 (Fachkonzept und ER-Modell) und die Datenbankgrundlage aus Sprint 1
+sind abgeschlossen. Als Nächstes folgt Sprint 2 mit Zeiterfassung und Planung.
 
 Aktuell enthalten:
 
@@ -13,9 +14,11 @@ Aktuell enthalten:
 - Migration `001_create_companies.sql`
 - Migration `002_create_users.sql`
 - Migration `003_create_roles.sql` mit historisierten Mehrfachrollen
+- Migrationen `004_create_customers.sql` bis `008_create_construction_sites.sql`
+- mandantengeschützte Kunden-, Standort-, Projekt- und Baustellenstruktur
 - Entwicklungs-Seed für die Schaaf Elektro GmbH
-- SQL-Abnahmetest für Tabelle, Nummernvergabe, Status, Historisierung und Mandantenschutz
-- GitHub Actions zur automatischen Prüfung von Compose und Migration
+- SQL-Abnahmetests für Nummernvergabe, Status, Historisierung und Mandantenschutz
+- GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
 - mobile PWA-Vorschau für Login und Monteur-Dashboard
 
 ## Öffentliche Vorschau
@@ -63,6 +66,7 @@ make db-migrate   # offene Migrationen idempotent anwenden
 make db-seed      # Entwicklungsdaten einspielen
 make db-test      # SQL-Abnahmetests ausführen
 make backup       # Datenbank-Dump unter backups/ erzeugen
+make backup-restore-test # vollständigen Dump und Restore prüfen
 make dev-down     # Container stoppen
 make frontend-test # PWA lokal prüfen
 make frontend-serve # PWA unter http://localhost:4173 öffnen

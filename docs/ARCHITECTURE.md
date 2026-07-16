@@ -27,7 +27,9 @@ Planung, Zeiterfassung, Berichte, Dokumente und VDE-Prüfungen werden an diesen 
 
 `companies` ist die Wurzel eines Mandanten. Nachfolgende Tabellen erhalten eine verpflichtende `company_id`. Die API setzt die aktuelle Firma serverseitig aus der authentifizierten Sitzung. Daten aus dem Frontend dürfen die Mandantenzuordnung nicht überschreiben.
 
-PostgreSQL Row Level Security bildet eine zusätzliche Schutzschicht. Migration 001 legt bereits die Policy für den Zugriff auf den eigenen Firmendatensatz an. Ein eigener API-Datenbankbenutzer und erzwungene RLS-Regeln folgen zusammen mit Login und Benutzerverwaltung.
+PostgreSQL Row Level Security bildet eine zusätzliche Schutzschicht. Die
+Datenbankrolle `schaefchen_api` besitzt nur die freigegebenen Tabellenrechte;
+für alle bisher veröffentlichten Fachtabellen ist RLS erzwungen.
 
 ## Datenhistorie
 
@@ -63,3 +65,18 @@ Frontends werden dafür nicht verwendet.
 Die erste sichtbare Oberfläche ist eine statische PWA-Vorschau. Ihre verbindliche
 Spezifikation steht in [`PHASE1_UI_SPEC.md`](PHASE1_UI_SPEC.md). Eine echte
 Anmeldung wird erst mit der beschriebenen API-Grenze freigeschaltet.
+
+## Sprint 1: Kunden, Projekte und Baustellen
+
+Die Migrationen 004 bis 008 schließen die mandantenfähige Auftragsgrundlage
+ab. Die Kernbeziehung wird über zusammengesetzte Fremdschlüssel abgesichert:
+
+`companies → customers → customer_locations → projects → construction_sites`
+
+Ein Projekt gehört zu einem Kunden und kann über `project_locations` mehrere
+Standorte dieses Kunden erhalten. `project_responsibles` bildet mehrere
+historisierte Verantwortliche ab. Eine Baustelle gehört genau zu einem Projekt
+und kann optional einen passenden Kundenstandort verwenden.
+
+Die vollständigen Feld- und Statusregeln stehen in
+[`SPRINT1_DATA_MODEL.md`](SPRINT1_DATA_MODEL.md).

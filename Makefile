@@ -1,6 +1,6 @@
 COMPOSE := docker compose --env-file .env
 
-.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-seed db-test backup restore frontend-test frontend-serve
+.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-seed db-test backup restore backup-restore-test frontend-test frontend-serve
 
 check-env:
 	@test -f .env || (echo "Fehler: .env fehlt. Zuerst 'cp .env.example .env' ausführen." && exit 1)
@@ -36,6 +36,13 @@ restore: check-env
 	@test -n "$(FILE)" || (echo "Fehler: make restore FILE=backups/datei.dump" && exit 1)
 	@test -f "$(FILE)" || (echo "Fehler: Datei $(FILE) nicht gefunden." && exit 1)
 	$(COMPOSE) exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --username="$$POSTGRES_USER" --dbname="$$POSTGRES_DB"' < "$(FILE)"
+
+backup-restore-test: check-env
+	@set -a; . ./.env; set +a; \
+	PGPASSWORD="$$POSTGRES_PASSWORD" \
+	POSTGRES_HOST=127.0.0.1 \
+	POSTGRES_PORT="$${POSTGRES_PORT:-5432}" \
+	sh database/scripts/verify-backup-restore.sh
 
 frontend-test:
 	node --check frontend/app.js

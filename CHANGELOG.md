@@ -25,3 +25,13 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - dokumentierte UI-Spezifikation für Login und Dashboard
 - mobiloptimierte, installierbare PWA-Vorschau ohne vorgetäuschte Serveranmeldung
 - PWA-Smoke-Test und GitHub-Pages-Veröffentlichungsworkflow
+- Migration 004 für Privat- und Firmenkunden, automatische Kundennummern, Debitorennummern, Archivierung und Dubletten-Zusammenführung
+- Migration 005 für mehrere Kundenansprechpartner, feste Zuständigkeiten und einen aktiven Hauptkontakt
+- Migration 006 für Kundenstandorte mit automatischer Standortnummer, Adresse, optionalem Geocoding und Rechnungsstandort
+- Migration 007 für Projekte mit Jahresnummer, Priorität, Status, Standort- und Verantwortlichenhistorie
+- Migration 008 für Baustellen mit Jahresnummer, flachen Bereichen, QR-Code, Pinnwand und Statushistorie
+- erzwungene Mandantentrennung und Löschschutz für die Auftragsgrundlage
+- SQL-Abnahmetests für Migrationen 004 bis 008
+- idempotente Doppelanwendung aller Migrationen in GitHub Actions
+- automatischer PostgreSQL-Backup-/Restore-Abnahmetest
+- technische Sprint-1-Dokumentation für Kunden, Projekte und Baustellen
