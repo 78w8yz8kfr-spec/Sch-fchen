@@ -8,7 +8,7 @@ set -eu
 : "${PGPASSWORD:?PGPASSWORD must be set}"
 
 restore_database="${POSTGRES_DB}_restore_check"
-dump_file="$(mktemp -t schaefchen-backup-XXXXXX.dump)"
+dump_file="$(mktemp /tmp/schaefchen-backup-XXXXXX)"
 
 cleanup() {
     dropdb \

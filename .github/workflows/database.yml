@@ -36,7 +36,7 @@ jobs:
         run: docker compose --env-file .env.example config --quiet
 
       - name: PostgreSQL-Client installieren
-        run: sudo apt-get update && sudo apt-get install --yes postgresql-client-17
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
 
       - name: Migration, Seed und SQL-Tests ausführen
         env:
@@ -57,4 +57,13 @@ jobs:
           POSTGRES_PORT: 5432
           POSTGRES_DB: schaefchen
           POSTGRES_USER: schaefchen
-        run: sh database/scripts/verify-backup-restore.sh
+        run: >-
+          docker run --rm --network host
+          --volume "$PWD/database/scripts:/scripts:ro"
+          --env PGPASSWORD
+          --env POSTGRES_HOST
+          --env POSTGRES_PORT
+          --env POSTGRES_DB
+          --env POSTGRES_USER
+          postgres:17-alpine
+          sh /scripts/verify-backup-restore.sh
