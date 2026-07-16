@@ -36,7 +36,7 @@ jobs:
         run: docker compose --env-file .env.example config --quiet
 
       - name: PostgreSQL-Client installieren
-        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client-17
 
       - name: Migration, Seed und SQL-Tests ausführen
         env:
