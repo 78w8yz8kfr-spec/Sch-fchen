@@ -1,0 +1,134 @@
+name: ${COMPOSE_PROJECT_NAME:-schaefchen}
+
+x-database-tool: &database-tool
+  image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE must be set}
+  profiles: [tools]
+  depends_on:
+    postgres:
+      condition: service_healthy
+  environment:
+    PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+    POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+  volumes:
+    - ./database:/database:ro
+  networks:
+    - backend
+  restart: "no"
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE must be set}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      N8N_DB_NAME: ${N8N_DB_NAME:?N8N_DB_NAME must be set}
+      TZ: ${TZ:-Europe/Berlin}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/bootstrap/000_create_service_databases.sh:/docker-entrypoint-initdb.d/000_create_service_databases.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - backend
+    restart: unless-stopped
+
+  pgadmin:
+    image: ${PGADMIN_IMAGE:?PGADMIN_IMAGE must be set}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?PGADMIN_DEFAULT_EMAIL must be set}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?PGADMIN_DEFAULT_PASSWORD must be set}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+      PGADMIN_CONFIG_LOGIN_BANNER: "'Schäfchen – lokale Entwicklungsumgebung'"
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - backend
+    restart: unless-stopped
+
+  minio:
+    image: ${MINIO_IMAGE:?MINIO_IMAGE must be set}
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [CMD, mc, ready, local]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - backend
+    restart: unless-stopped
+
+  n8n:
+    image: ${N8N_IMAGE:?N8N_IMAGE must be set}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${N8N_DB_NAME:?N8N_DB_NAME must be set}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY must be set}
+      N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_USER_MANAGEMENT_JWT_SECRET:?N8N_USER_MANAGEMENT_JWT_SECRET must be set}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: ${TZ:-Europe/Berlin}
+      TZ: ${TZ:-Europe/Berlin}
+    ports:
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - backend
+    restart: unless-stopped
+
+  db-migrate:
+    <<: *database-tool
+    entrypoint: [/bin/sh, /database/scripts/run-sql-directories.sh]
+    command: [/database/migrations]
+
+  db-seed:
+    <<: *database-tool
+    entrypoint: [/bin/sh, /database/scripts/run-sql-directories.sh]
+    command: [/database/seeds]
+
+  db-test:
+    <<: *database-tool
+    entrypoint: [/bin/sh, /database/scripts/run-sql-directories.sh]
+    command: [/database/tests]
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  minio_data:
+  n8n_data:
+
+networks:
+  backend:
+    driver: bridge

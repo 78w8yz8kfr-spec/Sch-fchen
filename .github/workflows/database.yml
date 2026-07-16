@@ -1,0 +1,52 @@
+name: Datenbankgrundlage prüfen
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: schaefchen
+          POSTGRES_USER: schaefchen
+          POSTGRES_PASSWORD: ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schaefchen -d schaefchen"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Docker-Compose validieren
+        run: docker compose --env-file .env.example config --quiet
+
+      - name: PostgreSQL-Client installieren
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+
+      - name: Migration, Seed und SQL-Tests ausführen
+        env:
+          PGPASSWORD: ci_only_password
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: schaefchen
+          POSTGRES_USER: schaefchen
+        run: >-
+          sh database/scripts/run-sql-directories.sh
+          database/migrations
+          database/seeds
+          database/tests
