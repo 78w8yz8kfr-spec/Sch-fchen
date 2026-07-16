@@ -11,9 +11,21 @@ Aktuell enthalten:
 - Docker Compose für PostgreSQL, pgAdmin, MinIO und n8n
 - getrennte Umgebungsvariablen ohne eingecheckte Zugangsdaten
 - Migration `001_create_companies.sql`
+- Migration `002_create_users.sql`
+- Migration `003_create_roles.sql` mit historisierten Mehrfachrollen
 - Entwicklungs-Seed für die Schaaf Elektro GmbH
 - SQL-Abnahmetest für Tabelle, Nummernvergabe, Status, Historisierung und Mandantenschutz
 - GitHub Actions zur automatischen Prüfung von Compose und Migration
+- mobile PWA-Vorschau für Login und Monteur-Dashboard
+
+## Öffentliche Vorschau
+
+Die erste sichtbare PWA-Version wird über GitHub Pages veröffentlicht:
+
+**[Schäfchen-Vorschau öffnen](https://78w8yz8kfr-spec.github.io/Sch-fchen/)**
+
+Die Vorschau enthält bewusst noch keine echte Anmeldung. Eingaben und der
+demonstrierte Arbeitsstatus werden weder übertragen noch dauerhaft gespeichert.
 
 ## Lokaler Start
 
@@ -52,6 +64,8 @@ make db-seed      # Entwicklungsdaten einspielen
 make db-test      # SQL-Abnahmetests ausführen
 make backup       # Datenbank-Dump unter backups/ erzeugen
 make dev-down     # Container stoppen
+make frontend-test # PWA lokal prüfen
+make frontend-serve # PWA unter http://localhost:4173 öffnen
 ```
 
 ## Verbindliche Leitlinien

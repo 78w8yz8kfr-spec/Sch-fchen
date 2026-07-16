@@ -18,3 +18,10 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - GitHub Actions für Compose- und Datenbankprüfung
 - lokale Befehle für Migrationen, Seeds, Tests, Backup und Restore
 - Architektur- und Projektstatusdokumentation
+- Migration 002 für Benutzer mit Personalnummer-Login, Aktivhistorie und Mandantenschutz
+- Migration 003 für anpassbare Rollen, historische Mehrfachzuweisungen und Standardrollen Admin, Büro, Vorarbeiter und Monteur
+- eigene eingeschränkte Datenbankrolle `schaefchen_api` mit erzwungener Row Level Security
+- automatische Pflege des Vorarbeiterstatus aus aktiven Rollenzuweisungen
+- dokumentierte UI-Spezifikation für Login und Dashboard
+- mobiloptimierte, installierbare PWA-Vorschau ohne vorgetäuschte Serveranmeldung
+- PWA-Smoke-Test und GitHub-Pages-Veröffentlichungsworkflow

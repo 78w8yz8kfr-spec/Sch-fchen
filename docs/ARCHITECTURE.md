@@ -41,3 +41,25 @@ Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht. 
 4. Montage- und Bautagesberichte mit PDF-Versionierung
 5. Integriertes VDE-Modul
 6. KI, OCR und Sprache erst nach stabiler Kernfunktion
+
+## Sprint 1: Benutzer und Rollen
+
+`users` gehört verpflichtend zu genau einer Firma. Die Personalnummer ist nur
+innerhalb dieser Firma eindeutig. E-Mail und Telefon bleiben optional;
+ausgeschiedene Mitarbeiter werden deaktiviert und nicht gelöscht.
+
+`roles` enthält pro Firma anpassbare Rollen und Rechte. Die unveränderlichen
+Systemschlüssel der vier Standardrollen lauten `admin`, `office`, `foreman` und
+`installer`. Der Admin behält immer Vollzugriff. `user_roles` bildet mehrere
+Rollen je Benutzer ab und historisiert Zuweisungen über Zuweisungs- und
+Widerrufszeitpunkt.
+
+Alle drei Tabellen erzwingen die Firmenzugehörigkeit mit zusammengesetzten
+Fremdschlüsseln und Row Level Security. Der Datenbankrolle `schaefchen_api`
+werden nur die für die spätere API benötigten Tabellenrechte erteilt. Die API
+setzt `app.current_company_id` aus der authentifizierten Sitzung; Werte des
+Frontends werden dafür nicht verwendet.
+
+Die erste sichtbare Oberfläche ist eine statische PWA-Vorschau. Ihre verbindliche
+Spezifikation steht in [`PHASE1_UI_SPEC.md`](PHASE1_UI_SPEC.md). Eine echte
+Anmeldung wird erst mit der beschriebenen API-Grenze freigeschaltet.

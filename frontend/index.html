@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#173c34">
+    <meta name="description" content="Schäfchen – die einfache Arbeitsapp für Handwerksbetriebe.">
+    <title>Schäfchen</title>
+    <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main id="app" class="app-shell">
+      <section id="login-view" class="view login-view" aria-labelledby="login-title">
+        <div class="login-card">
+          <div class="brand brand--large">
+            <img src="./assets/mark.svg" alt="" width="56" height="56">
+            <div>
+              <p class="eyebrow">Arbeitsapp</p>
+              <h1 id="login-title">Schäfchen</h1>
+            </div>
+          </div>
+
+          <div class="company-context">
+            <span class="company-context__mark" aria-hidden="true">S</span>
+            <div>
+              <span>Firma</span>
+              <strong>Schaaf Elektro GmbH</strong>
+            </div>
+          </div>
+
+          <div class="preview-note" role="note">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+            </svg>
+            <p><strong>Öffentliche Vorschau</strong><br>Noch keine echte Serveranmeldung und keine Speicherung.</p>
+          </div>
+
+          <form id="login-form" class="login-form" novalidate>
+            <label for="personnel-number">Personalnummer</label>
+            <input
+              id="personnel-number"
+              name="personnel-number"
+              type="text"
+              inputmode="numeric"
+              autocomplete="username"
+              placeholder="Personalnummer"
+            >
+
+            <div class="label-row">
+              <label for="password">Passwort</label>
+              <span>Noch nicht aktiv</span>
+            </div>
+            <div class="password-field">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Passwort"
+              >
+              <button id="toggle-password" class="icon-button" type="button" aria-label="Passwort anzeigen">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/>
+                  <circle cx="12" cy="12" r="2.5"/>
+                </svg>
+              </button>
+            </div>
+
+            <button class="button button--secondary" type="submit">Anmelden</button>
+            <p id="login-message" class="form-message" aria-live="polite"></p>
+          </form>
+
+          <div class="divider"><span>Vorschau ohne Zugangsdaten</span></div>
+          <button id="open-preview" class="button button--primary" type="button">
+            Vorschau öffnen
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+
+          <p class="login-footer">Einfach vor komplex · Version 0.3 Vorschau</p>
+        </div>
+      </section>
+
+      <section id="dashboard-view" class="view dashboard-view" aria-labelledby="dashboard-title" hidden>
+        <header class="topbar">
+          <div class="brand brand--small">
+            <img src="./assets/mark.svg" alt="" width="40" height="40">
+            <div>
+              <strong>Schäfchen</strong>
+              <span>Schaaf Elektro GmbH</span>
+            </div>
+          </div>
+          <div class="topbar__actions">
+            <span id="connection-state" class="connection-state">
+              <i aria-hidden="true"></i>
+              <span>Online</span>
+            </span>
+            <button id="close-preview" class="avatar-button" type="button" aria-label="Vorschau beenden">D</button>
+          </div>
+        </header>
+
+        <div class="dashboard-content">
+          <div class="welcome-row">
+            <div>
+              <p id="today-label" class="eyebrow">Heute</p>
+              <h1 id="dashboard-title">Guten Morgen</h1>
+            </div>
+            <span class="preview-badge">Vorschau</span>
+          </div>
+
+          <section class="status-card" aria-labelledby="workday-title">
+            <div class="status-card__top">
+              <div id="workday-icon" class="status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
+              </div>
+              <div>
+                <p class="card-label">Dein Arbeitstag</p>
+                <h2 id="workday-title">Noch nicht gestartet</h2>
+              </div>
+              <time id="start-time" class="start-time">– – : – –</time>
+            </div>
+            <button id="primary-action" class="button button--action" type="button">
+              <span id="primary-action-icon" aria-hidden="true">▶</span>
+              <span id="primary-action-label">Arbeitstag starten</span>
+            </button>
+            <p id="action-hint" class="action-hint">Dein nächster logischer Schritt</p>
+          </section>
+
+          <section class="section" aria-labelledby="today-assignment-title">
+            <div class="section-heading">
+              <h2 id="today-assignment-title">Heutiger Einsatz</h2>
+              <button class="text-button planned-feature" type="button">Details</button>
+            </div>
+            <article class="assignment-card assignment-card--empty">
+              <div class="assignment-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M9 20v-6h6v6"/></svg>
+              </div>
+              <div>
+                <h3>Noch keine Baustelle geplant</h3>
+                <p>Deine Wochenplanung erscheint später automatisch hier.</p>
+              </div>
+            </article>
+          </section>
+
+          <section class="section" aria-labelledby="week-title">
+            <div class="section-heading">
+              <h2 id="week-title">Diese Woche</h2>
+              <button class="text-button planned-feature" type="button">Alle Tage</button>
+            </div>
+            <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
+          </section>
+
+          <aside class="info-card">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            <div>
+              <strong>Dies ist die erste PWA-Vorschau.</strong>
+              <p>Aktionen bleiben auf diesem Gerät und werden nach dem Neuladen verworfen.</p>
+            </div>
+          </aside>
+        </div>
+
+        <nav class="bottom-nav" aria-label="Hauptnavigation">
+          <button class="nav-item nav-item--active" type="button" aria-current="page">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 11 9-7 9 7v9H3v-9Z"/><path d="M9 20v-6h6v6"/></svg>
+            <span>Start</span>
+          </button>
+          <button class="nav-item planned-feature" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/></svg>
+            <span>Woche</span>
+          </button>
+          <button class="nav-item planned-feature" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+            <span>Mehr</span>
+          </button>
+        </nav>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

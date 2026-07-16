@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Repository laden
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Docker-Compose validieren
         run: docker compose --env-file .env.example config --quiet
