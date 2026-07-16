@@ -15,7 +15,7 @@ DECLARE
     user_a_id UUID;
     user_b_id UUID;
     project_id UUID;
-    project_number VARCHAR(20);
+    generated_project_number VARCHAR(20);
     version_before BIGINT;
     version_after BIGINT;
 BEGIN
@@ -91,10 +91,10 @@ BEGIN
         CURRENT_DATE + 30
     )
     RETURNING id, project_number, row_version
-    INTO project_id, project_number, version_before;
+    INTO project_id, generated_project_number, version_before;
 
-    IF project_number <> 'SE-' || EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER || '-0001' THEN
-        RAISE EXCEPTION 'Projektnummer wurde nicht korrekt erzeugt: %', project_number;
+    IF generated_project_number <> 'SE-' || EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER || '-0001' THEN
+        RAISE EXCEPTION 'Projektnummer wurde nicht korrekt erzeugt: %', generated_project_number;
     END IF;
 
     INSERT INTO project_locations (company_id, project_id, customer_location_id)

@@ -9,7 +9,7 @@ DECLARE
     customer_a_id UUID;
     customer_b_id UUID;
     location_id UUID;
-    location_number VARCHAR(20);
+    generated_location_number VARCHAR(20);
     version_before BIGINT;
     version_after BIGINT;
 BEGIN
@@ -62,10 +62,10 @@ BEGIN
         TRUE
     )
     RETURNING id, location_number, row_version
-    INTO location_id, location_number, version_before;
+    INTO location_id, generated_location_number, version_before;
 
-    IF location_number <> 'SE-S-00001' THEN
-        RAISE EXCEPTION 'Standortnummer wurde nicht korrekt erzeugt: %', location_number;
+    IF generated_location_number <> 'SE-S-00001' THEN
+        RAISE EXCEPTION 'Standortnummer wurde nicht korrekt erzeugt: %', generated_location_number;
     END IF;
 
     IF NOT EXISTS (

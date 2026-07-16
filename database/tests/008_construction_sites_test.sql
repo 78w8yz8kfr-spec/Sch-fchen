@@ -15,7 +15,7 @@ DECLARE
     project_a_id UUID;
     project_b_id UUID;
     site_id UUID;
-    site_number VARCHAR(24);
+    generated_site_number VARCHAR(24);
     version_before BIGINT;
     version_after BIGINT;
 BEGIN
@@ -97,10 +97,10 @@ BEGIN
         CURRENT_DATE + 14
     )
     RETURNING id, site_number, row_version
-    INTO site_id, site_number, version_before;
+    INTO site_id, generated_site_number, version_before;
 
-    IF site_number <> 'SE-B-' || EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER || '-0001' THEN
-        RAISE EXCEPTION 'Baustellennummer wurde nicht korrekt erzeugt: %', site_number;
+    IF generated_site_number <> 'SE-B-' || EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER || '-0001' THEN
+        RAISE EXCEPTION 'Baustellennummer wurde nicht korrekt erzeugt: %', generated_site_number;
     END IF;
 
     IF NOT EXISTS (
