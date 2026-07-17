@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: schaefchen-online
+    runtime: docker
+    region: frankfurt
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile.production
+    dockerContext: .
+    dockerCommand: sh deploy/render-start.sh
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 10000
+      - key: STATIC_DIRECTORY
+        value: /app/frontend
+      - key: DATABASE_URL
+        fromDatabase:
+          name: schaefchen-postgres
+          property: connectionString
+      - key: API_DB_USER
+        value: schaefchen_api_login
+      - key: API_DB_PASSWORD
+        generateValue: true
+      - key: INITIAL_COMPANY_NUMBER
+        value: F-000001
+      - key: INITIAL_SETUP_TOKEN
+        sync: false
+      - key: SESSION_TTL_SECONDS
+        value: "28800"
+      - key: APP_TIME_ZONE
+        value: Europe/Berlin
+
+databases:
+  - name: schaefchen-postgres
+    databaseName: schaefchen
+    user: schaefchen_owner
+    region: frankfurt
+    plan: free
+    postgresMajorVersion: "17"
+    ipAllowList: []

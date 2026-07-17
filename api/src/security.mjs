@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const SESSION_COOKIE = "schaefchen_session";
 
@@ -8,6 +8,13 @@ export function createSessionToken() {
 
 export function hashSessionToken(token) {
   return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+export function secretsEqual(received, expected) {
+  if (typeof received !== "string" || typeof expected !== "string") return false;
+  const receivedHash = createHash("sha256").update(received, "utf8").digest();
+  const expectedHash = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(receivedHash, expectedHash);
 }
 
 export function parseCookies(header = "") {

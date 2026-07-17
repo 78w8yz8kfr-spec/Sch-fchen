@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 17.07.2026
-Technischer Stand: V0.5-dev
+Technischer Stand: V0.6-dev
 
 ## Abgeschlossen
 
@@ -45,23 +45,29 @@ Technischer Stand: V0.5-dev
 - getrennte technische Login-Rolle ohne eigene Tabellenrechte
 - API-Endpunkte für Sitzung, eigenen Arbeitstag und idempotente Offline-Zeitbuchungen
 - API-Unit-Tests sowie echter PostgreSQL-Integrationstest im GitHub-Workflow
+- Migration 014 und einmalige schlüsselgeschützte Admin-Ersteinrichtung
+- API-Endpunkt für eigene freigegebene Tageseinsätze
+- echter PWA-Login mit benutzergetrennter Offline-Warteschlange und Synchronisation
+- gemeinsame statische PWA-/API-Auslieferung mit Browser-Sicherheitsheadern
+- Produktionscontainer und Render-Blueprint mit automatischem Migrationsstart
 
 ## Noch zu prüfen
 
 - vollständiger lokaler Docker-Start auf einem eigenen Rechner mit Docker
 - Backup-/Restore-Abnahme mit einem dauerhaft gespeicherten lokalen Entwicklungsvolumen; der isolierte CI-Durchlauf ist automatisiert
 - genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden bewusst keine Daten erfunden
-- produktive Bereitstellungsadresse mit TLS und Secret-Verwaltung für die API
-- API-Anbindung der öffentlichen PWA; bis dahin bleibt sie eine gekennzeichnete lokale Vorschau
+- Render-Blueprint einmalig mit dem GitHub-Konto bereitstellen und Online-Adresse abnehmen
+- vor echten Betriebsdaten dauerhafte Tarife, Backups und Aufbewahrungskonzept festlegen
 
 ## Nächster Entwicklungsschritt
 
-Nach der sicheren API-Grundlage folgt deren kontrollierte Produktanbindung:
+Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
-- Reverse Proxy/TLS und produktive Secret-Verwaltung für die API
-- Umschalten der PWA von lokaler Demo auf Login und Offline-Synchronisation
+- Render-Blueprint bereitstellen und erste Admin-Anmeldung abnehmen
+- dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
 - rollenabhängige Wochenplanung und Büroprüfung offener Korrekturen
 - anschließend Montage- und Bautagesberichte mit PDF-Versionierung
 
-Bis zur API-Anbindung bleibt die öffentliche PWA eindeutig als lokale Demo
-gekennzeichnet; ihre Buchungen verlassen das Gerät nicht.
+Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo
+gekennzeichnet; die echte Anmeldung läuft ausschließlich auf der gemeinsamen
+Online-Adresse.

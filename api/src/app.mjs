@@ -5,20 +5,23 @@ import {
   withSessionTransaction,
   withTenantTransaction
 } from "./database.mjs";
-import { verifyPassword } from "./password.mjs";
+import { hashPassword, verifyPassword } from "./password.mjs";
 import {
   createSessionToken,
   hashSessionToken,
   LoginRateLimiter,
   parseCookies,
+  secretsEqual,
   SESSION_COOKIE,
   sessionCookie
 } from "./security.mjs";
+import { securityHeaders, serveStatic } from "./static.mjs";
 import {
   expectedNextTypes,
   InputError,
   localDate,
   readJson,
+  validateInitialSetup,
   validateLogin,
   validateTimeEntry,
   validateWorkDate
@@ -32,10 +35,70 @@ function json(response, status, body, headers = {}) {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(encoded),
     "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
+    ...securityHeaders(),
     ...headers
   });
   response.end(encoded);
+}
+
+async function setupStatus(pool, companyNumber) {
+  return withApiTransaction(pool, async (client) => {
+    const result = await client.query(
+      `SELECT company_number, display_name, setup_required
+       FROM api_get_initial_setup_status($1::VARCHAR)`,
+      [companyNumber]
+    );
+    if (result.rowCount !== 1) {
+      throw new InputError("Die Firma für die Ersteinrichtung wurde nicht gefunden.", 404, "company_not_found");
+    }
+    const row = result.rows[0];
+    return {
+      companyNumber: row.company_number,
+      displayName: row.display_name,
+      setupRequired: row.setup_required
+    };
+  });
+}
+
+async function createInitialAdmin(pool, config, limiter, request, body) {
+  if (!config.initialSetupToken) {
+    throw new InputError("Die Ersteinrichtung ist serverseitig nicht freigeschaltet.", 503, "setup_unavailable");
+  }
+  const input = validateInitialSetup(body);
+  const key = limiter.key(clientIp(request), "setup", config.initialCompanyNumber);
+  if (limiter.isBlocked(key)) {
+    throw new InputError("Zu viele Einrichtungsversuche. Bitte später erneut versuchen.", 429, "rate_limited");
+  }
+  if (!secretsEqual(input.setupToken, config.initialSetupToken)) {
+    limiter.fail(key);
+    throw new InputError("Der Einrichtungsschlüssel ist falsch.", 401, "invalid_setup_token");
+  }
+
+  const status = await setupStatus(pool, config.initialCompanyNumber);
+  if (!status.setupRequired) {
+    throw new InputError("Die Ersteinrichtung ist bereits abgeschlossen.", 409, "setup_completed");
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  await withApiTransaction(pool, async (client) => {
+    await client.query(
+      `SELECT api_create_initial_admin(
+         $1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TEXT
+       )`,
+      [
+        config.initialCompanyNumber,
+        input.personnelNumber,
+        input.firstName,
+        input.lastName,
+        passwordHash
+      ]
+    );
+  });
+  limiter.clear(key);
+  return {
+    companyNumber: config.initialCompanyNumber,
+    personnelNumber: input.personnelNumber
+  };
 }
 
 function clientIp(request) {
@@ -143,6 +206,48 @@ async function getWorkDay(client, context, date) {
     [context.companyId, context.userId, day.id]
   );
   return workDayDto(day, entries.rows);
+}
+
+async function getAssignments(client, context, date) {
+  const result = await client.query(
+    `SELECT
+       assignment.id,
+       assignment.sequence_number,
+       assignment.planned_start_time::TEXT,
+       assignment.planned_duration_minutes,
+       assignment.status,
+       assignment.comment,
+       site.id AS construction_site_id,
+       site.site_number,
+       site.name,
+       site.area_label,
+       site.installer_short_text
+     FROM site_assignments AS assignment
+     JOIN construction_sites AS site
+       ON site.company_id = assignment.company_id
+      AND site.id = assignment.construction_site_id
+     WHERE assignment.company_id = $1
+       AND assignment.user_id = $2
+       AND assignment.work_date = $3
+       AND assignment.status IN ('released', 'completed')
+     ORDER BY assignment.sequence_number`,
+    [context.companyId, context.userId, date]
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    sequenceNumber: row.sequence_number,
+    plannedStartTime: row.planned_start_time,
+    plannedDurationMinutes: row.planned_duration_minutes,
+    status: row.status,
+    comment: row.comment,
+    constructionSite: {
+      id: row.construction_site_id,
+      number: row.site_number,
+      name: row.name,
+      area: row.area_label,
+      shortText: row.installer_short_text
+    }
+  }));
 }
 
 async function insertTimeEntry(client, context, input, timeZone) {
@@ -296,12 +401,29 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { status: "ok" });
       }
 
+      if (request.method === "GET" && url.pathname === "/api/v1/setup") {
+        const setup = await setupStatus(pool, config.initialCompanyNumber);
+        return json(response, 200, { setup });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/setup") {
+        const account = await createInitialAdmin(pool, config, limiter, request, await readJson(request));
+        return json(response, 201, { created: true, account });
+      }
+
       if (request.method === "POST" && url.pathname === "/api/v1/session") {
         const { token, view } = await createLogin(pool, config, limiter, request, await readJson(request));
         return json(response, 201, { session: view }, {
           "Set-Cookie": sessionCookie(token, { secure: config.cookieSecure, maxAge: config.sessionTtlSeconds })
         });
       }
+
+      if (!url.pathname.startsWith("/api/") && await serveStatic(
+        request,
+        response,
+        config.staticDirectory,
+        url.pathname
+      )) return;
 
       const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
       if (!token || token.length < 40 || token.length > 128) {
@@ -332,6 +454,17 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const date = validateWorkDate(workDayMatch[1]);
         const day = await withSessionTransaction(pool, tokenHash, (client, context) => getWorkDay(client, context, date));
         return json(response, 200, { workDay: day });
+      }
+
+      const assignmentMatch = /^\/api\/v1\/site-assignments\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+      if (request.method === "GET" && assignmentMatch) {
+        const date = validateWorkDate(assignmentMatch[1]);
+        const assignments = await withSessionTransaction(
+          pool,
+          tokenHash,
+          (client, context) => getAssignments(client, context, date)
+        );
+        return json(response, 200, { assignments });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/time-entries") {

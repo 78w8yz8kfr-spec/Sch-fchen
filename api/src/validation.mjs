@@ -68,6 +68,21 @@ export function validateLogin(body) {
   };
 }
 
+export function validateInitialSetup(body) {
+  rejectTenantFields(body);
+  const password = text(body.password, "Passwort", 12, 256);
+  if (!/[a-zäöü]/i.test(password) || !/\d/.test(password)) {
+    throw new InputError("Das Passwort benötigt mindestens einen Buchstaben und eine Zahl.");
+  }
+  return {
+    setupToken: text(body.setupToken, "Einrichtungsschlüssel", 24, 512),
+    personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
+    firstName: text(body.firstName, "Vorname", 1, 100),
+    lastName: text(body.lastName, "Nachname", 1, 100),
+    password
+  };
+}
+
 export function validateWorkDate(value) {
   if (typeof value !== "string" || !DATE.test(value)) {
     throw new InputError("Das Datum muss dem Format JJJJ-MM-TT entsprechen.");

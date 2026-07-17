@@ -71,6 +71,14 @@ jobs:
       - name: Node-Abhängigkeiten installieren
         run: npm --prefix api ci --ignore-scripts
 
+      - name: Produktionsstart und PWA syntaktisch prüfen
+        run: |
+          sh -n deploy/render-start.sh
+          make frontend-test
+
+      - name: Produktionsimage bauen
+        run: docker build --file Dockerfile.production --tag schaefchen-online:test .
+
       - name: API-Unit- und PostgreSQL-Integrationstests ausführen
         env:
           API_INTEGRATION_TEST: "true"

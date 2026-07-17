@@ -28,8 +28,10 @@ assert.match(html, /id="open-preview"/);
 assert.match(html, /id="timesheet-section"/);
 assert.match(html, /id="secondary-action"/);
 assert.match(html, /id="reset-demo"/);
+assert.match(html, /id="setup-form"/);
+assert.match(html, /id="company-number"/);
 assert.match(html, /aria-live="polite"/);
-assert.match(html, /Öffentliche Sprint-2-Demo/);
+assert.match(html, /Öffentliche Demo/);
 assert.match(html, /keine GPS-Daten/i);
 assert.doesNotMatch(html, /https?:\/\//, "Die PWA darf keine externen Laufzeitressourcen laden");
 
@@ -46,7 +48,11 @@ assert.match(app, /navigator\.serviceWorker\.register/);
 assert.match(app, /window\.localStorage\.setItem/);
 assert.match(app, /window\.crypto\?\.randomUUID/);
 assert.match(app, /clientEntryId/);
-assert.match(app, /pendingSync: true/);
+assert.match(app, /pendingSync: !demoMode/);
+assert.match(app, /\.\/api\/v1\/session/);
+assert.match(app, /\.\/api\/v1\/setup/);
+assert.match(app, /window\.location\.hostname\.endsWith\("github\.io"\)/);
+assert.match(app, /window\.localStorage\.removeItem\(ONLINE_STORAGE_KEY\)/);
 assert.match(app, /gross >= 360 \? 60 : gross >= 210 \? 30/);
 assert.doesNotMatch(app, /geolocation/i, "Die Demo darf keine GPS- oder Standortabfrage enthalten");
 
@@ -63,6 +69,7 @@ assert.doesNotMatch(mark, /#173c34|#b9e65a/i);
 for (const asset of ["./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./assets/mark.svg"]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
+assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);

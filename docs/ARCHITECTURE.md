@@ -68,11 +68,11 @@ werden nur die für die spätere API benötigten Tabellenrechte erteilt. Die API
 setzt `app.current_company_id` aus der authentifizierten Sitzung; Werte des
 Frontends werden dafür nicht verwendet.
 
-Die erste sichtbare Oberfläche begann als statische PWA-Vorschau und besitzt in
-Sprint 2 einen ausschließlich lokal gespeicherten Demo-Arbeitsfluss. Ihre
-verbindliche Spezifikation steht in
-[`PHASE1_UI_SPEC.md`](PHASE1_UI_SPEC.md). Eine echte Anmeldung und
-Synchronisation werden erst mit der beschriebenen API-Grenze freigeschaltet.
+Die erste sichtbare Oberfläche begann als statische PWA-Vorschau und behält auf
+GitHub Pages einen ausschließlich lokal gespeicherten Demo-Arbeitsfluss. Ihre
+verbindliche Spezifikation steht in [`PHASE1_UI_SPEC.md`](PHASE1_UI_SPEC.md).
+Unter der gemeinsamen Produktionsadresse schaltet dieselbe PWA auf echte
+Anmeldung, eigene Tageseinsätze und idempotente Offline-Synchronisation um.
 
 ## Sprint 1: Kunden, Projekte und Baustellen
 
@@ -104,11 +104,12 @@ Offline-Übertragungen idempotent. Korrekturen werden als referenzierender neuer
 Eintrag genehmigt oder abgelehnt; das Original bleibt erhalten. Für die
 Zeiterfassung wird kein GPS gespeichert.
 
-Die öffentliche PWA-Demo verwendet noch keine API. Sie schreibt gekennzeichnete Demodaten in
-den lokalen Browserspeicher und bildet dort denselben Ereignisablauf und die
-Pausenberechnung ab. Die implementierte API setzt Firma und Benutzer aus der
-Sitzung und synchronisiert jede Client-ID in einer Transaktion. Die Anbindung
-der PWA wird erst aktiviert, wenn eine geschützte API-Adresse bereitsteht.
+Die öffentliche PWA-Demo verwendet keine API. Sie schreibt gekennzeichnete
+Demodaten in den lokalen Browserspeicher und bildet dort denselben
+Ereignisablauf und die Pausenberechnung ab. Im Online-Modus setzt die API Firma
+und Benutzer aus der Sitzung, liefert die eigenen Einsätze und synchronisiert
+jede Client-ID in einer Transaktion. PWA und API teilen dort eine geschützte
+HTTPS-Adresse.
 
 Die vollständigen Feld-, Rechen- und Korrekturregeln stehen in
 [`SPRINT2_TIME_MODEL.md`](SPRINT2_TIME_MODEL.md).

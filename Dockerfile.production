@@ -1,0 +1,23 @@
+FROM node:24-alpine
+
+RUN apk add --no-cache postgresql-client
+
+WORKDIR /app
+
+COPY api/package*.json ./api/
+RUN npm --prefix api ci --omit=dev --ignore-scripts \
+    && npm cache clean --force
+
+COPY api/src ./api/src
+COPY frontend ./frontend
+COPY database ./database
+COPY deploy ./deploy
+
+ENV NODE_ENV=production \
+    API_PORT=10000 \
+    STATIC_DIRECTORY=/app/frontend
+
+USER node
+EXPOSE 10000
+
+CMD ["sh", "deploy/render-start.sh"]

@@ -101,8 +101,9 @@ zwei gekennzeichneten Demo-Baustellen ab. Ereignisse werden ausschließlich in
 `localStorage` auf dem jeweiligen Gerät gespeichert und an keinen Server
 gesendet. Sie bleiben nach einem Neuladen erhalten und können über „Demo
 zurücksetzen“ entfernt werden. Die Demo erzeugt dieselben eindeutigen
-Client-IDs und zeigt die Berechnung live, ersetzt aber noch keine produktive
-API-Synchronisation.
+Client-IDs und zeigt die Berechnung live. Auf der getrennten Online-Adresse
+verwendet die PWA dieselben Client-IDs für die echte API-Synchronisation; die
+GitHub-Pages-Demo selbst sendet weiterhin nichts.
 
 ## Abnahme
 

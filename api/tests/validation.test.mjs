@@ -3,10 +3,42 @@ import test from "node:test";
 import {
   expectedNextTypes,
   localDate,
+  validateInitialSetup,
   validateLogin,
   validateTimeEntry,
   validateWorkDate
 } from "../src/validation.mjs";
+
+test("Ersteinrichtung verlangt lange Schlüssel und starke Passwörter", () => {
+  const setup = validateInitialSetup({
+    setupToken: "CI-SETUP-TOKEN-2026-ONLY-TEST",
+    personnelNumber: "ADMIN-1",
+    firstName: "Schaaf",
+    lastName: "Admin",
+    password: "Schaefchen-Online-2026!"
+  });
+  assert.equal(setup.personnelNumber, "ADMIN-1");
+  assert.throws(
+    () => validateInitialSetup({
+      setupToken: "zu-kurz",
+      personnelNumber: "ADMIN-1",
+      firstName: "Schaaf",
+      lastName: "Admin",
+      password: "Schaefchen-Online-2026!"
+    }),
+    /Einrichtungsschlüssel/
+  );
+  assert.throws(
+    () => validateInitialSetup({
+      setupToken: "CI-SETUP-TOKEN-2026-ONLY-TEST",
+      personnelNumber: "ADMIN-1",
+      firstName: "Schaaf",
+      lastName: "Admin",
+      password: "nur-buchstaben"
+    }),
+    /Buchstaben und eine Zahl/
+  );
+});
 
 test("Login übernimmt keine Mandanten-ID aus dem Client", () => {
   assert.throws(

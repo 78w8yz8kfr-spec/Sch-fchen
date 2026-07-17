@@ -50,3 +50,8 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - `scrypt`-Passwort-Hashing, sichere Cookies, Login-Sperre, exakte Herkunftsprüfung und begrenzte JSON-Anfragen
 - idempotente Offline-Synchronisation mit Schritt-, Zeit-, Baustellen- und Zuweisungsprüfung
 - Docker-API-Dienst, lokale API-Befehle und PostgreSQL-Integrationstest in GitHub Actions
+- Migration 014 für eine einmalige, schlüsselgeschützte Admin-Ersteinrichtung
+- gleicher HTTPS-Ursprung für installierbare PWA und API mit echtem Login
+- mobile Offline-Warteschlange mit idempotenter Synchronisation und benutzergetrenntem Gerätespeicher
+- API für freigegebene eigene Tageseinsätze und serverseitige PWA-Auslieferung mit Sicherheitsheadern
+- Produktionscontainer, automatischer Migrationsstart und Render-Blueprint für Webdienst und PostgreSQL

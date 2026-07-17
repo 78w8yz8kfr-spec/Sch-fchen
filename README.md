@@ -5,7 +5,7 @@ Schäfchen ist eine SaaS-fähige Progressive Web App für Handwerksbetriebe. Die
 ## Projektstand
 
 Phase 0 (Fachkonzept und ER-Modell), Sprint 1 (Auftragsgrundlage), Sprint 2
-(Planung und Zeiterfassung) sowie die sichere API-Grundlage sind umgesetzt.
+(Planung und Zeiterfassung) sowie die sichere Online-Grundlage sind umgesetzt.
 
 Aktuell enthalten:
 
@@ -18,6 +18,7 @@ Aktuell enthalten:
 - mandantengeschützte Kunden-, Standort-, Projekt- und Baustellenstruktur
 - Migrationen `009_create_site_assignments.sql` bis `012_create_time_entries.sql`
 - Migration `013_create_user_sessions.sql` mit widerrufbaren, gehashten Sitzungen
+- Migration `014_create_initial_setup_functions.sql` für die einmalige, geschützte Admin-Ersteinrichtung
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -25,7 +26,8 @@ Aktuell enthalten:
 - Entwicklungs-Seed für die Schaaf Elektro GmbH
 - SQL-Abnahmetests für Nummernvergabe, Status, Historisierung und Mandantenschutz
 - GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
-- mobile, installierbare Sprint-2-PWA-Demo mit lokalem Arbeitsfluss
+- mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
+- Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
 
 ## Öffentliche Vorschau
 
@@ -37,6 +39,14 @@ Die Demo enthält bewusst noch keine echte Anmeldung. Demo-Buchungen werden an
 keinen Server übertragen, aber auf dem jeweiligen Gerät lokal gespeichert und
 bleiben deshalb nach einem Neuladen erhalten. „Demo zurücksetzen“ entfernt sie
 wieder. Es werden keine GPS-Daten abgefragt.
+
+## Online-Betrieb
+
+`render.yaml` stellt Web-App, API und PostgreSQL gemeinsam bereit. Die
+Handy-Anleitung einschließlich der einmaligen sicheren Admin-Ersteinrichtung
+steht in [`docs/ONLINE_DEPLOYMENT.md`](docs/ONLINE_DEPLOYMENT.md). Die
+kostenlose Vorlage ist nur für die Erprobung; vor dem Einsatz mit echten
+Betriebsdaten sind bezahlte, dauerhaft gespeicherte Dienste und Backups nötig.
 
 ## Lokaler Start
 

@@ -1,11 +1,22 @@
 # API-Sicherheitsgrenze
 
 Stand: 17.07.2026  
-Technischer Stand: V0.5-dev
+Technischer Stand: V0.6-dev
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
-öffentliche GitHub-Pages-Demo bleibt lokal, bis eine geschützte API-Adresse mit
-TLS und produktiver Secret-Verwaltung bereitsteht.
+öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
+liefert derselbe HTTPS-Webdienst PWA und API aus, damit das strikte
+Sitzungscookie nie einen fremden Ursprung benötigt.
+
+## Einmalige Ersteinrichtung
+
+`api_get_initial_setup_status` gibt für die fest konfigurierte Startfirma nur
+Name, Nummer und den Einrichtungsstatus zurück. Solange noch kein Benutzer
+existiert, kann `api_create_initial_admin` genau ein Konto mit der aktiven
+Admin-Systemrolle anlegen. Der API-Endpunkt verlangt zusätzlich einen
+mindestens 24 Zeichen langen geheimen Einrichtungsschlüssel, vergleicht ihn
+zeitkonstant und begrenzt Fehlversuche. Das Passwort wird vor der
+Datenbanktransaktion mit `scrypt` gehasht.
 
 ## Anmeldung und Sitzung
 
@@ -45,10 +56,13 @@ API setzt beide Werte ausschließlich selbst.
 | Methode | Pfad | Aufgabe |
 | --- | --- | --- |
 | `GET` | `/health` | Datenbank-Erreichbarkeit ohne Fachdaten prüfen |
+| `GET` | `/api/v1/setup` | Status der einmaligen Ersteinrichtung lesen |
+| `POST` | `/api/v1/setup` | Genau den ersten Admin geschützt anlegen |
 | `POST` | `/api/v1/session` | Mit Firma, Personalnummer und Passwort anmelden |
 | `GET` | `/api/v1/session` | Eigene Firma, Person, Rollen und Ablaufzeit lesen |
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
 | `GET` | `/api/v1/work-days/:date` | Eigenen berechneten Arbeitstag und Ereignisse lesen |
+| `GET` | `/api/v1/site-assignments/:date` | Eigene freigegebene Tageseinsätze lesen |
 | `POST` | `/api/v1/time-entries` | Offline-Zeitereignis idempotent synchronisieren |
 
 Der Zeitendpunkt verlangt eine Client-UUID, Buchungsart und ISO-Zeitpunkte mit
@@ -67,8 +81,10 @@ Migrationen, eingeschränkte Login-Rolle, Tests und API:
 make dev-init
 ```
 
-Der Seed enthält absichtlich keine erfundenen Mitarbeiter-Zugangsdaten. Ein
-Passwort-Hash kann ohne Passwort im Prozessargument erzeugt werden:
+Der Seed enthält absichtlich keine erfundenen Mitarbeiter-Zugangsdaten. Lokal
+kann der erste Admin über denselben Einrichtungsendpunkt angelegt werden. Für
+gezielte Entwicklungstests lässt sich ein Passwort-Hash weiterhin ohne
+Passwort im Prozessargument erzeugen:
 
 ```bash
 read -s PASSWORD
@@ -78,13 +94,13 @@ unset PASSWORD
 
 Der ausgegebene Hash wird serverseitig in `users.password_hash` gespeichert.
 Der Hash und erst recht das Klartextpasswort gehören weder ins Repository noch
-in Browserdaten. Ein späterer Admin-Endpunkt übernimmt diesen manuellen
-Entwicklungsschritt.
+in Browserdaten.
 
 ## Prüfungen
 
 `npm --prefix api test` prüft Hashing, Cookieattribute, Login-Sperre,
-Eingabegrenzen, Mandantenfelder und Schrittfolge. In GitHub Actions kommt ein
-echter PostgreSQL-Ablauf hinzu: Benutzer und Rolle anlegen, anmelden, Sitzung
-lesen, Arbeitsbeginn doppelt übertragen, Feierabend buchen, Arbeitstag lesen,
-abmelden und den widerrufenen Cookie zurückweisen.
+Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder und Schrittfolge. In
+GitHub Actions kommt ein echter PostgreSQL-Ablauf hinzu: ersten Admin anlegen,
+PWA ausliefern, anmelden, Sitzung und Einsätze lesen, Arbeitsbeginn doppelt
+übertragen, Feierabend buchen, Arbeitstag lesen, abmelden und den widerrufenen
+Cookie zurückweisen.

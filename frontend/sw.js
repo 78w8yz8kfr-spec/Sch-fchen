@@ -1,4 +1,4 @@
-const CACHE_NAME = "schaefchen-sprint2-v3";
+const CACHE_NAME = "schaefchen-online-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -31,6 +31,9 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+  if (requestUrl.pathname.startsWith("/api/") || requestUrl.pathname === "/health") {
     return;
   }
 

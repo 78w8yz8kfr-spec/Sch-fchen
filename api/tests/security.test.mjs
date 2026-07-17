@@ -5,6 +5,7 @@ import {
   hashSessionToken,
   LoginRateLimiter,
   parseCookies,
+  secretsEqual,
   sessionCookie
 } from "../src/security.mjs";
 
@@ -33,4 +34,10 @@ test("Login-Sperre greift nach fünf Fehlern und kann zurückgesetzt werden", ()
   assert.equal(limiter.isBlocked(key, 200), true);
   limiter.clear(key);
   assert.equal(limiter.isBlocked(key, 200), false);
+});
+
+test("Einrichtungsschlüssel werden zeitkonstant verglichen", () => {
+  assert.equal(secretsEqual("ein-langer-einrichtungsschluessel", "ein-langer-einrichtungsschluessel"), true);
+  assert.equal(secretsEqual("falsch", "ein-langer-einrichtungsschluessel"), false);
+  assert.equal(secretsEqual(null, "ein-langer-einrichtungsschluessel"), false);
 });
