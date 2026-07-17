@@ -35,3 +35,11 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - idempotente Doppelanwendung aller Migrationen in GitHub Actions
 - automatischer PostgreSQL-Backup-/Restore-Abnahmetest
 - technische Sprint-1-Dokumentation für Kunden, Projekte und Baustellen
+- Migration 009 für mehrfache, geordnete Tagesbaustellen mit Freigabe und Änderungshistorie
+- Migration 010 für mehrere Vorarbeiter, genau einen aktiven Hauptvorarbeiter und automatische Berichtsübergabe
+- Migration 011 für individuelle Wochen-Sollzeiten, berechnete Arbeitstage und Abrechnungssperre
+- Migration 012 für unveränderliche Offline-Zeitereignisse, Client-ID-Dublettenschutz und Korrekturanträge
+- automatische Pausen-, Arbeits-, Fahr- und Mehrarbeitsberechnung mit versionierter Rechenregel
+- SQL-Abnahmetests für Migrationen 009 bis 012 und erweiterte Backup-/Restore-Prüfung
+- interaktive Sprint-2-PWA-Demo mit zwei Einsätzen, lokalem Stundenzettel und dauerhafter Gerätespeicherung
+- vollständige Sprint-2-Dokumentation für Planung, Zeiterfassung, Korrekturen und Offline-Verhalten

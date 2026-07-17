@@ -4,8 +4,8 @@ Schäfchen ist eine SaaS-fähige Progressive Web App für Handwerksbetriebe. Die
 
 ## Projektstand
 
-Phase 0 (Fachkonzept und ER-Modell) und die Datenbankgrundlage aus Sprint 1
-sind abgeschlossen. Als Nächstes folgt Sprint 2 mit Zeiterfassung und Planung.
+Phase 0 (Fachkonzept und ER-Modell), Sprint 1 (Auftragsgrundlage) und der
+technische Sprint 2 (Planung und Zeiterfassung) sind umgesetzt.
 
 Aktuell enthalten:
 
@@ -16,19 +16,24 @@ Aktuell enthalten:
 - Migration `003_create_roles.sql` mit historisierten Mehrfachrollen
 - Migrationen `004_create_customers.sql` bis `008_create_construction_sites.sql`
 - mandantengeschützte Kunden-, Standort-, Projekt- und Baustellenstruktur
+- Migrationen `009_create_site_assignments.sql` bis `012_create_time_entries.sql`
+- historisierte Wochenplanung und automatische Vorarbeiterübergabe
+- Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Entwicklungs-Seed für die Schaaf Elektro GmbH
 - SQL-Abnahmetests für Nummernvergabe, Status, Historisierung und Mandantenschutz
 - GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
-- mobile PWA-Vorschau für Login und Monteur-Dashboard
+- mobile, installierbare Sprint-2-PWA-Demo mit lokalem Arbeitsfluss
 
 ## Öffentliche Vorschau
 
-Die erste sichtbare PWA-Version wird über GitHub Pages veröffentlicht:
+Die sichtbare Sprint-2-Demo wird über GitHub Pages veröffentlicht:
 
 **[Schäfchen-Vorschau öffnen](https://78w8yz8kfr-spec.github.io/Sch-fchen/)**
 
-Die Vorschau enthält bewusst noch keine echte Anmeldung. Eingaben und der
-demonstrierte Arbeitsstatus werden weder übertragen noch dauerhaft gespeichert.
+Die Demo enthält bewusst noch keine echte Anmeldung. Demo-Buchungen werden an
+keinen Server übertragen, aber auf dem jeweiligen Gerät lokal gespeichert und
+bleiben deshalb nach einem Neuladen erhalten. „Demo zurücksetzen“ entfernt sie
+wieder. Es werden keine GPS-Daten abgefragt.
 
 ## Lokaler Start
 
@@ -81,4 +86,6 @@ make frontend-serve # PWA unter http://localhost:4173 öffnen
 - Keine Datenbankänderung ohne Migration, Test und Dokumentationsupdate.
 - LWL ist ausdrücklich nicht Bestandteil von Schäfchen.
 
-Die technische Struktur und der aktuelle Umsetzungsstand stehen unter [`docs/`](docs/).
+Die technische Struktur und der aktuelle Umsetzungsstand stehen unter
+[`docs/`](docs/). Das Sprint-2-Modell ist in
+[`docs/SPRINT2_TIME_MODEL.md`](docs/SPRINT2_TIME_MODEL.md) beschrieben.

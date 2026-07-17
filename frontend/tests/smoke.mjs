@@ -24,16 +24,27 @@ assert.match(html, /lang="de"/);
 assert.match(html, /id="login-view"/);
 assert.match(html, /id="dashboard-view"/);
 assert.match(html, /id="open-preview"/);
+assert.match(html, /id="timesheet-section"/);
+assert.match(html, /id="secondary-action"/);
+assert.match(html, /id="reset-demo"/);
 assert.match(html, /aria-live="polite"/);
-assert.match(html, /Öffentliche Vorschau/);
+assert.match(html, /Öffentliche Sprint-2-Demo/);
+assert.match(html, /keine GPS-Daten/i);
 assert.doesNotMatch(html, /https?:\/\//, "Die PWA darf keine externen Laufzeitressourcen laden");
 
 assert.match(styles, /env\(safe-area-inset-bottom\)/);
 assert.match(styles, /:focus-visible/);
 assert.match(styles, /min-width: 320px/);
+assert.match(styles, /\.time-summary/);
+assert.match(styles, /\.entry-list/);
 
 assert.match(app, /navigator\.serviceWorker\.register/);
-assert.match(app, /Es wurden keine Daten gespeichert/);
+assert.match(app, /window\.localStorage\.setItem/);
+assert.match(app, /window\.crypto\?\.randomUUID/);
+assert.match(app, /clientEntryId/);
+assert.match(app, /pendingSync: true/);
+assert.match(app, /gross >= 360 \? 60 : gross >= 210 \? 30/);
+assert.doesNotMatch(app, /geolocation/i, "Die Demo darf keine GPS- oder Standortabfrage enthalten");
 
 assert.equal(manifest.name, "Schäfchen");
 assert.equal(manifest.display, "standalone");

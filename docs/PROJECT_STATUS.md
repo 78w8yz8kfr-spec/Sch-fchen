@@ -31,6 +31,13 @@ Technischer Stand: V0.4-dev
 - durchgehende Mandanten-Fremdschlüssel, erzwungene RLS-Regeln, Historie und Löschschutz für Migrationen 004 bis 008
 - SQL-Abnahmetests für jede Migration sowie automatischer Backup-/Restore-Test
 - GitHub Pages aktiviert und öffentliche PWA erfolgreich veröffentlicht
+- Migration 009 `site_assignments` mit mehreren geordneten Baustellen pro Tag, Freigabe und Änderungshistorie
+- Migration 010 `site_supervisors` mit mehreren Vorarbeitern, Hauptverantwortung und automatischer Übergabe
+- Migration 011 `work_days` mit individuellem Wochensoll, versionierter Berechnung und Abrechnungssperre
+- Migration 012 `time_entries` mit Offline-ID, Dublettenschutz, unveränderlichen Originalen und Korrekturworkflow
+- automatische Berechnung von Pause, Arbeitszeit, Fahrtzeit und Mehrarbeit
+- SQL-Abnahmetests für Planung, Vorarbeiter, Arbeitstage, Zeitereignisse und Mandantentrennung
+- interaktive PWA-Demo für den vollständigen Monteur-Arbeitsfluss mit lokaler Speicherung
 
 ## Noch zu prüfen
 
@@ -41,17 +48,13 @@ Technischer Stand: V0.4-dev
 
 ## Nächster Entwicklungsschritt
 
-Sprint 2 beginnt mit Zeiterfassung und Wochenplanung:
+Nach der technischen Sprint-2-Abnahme folgt die sichere API-Grenze:
 
-- 009 `site_assignments`
-- 010 `site_supervisors`
-- 011 `work_days`
-- 012 `time_entries`
-- Arbeitszeitberechnung und Live-Stundenzettel
-- Offline-ID und Dublettenvermeidung
-- Korrekturworkflow mit Bürobenachrichtigung
-- Wochenplanung und spontane Umplanung
+- produktive Personalnummer-Anmeldung und kurzlebige Sitzung
+- serverseitige Ermittlung von Firma, Benutzer und wirksamen Rollen
+- idempotente Synchronisation der lokalen `client_entry_id`
+- rollenabhängige Wochenplanung und Büroprüfung offener Korrekturen
+- anschließend Montage- und Bautagesberichte mit PDF-Versionierung
 
-Die produktive Personalnummer-Anmeldung folgt mit der dokumentierten
-Sitzungs-API. Bis dahin bleibt die öffentliche PWA eindeutig als Vorschau
-gekennzeichnet.
+Bis zur API-Anbindung bleibt die öffentliche PWA eindeutig als lokale Demo
+gekennzeichnet; ihre Buchungen verlassen das Gerät nicht.

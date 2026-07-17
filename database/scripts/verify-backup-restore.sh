@@ -77,7 +77,13 @@ BEGIN
             ('projects'),
             ('project_locations'),
             ('project_responsibles'),
-            ('construction_sites')
+            ('construction_sites'),
+            ('site_assignments'),
+            ('site_assignment_history'),
+            ('site_supervisors'),
+            ('site_supervisor_history'),
+            ('work_days'),
+            ('time_entries')
     ) AS required(table_name)
     WHERE TO_REGCLASS('public.' || required.table_name) IS NULL;
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = "schaefchen-preview-v1";
+const CACHE_NAME = "schaefchen-sprint2-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
