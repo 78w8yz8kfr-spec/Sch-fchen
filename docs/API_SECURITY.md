@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 17.07.2026  
-Technischer Stand: V0.8-dev
+Technischer Stand: V0.9.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -69,6 +69,8 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz freigeben |
 | `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung verschieben oder Startzeit ändern |
 | `POST` | `/api/v1/admin/assignments/:id/cancel` | Einsatz mit Begründung stornieren; Historie bleibt erhalten |
+| `POST` | `/api/v1/admin/assignment-imports/preview` | XLSX-Wochenplan prüfen und sichere X-Zuweisungen vorschlagen |
+| `POST` | `/api/v1/admin/assignment-imports` | zuvor prüfbare X-Zuweisungen geschützt importieren |
 | `POST` | `/api/v1/session` | Mit Firma, Personalnummer und Passwort anmelden |
 | `GET` | `/api/v1/session` | Eigene Firma, Person, Rollen und Ablaufzeit lesen |
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
@@ -91,6 +93,14 @@ früheren Rolle `office` bleiben kompatibel, die Rolle wird aber nicht mehr neu
 angeboten. Monteur und Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum
 persönlichen Wechsel des Startpassworts sind Fach- und Verwaltungsendpunkte für
 das neue Konto gesperrt.
+
+Der Excel-Import akzeptiert ausschließlich `.xlsx` bis 1,5 MB. Zusätzlich
+werden Archivstruktur, entpackte Gesamtgröße, Tabellenabmessungen und maximale
+Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
+normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
+sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
+der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
+Sonderkürzel werden lediglich gezählt; V0.9.0 legt daraus keine Fachdaten an.
 
 ## Lokale Inbetriebnahme
 
@@ -123,7 +133,8 @@ Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder und Schrittfolge. In
 GitHub Actions werden Migration und Seed zusätzlich mit einem nicht
 privilegierten, Render-ähnlichen Datenbankeigentümer geprüft. Danach folgt der
 echte PostgreSQL-Ablauf: ersten Admin anlegen, PWA ausliefern, anmelden,
-Planer und Monteur anlegen, Einsatz freigeben, Startpasswort persönlich ändern,
+Planer und Monteur anlegen, Excel-Import vorschauen und doppelt geschützt
+ausführen, Einsatz freigeben, Startpasswort persönlich ändern,
 Rollenverbot prüfen, Einsatz historisiert verschieben und stornieren, Zeiten
 idempotent übertragen, Arbeitstag lesen, abmelden und den widerrufenen Cookie
 zurückweisen.

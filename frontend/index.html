@@ -119,7 +119,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.8.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.9.0</p>
         </div>
       </section>
 
@@ -290,6 +290,36 @@
               </div>
               <p id="assignment-edit-message" class="form-message" aria-live="polite"></p>
             </form>
+
+            <details id="assignment-import-panel" class="admin-panel">
+              <summary>Excel-Wochenplan importieren</summary>
+              <div class="admin-form">
+                <p class="field-help">Geeignet für euren Baustellenplan: Mitarbeiter links, Baustellen in Fünferblöcken und X von Montag bis Freitag.</p>
+                <label id="assignment-import-dropzone" class="file-drop" for="assignment-import-file">
+                  <input
+                    id="assignment-import-file"
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  >
+                  <strong>Excel-Datei auswählen</strong>
+                  <span id="assignment-import-file-name">oder hier ablegen · maximal 1,5 MB</span>
+                </label>
+                <button id="assignment-import-preview-button" class="button button--secondary" type="button" disabled>Excel sicher prüfen</button>
+                <p id="assignment-import-message" class="form-message" aria-live="polite"></p>
+
+                <section id="assignment-import-preview" class="import-preview" aria-labelledby="assignment-import-title" hidden>
+                  <div>
+                    <p class="eyebrow">Importvorschau</p>
+                    <strong id="assignment-import-title">Wochenplan</strong>
+                  </div>
+                  <div id="assignment-import-stats" class="import-stats" aria-label="Importübersicht"></div>
+                  <div id="assignment-import-warnings" class="import-warnings"></div>
+                  <ul id="assignment-import-list" class="import-list" aria-label="Importierbare Einsätze"></ul>
+                  <button id="assignment-import-confirm" class="button button--primary" type="button">Einsätze importieren</button>
+                  <p class="field-help">Bestehende oder nicht eindeutig zugeordnete Tage werden nicht überschrieben.</p>
+                </section>
+              </div>
+            </details>
 
             <details class="admin-panel">
               <summary>Mitarbeiter anlegen</summary>

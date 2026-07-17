@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
@@ -191,6 +192,80 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(siteResponse.status, 201);
   const site = (await siteResponse.json()).site;
   assert.match(site.number, /^SE-B-\d{4}-\d{4}$/);
+
+  const excelEmployeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      personnelNumber: `XLSX-${suffix}`,
+      firstName: "Excel",
+      lastName: "Import",
+      role: "installer",
+      temporaryPassword: "Excel-Import-Start-2026!"
+    })
+  });
+  assert.equal(excelEmployeeResponse.status, 201, await excelEmployeeResponse.clone().text());
+
+  const excelSiteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      customerName: `Excel Kunde ${suffix} GmbH`,
+      projectName: "Excel Baustelle",
+      siteName: "Excel Baustelle",
+      installerShortText: "Excel-Import prüfen",
+      street: "Tabellenweg",
+      houseNumber: "5",
+      postalCode: "12345",
+      city: "Teststadt"
+    })
+  });
+  assert.equal(excelSiteResponse.status, 201, await excelSiteResponse.clone().text());
+
+  const excelContentBase64 = (await readFile(
+    resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/assignment-import.xlsx.base64"),
+    "utf8"
+  )).trim();
+  const excelPayload = { fileName: "Baustellenplan Test.xlsx", contentBase64: excelContentBase64 };
+  const importPreviewResponse = await fetch(`${baseUrl}/api/v1/admin/assignment-imports/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(excelPayload)
+  });
+  assert.equal(importPreviewResponse.status, 200, await importPreviewResponse.clone().text());
+  const importPreview = (await importPreviewResponse.json()).importPreview;
+  assert.equal(importPreview.weekStart, "2026-07-20");
+  assert.equal(importPreview.readyCount, 2);
+  assert.equal(importPreview.ignoredStatusCount, 1);
+
+  const importResponse = await fetch(`${baseUrl}/api/v1/admin/assignment-imports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(excelPayload)
+  });
+  assert.equal(importResponse.status, 201, await importResponse.clone().text());
+  assert.equal((await importResponse.json()).import.importedCount, 2);
+
+  const importedOverviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=2026-07-20`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(importedOverviewResponse.status, 200);
+  const importedOverview = (await importedOverviewResponse.json()).overview;
+  assert.equal(
+    importedOverview.weekAssignments.filter((item) => item.employeeName === "Excel Import").length,
+    2
+  );
+
+  const duplicatePreviewResponse = await fetch(`${baseUrl}/api/v1/admin/assignment-imports/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(excelPayload)
+  });
+  assert.equal(duplicatePreviewResponse.status, 200);
+  const duplicatePreview = (await duplicatePreviewResponse.json()).importPreview;
+  assert.equal(duplicatePreview.readyCount, 0);
+  assert.equal(duplicatePreview.duplicateCount, 2);
 
   const assignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
     method: "POST",

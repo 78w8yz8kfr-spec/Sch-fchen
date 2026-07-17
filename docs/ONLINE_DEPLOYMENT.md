@@ -1,6 +1,13 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.8-dev
+Technischer Stand: V0.9.0
+
+Nach der Anmeldung können Admin, Planer, Projektleiter und Assistenz der
+Geschäftsführung unter **Mehr → Verwaltung → Excel-Wochenplan importieren**
+eine `.xlsx`-Datei auswählen. Erst die Vorschau zeigt, welche X-Zuweisungen
+eindeutig importiert werden können; eine zweite Bestätigung speichert sie.
+Bestehende Mitarbeitertage und nicht eindeutig zugeordnete Namen bleiben
+unverändert.
 
 Die Produktionsvorlage in `render.yaml` startet die PWA, die API und PostgreSQL
 unter einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere

@@ -1018,6 +1018,130 @@ select:focus-visible {
   background: #f8dadd;
 }
 
+.file-drop {
+  display: grid;
+  gap: 5px;
+  padding: 18px;
+  border: 2px dashed #e7a5aa;
+  border-radius: 15px;
+  background: var(--brand-soft);
+  text-align: center;
+  cursor: pointer;
+}
+
+.file-drop--active {
+  border-color: var(--brand);
+  background: #ffdfe2;
+}
+
+.file-drop input {
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.file-drop strong {
+  color: var(--brand-dark);
+  font-size: 0.8rem;
+}
+
+.file-drop span {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.import-preview {
+  display: grid;
+  gap: 12px;
+  padding-top: 5px;
+}
+
+.import-preview > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.import-preview p,
+.import-preview strong {
+  margin: 0;
+}
+
+.import-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+}
+
+.import-stats div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 5px;
+  text-align: center;
+}
+
+.import-stats div + div {
+  border-left: 1px solid var(--line);
+}
+
+.import-stats strong {
+  color: var(--brand);
+  font-size: 1rem;
+}
+
+.import-stats span {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.import-warnings {
+  display: grid;
+  gap: 7px;
+}
+
+.import-warning {
+  padding: 10px 12px;
+  border: 1px solid #edb3b8;
+  border-radius: 12px;
+  color: #6f1118;
+  background: #fff1f2;
+  font-size: 0.67rem;
+  line-height: 1.4;
+}
+
+.import-list {
+  display: grid;
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  list-style: none;
+  background: var(--surface);
+}
+
+.import-list li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.import-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.import-list strong {
+  font-size: 0.7rem;
+}
+
+.import-list span {
+  color: var(--muted);
+  font-size: 0.63rem;
+}
+
 .admin-panel {
   overflow: hidden;
   border: 1px solid var(--line);

@@ -103,6 +103,18 @@
     assignmentEditCancel: document.querySelector("#assignment-edit-cancel"),
     assignmentEditClose: document.querySelector("#assignment-edit-close"),
     assignmentEditMessage: document.querySelector("#assignment-edit-message"),
+    assignmentImportPanel: document.querySelector("#assignment-import-panel"),
+    assignmentImportDropzone: document.querySelector("#assignment-import-dropzone"),
+    assignmentImportFile: document.querySelector("#assignment-import-file"),
+    assignmentImportFileName: document.querySelector("#assignment-import-file-name"),
+    assignmentImportPreviewButton: document.querySelector("#assignment-import-preview-button"),
+    assignmentImportMessage: document.querySelector("#assignment-import-message"),
+    assignmentImportPreview: document.querySelector("#assignment-import-preview"),
+    assignmentImportTitle: document.querySelector("#assignment-import-title"),
+    assignmentImportStats: document.querySelector("#assignment-import-stats"),
+    assignmentImportWarnings: document.querySelector("#assignment-import-warnings"),
+    assignmentImportList: document.querySelector("#assignment-import-list"),
+    assignmentImportConfirm: document.querySelector("#assignment-import-confirm"),
     employeeForm: document.querySelector("#employee-form"),
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
@@ -150,6 +162,9 @@
   let session = null;
   let adminState = null;
   let editingAssignmentId = null;
+  let assignmentImportFile = null;
+  let assignmentImportPayload = null;
+  let assignmentImportState = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -250,7 +265,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.8.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.9.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -330,6 +345,128 @@
 
   function dateFromIso(date) {
     return new Date(`${date}T12:00:00`);
+  }
+
+  function shortDate(date) {
+    return dateFromIso(date).toLocaleDateString("de-DE", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit"
+    });
+  }
+
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 32768) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+    }
+    return window.btoa(binary);
+  }
+
+  function resetAssignmentImportPreview() {
+    assignmentImportPayload = null;
+    assignmentImportState = null;
+    elements.assignmentImportPreview.hidden = true;
+    elements.assignmentImportStats.replaceChildren();
+    elements.assignmentImportWarnings.replaceChildren();
+    elements.assignmentImportList.replaceChildren();
+  }
+
+  function selectAssignmentImportFile(file) {
+    resetAssignmentImportPreview();
+    assignmentImportFile = file || null;
+    elements.assignmentImportMessage.textContent = "";
+    const valid = Boolean(
+      file
+      && file.name.toLocaleLowerCase("de-DE").endsWith(".xlsx")
+      && file.size > 0
+      && file.size <= 1_500_000
+    );
+    elements.assignmentImportPreviewButton.disabled = !valid;
+    if (!file) {
+      elements.assignmentImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      return;
+    }
+    elements.assignmentImportFileName.textContent = `${file.name} · ${Math.ceil(file.size / 1024)} KB`;
+    if (!valid) {
+      elements.assignmentImportMessage.textContent = "Bitte eine .xlsx-Datei mit höchstens 1,5 MB auswählen.";
+    }
+  }
+
+  function addImportStat(value, label) {
+    const item = document.createElement("div");
+    const strong = document.createElement("strong");
+    const span = document.createElement("span");
+    strong.textContent = String(value);
+    span.textContent = label;
+    item.append(strong, span);
+    elements.assignmentImportStats.append(item);
+  }
+
+  function addImportWarning(message) {
+    const warning = document.createElement("p");
+    warning.className = "import-warning";
+    warning.textContent = message;
+    elements.assignmentImportWarnings.append(warning);
+  }
+
+  function importLabelList(items) {
+    return items.slice(0, 8).map((item) => `${item.name} (${item.assignments})`).join(", ")
+      + (items.length > 8 ? ` und ${items.length - 8} weitere` : "");
+  }
+
+  function renderAssignmentImportPreview(preview) {
+    assignmentImportState = preview;
+    elements.assignmentImportPreview.hidden = false;
+    elements.assignmentImportTitle.textContent = `${shortDate(preview.weekStart)} bis ${shortDate(preview.weekEnd)}`;
+    elements.assignmentImportStats.replaceChildren();
+    addImportStat(preview.sourceAssignmentCount, "X gelesen");
+    addImportStat(preview.readyCount, "bereit");
+    addImportStat(preview.sourceAssignmentCount - preview.readyCount, "übersprungen");
+    elements.assignmentImportWarnings.replaceChildren();
+
+    if (preview.unmatchedEmployees.length) {
+      addImportWarning(`Mitarbeiter nicht eindeutig gefunden: ${importLabelList(preview.unmatchedEmployees)}.`);
+    }
+    if (preview.unmatchedSites.length) {
+      addImportWarning(`Baustellen nicht eindeutig gefunden: ${importLabelList(preview.unmatchedSites)}.`);
+    }
+    if (preview.conflicts.length) {
+      const examples = preview.conflicts.slice(0, 5)
+        .map((conflict) => `${conflict.employeeName} am ${shortDate(conflict.workDate)}`)
+        .join(", ");
+      addImportWarning(`${preview.conflicts.length} bereits anders geplanter Tag wird geschützt: ${examples}.`);
+    }
+    if (preview.duplicateCount) {
+      addImportWarning(`${preview.duplicateCount} bereits identische oder doppelte Zuweisung wird nicht erneut angelegt.`);
+    }
+    if (preview.ignoredStatusCount) {
+      const status = Object.entries(preview.statusCounts)
+        .map(([marker, count]) => `${marker}: ${count}`)
+        .join(", ");
+      addImportWarning(`Abwesenheits- und Sonderkürzel werden in dieser Version nur erkannt, nicht importiert (${status}).`);
+    }
+
+    elements.assignmentImportList.replaceChildren();
+    preview.rows.forEach((row) => {
+      const item = document.createElement("li");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      title.textContent = `${shortDate(row.workDate)} · ${row.employeeName}`;
+      meta.textContent = row.siteName;
+      item.append(title, meta);
+      elements.assignmentImportList.append(item);
+    });
+    if (preview.rowsTruncated) {
+      const item = document.createElement("li");
+      item.textContent = "Weitere sichere Zuweisungen sind in der Summe enthalten.";
+      elements.assignmentImportList.append(item);
+    }
+    elements.assignmentImportConfirm.disabled = preview.readyCount === 0;
+    elements.assignmentImportConfirm.textContent = preview.readyCount === 1
+      ? "1 Einsatz importieren"
+      : `${preview.readyCount} Einsätze importieren`;
   }
 
   function appendAdminListItem(list, title, meta) {
@@ -1085,6 +1222,78 @@
     elements.assignmentTime.value = "";
     elements.assignmentComment.value = "";
     await Promise.all([refreshAdmin(), refreshLiveData()]);
+  });
+
+  elements.assignmentImportFile.addEventListener("change", () => {
+    selectAssignmentImportFile(elements.assignmentImportFile.files?.[0] || null);
+  });
+
+  for (const eventName of ["dragenter", "dragover"]) {
+    elements.assignmentImportDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.assignmentImportDropzone.classList.add("file-drop--active");
+    });
+  }
+  for (const eventName of ["dragleave", "drop"]) {
+    elements.assignmentImportDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.assignmentImportDropzone.classList.remove("file-drop--active");
+    });
+  }
+  elements.assignmentImportDropzone.addEventListener("drop", (event) => {
+    selectAssignmentImportFile(event.dataTransfer?.files?.[0] || null);
+  });
+
+  elements.assignmentImportPreviewButton.addEventListener("click", async () => {
+    if (!assignmentImportFile) return;
+    elements.assignmentImportPreviewButton.disabled = true;
+    elements.assignmentImportMessage.textContent = "Excel-Datei wird sicher geprüft …";
+    resetAssignmentImportPreview();
+    try {
+      const contentBase64 = arrayBufferToBase64(await assignmentImportFile.arrayBuffer());
+      assignmentImportPayload = { fileName: assignmentImportFile.name, contentBase64 };
+      const body = await requestJson("./api/v1/admin/assignment-imports/preview", {
+        method: "POST",
+        body: JSON.stringify(assignmentImportPayload)
+      });
+      elements.assignmentImportMessage.textContent = "";
+      renderAssignmentImportPreview(body.importPreview);
+    } catch (error) {
+      assignmentImportPayload = null;
+      elements.assignmentImportMessage.textContent = error.message;
+    } finally {
+      elements.assignmentImportPreviewButton.disabled = false;
+    }
+  });
+
+  elements.assignmentImportConfirm.addEventListener("click", async () => {
+    if (!assignmentImportPayload || !assignmentImportState?.readyCount) return;
+    if (!window.confirm(
+      `${assignmentImportState.readyCount} Einsätze aus Excel freigeben? Bestehende Tage bleiben unverändert.`
+    )) return;
+    elements.assignmentImportConfirm.disabled = true;
+    elements.assignmentImportPreviewButton.disabled = true;
+    elements.assignmentImportMessage.textContent = "Wochenplanung wird sicher gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/admin/assignment-imports", {
+        method: "POST",
+        body: JSON.stringify(assignmentImportPayload)
+      });
+      const importedWeek = body.import.weekStart;
+      const importedCount = body.import.importedCount;
+      assignmentImportFile = null;
+      elements.assignmentImportFile.value = "";
+      elements.assignmentImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      resetAssignmentImportPreview();
+      elements.assignmentImportMessage.textContent = `${importedCount} Einsätze wurden sicher importiert.`;
+      showToast(`${importedCount} Excel-Einsätze sind jetzt in der Wochenplanung.`);
+      await Promise.all([refreshAdmin(importedWeek), refreshLiveData()]);
+    } catch (error) {
+      elements.assignmentImportMessage.textContent = error.message;
+      elements.assignmentImportConfirm.disabled = false;
+    } finally {
+      elements.assignmentImportPreviewButton.disabled = !assignmentImportFile;
+    }
   });
 
   elements.assignmentEditForm.addEventListener("submit", async (event) => {

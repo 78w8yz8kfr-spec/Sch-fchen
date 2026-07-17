@@ -67,3 +67,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - mobile Wochenplanung Montag bis Freitag mit allen Mitarbeitern und Einsätzen
 - begründetes Verschieben und Stornieren von Einsätzen unter Erhalt der Änderungshistorie
 - Versionsstand 0.8.0
+- sicherer Excel-Import für Wochenpläne im vorhandenen Baustellenplan-Format
+- Importvorschau für X-Zuweisungen mit eindeutiger Mitarbeiter- und Baustellenzuordnung
+- Schutz bestehender Mitarbeitertage vor Überschreiben und Dublettenschutz bei Wiederholungen
+- Erkennung von Abwesenheits- und Sonderkürzeln ohne automatische Übernahme
+- Größen-, Dateityp- und Archivprüfung für hochgeladene XLSX-Dateien
+- Versionsstand 0.9.0

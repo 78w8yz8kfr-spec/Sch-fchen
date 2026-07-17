@@ -118,6 +118,13 @@ HTTPS-Adresse.
 Die vollständigen Feld-, Rechen- und Korrekturregeln stehen in
 [`SPRINT2_TIME_MODEL.md`](SPRINT2_TIME_MODEL.md).
 
+Der optionale Excel-Wochenplanimport läuft vollständig über die API. Die PWA
+überträgt eine größenbegrenzte XLSX-Datei, der Server prüft Archiv und
+Tabellenstruktur und ordnet Mitarbeiter sowie Baustellen innerhalb des
+Sitzungsmandanten eindeutig zu. Erst eine Vorschau und eine ausdrückliche
+Bestätigung erzeugen freigegebene `site_assignments`. Bereits vorhandene
+Mitarbeitertage werden unter einer transaktionalen Sperre nicht überschrieben.
+
 ## API-Grundlage
 
 Migration 013 speichert ausschließlich den SHA-256-Hash eines zufälligen

@@ -17,6 +17,11 @@ import {
 } from "./security.mjs";
 import { securityHeaders, serveStatic } from "./static.mjs";
 import {
+  buildAssignmentImportPreview,
+  parseAssignmentWorkbook,
+  validateAssignmentImportPayload
+} from "./assignment-import.mjs";
+import {
   expectedNextTypes,
   InputError,
   localDate,
@@ -435,6 +440,151 @@ async function adminOverview(client, context, date) {
     sites: siteResult.rows.map(siteDto),
     assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
     weekAssignments
+  };
+}
+
+function publicAssignmentImportPreview(preview) {
+  const { readyRows, rows, ...publicPreview } = preview;
+  return {
+    ...publicPreview,
+    rows: rows.slice(0, 250),
+    rowsTruncated: rows.length > 250
+  };
+}
+
+async function prepareAssignmentImport(client, context, plan) {
+  await requirePlanner(client, context);
+  const [employeeResult, siteResult, existingResult] = await Promise.all([
+    client.query(
+      `SELECT id, personnel_number, first_name, last_name
+       FROM users
+       WHERE company_id = $1 AND status = 'active'`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT site.id, site.name, site.installer_short_text,
+              project.name AS project_name
+       FROM construction_sites AS site
+       JOIN projects AS project
+         ON project.company_id = site.company_id AND project.id = site.project_id
+       WHERE site.company_id = $1
+         AND site.status IN ('planned', 'active', 'on_hold', 'delayed')`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT assignment.user_id, assignment.construction_site_id,
+              assignment.work_date, site.name AS site_name
+       FROM site_assignments AS assignment
+       JOIN construction_sites AS site
+         ON site.company_id = assignment.company_id
+        AND site.id = assignment.construction_site_id
+       WHERE assignment.company_id = $1
+         AND assignment.work_date BETWEEN $2 AND $3
+         AND assignment.status <> 'cancelled'`,
+      [context.companyId, plan.weekStart, plan.weekEnd]
+    )
+  ]);
+  return buildAssignmentImportPreview(
+    plan,
+    employeeResult.rows.map((row) => ({
+      id: row.id,
+      personnelNumber: row.personnel_number,
+      firstName: row.first_name,
+      lastName: row.last_name
+    })),
+    siteResult.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      projectName: row.project_name,
+      shortText: row.installer_short_text
+    })),
+    existingResult.rows.map((row) => ({
+      employeeId: row.user_id,
+      siteId: row.construction_site_id,
+      siteName: row.site_name,
+      workDate: databaseDate(row.work_date)
+    }))
+  );
+}
+
+async function importAssignmentsFromWorkbook(client, context, plan, fileName) {
+  const preview = await prepareAssignmentImport(client, context, plan);
+  if (preview.readyRows.length === 0) {
+    throw new InputError(
+      "Es gibt keine sicher importierbaren X-Zuweisungen.",
+      409,
+      "no_importable_assignments"
+    );
+  }
+
+  const groups = new Map();
+  for (const row of preview.readyRows) {
+    const key = `${row.employee.id}:${row.workDate}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  let importedCount = 0;
+  let skippedChangedDays = 0;
+  for (const rows of groups.values()) {
+    const orderedRows = rows.sort((left, right) => left.siteOrder - right.siteOrder);
+    const { employee, workDate } = orderedRows[0];
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`assignment:${context.companyId}:${employee.id}:${workDate}`]
+    );
+    const existing = await client.query(
+      `SELECT 1 FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND work_date = $3
+         AND status <> 'cancelled'
+       LIMIT 1`,
+      [context.companyId, employee.id, workDate]
+    );
+    if (existing.rowCount) {
+      skippedChangedDays += 1;
+      continue;
+    }
+    const sequence = await client.query(
+      `SELECT COALESCE(MAX(sequence_number), 0) AS maximum
+       FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND work_date = $3
+         AND status <> 'cancelled'`,
+      [context.companyId, employee.id, workDate]
+    );
+    let sequenceNumber = Number(sequence.rows[0].maximum) + 1;
+    for (const row of orderedRows) {
+      await client.query(
+        `INSERT INTO site_assignments (
+           company_id, user_id, construction_site_id, work_date,
+           sequence_number, planned_start_time, status, comment,
+           created_by_user_id, changed_by_user_id
+         ) VALUES ($1, $2, $3, $4, $5, NULL, 'released', $6, $7, $7)`,
+        [
+          context.companyId,
+          employee.id,
+          row.site.id,
+          workDate,
+          sequenceNumber,
+          `Excel-Import · ${fileName}`,
+          context.userId
+        ]
+      );
+      sequenceNumber += 1;
+      importedCount += 1;
+    }
+  }
+  if (importedCount === 0) {
+    throw new InputError(
+      "Die Planung wurde zwischen Vorschau und Import geändert. Bitte Excel erneut prüfen.",
+      409,
+      "assignment_import_changed"
+    );
+  }
+  return {
+    importedCount,
+    skippedChangedDays,
+    weekStart: plan.weekStart,
+    weekEnd: plan.weekEnd
   };
 }
 
@@ -906,6 +1056,30 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports/preview") {
+        await withReadySession(pool, tokenHash, requirePlanner);
+        const { workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        const plan = await parseAssignmentWorkbook(workbook);
+        const preview = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => prepareAssignmentImport(client, context, plan)
+        );
+        return json(response, 200, { importPreview: publicAssignmentImportPreview(preview) });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports") {
+        await withReadySession(pool, tokenHash, requirePlanner);
+        const { fileName, workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        const plan = await parseAssignmentWorkbook(workbook);
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => importAssignmentsFromWorkbook(client, context, plan, fileName)
+        );
+        return json(response, 201, { import: result });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/employees") {

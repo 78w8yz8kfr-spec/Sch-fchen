@@ -1,4 +1,4 @@
-const CACHE_NAME = "schaefchen-online-v7";
+const CACHE_NAME = "schaefchen-online-v8";
 const APP_SHELL = [
   "./",
   "./index.html",

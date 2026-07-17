@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 17.07.2026
-Technischer Stand: V0.8-dev
+Technischer Stand: V0.9.0
 
 ## Abgeschlossen
 
@@ -58,6 +58,9 @@ Technischer Stand: V0.8-dev
 - selbstständige iOS-PWA-Cache-Reparatur ohne Löschen lokaler Offline-Fachdaten
 - mobile Wochenplanung Montag bis Freitag mit allen Einsätzen
 - begründetes Verschieben und Stornieren von Einsätzen mit vollständiger Änderungshistorie
+- XLSX-Wochenplanimport für das vorhandene Baustellenplan-Format mit sicherer Vorschau
+- ausschließliche Übernahme eindeutiger X-Zuweisungen; Abwesenheiten und Sonderkürzel bleiben unberührt
+- Schutz bestehender Mitarbeitertage sowie serverseitige Wiederholungs- und Größenprüfung
 
 ## Noch zu prüfen
 

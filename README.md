@@ -29,6 +29,7 @@ Aktuell enthalten:
 - GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
+- sicherer Excel-Wochenplanimport mit Vorschau, eindeutiger Zuordnung und Schutz bestehender Einsätze
 - historisiertes Verschieben und Stornieren freigegebener Einsätze
 - verpflichtender persönlicher Passwortwechsel nach einem Mitarbeiter-Startpasswort
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
