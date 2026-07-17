@@ -27,6 +27,8 @@ Aktuell enthalten:
 - SQL-Abnahmetests für Nummernvergabe, Status, Historisierung und Mandantenschutz
 - GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
+- mobile Admin-/Büroverwaltung für Mitarbeiter, Baustellen und Tageseinsätze
+- verpflichtender persönlicher Passwortwechsel nach einem Mitarbeiter-Startpasswort
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
 
 ## Öffentliche Vorschau

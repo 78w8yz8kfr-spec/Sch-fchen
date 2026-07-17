@@ -85,6 +85,106 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(session.status, 200);
 
   const assignmentDate = localDate(new Date().toISOString(), config.timeZone);
+  const employeePersonnelNumber = `MON-${suffix}`;
+  const employeeTemporaryPassword = "Montage-Start-2026!";
+  const employeePassword = "Montage-Eigen-2026!";
+
+  const initialOverview = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(initialOverview.status, 200);
+  assert.equal((await initialOverview.json()).overview.canCreateOffice, true);
+
+  const employeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      personnelNumber: employeePersonnelNumber,
+      firstName: "Mara",
+      lastName: "Montage",
+      role: "installer",
+      temporaryPassword: employeeTemporaryPassword
+    })
+  });
+  assert.equal(employeeResponse.status, 201);
+  const employee = (await employeeResponse.json()).employee;
+  assert.equal(employee.mustChangePassword, true);
+  assert.deepEqual(employee.roles, ["installer"]);
+
+  const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      customerName: `API Kunde ${suffix} GmbH`,
+      projectName: "API Integration",
+      siteName: `API Baustelle ${suffix}`,
+      installerShortText: "Verteilung prüfen",
+      street: "Testweg",
+      houseNumber: "17",
+      postalCode: "12345",
+      city: "Teststadt"
+    })
+  });
+  assert.equal(siteResponse.status, 201);
+  const site = (await siteResponse.json()).site;
+  assert.match(site.number, /^SE-B-\d{4}-\d{4}$/);
+
+  const assignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      employeeId: employee.id,
+      constructionSiteId: site.id,
+      workDate: assignmentDate,
+      plannedStartTime: "07:30",
+      comment: "API-Test"
+    })
+  });
+  assert.equal(assignmentResponse.status, 201, await assignmentResponse.text());
+
+  const employeeLogin = await fetch(`${baseUrl}/api/v1/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+    body: JSON.stringify({
+      companyNumber: "F-000001",
+      personnelNumber: employeePersonnelNumber,
+      password: employeeTemporaryPassword
+    })
+  });
+  assert.equal(employeeLogin.status, 201);
+  const employeeCookie = employeeLogin.headers.get("set-cookie").split(";", 1)[0];
+  const employeeSession = (await employeeLogin.json()).session;
+  assert.equal(employeeSession.user.mustChangePassword, true);
+  assert.deepEqual(employeeSession.user.roles, ["installer"]);
+
+  const blockedBeforePasswordChange = await fetch(
+    `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(blockedBeforePasswordChange.status, 403);
+
+  const changedPassword = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+    body: JSON.stringify({ newPassword: employeePassword })
+  });
+  assert.equal(changedPassword.status, 200);
+  assert.equal((await changedPassword.json()).session.user.mustChangePassword, false);
+
+  const employeeAssignments = await fetch(
+    `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(employeeAssignments.status, 200);
+  assert.equal((await employeeAssignments.json()).assignments[0].constructionSite.id, site.id);
+
+  const forbiddenOverview = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(forbiddenOverview.status, 403);
+
   const assignments = await fetch(`${baseUrl}/api/v1/site-assignments/${assignmentDate}`, {
     headers: { Cookie: cookie }
   });

@@ -8,6 +8,7 @@ const ENTRY_TYPES = new Set([
   "clock_out"
 ]);
 const SITE_TYPES = new Set(["site_arrival", "site_departure", "next_site"]);
+const EMPLOYEE_ROLES = new Set(["installer", "foreman", "office"]);
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -51,6 +52,25 @@ function text(value, label, minimum, maximum) {
   return normalized;
 }
 
+function optionalText(value, label, maximum) {
+  if (value === undefined || value === null || value === "") return null;
+  return text(value, label, 1, maximum);
+}
+
+function uuid(value, label) {
+  const normalized = text(value, label, 36, 36);
+  if (!UUID.test(normalized)) throw new InputError(`${label} ist keine gültige UUID.`);
+  return normalized;
+}
+
+function password(value) {
+  const normalized = text(value, "Passwort", 12, 256);
+  if (!/[a-zäöü]/i.test(normalized) || !/\d/.test(normalized)) {
+    throw new InputError("Das Passwort benötigt mindestens einen Buchstaben und eine Zahl.");
+  }
+  return normalized;
+}
+
 function rejectTenantFields(body) {
   for (const field of ["companyId", "company_id", "userId", "user_id", "workDayId", "work_day_id"]) {
     if (Object.hasOwn(body, field)) {
@@ -70,17 +90,63 @@ export function validateLogin(body) {
 
 export function validateInitialSetup(body) {
   rejectTenantFields(body);
-  const password = text(body.password, "Passwort", 12, 256);
-  if (!/[a-zäöü]/i.test(password) || !/\d/.test(password)) {
-    throw new InputError("Das Passwort benötigt mindestens einen Buchstaben und eine Zahl.");
-  }
+  const initialPassword = password(body.password);
   return {
     setupToken: text(body.setupToken, "Einrichtungsschlüssel", 24, 512),
     personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
     firstName: text(body.firstName, "Vorname", 1, 100),
     lastName: text(body.lastName, "Nachname", 1, 100),
-    password
+    password: initialPassword
   };
+}
+
+export function validateEmployee(body) {
+  rejectTenantFields(body);
+  const role = text(body.role, "Rolle", 2, 50).toLowerCase();
+  if (!EMPLOYEE_ROLES.has(role)) throw new InputError("Die Mitarbeiterrolle ist ungültig.");
+  return {
+    personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
+    firstName: text(body.firstName, "Vorname", 1, 100),
+    lastName: text(body.lastName, "Nachname", 1, 100),
+    role,
+    temporaryPassword: password(body.temporaryPassword)
+  };
+}
+
+export function validateSiteBundle(body) {
+  rejectTenantFields(body);
+  return {
+    customerName: text(body.customerName, "Kundenname", 2, 200),
+    projectName: optionalText(body.projectName, "Projektname", 200),
+    siteName: text(body.siteName, "Baustellenname", 2, 200),
+    installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    street: text(body.street, "Straße", 1, 150),
+    houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
+    postalCode: text(body.postalCode, "Postleitzahl", 1, 12),
+    city: text(body.city, "Ort", 1, 100)
+  };
+}
+
+export function validateAssignment(body) {
+  if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
+    throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
+  }
+  const plannedStartTime = optionalText(body.plannedStartTime, "Startzeit", 5);
+  if (plannedStartTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedStartTime)) {
+    throw new InputError("Die Startzeit muss dem Format HH:MM entsprechen.");
+  }
+  return {
+    employeeId: uuid(body.employeeId, "Mitarbeiter"),
+    constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
+    workDate: validateWorkDate(body.workDate),
+    plannedStartTime,
+    comment: optionalText(body.comment, "Hinweis", 500)
+  };
+}
+
+export function validateInitialPasswordChange(body) {
+  rejectTenantFields(body);
+  return { newPassword: password(body.newPassword) };
 }
 
 export function validateWorkDate(value) {

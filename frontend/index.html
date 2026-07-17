@@ -54,7 +54,6 @@
               id="personnel-number"
               name="personnel-number"
               type="text"
-              inputmode="numeric"
               autocomplete="username"
               placeholder="Personalnummer"
             >
@@ -120,7 +119,30 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.6</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.7</p>
+        </div>
+      </section>
+
+      <section id="password-change-view" class="view login-view" aria-labelledby="password-change-title" hidden>
+        <div class="login-card">
+          <div class="brand brand--large">
+            <img src="./assets/mark.svg" alt="" width="56" height="56">
+            <div>
+              <p class="eyebrow">Erste Anmeldung</p>
+              <h1 id="password-change-title">Eigenes Passwort</h1>
+            </div>
+          </div>
+          <div class="preview-note password-change-note" role="note">
+            <p>Das Startpasswort war nur für die Übergabe. Lege jetzt dein persönliches Passwort fest.</p>
+          </div>
+          <form id="password-change-form" class="login-form" novalidate>
+            <label for="new-password">Neues Passwort</label>
+            <input id="new-password" name="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+            <label for="confirm-password">Passwort wiederholen</label>
+            <input id="confirm-password" name="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+            <button id="password-change-submit" class="button button--primary" type="submit">Passwort speichern</button>
+            <p id="password-change-message" class="form-message" aria-live="polite"></p>
+          </form>
         </div>
       </section>
 
@@ -214,6 +236,115 @@
               <button id="show-week" class="text-button" type="button">Alle Tage</button>
             </div>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
+          </section>
+
+          <section id="admin-section" class="section admin-section" aria-labelledby="admin-title" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Admin und Büro</p>
+                <h2 id="admin-title">Verwaltung</h2>
+              </div>
+              <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
+            </div>
+            <p class="admin-intro">Mitarbeiter, Baustellen und freigegebene Einsätze – einfach direkt vom Handy.</p>
+
+            <div class="admin-summary" aria-label="Verwaltungsübersicht">
+              <div><strong id="admin-employee-count">0</strong><span>Mitarbeiter</span></div>
+              <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
+              <div><strong id="admin-assignment-count">0</strong><span>Einsätze</span></div>
+            </div>
+
+            <details class="admin-panel">
+              <summary>Mitarbeiter anlegen</summary>
+              <form id="employee-form" class="admin-form" novalidate>
+                <div class="setup-grid">
+                  <div>
+                    <label for="employee-first-name">Vorname</label>
+                    <input id="employee-first-name" maxlength="100" autocomplete="off" required>
+                  </div>
+                  <div>
+                    <label for="employee-last-name">Nachname</label>
+                    <input id="employee-last-name" maxlength="100" autocomplete="off" required>
+                  </div>
+                </div>
+                <label for="employee-personnel-number">Personalnummer</label>
+                <input id="employee-personnel-number" maxlength="30" autocomplete="off" required>
+                <label for="employee-role">Rolle</label>
+                <select id="employee-role" required>
+                  <option value="installer">Monteur</option>
+                  <option value="foreman">Vorarbeiter</option>
+                  <option id="employee-office-role" value="office">Büro</option>
+                </select>
+                <label for="employee-temporary-password">Startpasswort</label>
+                <input id="employee-temporary-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+                <p class="field-help">Mindestens 12 Zeichen mit Buchstabe und Zahl. Der Mitarbeiter muss es beim ersten Login ändern.</p>
+                <button class="button button--primary" type="submit">Mitarbeiter sicher anlegen</button>
+                <p id="employee-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="employee-list" class="admin-list" aria-label="Aktive Mitarbeiter"></ul>
+            </details>
+
+            <details class="admin-panel">
+              <summary>Baustelle anlegen</summary>
+              <form id="site-form" class="admin-form" novalidate>
+                <label for="site-customer-name">Kunde/Firma</label>
+                <input id="site-customer-name" maxlength="200" autocomplete="organization" required>
+                <label for="site-name">Baustellenname</label>
+                <input id="site-name" maxlength="200" required>
+                <label for="site-project-name">Projektname <span>(optional)</span></label>
+                <input id="site-project-name" maxlength="200">
+                <label for="site-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
+                <input id="site-short-text" maxlength="300" placeholder="z. B. Verteilung erneuern">
+                <div class="address-grid">
+                  <div>
+                    <label for="site-street">Straße</label>
+                    <input id="site-street" maxlength="150" autocomplete="street-address" required>
+                  </div>
+                  <div>
+                    <label for="site-house-number">Nr.</label>
+                    <input id="site-house-number" maxlength="20" required>
+                  </div>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="site-postal-code">PLZ</label>
+                    <input id="site-postal-code" maxlength="12" inputmode="numeric" autocomplete="postal-code" required>
+                  </div>
+                  <div>
+                    <label for="site-city">Ort</label>
+                    <input id="site-city" maxlength="100" autocomplete="address-level2" required>
+                  </div>
+                </div>
+                <button class="button button--primary" type="submit">Kunde und Baustelle anlegen</button>
+                <p id="site-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="site-list" class="admin-list" aria-label="Aktive Baustellen"></ul>
+            </details>
+
+            <details class="admin-panel" open>
+              <summary>Einsatz zuweisen</summary>
+              <form id="assignment-form" class="admin-form" novalidate>
+                <label for="assignment-employee">Mitarbeiter</label>
+                <select id="assignment-employee" required></select>
+                <label for="assignment-site">Baustelle</label>
+                <select id="assignment-site" required></select>
+                <div class="setup-grid">
+                  <div>
+                    <label for="assignment-date">Datum</label>
+                    <input id="assignment-date" type="date" required>
+                  </div>
+                  <div>
+                    <label for="assignment-time">Startzeit</label>
+                    <input id="assignment-time" type="time">
+                  </div>
+                </div>
+                <label for="assignment-comment">Hinweis <span>(optional)</span></label>
+                <input id="assignment-comment" maxlength="500">
+                <button class="button button--primary" type="submit">Einsatz freigeben</button>
+                <p id="assignment-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="admin-assignment-list" class="admin-list" aria-label="Freigegebene Einsätze"></ul>
+            </details>
           </section>
 
           <aside class="info-card">

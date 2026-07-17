@@ -22,6 +22,7 @@
 
   const elements = {
     loginView: document.querySelector("#login-view"),
+    passwordChangeView: document.querySelector("#password-change-view"),
     dashboardView: document.querySelector("#dashboard-view"),
     loginForm: document.querySelector("#login-form"),
     loginMessage: document.querySelector("#login-message"),
@@ -39,6 +40,11 @@
     setupToken: document.querySelector("#setup-token"),
     setupSubmit: document.querySelector("#setup-submit"),
     setupMessage: document.querySelector("#setup-message"),
+    passwordChangeForm: document.querySelector("#password-change-form"),
+    newPassword: document.querySelector("#new-password"),
+    confirmPassword: document.querySelector("#confirm-password"),
+    passwordChangeSubmit: document.querySelector("#password-change-submit"),
+    passwordChangeMessage: document.querySelector("#password-change-message"),
     modeNote: document.querySelector("#mode-note"),
     modeNoteText: document.querySelector("#mode-note-text"),
     openPreview: document.querySelector("#open-preview"),
@@ -79,6 +85,39 @@
     navWeek: document.querySelector("#nav-week"),
     navMore: document.querySelector("#nav-more"),
     infoCard: document.querySelector(".info-card"),
+    adminSection: document.querySelector("#admin-section"),
+    adminRefresh: document.querySelector("#admin-refresh"),
+    adminEmployeeCount: document.querySelector("#admin-employee-count"),
+    adminSiteCount: document.querySelector("#admin-site-count"),
+    adminAssignmentCount: document.querySelector("#admin-assignment-count"),
+    employeeForm: document.querySelector("#employee-form"),
+    employeeFirstName: document.querySelector("#employee-first-name"),
+    employeeLastName: document.querySelector("#employee-last-name"),
+    employeePersonnelNumber: document.querySelector("#employee-personnel-number"),
+    employeeRole: document.querySelector("#employee-role"),
+    employeeOfficeRole: document.querySelector("#employee-office-role"),
+    employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
+    employeeMessage: document.querySelector("#employee-message"),
+    employeeList: document.querySelector("#employee-list"),
+    siteForm: document.querySelector("#site-form"),
+    siteCustomerName: document.querySelector("#site-customer-name"),
+    siteName: document.querySelector("#site-name"),
+    siteProjectName: document.querySelector("#site-project-name"),
+    siteShortText: document.querySelector("#site-short-text"),
+    siteStreet: document.querySelector("#site-street"),
+    siteHouseNumber: document.querySelector("#site-house-number"),
+    sitePostalCode: document.querySelector("#site-postal-code"),
+    siteCity: document.querySelector("#site-city"),
+    siteMessage: document.querySelector("#site-message"),
+    siteList: document.querySelector("#site-list"),
+    assignmentForm: document.querySelector("#assignment-form"),
+    assignmentEmployee: document.querySelector("#assignment-employee"),
+    assignmentSite: document.querySelector("#assignment-site"),
+    assignmentDate: document.querySelector("#assignment-date"),
+    assignmentTime: document.querySelector("#assignment-time"),
+    assignmentComment: document.querySelector("#assignment-comment"),
+    assignmentMessage: document.querySelector("#assignment-message"),
+    adminAssignmentList: document.querySelector("#admin-assignment-list"),
     toast: document.querySelector("#toast")
   };
 
@@ -96,6 +135,7 @@
   let toastTimer;
   let syncing = false;
   let session = null;
+  let adminState = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -196,7 +236,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.6 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.7 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -217,6 +257,7 @@
 
   function showDashboard() {
     elements.loginView.hidden = true;
+    elements.passwordChangeView.hidden = true;
     elements.dashboardView.hidden = false;
     document.title = "Start · Schäfchen";
     render();
@@ -225,6 +266,7 @@
 
   function showLogin() {
     elements.dashboardView.hidden = true;
+    elements.passwordChangeView.hidden = true;
     elements.loginView.hidden = false;
     elements.setupForm.hidden = true;
     elements.loginForm.hidden = false;
@@ -234,6 +276,7 @@
   }
 
   function showSetup(setup) {
+    elements.passwordChangeView.hidden = true;
     elements.companyNumber.value = setup.companyNumber;
     elements.companyNumber.readOnly = true;
     elements.loginForm.hidden = true;
@@ -242,6 +285,144 @@
     const strong = document.createElement("strong");
     strong.textContent = setup.displayName;
     elements.modeNoteText.append(strong, document.createElement("br"), "Die Online-App benötigt einmalig ihren ersten Administrator.");
+  }
+
+  function showPasswordChange() {
+    elements.loginView.hidden = true;
+    elements.dashboardView.hidden = true;
+    elements.passwordChangeView.hidden = false;
+    elements.newPassword.value = "";
+    elements.confirmPassword.value = "";
+    elements.passwordChangeMessage.textContent = "";
+    document.title = "Passwort ändern · Schäfchen";
+  }
+
+  function canPlan() {
+    return !demoMode && Boolean(session?.user.roles?.some((role) => role === "admin" || role === "office"));
+  }
+
+  function appendAdminListItem(list, title, meta) {
+    const item = document.createElement("li");
+    const strong = document.createElement("strong");
+    const span = document.createElement("span");
+    strong.textContent = title;
+    span.textContent = meta;
+    item.append(strong, span);
+    list.append(item);
+  }
+
+  function renderAdminSelect(select, items, placeholder, label) {
+    const selected = select.value;
+    select.replaceChildren();
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = placeholder;
+    select.append(empty);
+    items.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = label(item);
+      select.append(option);
+    });
+    if (items.some((item) => item.id === selected)) select.value = selected;
+  }
+
+  function renderAdmin() {
+    if (!adminState) return;
+    elements.adminEmployeeCount.textContent = String(adminState.employees.length);
+    elements.adminSiteCount.textContent = String(adminState.sites.length);
+    elements.adminAssignmentCount.textContent = String(adminState.assignments.length);
+    elements.employeeOfficeRole.hidden = !adminState.canCreateOffice;
+    if (!adminState.canCreateOffice && elements.employeeRole.value === "office") {
+      elements.employeeRole.value = "installer";
+    }
+
+    renderAdminSelect(
+      elements.assignmentEmployee,
+      adminState.employees,
+      "Mitarbeiter auswählen",
+      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
+    );
+    renderAdminSelect(
+      elements.assignmentSite,
+      adminState.sites,
+      "Baustelle auswählen",
+      (site) => `${site.name} · ${site.address.city}`
+    );
+
+    elements.employeeList.replaceChildren();
+    adminState.employees.forEach((employee) => {
+      const roleLabels = {
+        admin: "Admin",
+        office: "Büro",
+        foreman: "Vorarbeiter",
+        installer: "Monteur"
+      };
+      appendAdminListItem(
+        elements.employeeList,
+        `${employee.firstName} ${employee.lastName}`,
+        `${employee.personnelNumber} · ${employee.roles.map((role) => roleLabels[role] || role).join(", ")}`
+      );
+    });
+
+    elements.siteList.replaceChildren();
+    adminState.sites.forEach((site) => {
+      appendAdminListItem(
+        elements.siteList,
+        site.name,
+        `${site.customerName} · ${site.address.street} ${site.address.houseNumber}, ${site.address.postalCode} ${site.address.city}`
+      );
+    });
+
+    elements.adminAssignmentList.replaceChildren();
+    if (adminState.assignments.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = `Für ${adminState.date} ist noch kein Einsatz freigegeben.`;
+      elements.adminAssignmentList.append(empty);
+    } else {
+      adminState.assignments.forEach((assignment) => {
+        const start = assignment.plannedStartTime ? `${assignment.plannedStartTime.slice(0, 5)} Uhr` : "ohne Startzeit";
+        appendAdminListItem(
+          elements.adminAssignmentList,
+          `${assignment.sequenceNumber}. ${assignment.employeeName}`,
+          `${start} · ${assignment.siteName}`
+        );
+      });
+    }
+  }
+
+  async function refreshAdmin(date = elements.assignmentDate.value || localDateKey()) {
+    if (!canPlan()) return;
+    elements.adminRefresh.disabled = true;
+    try {
+      const body = await requestJson(`./api/v1/admin/overview?date=${encodeURIComponent(date)}`);
+      adminState = body.overview;
+      elements.assignmentDate.value = adminState.date;
+      renderAdmin();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) showToast(error.message);
+    } finally {
+      elements.adminRefresh.disabled = false;
+    }
+  }
+
+  async function submitAdminForm(form, messageElement, requestPath, payload, successMessage) {
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    messageElement.textContent = "Wird sicher gespeichert …";
+    try {
+      await requestJson(requestPath, { method: "POST", body: JSON.stringify(payload) });
+      messageElement.textContent = "";
+      showToast(successMessage);
+      return true;
+    } catch (error) {
+      messageElement.textContent = error.message;
+      return false;
+    } finally {
+      submit.disabled = false;
+    }
   }
 
   function currentSiteIndex() {
@@ -608,16 +789,23 @@
     if (cachedUserId && cachedUserId !== sessionView.user.id) {
       state = initialState();
       assignments = [];
+      adminState = null;
     }
     session = sessionView;
     cachedUserId = session.user.id;
     saveState();
+    if (session.user.mustChangePassword) {
+      showPasswordChange();
+      return;
+    }
     elements.dashboardCompany.textContent = session.company.displayName;
     elements.companyNumber.value = session.company.number;
     elements.dashboardTitle.textContent = `Guten Morgen, ${session.user.firstName}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
+    elements.adminSection.hidden = !canPlan();
+    if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();
-    await refreshLiveData();
+    await Promise.all([refreshLiveData(), refreshAdmin()]);
     await syncPendingEntries();
   }
 
@@ -695,6 +883,95 @@
     }
   });
 
+  elements.passwordChangeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (elements.newPassword.value !== elements.confirmPassword.value) {
+      elements.passwordChangeMessage.textContent = "Die beiden Passwörter stimmen nicht überein.";
+      return;
+    }
+    elements.passwordChangeSubmit.disabled = true;
+    elements.passwordChangeMessage.textContent = "Passwort wird sicher gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/account/initial-password", {
+        method: "POST",
+        body: JSON.stringify({ newPassword: elements.newPassword.value })
+      });
+      await enterLiveDashboard(body.session);
+      showToast("Dein persönliches Passwort ist gespeichert.");
+    } catch (error) {
+      elements.passwordChangeMessage.textContent = error.message;
+    } finally {
+      elements.passwordChangeSubmit.disabled = false;
+    }
+  });
+
+  elements.employeeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const saved = await submitAdminForm(
+      elements.employeeForm,
+      elements.employeeMessage,
+      "./api/v1/admin/employees",
+      {
+        firstName: elements.employeeFirstName.value,
+        lastName: elements.employeeLastName.value,
+        personnelNumber: elements.employeePersonnelNumber.value,
+        role: elements.employeeRole.value,
+        temporaryPassword: elements.employeeTemporaryPassword.value
+      },
+      "Mitarbeiter angelegt · Startpasswort sicher übergeben."
+    );
+    if (!saved) return;
+    elements.employeeForm.reset();
+    await refreshAdmin();
+  });
+
+  elements.siteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const saved = await submitAdminForm(
+      elements.siteForm,
+      elements.siteMessage,
+      "./api/v1/admin/sites",
+      {
+        customerName: elements.siteCustomerName.value,
+        projectName: elements.siteProjectName.value,
+        siteName: elements.siteName.value,
+        installerShortText: elements.siteShortText.value,
+        street: elements.siteStreet.value,
+        houseNumber: elements.siteHouseNumber.value,
+        postalCode: elements.sitePostalCode.value,
+        city: elements.siteCity.value
+      },
+      "Kunde und Baustelle wurden angelegt."
+    );
+    if (!saved) return;
+    elements.siteForm.reset();
+    await refreshAdmin();
+  });
+
+  elements.assignmentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const saved = await submitAdminForm(
+      elements.assignmentForm,
+      elements.assignmentMessage,
+      "./api/v1/admin/assignments",
+      {
+        employeeId: elements.assignmentEmployee.value,
+        constructionSiteId: elements.assignmentSite.value,
+        workDate: elements.assignmentDate.value,
+        plannedStartTime: elements.assignmentTime.value,
+        comment: elements.assignmentComment.value
+      },
+      "Einsatz freigegeben · auf dem Mitarbeiter-Handy sichtbar."
+    );
+    if (!saved) return;
+    elements.assignmentTime.value = "";
+    elements.assignmentComment.value = "";
+    await Promise.all([refreshAdmin(), refreshLiveData()]);
+  });
+
+  elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
+  elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
+
   elements.togglePassword.addEventListener("click", () => {
     const show = elements.passwordInput.type === "password";
     elements.passwordInput.type = show ? "text" : "password";
@@ -707,6 +984,7 @@
     try {
       await requestJson("./api/v1/session", { method: "DELETE" });
       session = null;
+      adminState = null;
       cachedUserId = null;
       assignments = [];
       state = initialState();
@@ -744,7 +1022,8 @@
   });
   elements.navMore.addEventListener("click", () => {
     activateNavigation(elements.navMore);
-    elements.infoCard.scrollIntoView({ behavior: "smooth", block: "center" });
+    (canPlan() ? elements.adminSection : elements.infoCard)
+      .scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   elements.todayLabel.textContent = dateFormatter.format(new Date());

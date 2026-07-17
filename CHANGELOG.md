@@ -58,3 +58,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Render-Fix: Migrationseigentümer darf RLS für Schemaaufbau umgehen, während die API-Rolle weiterhin vollständig RLS-gebunden bleibt
 - zusätzlicher CI-Migrationslauf mit einem nicht privilegierten Render-ähnlichen Datenbankeigentümer
 - Render-kompatible Härtung der technischen Login-Rolle ohne verbotene Superuser-Attributänderung
+- mobile Verwaltung unter „Mehr“ für Mitarbeiter, Kunden-/Projekt-/Baustellenpakete und freigegebene Einsätze
+- serverseitige Rollenprüfung: Admin und Büro planen, ausschließlich Admin darf Bürokonten anlegen
+- persönliche Startpasswort-Änderung bei der ersten Anmeldung neuer Mitarbeiter
+- PostgreSQL-Integrationstest für Verwaltung, Rollentrennung, Passwortwechsel und sichtbare Mitarbeiterzuweisung

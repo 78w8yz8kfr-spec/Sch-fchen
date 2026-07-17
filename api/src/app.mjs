@@ -21,8 +21,12 @@ import {
   InputError,
   localDate,
   readJson,
+  validateAssignment,
+  validateEmployee,
+  validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
+  validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
 } from "./validation.mjs";
@@ -250,6 +254,323 @@ async function getAssignments(client, context, date) {
   }));
 }
 
+async function activeRoleKeys(client, context) {
+  const result = await client.query(
+    `SELECT role.role_key
+     FROM user_roles AS assignment
+     JOIN roles AS role
+       ON role.company_id = assignment.company_id
+      AND role.id = assignment.role_id
+     WHERE assignment.company_id = $1
+       AND assignment.user_id = $2
+       AND assignment.revoked_at IS NULL
+       AND role.status = 'active'`,
+    [context.companyId, context.userId]
+  );
+  return new Set(result.rows.map((row) => row.role_key));
+}
+
+async function requirePlanner(client, context) {
+  const roles = await activeRoleKeys(client, context);
+  if (!roles.has("admin") && !roles.has("office")) {
+    throw new InputError("Diese Funktion ist nur für Admin und Büro freigeschaltet.", 403, "forbidden");
+  }
+  return roles;
+}
+
+async function requirePasswordReady(client, context) {
+  const result = await client.query(
+    "SELECT must_change_password FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+    [context.companyId, context.userId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Das Benutzerkonto ist nicht mehr aktiv.", 401, "unauthorized");
+  }
+  if (result.rows[0].must_change_password) {
+    throw new InputError("Bitte zuerst das Startpasswort ändern.", 403, "password_change_required");
+  }
+}
+
+async function withReadySession(pool, tokenHash, callback) {
+  return withSessionTransaction(pool, tokenHash, async (client, context) => {
+    await requirePasswordReady(client, context);
+    return callback(client, context);
+  });
+}
+
+function employeeDto(row) {
+  return {
+    id: row.id,
+    personnelNumber: row.personnel_number,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    roles: row.roles,
+    mustChangePassword: row.must_change_password
+  };
+}
+
+function siteDto(row) {
+  return {
+    id: row.id,
+    number: row.site_number,
+    name: row.name,
+    shortText: row.installer_short_text,
+    customerName: row.customer_name,
+    projectName: row.project_name,
+    address: {
+      street: row.street,
+      houseNumber: row.house_number,
+      postalCode: row.postal_code,
+      city: row.city
+    }
+  };
+}
+
+async function adminOverview(client, context, date) {
+  const roles = await requirePlanner(client, context);
+  const [employeeResult, siteResult, assignmentResult] = await Promise.all([
+    client.query(
+      `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
+              account.must_change_password,
+              COALESCE(
+                jsonb_agg(role.role_key ORDER BY role.role_key)
+                  FILTER (WHERE role.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS roles
+       FROM users AS account
+       LEFT JOIN user_roles AS role_assignment
+         ON role_assignment.company_id = account.company_id
+        AND role_assignment.user_id = account.id
+        AND role_assignment.revoked_at IS NULL
+       LEFT JOIN roles AS role
+         ON role.company_id = role_assignment.company_id
+        AND role.id = role_assignment.role_id
+        AND role.status = 'active'
+       WHERE account.company_id = $1 AND account.status = 'active'
+       GROUP BY account.id
+       ORDER BY LOWER(account.last_name), LOWER(account.first_name), account.personnel_number`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT site.id, site.site_number, site.name, site.installer_short_text,
+              project.name AS project_name,
+              customer.company_name AS customer_name,
+              location.street, location.house_number, location.postal_code, location.city
+       FROM construction_sites AS site
+       JOIN projects AS project
+         ON project.company_id = site.company_id AND project.id = site.project_id
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       LEFT JOIN customer_locations AS location
+         ON location.company_id = site.company_id AND location.id = site.customer_location_id
+       WHERE site.company_id = $1
+         AND site.status IN ('planned', 'active', 'on_hold', 'delayed')
+       ORDER BY LOWER(site.name), site.site_number`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
+              assignment.sequence_number, assignment.planned_start_time::TEXT,
+              account.first_name, account.last_name, site.name AS site_name
+       FROM site_assignments AS assignment
+       JOIN users AS account
+         ON account.company_id = assignment.company_id AND account.id = assignment.user_id
+       JOIN construction_sites AS site
+         ON site.company_id = assignment.company_id AND site.id = assignment.construction_site_id
+       WHERE assignment.company_id = $1
+         AND assignment.work_date = $2
+         AND assignment.status IN ('draft', 'released')
+       ORDER BY LOWER(account.last_name), LOWER(account.first_name), assignment.sequence_number`,
+      [context.companyId, date]
+    )
+  ]);
+
+  return {
+    date,
+    canCreateOffice: roles.has("admin"),
+    employees: employeeResult.rows.map(employeeDto),
+    sites: siteResult.rows.map(siteDto),
+    assignments: assignmentResult.rows.map((row) => ({
+      id: row.id,
+      employeeId: row.user_id,
+      constructionSiteId: row.construction_site_id,
+      sequenceNumber: row.sequence_number,
+      plannedStartTime: row.planned_start_time,
+      employeeName: `${row.first_name} ${row.last_name}`,
+      siteName: row.site_name
+    }))
+  };
+}
+
+async function createEmployee(client, context, input) {
+  const roles = await requirePlanner(client, context);
+  if (input.role === "office" && !roles.has("admin")) {
+    throw new InputError("Nur ein Admin darf ein Bürokonto anlegen.", 403, "forbidden");
+  }
+  const duplicate = await client.query(
+    "SELECT 1 FROM users WHERE company_id = $1 AND personnel_number = $2",
+    [context.companyId, input.personnelNumber]
+  );
+  if (duplicate.rowCount) {
+    throw new InputError("Diese Personalnummer ist bereits vergeben.", 409, "personnel_number_exists");
+  }
+  const roleResult = await client.query(
+    "SELECT id FROM roles WHERE company_id = $1 AND role_key = $2 AND status = 'active'",
+    [context.companyId, input.role]
+  );
+  if (roleResult.rowCount !== 1) throw new InputError("Die gewählte Rolle ist nicht verfügbar.");
+
+  const passwordHash = await hashPassword(input.temporaryPassword);
+  const inserted = await client.query(
+    `INSERT INTO users (
+       company_id, personnel_number, first_name, last_name, password_hash, must_change_password
+     ) VALUES ($1, $2, $3, $4, $5, TRUE)
+     RETURNING id, personnel_number, first_name, last_name, must_change_password`,
+    [context.companyId, input.personnelNumber, input.firstName, input.lastName, passwordHash]
+  );
+  await client.query(
+    `INSERT INTO user_roles (company_id, user_id, role_id, assigned_by_user_id, reason)
+     VALUES ($1, $2, $3, $4, 'Anlage in der Verwaltung')`,
+    [context.companyId, inserted.rows[0].id, roleResult.rows[0].id, context.userId]
+  );
+  return employeeDto({ ...inserted.rows[0], roles: [input.role] });
+}
+
+async function createSiteBundle(client, context, input) {
+  await requirePlanner(client, context);
+  const customer = await client.query(
+    `INSERT INTO customers (
+       company_id, customer_type, company_name,
+       billing_street, billing_house_number, billing_postal_code, billing_city
+     ) VALUES ($1, 'company', $2, $3, $4, $5, $6)
+     RETURNING id, customer_number`,
+    [context.companyId, input.customerName, input.street, input.houseNumber, input.postalCode, input.city]
+  );
+  const location = await client.query(
+    `INSERT INTO customer_locations (
+       company_id, customer_id, name, location_type, street, house_number,
+       postal_code, city, is_billing_location
+     ) VALUES ($1, $2, $3, 'construction', $4, $5, $6, $7, TRUE)
+     RETURNING id, location_number`,
+    [
+      context.companyId,
+      customer.rows[0].id,
+      input.siteName,
+      input.street,
+      input.houseNumber,
+      input.postalCode,
+      input.city
+    ]
+  );
+  const project = await client.query(
+    `INSERT INTO projects (
+       company_id, customer_id, name, status, installer_short_text
+     ) VALUES ($1, $2, $3, 'active', $4)
+     RETURNING id, project_number`,
+    [context.companyId, customer.rows[0].id, input.projectName || input.siteName, input.installerShortText]
+  );
+  await client.query(
+    `INSERT INTO project_locations (company_id, project_id, customer_location_id)
+     VALUES ($1, $2, $3)`,
+    [context.companyId, project.rows[0].id, location.rows[0].id]
+  );
+  const site = await client.query(
+    `INSERT INTO construction_sites (
+       company_id, project_id, customer_location_id, name, installer_short_text, status
+     ) VALUES ($1, $2, $3, $4, $5, 'active')
+     RETURNING id, site_number, name, installer_short_text`,
+    [context.companyId, project.rows[0].id, location.rows[0].id, input.siteName, input.installerShortText]
+  );
+  return siteDto({
+    ...site.rows[0],
+    customer_name: input.customerName,
+    project_name: input.projectName || input.siteName,
+    street: input.street,
+    house_number: input.houseNumber,
+    postal_code: input.postalCode,
+    city: input.city
+  });
+}
+
+async function createAssignment(client, context, input) {
+  await requirePlanner(client, context);
+  const [employee, site] = await Promise.all([
+    client.query(
+      "SELECT 1 FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+      [context.companyId, input.employeeId]
+    ),
+    client.query(
+      `SELECT 1 FROM construction_sites
+       WHERE company_id = $1 AND id = $2
+         AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+      [context.companyId, input.constructionSiteId]
+    )
+  ]);
+  if (employee.rowCount !== 1) throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  if (site.rowCount !== 1) throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
+
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`assignment:${context.companyId}:${input.employeeId}:${input.workDate}`]
+  );
+  const sequence = await client.query(
+    `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_sequence
+     FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND work_date = $3 AND status <> 'cancelled'`,
+    [context.companyId, input.employeeId, input.workDate]
+  );
+  const inserted = await client.query(
+    `INSERT INTO site_assignments (
+       company_id, user_id, construction_site_id, work_date, sequence_number,
+       planned_start_time, status, comment, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, 'released', $7, $8, $8)
+     RETURNING id, sequence_number, planned_start_time::TEXT`,
+    [
+      context.companyId,
+      input.employeeId,
+      input.constructionSiteId,
+      input.workDate,
+      sequence.rows[0].next_sequence,
+      input.plannedStartTime,
+      input.comment,
+      context.userId
+    ]
+  );
+  return {
+    id: inserted.rows[0].id,
+    employeeId: input.employeeId,
+    constructionSiteId: input.constructionSiteId,
+    workDate: input.workDate,
+    sequenceNumber: inserted.rows[0].sequence_number,
+    plannedStartTime: inserted.rows[0].planned_start_time
+  };
+}
+
+async function changeInitialPassword(client, context, newPassword) {
+  const account = await client.query(
+    "SELECT must_change_password FROM users WHERE company_id = $1 AND id = $2 AND status = 'active' FOR UPDATE",
+    [context.companyId, context.userId]
+  );
+  if (account.rowCount !== 1) throw new InputError("Das Benutzerkonto ist nicht mehr aktiv.", 401, "unauthorized");
+  if (!account.rows[0].must_change_password) {
+    throw new InputError("Das Startpasswort wurde bereits geändert.", 409, "password_already_changed");
+  }
+  const passwordHash = await hashPassword(newPassword);
+  await client.query(
+    `UPDATE users
+     SET password_hash = $3, must_change_password = FALSE, password_changed_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, context.userId, passwordHash]
+  );
+  await client.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP, revocation_reason = 'initial_password_changed'
+     WHERE company_id = $1 AND user_id = $2 AND id <> $3 AND revoked_at IS NULL`,
+    [context.companyId, context.userId, context.sessionId]
+  );
+  return sessionView(client, context);
+}
+
 async function insertTimeEntry(client, context, input, timeZone) {
   const workDate = localDate(input.recordedAt, timeZone);
   await client.query(
@@ -449,17 +770,67 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { loggedOut: true });
       }
 
+      if (request.method === "POST" && url.pathname === "/api/v1/account/initial-password") {
+        const input = validateInitialPasswordChange(await readJson(request));
+        const view = await withSessionTransaction(
+          pool,
+          tokenHash,
+          (client, context) => changeInitialPassword(client, context, input.newPassword)
+        );
+        return json(response, 200, { changed: true, session: view });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/overview") {
+        const date = validateWorkDate(url.searchParams.get("date") || localDate(new Date().toISOString(), config.timeZone));
+        const overview = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => adminOverview(client, context, date)
+        );
+        return json(response, 200, { overview });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/employees") {
+        const input = validateEmployee(await readJson(request));
+        const employee = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createEmployee(client, context, input)
+        );
+        return json(response, 201, { employee });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/sites") {
+        const input = validateSiteBundle(await readJson(request));
+        const site = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createSiteBundle(client, context, input)
+        );
+        return json(response, 201, { site });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/assignments") {
+        const input = validateAssignment(await readJson(request));
+        const assignment = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createAssignment(client, context, input)
+        );
+        return json(response, 201, { assignment });
+      }
+
       const workDayMatch = /^\/api\/v1\/work-days\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
       if (request.method === "GET" && workDayMatch) {
         const date = validateWorkDate(workDayMatch[1]);
-        const day = await withSessionTransaction(pool, tokenHash, (client, context) => getWorkDay(client, context, date));
+        const day = await withReadySession(pool, tokenHash, (client, context) => getWorkDay(client, context, date));
         return json(response, 200, { workDay: day });
       }
 
       const assignmentMatch = /^\/api\/v1\/site-assignments\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
       if (request.method === "GET" && assignmentMatch) {
         const date = validateWorkDate(assignmentMatch[1]);
-        const assignments = await withSessionTransaction(
+        const assignments = await withReadySession(
           pool,
           tokenHash,
           (client, context) => getAssignments(client, context, date)
@@ -469,7 +840,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
 
       if (request.method === "POST" && url.pathname === "/api/v1/time-entries") {
         const input = validateTimeEntry(await readJson(request));
-        const entry = await withSessionTransaction(
+        const entry = await withReadySession(
           pool,
           tokenHash,
           (client, context) => insertTimeEntry(client, context, input, config.timeZone)

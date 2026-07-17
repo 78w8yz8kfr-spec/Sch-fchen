@@ -37,7 +37,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -47,6 +48,11 @@ button {
 
 button:focus-visible,
 input:focus-visible {
+  outline: 3px solid rgba(227, 6, 19, 0.28);
+  outline-offset: 2px;
+}
+
+select:focus-visible {
   outline: 3px solid rgba(227, 6, 19, 0.28);
   outline-offset: 2px;
 }
@@ -161,6 +167,10 @@ input:focus-visible {
   padding: 13px 14px;
 }
 
+.password-change-note {
+  margin-top: 24px;
+}
+
 .preview-note svg,
 .info-card svg {
   width: 20px;
@@ -236,7 +246,9 @@ input:focus-visible {
   font-size: 0.72rem;
 }
 
-.login-form input {
+.login-form input,
+.admin-form input,
+.admin-form select {
   width: 100%;
   height: 52px;
   border: 1px solid #cfd9d3;
@@ -295,6 +307,11 @@ input:focus-visible {
 
 .button:active {
   transform: translateY(1px) scale(0.995);
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .button--secondary {
@@ -791,6 +808,148 @@ input:focus-visible {
 .info-card {
   margin-top: 27px;
   padding: 15px;
+}
+
+.admin-section {
+  scroll-margin-top: 96px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 23px;
+  background: var(--surface);
+  box-shadow: 0 16px 38px rgba(17, 17, 17, 0.08);
+}
+
+.admin-intro {
+  margin: -3px 0 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.admin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.admin-summary div {
+  display: grid;
+  gap: 3px;
+  padding: 13px 6px;
+  text-align: center;
+}
+
+.admin-summary div + div {
+  border-left: 1px solid var(--line);
+}
+
+.admin-summary strong {
+  color: var(--brand);
+  font-size: 1.15rem;
+}
+
+.admin-summary span {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.admin-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.admin-panel + .admin-panel {
+  margin-top: 10px;
+}
+
+.admin-panel summary {
+  min-height: 54px;
+  padding: 17px;
+  color: var(--ink);
+  font-size: 0.83rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.admin-panel[open] summary {
+  border-bottom: 1px solid var(--line);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.admin-form {
+  display: grid;
+  gap: 9px;
+  padding: 16px;
+}
+
+.admin-form label {
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.admin-form label span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.admin-form .button {
+  margin-top: 7px;
+}
+
+.field-help {
+  margin: -2px 0 3px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.address-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(74px, 1fr);
+  gap: 10px;
+}
+
+.address-grid > div,
+.admin-form .setup-grid > div {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-list {
+  display: grid;
+  margin: 0;
+  padding: 0 16px 16px;
+  list-style: none;
+}
+
+.admin-list li {
+  display: grid;
+  gap: 3px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-list strong {
+  font-size: 0.76rem;
+}
+
+.admin-list span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.admin-list .admin-list__empty {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
 }
 
 .info-card strong {

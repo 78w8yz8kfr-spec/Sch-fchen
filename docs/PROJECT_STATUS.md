@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 17.07.2026
-Technischer Stand: V0.6-dev
+Technischer Stand: V0.7-dev
 
 ## Abgeschlossen
 
@@ -51,6 +51,10 @@ Technischer Stand: V0.6-dev
 - gemeinsame statische PWA-/API-Auslieferung mit Browser-Sicherheitsheadern
 - Produktionscontainer und Render-Blueprint mit automatischem Migrationsstart
 - Render-kompatible Trennung zwischen nicht privilegiertem Datenbankeigentümer und RLS-gebundener API-Rolle
+- rollenabhängige mobile Verwaltung für Mitarbeiter, Baustellen und freigegebene Tageseinsätze
+- vereinfachte Baustellenanlage, die Kunde, Standort und Projekt konsistent in einer Transaktion erzeugt
+- verpflichtender persönlicher Passwortwechsel nach der Übergabe eines Mitarbeiter-Startpassworts
+- API- und Oberflächenprüfung für Admin/Büro im PostgreSQL-Integrationslauf
 
 ## Noch zu prüfen
 
@@ -64,9 +68,8 @@ Technischer Stand: V0.6-dev
 
 Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
-- Render-Blueprint bereitstellen und erste Admin-Anmeldung abnehmen
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
-- rollenabhängige Wochenplanung und Büroprüfung offener Korrekturen
+- vollständige Wochenansicht und Büroprüfung offener Korrekturen
 - anschließend Montage- und Bautagesberichte mit PDF-Versionierung
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo

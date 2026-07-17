@@ -3,8 +3,12 @@ import test from "node:test";
 import {
   expectedNextTypes,
   localDate,
+  validateAssignment,
+  validateEmployee,
+  validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
+  validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
 } from "../src/validation.mjs";
@@ -36,6 +40,56 @@ test("Ersteinrichtung verlangt lange Schlüssel und starke Passwörter", () => {
       lastName: "Admin",
       password: "nur-buchstaben"
     }),
+    /Buchstaben und eine Zahl/
+  );
+});
+
+test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () => {
+  const employee = validateEmployee({
+    personnelNumber: "M-17",
+    firstName: "Mara",
+    lastName: "Montage",
+    role: "installer",
+    temporaryPassword: "Startpasswort-2026"
+  });
+  assert.equal(employee.role, "installer");
+  assert.throws(
+    () => validateEmployee({ ...employee, role: "admin", temporaryPassword: "Startpasswort-2026" }),
+    /Mitarbeiterrolle/
+  );
+
+  const site = validateSiteBundle({
+    customerName: "Musterkunde GmbH",
+    projectName: "Verteilung",
+    siteName: "Musterstraße 12",
+    installerShortText: "Verteilung erneuern",
+    street: "Musterstraße",
+    houseNumber: "12",
+    postalCode: "12345",
+    city: "Musterstadt"
+  });
+  assert.equal(site.city, "Musterstadt");
+
+  const assignment = validateAssignment({
+    employeeId: "11111111-1111-4111-8111-111111111111",
+    constructionSiteId: "22222222-2222-4222-8222-222222222222",
+    workDate: "2026-07-20",
+    plannedStartTime: "07:30"
+  });
+  assert.equal(assignment.plannedStartTime, "07:30");
+  assert.throws(
+    () => validateAssignment({ ...assignment, plannedStartTime: "25:30" }),
+    /Startzeit/
+  );
+});
+
+test("Startpasswortwechsel nutzt dieselben Passwortregeln", () => {
+  assert.equal(
+    validateInitialPasswordChange({ newPassword: "Eigenes-Passwort-2026" }).newPassword,
+    "Eigenes-Passwort-2026"
+  );
+  assert.throws(
+    () => validateInitialPasswordChange({ newPassword: "keine-zahl-hier" }),
     /Buchstaben und eine Zahl/
   );
 });
