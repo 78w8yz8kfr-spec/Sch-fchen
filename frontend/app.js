@@ -113,8 +113,23 @@
     assignmentImportTitle: document.querySelector("#assignment-import-title"),
     assignmentImportStats: document.querySelector("#assignment-import-stats"),
     assignmentImportWarnings: document.querySelector("#assignment-import-warnings"),
+    assignmentImportMappings: document.querySelector("#assignment-import-mappings"),
+    assignmentImportMappingFields: document.querySelector("#assignment-import-mapping-fields"),
+    assignmentImportApplyMappings: document.querySelector("#assignment-import-apply-mappings"),
     assignmentImportList: document.querySelector("#assignment-import-list"),
     assignmentImportConfirm: document.querySelector("#assignment-import-confirm"),
+    siteImportPanel: document.querySelector("#site-import-panel"),
+    siteImportDropzone: document.querySelector("#site-import-dropzone"),
+    siteImportFile: document.querySelector("#site-import-file"),
+    siteImportFileName: document.querySelector("#site-import-file-name"),
+    siteImportPreviewButton: document.querySelector("#site-import-preview-button"),
+    siteImportMessage: document.querySelector("#site-import-message"),
+    siteImportPreview: document.querySelector("#site-import-preview"),
+    siteImportTitle: document.querySelector("#site-import-title"),
+    siteImportStats: document.querySelector("#site-import-stats"),
+    siteImportWarnings: document.querySelector("#site-import-warnings"),
+    siteImportList: document.querySelector("#site-import-list"),
+    siteImportConfirm: document.querySelector("#site-import-confirm"),
     employeeForm: document.querySelector("#employee-form"),
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
@@ -165,6 +180,9 @@
   let assignmentImportFile = null;
   let assignmentImportPayload = null;
   let assignmentImportState = null;
+  let siteImportFile = null;
+  let siteImportPayload = null;
+  let siteImportState = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -265,7 +283,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.9.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.10.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -302,6 +320,14 @@
     document.title = "Schäfchen";
     elements.passwordInput.value = "";
     elements.loginMessage.textContent = "";
+    assignmentImportFile = null;
+    elements.assignmentImportFile.value = "";
+    elements.assignmentImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+    resetAssignmentImportPreview();
+    siteImportFile = null;
+    elements.siteImportFile.value = "";
+    elements.siteImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+    resetSiteImportPreview();
   }
 
   function showSetup(setup) {
@@ -370,6 +396,8 @@
     elements.assignmentImportPreview.hidden = true;
     elements.assignmentImportStats.replaceChildren();
     elements.assignmentImportWarnings.replaceChildren();
+    elements.assignmentImportMappings.hidden = true;
+    elements.assignmentImportMappingFields.replaceChildren();
     elements.assignmentImportList.replaceChildren();
   }
 
@@ -394,14 +422,14 @@
     }
   }
 
-  function addImportStat(value, label) {
+  function addImportStat(container, value, label) {
     const item = document.createElement("div");
     const strong = document.createElement("strong");
     const span = document.createElement("span");
     strong.textContent = String(value);
     span.textContent = label;
     item.append(strong, span);
-    elements.assignmentImportStats.append(item);
+    container.append(item);
   }
 
   function addImportWarning(message) {
@@ -416,14 +444,53 @@
       + (items.length > 8 ? ` und ${items.length - 8} weitere` : "");
   }
 
+  function addAssignmentMapping(kind, item, targets, targetLabel) {
+    const wrapper = document.createElement("div");
+    const label = document.createElement("label");
+    const select = document.createElement("select");
+    const empty = document.createElement("option");
+    wrapper.className = "import-mapping-field";
+    label.textContent = `Excel: ${item.name} (${item.assignments}×)`;
+    empty.value = "";
+    empty.textContent = "Bitte zuordnen oder nicht übernehmen";
+    select.dataset.mappingKind = kind;
+    select.dataset.sourceLabel = item.name;
+    select.append(empty);
+    targets.forEach((target) => {
+      const option = document.createElement("option");
+      option.value = target.id;
+      option.textContent = targetLabel(target);
+      select.append(option);
+    });
+    wrapper.append(label, select);
+    elements.assignmentImportMappingFields.append(wrapper);
+  }
+
+  function renderAssignmentMappings(preview) {
+    elements.assignmentImportMappingFields.replaceChildren();
+    preview.unmatchedEmployees.forEach((item) => addAssignmentMapping(
+      "employees",
+      item,
+      adminState?.employees || [],
+      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
+    ));
+    preview.unmatchedSites.forEach((item) => addAssignmentMapping(
+      "sites",
+      item,
+      adminState?.sites || [],
+      (site) => `${site.name} · ${site.address.city}`
+    ));
+    elements.assignmentImportMappings.hidden = elements.assignmentImportMappingFields.children.length === 0;
+  }
+
   function renderAssignmentImportPreview(preview) {
     assignmentImportState = preview;
     elements.assignmentImportPreview.hidden = false;
     elements.assignmentImportTitle.textContent = `${shortDate(preview.weekStart)} bis ${shortDate(preview.weekEnd)}`;
     elements.assignmentImportStats.replaceChildren();
-    addImportStat(preview.sourceAssignmentCount, "X gelesen");
-    addImportStat(preview.readyCount, "bereit");
-    addImportStat(preview.sourceAssignmentCount - preview.readyCount, "übersprungen");
+    addImportStat(elements.assignmentImportStats, preview.sourceAssignmentCount, "X gelesen");
+    addImportStat(elements.assignmentImportStats, preview.readyCount, "bereit");
+    addImportStat(elements.assignmentImportStats, preview.sourceAssignmentCount - preview.readyCount, "übersprungen");
     elements.assignmentImportWarnings.replaceChildren();
 
     if (preview.unmatchedEmployees.length) {
@@ -447,6 +514,7 @@
         .join(", ");
       addImportWarning(`Abwesenheits- und Sonderkürzel werden in dieser Version nur erkannt, nicht importiert (${status}).`);
     }
+    renderAssignmentMappings(preview);
 
     elements.assignmentImportList.replaceChildren();
     preview.rows.forEach((row) => {
@@ -467,6 +535,78 @@
     elements.assignmentImportConfirm.textContent = preview.readyCount === 1
       ? "1 Einsatz importieren"
       : `${preview.readyCount} Einsätze importieren`;
+  }
+
+  function resetSiteImportPreview() {
+    siteImportPayload = null;
+    siteImportState = null;
+    elements.siteImportPreview.hidden = true;
+    elements.siteImportStats.replaceChildren();
+    elements.siteImportWarnings.replaceChildren();
+    elements.siteImportList.replaceChildren();
+  }
+
+  function selectSiteImportFile(file) {
+    resetSiteImportPreview();
+    siteImportFile = file || null;
+    elements.siteImportMessage.textContent = "";
+    const valid = Boolean(
+      file
+      && file.name.toLocaleLowerCase("de-DE").endsWith(".xlsx")
+      && file.size > 0
+      && file.size <= 1_500_000
+    );
+    elements.siteImportPreviewButton.disabled = !valid;
+    if (!file) {
+      elements.siteImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      return;
+    }
+    elements.siteImportFileName.textContent = `${file.name} · ${Math.ceil(file.size / 1024)} KB`;
+    if (!valid) elements.siteImportMessage.textContent = "Bitte eine .xlsx-Datei mit höchstens 1,5 MB auswählen.";
+  }
+
+  function renderSiteImportPreview(preview) {
+    siteImportState = preview;
+    elements.siteImportPreview.hidden = false;
+    elements.siteImportTitle.textContent = `${preview.sourceRowCount} gelesene Zeilen`;
+    elements.siteImportStats.replaceChildren();
+    addImportStat(elements.siteImportStats, preview.sourceRowCount, "gelesen");
+    addImportStat(elements.siteImportStats, preview.readyCount, "bereit");
+    addImportStat(elements.siteImportStats, preview.duplicateCount + preview.conflictCount, "übersprungen");
+    elements.siteImportWarnings.replaceChildren();
+    if (preview.duplicates.length) {
+      addImportWarningTo(
+        elements.siteImportWarnings,
+        `${preview.duplicates.length} vorhandene Baustelle wird nicht doppelt angelegt: ${preview.duplicates.slice(0, 5).map((item) => item.siteName).join(", ")}.`
+      );
+    }
+    if (preview.conflicts.length) {
+      addImportWarningTo(
+        elements.siteImportWarnings,
+        `${preview.conflicts.length} fehlerhafte oder nicht eindeutige Zeile: ${preview.conflicts.slice(0, 5).map((item) => `Zeile ${item.sourceRow}: ${item.message}`).join(" · ")}.`
+      );
+    }
+    elements.siteImportList.replaceChildren();
+    preview.rows.forEach((row) => {
+      const item = document.createElement("li");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      title.textContent = `${row.siteName} · ${row.customerName}`;
+      meta.textContent = `${row.address} · Kunde ${row.customerAction === "existing" ? "vorhanden" : "wird neu angelegt"}`;
+      item.append(title, meta);
+      elements.siteImportList.append(item);
+    });
+    elements.siteImportConfirm.disabled = preview.readyCount === 0;
+    elements.siteImportConfirm.textContent = preview.readyCount === 1
+      ? "1 Baustelle importieren"
+      : `${preview.readyCount} Baustellen importieren`;
+  }
+
+  function addImportWarningTo(container, message) {
+    const warning = document.createElement("p");
+    warning.className = "import-warning";
+    warning.textContent = message;
+    container.append(warning);
   }
 
   function appendAdminListItem(list, title, meta) {
@@ -1251,7 +1391,11 @@
     resetAssignmentImportPreview();
     try {
       const contentBase64 = arrayBufferToBase64(await assignmentImportFile.arrayBuffer());
-      assignmentImportPayload = { fileName: assignmentImportFile.name, contentBase64 };
+      assignmentImportPayload = {
+        fileName: assignmentImportFile.name,
+        contentBase64,
+        mappings: { employees: [], sites: [] }
+      };
       const body = await requestJson("./api/v1/admin/assignment-imports/preview", {
         method: "POST",
         body: JSON.stringify(assignmentImportPayload)
@@ -1263,6 +1407,44 @@
       elements.assignmentImportMessage.textContent = error.message;
     } finally {
       elements.assignmentImportPreviewButton.disabled = false;
+    }
+  });
+
+  elements.assignmentImportApplyMappings.addEventListener("click", async () => {
+    if (!assignmentImportPayload) return;
+    const mappings = {
+      employees: [...(assignmentImportPayload.mappings?.employees || [])],
+      sites: [...(assignmentImportPayload.mappings?.sites || [])]
+    };
+    let selectedCount = 0;
+    elements.assignmentImportMappingFields.querySelectorAll("select").forEach((select) => {
+      if (!select.value) return;
+      const list = mappings[select.dataset.mappingKind];
+      const sourceLabel = select.dataset.sourceLabel;
+      const existingIndex = list.findIndex((mapping) => mapping.sourceLabel === sourceLabel);
+      const mapping = { sourceLabel, targetId: select.value };
+      if (existingIndex >= 0) list[existingIndex] = mapping;
+      else list.push(mapping);
+      selectedCount += 1;
+    });
+    if (selectedCount === 0) {
+      elements.assignmentImportMessage.textContent = "Bitte mindestens eine Zuordnung auswählen.";
+      return;
+    }
+    assignmentImportPayload = { ...assignmentImportPayload, mappings };
+    elements.assignmentImportApplyMappings.disabled = true;
+    elements.assignmentImportMessage.textContent = "Zuordnung wird sicher geprüft …";
+    try {
+      const body = await requestJson("./api/v1/admin/assignment-imports/preview", {
+        method: "POST",
+        body: JSON.stringify(assignmentImportPayload)
+      });
+      elements.assignmentImportMessage.textContent = "Zuordnung übernommen.";
+      renderAssignmentImportPreview(body.importPreview);
+    } catch (error) {
+      elements.assignmentImportMessage.textContent = error.message;
+    } finally {
+      elements.assignmentImportApplyMappings.disabled = false;
     }
   });
 
@@ -1293,6 +1475,77 @@
       elements.assignmentImportConfirm.disabled = false;
     } finally {
       elements.assignmentImportPreviewButton.disabled = !assignmentImportFile;
+    }
+  });
+
+  elements.siteImportFile.addEventListener("change", () => {
+    selectSiteImportFile(elements.siteImportFile.files?.[0] || null);
+  });
+
+  for (const eventName of ["dragenter", "dragover"]) {
+    elements.siteImportDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.siteImportDropzone.classList.add("file-drop--active");
+    });
+  }
+  for (const eventName of ["dragleave", "drop"]) {
+    elements.siteImportDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.siteImportDropzone.classList.remove("file-drop--active");
+    });
+  }
+  elements.siteImportDropzone.addEventListener("drop", (event) => {
+    selectSiteImportFile(event.dataTransfer?.files?.[0] || null);
+  });
+
+  elements.siteImportPreviewButton.addEventListener("click", async () => {
+    if (!siteImportFile) return;
+    elements.siteImportPreviewButton.disabled = true;
+    elements.siteImportMessage.textContent = "Baustellenliste wird sicher geprüft …";
+    resetSiteImportPreview();
+    try {
+      const contentBase64 = arrayBufferToBase64(await siteImportFile.arrayBuffer());
+      siteImportPayload = { fileName: siteImportFile.name, contentBase64 };
+      const body = await requestJson("./api/v1/admin/site-imports/preview", {
+        method: "POST",
+        body: JSON.stringify(siteImportPayload)
+      });
+      elements.siteImportMessage.textContent = "";
+      renderSiteImportPreview(body.importPreview);
+    } catch (error) {
+      siteImportPayload = null;
+      elements.siteImportMessage.textContent = error.message;
+    } finally {
+      elements.siteImportPreviewButton.disabled = false;
+    }
+  });
+
+  elements.siteImportConfirm.addEventListener("click", async () => {
+    if (!siteImportPayload || !siteImportState?.readyCount) return;
+    if (!window.confirm(
+      `${siteImportState.readyCount} Baustellen aus Excel anlegen? Vorhandene Namen bleiben unverändert.`
+    )) return;
+    elements.siteImportConfirm.disabled = true;
+    elements.siteImportPreviewButton.disabled = true;
+    elements.siteImportMessage.textContent = "Baustellen werden sicher angelegt …";
+    try {
+      const body = await requestJson("./api/v1/admin/site-imports", {
+        method: "POST",
+        body: JSON.stringify(siteImportPayload)
+      });
+      const createdCount = body.import.createdCount;
+      siteImportFile = null;
+      elements.siteImportFile.value = "";
+      elements.siteImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      resetSiteImportPreview();
+      elements.siteImportMessage.textContent = `${createdCount} Baustellen wurden sicher angelegt.`;
+      showToast(`${createdCount} Excel-Baustellen sind jetzt verfügbar.`);
+      await refreshAdmin();
+    } catch (error) {
+      elements.siteImportMessage.textContent = error.message;
+      elements.siteImportConfirm.disabled = false;
+    } finally {
+      elements.siteImportPreviewButton.disabled = !siteImportFile;
     }
   });
 

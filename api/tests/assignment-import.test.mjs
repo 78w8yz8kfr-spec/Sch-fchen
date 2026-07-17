@@ -94,6 +94,28 @@ test("Unbekannte Baustellen verhindern unvollständige Tagesimporte", () => {
   assert.deepEqual(preview.unmatchedSites, [{ name: "Musterstraße 12", assignments: 2 }]);
 });
 
+test("Unbekannte Excel-Bezeichnungen können ausdrücklich zugeordnet werden", () => {
+  const plan = parseAssignmentWorkbookRows(sampleRows());
+  const employees = [{
+    id: "00000000-0000-4000-8000-000000000001",
+    firstName: "Mara",
+    lastName: "Montage",
+    personnelNumber: "M-1"
+  }];
+  const sites = [{
+    id: "00000000-0000-4000-8000-000000000002",
+    name: "Nordbaustelle",
+    projectName: "Nordprojekt",
+    shortText: null
+  }];
+  const preview = buildAssignmentImportPreview(plan, employees, sites, [], {
+    employees: [],
+    sites: [{ sourceLabel: "Musterstraße 12", targetId: sites[0].id }]
+  });
+  assert.equal(preview.readyCount, 2);
+  assert.deepEqual(preview.unmatchedSites, []);
+});
+
 test("Upload akzeptiert nur kleine XLSX-Dateien", () => {
   const payload = validateAssignmentImportPayload({
     fileName: "Wochenplan.xlsx",

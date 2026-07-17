@@ -18,9 +18,11 @@ import {
 import { securityHeaders, serveStatic } from "./static.mjs";
 import {
   buildAssignmentImportPreview,
+  normalizeImportText,
   parseAssignmentWorkbook,
   validateAssignmentImportPayload
 } from "./assignment-import.mjs";
+import { buildSiteImportPreview, parseSiteWorkbook } from "./site-import.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -452,7 +454,7 @@ function publicAssignmentImportPreview(preview) {
   };
 }
 
-async function prepareAssignmentImport(client, context, plan) {
+async function prepareAssignmentImport(client, context, plan, mappings) {
   await requirePlanner(client, context);
   const [employeeResult, siteResult, existingResult] = await Promise.all([
     client.query(
@@ -503,12 +505,13 @@ async function prepareAssignmentImport(client, context, plan) {
       siteId: row.construction_site_id,
       siteName: row.site_name,
       workDate: databaseDate(row.work_date)
-    }))
+    })),
+    mappings
   );
 }
 
-async function importAssignmentsFromWorkbook(client, context, plan, fileName) {
-  const preview = await prepareAssignmentImport(client, context, plan);
+async function importAssignmentsFromWorkbook(client, context, plan, fileName, mappings) {
+  const preview = await prepareAssignmentImport(client, context, plan, mappings);
   if (preview.readyRows.length === 0) {
     throw new InputError(
       "Es gibt keine sicher importierbaren X-Zuweisungen.",
@@ -588,6 +591,107 @@ async function importAssignmentsFromWorkbook(client, context, plan, fileName) {
   };
 }
 
+function publicSiteImportPreview(preview) {
+  const { readyRows, rows, ...publicPreview } = preview;
+  return {
+    ...publicPreview,
+    rows: rows.slice(0, 200),
+    rowsTruncated: rows.length > 200
+  };
+}
+
+async function prepareSiteImport(client, context, plan) {
+  await requirePlanner(client, context);
+  const [siteResult, customerResult] = await Promise.all([
+    client.query(
+      `SELECT id, site_number, name
+       FROM construction_sites
+       WHERE company_id = $1 AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT id, company_name
+       FROM customers
+       WHERE company_id = $1 AND customer_type = 'company' AND status = 'active'`,
+      [context.companyId]
+    )
+  ]);
+  return buildSiteImportPreview(
+    plan,
+    siteResult.rows.map((row) => ({ id: row.id, number: row.site_number, name: row.name })),
+    customerResult.rows.map((row) => ({ id: row.id, name: row.company_name }))
+  );
+}
+
+async function importSitesFromWorkbook(client, context, plan) {
+  await requirePlanner(client, context);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`sites:${context.companyId}`]
+  );
+  const preview = await prepareSiteImport(client, context, plan);
+  if (preview.readyRows.length === 0) {
+    throw new InputError("Es gibt keine sicher importierbaren Baustellen.", 409, "no_importable_sites");
+  }
+
+  const createdCustomers = new Map();
+  let createdCount = 0;
+  for (const row of preview.readyRows) {
+    const customerKey = normalizeImportText(row.customerName);
+    let customerId = row.customerId || createdCustomers.get(customerKey);
+    let isBillingLocation = false;
+    if (!customerId) {
+      const customer = await client.query(
+        `INSERT INTO customers (
+           company_id, customer_type, company_name,
+           billing_street, billing_house_number, billing_postal_code, billing_city
+         ) VALUES ($1, 'company', $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [context.companyId, row.customerName, row.street, row.houseNumber, row.postalCode, row.city]
+      );
+      customerId = customer.rows[0].id;
+      createdCustomers.set(customerKey, customerId);
+      isBillingLocation = true;
+    }
+    const location = await client.query(
+      `INSERT INTO customer_locations (
+         company_id, customer_id, name, location_type, street, house_number,
+         postal_code, city, is_billing_location
+       ) VALUES ($1, $2, $3, 'construction', $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [
+        context.companyId,
+        customerId,
+        row.siteName,
+        row.street,
+        row.houseNumber,
+        row.postalCode,
+        row.city,
+        isBillingLocation
+      ]
+    );
+    const project = await client.query(
+      `INSERT INTO projects (company_id, customer_id, name, status, installer_short_text)
+       VALUES ($1, $2, $3, 'active', $4)
+       RETURNING id`,
+      [context.companyId, customerId, row.projectName || row.siteName, row.installerShortText]
+    );
+    await client.query(
+      `INSERT INTO project_locations (company_id, project_id, customer_location_id)
+       VALUES ($1, $2, $3)`,
+      [context.companyId, project.rows[0].id, location.rows[0].id]
+    );
+    await client.query(
+      `INSERT INTO construction_sites (
+         company_id, project_id, customer_location_id, name, installer_short_text, status
+       ) VALUES ($1, $2, $3, $4, $5, 'active')`,
+      [context.companyId, project.rows[0].id, location.rows[0].id, row.siteName, row.installerShortText]
+    );
+    createdCount += 1;
+  }
+  return { createdCount, skippedCount: preview.sourceRowCount - createdCount };
+}
+
 async function createEmployee(client, context, input) {
   const roles = await requirePlanner(client, context);
   if (ADMIN_ASSIGNED_ROLES.has(input.role) && !roles.has("admin")) {
@@ -624,6 +728,18 @@ async function createEmployee(client, context, input) {
 
 async function createSiteBundle(client, context, input) {
   await requirePlanner(client, context);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`sites:${context.companyId}`]
+  );
+  const existingNames = await client.query(
+    `SELECT name FROM construction_sites
+     WHERE company_id = $1 AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId]
+  );
+  if (existingNames.rows.some((row) => normalizeImportText(row.name) === normalizeImportText(input.siteName))) {
+    throw new InputError("Eine aktive Baustelle mit diesem Namen existiert bereits.", 409, "site_name_exists");
+  }
   const customer = await client.query(
     `INSERT INTO customers (
        company_id, customer_type, company_name,
@@ -1060,24 +1176,48 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports/preview") {
         await withReadySession(pool, tokenHash, requirePlanner);
-        const { workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        const { workbook, mappings } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
         const plan = await parseAssignmentWorkbook(workbook);
         const preview = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => prepareAssignmentImport(client, context, plan)
+          (client, context) => prepareAssignmentImport(client, context, plan, mappings)
         );
         return json(response, 200, { importPreview: publicAssignmentImportPreview(preview) });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports") {
         await withReadySession(pool, tokenHash, requirePlanner);
-        const { fileName, workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        const { fileName, workbook, mappings } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
         const plan = await parseAssignmentWorkbook(workbook);
         const result = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => importAssignmentsFromWorkbook(client, context, plan, fileName)
+          (client, context) => importAssignmentsFromWorkbook(client, context, plan, fileName, mappings)
+        );
+        return json(response, 201, { import: result });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/site-imports/preview") {
+        await withReadySession(pool, tokenHash, requirePlanner);
+        const { workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        const plan = await parseSiteWorkbook(workbook);
+        const preview = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => prepareSiteImport(client, context, plan)
+        );
+        return json(response, 200, { importPreview: publicSiteImportPreview(preview) });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/site-imports") {
+        await withReadySession(pool, tokenHash, requirePlanner);
+        const { workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        const plan = await parseSiteWorkbook(workbook);
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => importSitesFromWorkbook(client, context, plan)
         );
         return json(response, 201, { import: result });
       }

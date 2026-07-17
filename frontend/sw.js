@@ -1,11 +1,12 @@
-const CACHE_NAME = "schaefchen-online-v8";
+const CACHE_NAME = "schaefchen-online-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
-  "./assets/mark.svg"
+  "./assets/mark.svg",
+  "./assets/baustellen-import-vorlage.xlsx"
 ];
 
 self.addEventListener("install", (event) => {

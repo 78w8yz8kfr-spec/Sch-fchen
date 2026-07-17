@@ -61,6 +61,11 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(appScript.status, 200);
   assert.match(appScript.headers.get("content-type"), /text\/javascript/);
 
+  const siteTemplate = await fetch(`${baseUrl}/assets/baustellen-import-vorlage.xlsx`);
+  assert.equal(siteTemplate.status, 200);
+  assert.match(siteTemplate.headers.get("content-type"), /spreadsheetml/);
+  assert.deepEqual([...new Uint8Array(await siteTemplate.arrayBuffer()).slice(0, 2)], [0x50, 0x4b]);
+
   const setupStatus = await fetch(`${baseUrl}/api/v1/setup`);
   assert.equal(setupStatus.status, 200);
   assert.equal((await setupStatus.json()).setup.setupRequired, true);
@@ -211,8 +216,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },
     body: JSON.stringify({
       customerName: `Excel Kunde ${suffix} GmbH`,
-      projectName: "Excel Baustelle",
-      siteName: "Excel Baustelle",
+      projectName: "Zugeordnete Excel Baustelle",
+      siteName: "Zugeordnete Excel Baustelle",
       installerShortText: "Excel-Import prüfen",
       street: "Tabellenweg",
       houseNumber: "5",
@@ -221,12 +226,65 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     })
   });
   assert.equal(excelSiteResponse.status, 201, await excelSiteResponse.clone().text());
+  const excelSite = (await excelSiteResponse.json()).site;
+
+  const siteImportWorkbook = await readFile(
+    resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/site-import.xlsx")
+  );
+  const siteImportPayload = {
+    fileName: "Baustellenliste Test.xlsx",
+    contentBase64: siteImportWorkbook.toString("base64")
+  };
+  const siteImportPreviewResponse = await fetch(`${baseUrl}/api/v1/admin/site-imports/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(siteImportPayload)
+  });
+  assert.equal(siteImportPreviewResponse.status, 200, await siteImportPreviewResponse.clone().text());
+  const siteImportPreview = (await siteImportPreviewResponse.json()).importPreview;
+  assert.equal(siteImportPreview.readyCount, 1);
+  assert.equal(siteImportPreview.conflictCount, 0);
+
+  const siteImportResponse = await fetch(`${baseUrl}/api/v1/admin/site-imports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(siteImportPayload)
+  });
+  assert.equal(siteImportResponse.status, 201, await siteImportResponse.clone().text());
+  assert.equal((await siteImportResponse.json()).import.createdCount, 1);
+
+  const siteDuplicatePreviewResponse = await fetch(`${baseUrl}/api/v1/admin/site-imports/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(siteImportPayload)
+  });
+  assert.equal(siteDuplicatePreviewResponse.status, 200);
+  const siteDuplicatePreview = (await siteDuplicatePreviewResponse.json()).importPreview;
+  assert.equal(siteDuplicatePreview.readyCount, 0);
+  assert.equal(siteDuplicatePreview.duplicateCount, 1);
 
   const excelContentBase64 = (await readFile(
     resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/assignment-import.xlsx.base64"),
     "utf8"
   )).trim();
-  const excelPayload = { fileName: "Baustellenplan Test.xlsx", contentBase64: excelContentBase64 };
+  const unmappedExcelPayload = { fileName: "Baustellenplan Test.xlsx", contentBase64: excelContentBase64 };
+  const unmappedImportPreviewResponse = await fetch(`${baseUrl}/api/v1/admin/assignment-imports/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify(unmappedExcelPayload)
+  });
+  assert.equal(unmappedImportPreviewResponse.status, 200);
+  const unmappedImportPreview = (await unmappedImportPreviewResponse.json()).importPreview;
+  assert.equal(unmappedImportPreview.readyCount, 0);
+  assert.deepEqual(unmappedImportPreview.unmatchedSites, [{ name: "Excel Baustelle", assignments: 2 }]);
+
+  const excelPayload = {
+    ...unmappedExcelPayload,
+    mappings: {
+      employees: [],
+      sites: [{ sourceLabel: "Excel Baustelle", targetId: excelSite.id }]
+    }
+  };
   const importPreviewResponse = await fetch(`${baseUrl}/api/v1/admin/assignment-imports/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },

@@ -30,6 +30,8 @@ Aktuell enthalten:
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
 - sicherer Excel-Wochenplanimport mit Vorschau, eindeutiger Zuordnung und Schutz bestehender Einsätze
+- Excel-Baustellenlistenimport mit Vorlage, Zeilenprüfung und Wiederverwendung vorhandener Kunden
+- interaktive Zuordnung unbekannter Mitarbeiter- und Baustellennamen aus der Wochenplanung
 - historisiertes Verschieben und Stornieren freigegebener Einsätze
 - verpflichtender persönlicher Passwortwechsel nach einem Mitarbeiter-Startpasswort
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse

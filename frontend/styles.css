@@ -1111,6 +1111,55 @@ select:focus-visible {
   line-height: 1.4;
 }
 
+.import-mappings {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #e7a5aa;
+  border-radius: 13px;
+  background: #fff8f8;
+}
+
+.import-mappings > div {
+  display: grid;
+  gap: 9px;
+}
+
+.import-mapping-field {
+  display: grid;
+  gap: 5px;
+}
+
+.import-mapping-field label {
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.import-mapping-field select {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #cfd9d3;
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  padding: 0 12px;
+}
+
+.download-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e7a5aa;
+  border-radius: 13px;
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .import-list {
   display: grid;
   max-height: 300px;

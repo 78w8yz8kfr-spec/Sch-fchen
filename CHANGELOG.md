@@ -73,3 +73,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Erkennung von Abwesenheits- und Sonderkürzeln ohne automatische Übernahme
 - Größen-, Dateityp- und Archivprüfung für hochgeladene XLSX-Dateien
 - Versionsstand 0.9.0
+- geschützter Excel-Import für mehrere Kunden-, Projekt- und Baustellenpakete
+- herunterladbare Baustellen-Importvorlage mit Pflichtfeldern und PLZ-Textformat
+- Vorschau für neue, bereits vorhandene und fehlerhafte Baustellenzeilen
+- ausdrückliche Zuordnung unbekannter Mitarbeiter- und Baustellenbezeichnungen aus Wochenplänen
+- Wiederverwendung eindeutig vorhandener Kunden und Schutz vor doppelten aktiven Baustellennamen
+- Versionsstand 0.10.0

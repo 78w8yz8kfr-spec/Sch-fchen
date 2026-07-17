@@ -9,7 +9,7 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, uiSpecification] = await Promise.all([
+const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, uiSpecification, siteTemplate] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
   readFrontendFile("app.js"),
@@ -18,7 +18,8 @@ const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, ma
   readFrontendFile("refresh.js"),
   readFrontendFile("manifest.webmanifest"),
   readFrontendFile("assets/mark.svg"),
-  readFile(resolve(repositoryDirectory, "docs/PHASE1_UI_SPEC.md"), "utf8")
+  readFile(resolve(repositoryDirectory, "docs/PHASE1_UI_SPEC.md"), "utf8"),
+  readFile(resolve(frontendDirectory, "assets/baustellen-import-vorlage.xlsx"))
 ]);
 
 const manifest = JSON.parse(manifestSource);
@@ -42,6 +43,12 @@ assert.match(html, /id="assignment-import-panel"/);
 assert.match(html, /id="assignment-import-file"/);
 assert.match(html, /id="assignment-import-preview"/);
 assert.match(html, /id="assignment-import-confirm"/);
+assert.match(html, /id="assignment-import-mappings"/);
+assert.match(html, /id="assignment-import-apply-mappings"/);
+assert.match(html, /id="site-import-panel"/);
+assert.match(html, /id="site-import-file"/);
+assert.match(html, /id="site-import-preview"/);
+assert.match(html, /baustellen-import-vorlage\.xlsx/);
 assert.match(html, /value="planner">Planer/);
 assert.match(html, /value="project_manager">Projektleiter/);
 assert.match(html, /value="executive_assistant">Assistenz der Geschäftsführung/);
@@ -59,6 +66,8 @@ assert.match(styles, /\.time-summary/);
 assert.match(styles, /\.entry-list/);
 assert.match(styles, /\.file-drop/);
 assert.match(styles, /\.import-preview/);
+assert.match(styles, /\.import-mappings/);
+assert.match(styles, /\.download-link/);
 assert.match(styles, /--brand: #e30613/);
 assert.match(styles, /--ink: #111111/);
 assert.doesNotMatch(styles, /#173c34|#b9e65a|#7da82a/i, "Alte grüne Markenfarben dürfen nicht verbleiben");
@@ -76,6 +85,9 @@ assert.match(app, /\.\/api\/v1\/admin\/sites/);
 assert.match(app, /\.\/api\/v1\/admin\/assignments/);
 assert.match(app, /\.\/api\/v1\/admin\/assignment-imports\/preview/);
 assert.match(app, /assignmentImportFile\.arrayBuffer/);
+assert.match(app, /assignmentImportApplyMappings/);
+assert.match(app, /\.\/api\/v1\/admin\/site-imports\/preview/);
+assert.match(app, /siteImportFile\.arrayBuffer/);
 assert.match(app, /window\.confirm/);
 assert.match(app, /method: "PATCH"/);
 assert.match(app, /\/cancel`/);
@@ -96,10 +108,13 @@ assert.ok(manifest.icons.length > 0);
 assert.match(mark, /fill="#111111"/);
 assert.match(mark, /fill="#e30613"/);
 assert.doesNotMatch(mark, /#173c34|#b9e65a/i);
+assert.equal(siteTemplate[0], 0x50);
+assert.equal(siteTemplate[1], 0x4b);
 
 for (const asset of ["./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./assets/mark.svg"]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
+assert.ok(worker.includes('"./assets/baustellen-import-vorlage.xlsx"'));
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 assert.match(worker, /event\.request\.mode === "navigate"/);
 assert.match(worker, /cache: "no-store"/);

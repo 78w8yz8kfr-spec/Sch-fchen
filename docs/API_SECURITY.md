@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 17.07.2026  
-Technischer Stand: V0.9.0
+Technischer Stand: V0.10.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -71,6 +71,8 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/admin/assignments/:id/cancel` | Einsatz mit Begründung stornieren; Historie bleibt erhalten |
 | `POST` | `/api/v1/admin/assignment-imports/preview` | XLSX-Wochenplan prüfen und sichere X-Zuweisungen vorschlagen |
 | `POST` | `/api/v1/admin/assignment-imports` | zuvor prüfbare X-Zuweisungen geschützt importieren |
+| `POST` | `/api/v1/admin/site-imports/preview` | XLSX-Baustellenliste prüfen und neue Pakete vorschlagen |
+| `POST` | `/api/v1/admin/site-imports` | geprüfte Kunden-, Projekt- und Baustellenpakete anlegen |
 | `POST` | `/api/v1/session` | Mit Firma, Personalnummer und Passwort anmelden |
 | `GET` | `/api/v1/session` | Eigene Firma, Person, Rollen und Ablaufzeit lesen |
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
@@ -100,7 +102,17 @@ Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
 normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
 sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
 der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
-Sonderkürzel werden lediglich gezählt; V0.9.0 legt daraus keine Fachdaten an.
+Sonderkürzel werden lediglich gezählt; V0.10.0 legt daraus keine Fachdaten an.
+Unbekannte Mitarbeiter- oder Baustellenbezeichnungen können ausdrücklich auf
+eine aktive ID des Sitzungsmandanten abgebildet werden. Der Server validiert
+jede Zuordnung erneut und akzeptiert keine fremden oder frei erfundenen IDs.
+
+Der Baustellenlistenimport verlangt die Spalten Kunde, Baustelle, Straße,
+Hausnummer, PLZ und Ort; Projekt und Aufgabe sind optional. Fehlerhafte Zeilen
+werden einzeln gemeldet. Vorhandene aktive Baustellennamen werden nicht erneut
+angelegt. Eindeutig vorhandene Firmenkunden werden wiederverwendet, neue Kunden
+werden gemeinsam mit Standort, Projekt und Baustelle in derselben Transaktion
+angelegt. Eine mandantenbezogene Sperre verhindert konkurrierende Doppelimporte.
 
 ## Lokale Inbetriebnahme
 

@@ -124,6 +124,14 @@ Tabellenstruktur und ordnet Mitarbeiter sowie Baustellen innerhalb des
 Sitzungsmandanten eindeutig zu. Erst eine Vorschau und eine ausdrückliche
 Bestätigung erzeugen freigegebene `site_assignments`. Bereits vorhandene
 Mitarbeitertage werden unter einer transaktionalen Sperre nicht überschrieben.
+Unbekannte Excel-Bezeichnungen dürfen nur ausdrücklich auf eine aktive
+Mitarbeiter- oder Baustellen-ID desselben Mandanten abgebildet werden.
+
+Der Baustellenlistenimport verwendet dieselben Upload- und Archivgrenzen. Er
+prüft jede Zeile separat, verwendet einen eindeutig gefundenen Firmenkunden
+weiter und legt neue Kunden, Standorte, Projekte und Baustellen atomar an. Eine
+mandantenbezogene Sperre sowie die erneute Vorschau innerhalb der
+Importtransaktion verhindern konkurrierende Dubletten.
 
 ## API-Grundlage
 

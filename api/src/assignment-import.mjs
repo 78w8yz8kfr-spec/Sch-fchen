@@ -8,6 +8,7 @@ const MAX_ROWS = 200;
 const MAX_COLUMNS = 200;
 const MAX_ASSIGNMENTS = 1_000;
 const STATUS_HEADER = /urlaub|schule|krank|ü-?std|ülu/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function displayText(value) {
   if (value === null || value === undefined) return "";
@@ -142,6 +143,27 @@ function validateWorkbookArchive(workbook) {
   }
 }
 
+function validateMappings(value, label) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 200) {
+    throw new InputError(`${label} sind ungültig.`);
+  }
+  const seen = new Set();
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new InputError(`${label} sind ungültig.`);
+    }
+    const sourceLabel = displayText(entry.sourceLabel);
+    const targetId = displayText(entry.targetId);
+    const sourceKey = normalizeImportText(sourceLabel);
+    if (!sourceKey || sourceLabel.length > 200 || !UUID.test(targetId) || seen.has(sourceKey)) {
+      throw new InputError(`${label} enthalten eine ungültige oder doppelte Zuordnung.`);
+    }
+    seen.add(sourceKey);
+    return { sourceLabel, targetId };
+  });
+}
+
 export function validateAssignmentImportPayload(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new InputError("Die Excel-Anfrage ist ungültig.");
@@ -172,7 +194,18 @@ export function validateAssignmentImportPayload(body) {
     throw new InputError("Die ausgewählte Datei ist keine gültige .xlsx-Datei.");
   }
   validateWorkbookArchive(workbook);
-  return { fileName, workbook };
+  const rawMappings = body.mappings === undefined ? {} : body.mappings;
+  if (!rawMappings || typeof rawMappings !== "object" || Array.isArray(rawMappings)) {
+    throw new InputError("Die Excel-Zuordnungen sind ungültig.");
+  }
+  return {
+    fileName,
+    workbook,
+    mappings: {
+      employees: validateMappings(rawMappings.employees, "Mitarbeiterzuordnungen"),
+      sites: validateMappings(rawMappings.sites, "Baustellenzuordnungen")
+    }
+  };
 }
 
 export async function parseAssignmentWorkbook(workbook) {
@@ -289,13 +322,27 @@ function sameSet(left, right) {
   return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
-export function buildAssignmentImportPreview(plan, employees, sites, existingAssignments = []) {
+export function buildAssignmentImportPreview(
+  plan,
+  employees,
+  sites,
+  existingAssignments = [],
+  mappings = { employees: [], sites: [] }
+) {
   const employeeIndex = aliasIndex(employees, (employee) => [
     `${employee.firstName} ${employee.lastName}`,
     `${employee.lastName}, ${employee.firstName}`,
     employee.personnelNumber
   ]);
   const siteIndex = aliasIndex(sites, (site) => [site.name, site.projectName, site.shortText]);
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const siteById = new Map(sites.map((site) => [site.id, site]));
+  const employeeMappings = new Map((mappings.employees || []).map(
+    (mapping) => [normalizeImportText(mapping.sourceLabel), mapping.targetId]
+  ));
+  const siteMappings = new Map((mappings.sites || []).map(
+    (mapping) => [normalizeImportText(mapping.sourceLabel), mapping.targetId]
+  ));
   const unknownEmployees = [];
   const unknownSites = [];
   const mapped = [];
@@ -306,8 +353,14 @@ export function buildAssignmentImportPreview(plan, employees, sites, existingAss
     if (!rawGroups.has(rawGroupKey)) rawGroups.set(rawGroupKey, { marks: [], incomplete: false });
     const group = rawGroups.get(rawGroupKey);
     group.marks.push(mark);
-    const employee = oneMatch(employeeIndex, mark.employeeLabel);
-    const site = oneMatch(siteIndex, mark.siteLabel);
+    const employeeKey = normalizeImportText(mark.employeeLabel);
+    const siteKey = normalizeImportText(mark.siteLabel);
+    const employee = employeeMappings.has(employeeKey)
+      ? employeeById.get(employeeMappings.get(employeeKey))
+      : oneMatch(employeeIndex, mark.employeeLabel);
+    const site = siteMappings.has(siteKey)
+      ? siteById.get(siteMappings.get(siteKey))
+      : oneMatch(siteIndex, mark.siteLabel);
     if (!employee) {
       unknownEmployees.push(mark.employeeLabel);
       group.incomplete = true;

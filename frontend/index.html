@@ -119,7 +119,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.9.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.10.0</p>
         </div>
       </section>
 
@@ -314,9 +314,46 @@
                   </div>
                   <div id="assignment-import-stats" class="import-stats" aria-label="Importübersicht"></div>
                   <div id="assignment-import-warnings" class="import-warnings"></div>
+                  <section id="assignment-import-mappings" class="import-mappings" hidden>
+                    <strong>Unbekannte Angaben zuordnen</strong>
+                    <p class="field-help">Wähle aus, welcher vorhandene Mitarbeiter oder welche Baustelle gemeint ist.</p>
+                    <div id="assignment-import-mapping-fields"></div>
+                    <button id="assignment-import-apply-mappings" class="button button--secondary" type="button">Zuordnung anwenden</button>
+                  </section>
                   <ul id="assignment-import-list" class="import-list" aria-label="Importierbare Einsätze"></ul>
                   <button id="assignment-import-confirm" class="button button--primary" type="button">Einsätze importieren</button>
                   <p class="field-help">Bestehende oder nicht eindeutig zugeordnete Tage werden nicht überschrieben.</p>
+                </section>
+              </div>
+            </details>
+
+            <details id="site-import-panel" class="admin-panel">
+              <summary>Baustellenliste aus Excel importieren</summary>
+              <div class="admin-form">
+                <p class="field-help">Mehrere Kunden, Projekte und Baustellen auf einmal anlegen. Vor dem Speichern erscheint immer eine Vorschau.</p>
+                <a class="download-link" href="./assets/baustellen-import-vorlage.xlsx" download>Excel-Vorlage herunterladen</a>
+                <label id="site-import-dropzone" class="file-drop" for="site-import-file">
+                  <input
+                    id="site-import-file"
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  >
+                  <strong>Baustellenliste auswählen</strong>
+                  <span id="site-import-file-name">oder hier ablegen · maximal 1,5 MB</span>
+                </label>
+                <button id="site-import-preview-button" class="button button--secondary" type="button" disabled>Baustellen sicher prüfen</button>
+                <p id="site-import-message" class="form-message" aria-live="polite"></p>
+
+                <section id="site-import-preview" class="import-preview" aria-labelledby="site-import-title" hidden>
+                  <div>
+                    <p class="eyebrow">Importvorschau</p>
+                    <strong id="site-import-title">Baustellenliste</strong>
+                  </div>
+                  <div id="site-import-stats" class="import-stats" aria-label="Baustellen-Importübersicht"></div>
+                  <div id="site-import-warnings" class="import-warnings"></div>
+                  <ul id="site-import-list" class="import-list" aria-label="Importierbare Baustellen"></ul>
+                  <button id="site-import-confirm" class="button button--primary" type="button">Baustellen importieren</button>
+                  <p class="field-help">Vorhandene Baustellennamen und fehlerhafte Zeilen werden nicht angelegt.</p>
                 </section>
               </div>
             </details>

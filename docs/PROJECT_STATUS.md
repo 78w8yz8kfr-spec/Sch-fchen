@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 17.07.2026
-Technischer Stand: V0.9.0
+Technischer Stand: V0.10.0
 
 ## Abgeschlossen
 
@@ -61,6 +61,9 @@ Technischer Stand: V0.9.0
 - XLSX-Wochenplanimport für das vorhandene Baustellenplan-Format mit sicherer Vorschau
 - ausschließliche Übernahme eindeutiger X-Zuweisungen; Abwesenheiten und Sonderkürzel bleiben unberührt
 - Schutz bestehender Mitarbeitertage sowie serverseitige Wiederholungs- und Größenprüfung
+- Excel-Baustellenlistenimport mit eigener Vorlage, Vorschau und zeilengenaue Fehleranzeige
+- Wiederverwendung eindeutiger Kunden und Schutz vor doppelten aktiven Baustellennamen
+- ausdrückliche Auswahl für unbekannte Mitarbeiter- und Baustellenbezeichnungen im Wochenplan
 
 ## Noch zu prüfen
 
