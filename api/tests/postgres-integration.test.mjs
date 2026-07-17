@@ -12,6 +12,13 @@ const enabled = process.env.API_INTEGRATION_TEST === "true";
 const integrationTest = enabled ? test : test.skip;
 const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../frontend");
 
+function nextBusinessDate(date) {
+  const value = new Date(`${date}T00:00:00Z`);
+  do value.setUTCDate(value.getUTCDate() + 1);
+  while ([0, 6].includes(value.getUTCDay()));
+  return value.toISOString().slice(0, 10);
+}
+
 integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktionieren mit PostgreSQL", async (t) => {
   const suffix = Date.now().toString(36).toUpperCase();
   const personnelNumber = `API-${suffix}`;
@@ -88,17 +95,72 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const employeePersonnelNumber = `MON-${suffix}`;
   const employeeTemporaryPassword = "Montage-Start-2026!";
   const employeePassword = "Montage-Eigen-2026!";
+  const plannerPersonnelNumber = `PLAN-${suffix}`;
+  const plannerTemporaryPassword = "Planung-Start-2026!";
+  const plannerPassword = "Planung-Eigen-2026!";
 
   const initialOverview = await fetch(
     `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
     { headers: { Cookie: cookie } }
   );
   assert.equal(initialOverview.status, 200);
-  assert.equal((await initialOverview.json()).overview.canCreateOffice, true);
+  assert.equal((await initialOverview.json()).overview.canCreateManagementRoles, true);
+
+  const plannerResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      personnelNumber: plannerPersonnelNumber,
+      firstName: "Paula",
+      lastName: "Planung",
+      role: "planner",
+      temporaryPassword: plannerTemporaryPassword
+    })
+  });
+  assert.equal(plannerResponse.status, 201, await plannerResponse.clone().text());
+  assert.deepEqual((await plannerResponse.json()).employee.roles, ["planner"]);
+
+  const plannerLogin = await fetch(`${baseUrl}/api/v1/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+    body: JSON.stringify({
+      companyNumber: "F-000001",
+      personnelNumber: plannerPersonnelNumber,
+      password: plannerTemporaryPassword
+    })
+  });
+  assert.equal(plannerLogin.status, 201);
+  const plannerCookie = plannerLogin.headers.get("set-cookie").split(";", 1)[0];
+  const plannerPasswordChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({ newPassword: plannerPassword })
+  });
+  assert.equal(plannerPasswordChange.status, 200);
+
+  const plannerOverview = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(plannerOverview.status, 200);
+  assert.equal((await plannerOverview.json()).overview.canCreateManagementRoles, false);
+
+  const forbiddenManagementRole = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      personnelNumber: `PL-${suffix}`,
+      firstName: "Nicht",
+      lastName: "Erlaubt",
+      role: "project_manager",
+      temporaryPassword: "Nicht-Erlaubt-2026!"
+    })
+  });
+  assert.equal(forbiddenManagementRole.status, 403);
 
   const employeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: cookie },
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
     body: JSON.stringify({
       personnelNumber: employeePersonnelNumber,
       firstName: "Mara",
@@ -114,7 +176,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: cookie },
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
     body: JSON.stringify({
       customerName: `API Kunde ${suffix} GmbH`,
       projectName: "API Integration",
@@ -132,7 +194,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   const assignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: cookie },
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
     body: JSON.stringify({
       employeeId: employee.id,
       constructionSiteId: site.id,
@@ -141,7 +203,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       comment: "API-Test"
     })
   });
-  assert.equal(assignmentResponse.status, 201, await assignmentResponse.text());
+  assert.equal(assignmentResponse.status, 201, await assignmentResponse.clone().text());
+  const assignment = (await assignmentResponse.json()).assignment;
 
   const employeeLogin = await fetch(`${baseUrl}/api/v1/session`, {
     method: "POST",
@@ -184,6 +247,58 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     { headers: { Cookie: employeeCookie } }
   );
   assert.equal(forbiddenOverview.status, 403);
+
+  const movedDate = nextBusinessDate(assignmentDate);
+  const movedAssignment = await fetch(`${baseUrl}/api/v1/admin/assignments/${assignment.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      workDate: movedDate,
+      plannedStartTime: "08:00",
+      changeReason: "Integrationstest verschiebt den Termin"
+    })
+  });
+  assert.equal(movedAssignment.status, 200, await movedAssignment.clone().text());
+  assert.equal((await movedAssignment.json()).assignment.workDate, movedDate);
+
+  const originalDayAssignments = await fetch(
+    `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(originalDayAssignments.status, 200);
+  assert.deepEqual((await originalDayAssignments.json()).assignments, []);
+
+  const movedDayAssignments = await fetch(
+    `${baseUrl}/api/v1/site-assignments/${movedDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(movedDayAssignments.status, 200);
+  assert.equal((await movedDayAssignments.json()).assignments[0].constructionSite.id, site.id);
+
+  const movedWeekOverview = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${movedDate}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(movedWeekOverview.status, 200);
+  assert.ok((await movedWeekOverview.json()).overview.weekAssignments.some((item) => item.id === assignment.id));
+
+  const cancelledAssignment = await fetch(
+    `${baseUrl}/api/v1/admin/assignments/${assignment.id}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ changeReason: "Integrationstest storniert den Termin" })
+    }
+  );
+  assert.equal(cancelledAssignment.status, 200, await cancelledAssignment.clone().text());
+  assert.equal((await cancelledAssignment.json()).assignment.status, "cancelled");
+
+  const cancelledDayAssignments = await fetch(
+    `${baseUrl}/api/v1/site-assignments/${movedDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(cancelledDayAssignments.status, 200);
+  assert.deepEqual((await cancelledDayAssignments.json()).assignments, []);
 
   const assignments = await fetch(`${baseUrl}/api/v1/site-assignments/${assignmentDate}`, {
     headers: { Cookie: cookie }

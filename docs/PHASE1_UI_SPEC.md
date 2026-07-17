@@ -47,7 +47,7 @@ gesendet und kann mit „Demo zurücksetzen“ vollständig entfernt werden.
 | --- | --- | --- |
 | Monteur | nächster eigener Arbeitsschritt | eigene Planung und eigene Daten |
 | Vorarbeiter | nächster eigener Arbeitsschritt | zusätzlich zugewiesene Baustellen |
-| Büro | Organisationsübersicht | Planung und freigegebene Korrekturen |
+| Planer, Projektleiter, Assistenz der Geschäftsführung | Organisationsübersicht | Planung und freigegebene Korrekturen |
 | Admin | Organisationsübersicht | vollständige Firmenverwaltung |
 
 Mehrere Rollen je Benutzer sind möglich. Die API liefert später die wirksamen

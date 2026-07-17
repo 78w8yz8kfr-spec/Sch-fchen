@@ -857,6 +857,167 @@ select:focus-visible {
   font-size: 0.62rem;
 }
 
+.admin-week {
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: #fafafa;
+}
+
+.admin-week__header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 11px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.admin-week__header div {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-week__header span {
+  color: var(--muted);
+  font-size: 0.63rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-week__header strong {
+  font-size: 0.78rem;
+}
+
+.week-button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 13px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.admin-week-board {
+  display: grid;
+}
+
+.admin-week-day {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 10px;
+  padding: 12px;
+}
+
+.admin-week-day + .admin-week-day {
+  border-top: 1px solid var(--line);
+}
+
+.admin-week-day__date {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.admin-week-day__date span {
+  font-size: 0.62rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-week-day__date strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.admin-week-day__items {
+  display: grid;
+  gap: 7px;
+}
+
+.week-assignment {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.week-assignment div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.week-assignment strong,
+.week-assignment span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-assignment strong {
+  font-size: 0.71rem;
+}
+
+.week-assignment span,
+.admin-week-empty {
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
+.week-assignment button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 11px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.admin-week-empty {
+  align-self: center;
+}
+
+.assignment-edit-form {
+  margin-bottom: 14px;
+  border: 2px solid var(--brand);
+  border-radius: 17px;
+  background: var(--surface);
+  box-shadow: 0 14px 32px rgba(227, 6, 19, 0.12);
+}
+
+.assignment-edit-form > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.assignment-edit-form p,
+.assignment-edit-form strong {
+  margin: 0;
+}
+
+.assignment-edit-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.button--danger {
+  width: 100%;
+  color: #8e0d15;
+  background: #f8dadd;
+}
+
 .admin-panel {
   overflow: hidden;
   border: 1px solid var(--line);

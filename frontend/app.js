@@ -90,12 +90,25 @@
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminSiteCount: document.querySelector("#admin-site-count"),
     adminAssignmentCount: document.querySelector("#admin-assignment-count"),
+    adminWeekPrevious: document.querySelector("#admin-week-previous"),
+    adminWeekNext: document.querySelector("#admin-week-next"),
+    adminWeekTitle: document.querySelector("#admin-week-title"),
+    adminWeekBoard: document.querySelector("#admin-week-board"),
+    assignmentEditForm: document.querySelector("#assignment-edit-form"),
+    assignmentEditTitle: document.querySelector("#assignment-edit-title"),
+    assignmentEditDate: document.querySelector("#assignment-edit-date"),
+    assignmentEditTime: document.querySelector("#assignment-edit-time"),
+    assignmentEditReason: document.querySelector("#assignment-edit-reason"),
+    assignmentEditSave: document.querySelector("#assignment-edit-save"),
+    assignmentEditCancel: document.querySelector("#assignment-edit-cancel"),
+    assignmentEditClose: document.querySelector("#assignment-edit-close"),
+    assignmentEditMessage: document.querySelector("#assignment-edit-message"),
     employeeForm: document.querySelector("#employee-form"),
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
     employeePersonnelNumber: document.querySelector("#employee-personnel-number"),
     employeeRole: document.querySelector("#employee-role"),
-    employeeOfficeRole: document.querySelector("#employee-office-role"),
+    employeeManagementRoles: [...document.querySelectorAll("[data-management-role]")],
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
     employeeList: document.querySelector("#employee-list"),
@@ -136,6 +149,7 @@
   let syncing = false;
   let session = null;
   let adminState = null;
+  let editingAssignmentId = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -236,7 +250,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.7.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.8.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -298,7 +312,24 @@
   }
 
   function canPlan() {
-    return !demoMode && Boolean(session?.user.roles?.some((role) => role === "admin" || role === "office"));
+    const planningRoles = new Set([
+      "admin",
+      "office",
+      "planner",
+      "project_manager",
+      "executive_assistant"
+    ]);
+    return !demoMode && Boolean(session?.user.roles?.some((role) => planningRoles.has(role)));
+  }
+
+  function addIsoDays(date, days) {
+    const value = new Date(`${date}T00:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+  }
+
+  function dateFromIso(date) {
+    return new Date(`${date}T12:00:00`);
   }
 
   function appendAdminListItem(list, title, meta) {
@@ -327,13 +358,96 @@
     if (items.some((item) => item.id === selected)) select.value = selected;
   }
 
+  function closeAssignmentEditor() {
+    editingAssignmentId = null;
+    elements.assignmentEditForm.hidden = true;
+    elements.assignmentEditMessage.textContent = "";
+    elements.assignmentEditReason.value = "";
+  }
+
+  function openAssignmentEditor(assignment) {
+    editingAssignmentId = assignment.id;
+    elements.assignmentEditTitle.textContent = `${assignment.employeeName} · ${assignment.siteName}`;
+    elements.assignmentEditDate.value = assignment.workDate;
+    elements.assignmentEditTime.value = assignment.plannedStartTime?.slice(0, 5) || "";
+    elements.assignmentEditReason.value = "";
+    elements.assignmentEditMessage.textContent = "";
+    elements.assignmentEditForm.hidden = false;
+    elements.assignmentEditForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function renderAdminWeek() {
+    const weekStart = adminState.weekStart;
+    const weekEnd = addIsoDays(weekStart, 4);
+    const start = dateFromIso(weekStart);
+    const end = dateFromIso(weekEnd);
+    const startLabel = start.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+    const endLabel = end.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
+    elements.adminWeekTitle.textContent = `${startLabel} – ${endLabel}`;
+    elements.adminWeekBoard.replaceChildren();
+
+    for (let offset = 0; offset < 5; offset += 1) {
+      const workDate = addIsoDays(weekStart, offset);
+      const date = dateFromIso(workDate);
+      const day = document.createElement("section");
+      const dateBlock = document.createElement("div");
+      const dayName = document.createElement("span");
+      const dayNumber = document.createElement("strong");
+      const items = document.createElement("div");
+      day.className = "admin-week-day";
+      dateBlock.className = "admin-week-day__date";
+      items.className = "admin-week-day__items";
+      dayName.textContent = shortDayFormatter.format(date).replace(".", "");
+      dayNumber.textContent = String(date.getDate());
+      dateBlock.append(dayName, dayNumber);
+
+      const dayAssignments = adminState.weekAssignments.filter(
+        (assignment) => assignment.workDate === workDate
+      );
+      if (dayAssignments.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "admin-week-empty";
+        empty.textContent = "Noch kein Einsatz";
+        items.append(empty);
+      } else {
+        dayAssignments.forEach((assignment) => {
+          const card = document.createElement("article");
+          const content = document.createElement("div");
+          const title = document.createElement("strong");
+          const meta = document.createElement("span");
+          const edit = document.createElement("button");
+          const startTime = assignment.plannedStartTime
+            ? `${assignment.plannedStartTime.slice(0, 5)} Uhr`
+            : "ohne Startzeit";
+          card.className = "week-assignment";
+          title.textContent = assignment.employeeName;
+          meta.textContent = `${startTime} · ${assignment.siteName}`;
+          edit.type = "button";
+          edit.textContent = "Ändern";
+          edit.addEventListener("click", () => openAssignmentEditor(assignment));
+          content.append(title, meta);
+          card.append(content, edit);
+          items.append(card);
+        });
+      }
+      day.append(dateBlock, items);
+      elements.adminWeekBoard.append(day);
+    }
+  }
+
   function renderAdmin() {
     if (!adminState) return;
     elements.adminEmployeeCount.textContent = String(adminState.employees.length);
     elements.adminSiteCount.textContent = String(adminState.sites.length);
-    elements.adminAssignmentCount.textContent = String(adminState.assignments.length);
-    elements.employeeOfficeRole.hidden = !adminState.canCreateOffice;
-    if (!adminState.canCreateOffice && elements.employeeRole.value === "office") {
+    elements.adminAssignmentCount.textContent = String(adminState.weekAssignments.length);
+    elements.employeeManagementRoles.forEach((option) => {
+      option.hidden = !adminState.canCreateManagementRoles;
+      option.disabled = !adminState.canCreateManagementRoles;
+    });
+    if (
+      !adminState.canCreateManagementRoles
+      && elements.employeeManagementRoles.some((option) => option.value === elements.employeeRole.value)
+    ) {
       elements.employeeRole.value = "installer";
     }
 
@@ -354,7 +468,10 @@
     adminState.employees.forEach((employee) => {
       const roleLabels = {
         admin: "Admin",
-        office: "Büro",
+        office: "Planung (Bestand)",
+        planner: "Planer",
+        project_manager: "Projektleiter",
+        executive_assistant: "Assistenz der Geschäftsführung",
         foreman: "Vorarbeiter",
         installer: "Monteur"
       };
@@ -390,6 +507,7 @@
         );
       });
     }
+    renderAdminWeek();
   }
 
   async function refreshAdmin(date = elements.assignmentDate.value || localDateKey()) {
@@ -969,6 +1087,74 @@
     await Promise.all([refreshAdmin(), refreshLiveData()]);
   });
 
+  elements.assignmentEditForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!editingAssignmentId) return;
+    const changeReason = elements.assignmentEditReason.value.trim();
+    if (changeReason.length < 3) {
+      elements.assignmentEditMessage.textContent = "Bitte einen kurzen Änderungsgrund eingeben.";
+      return;
+    }
+    elements.assignmentEditSave.disabled = true;
+    elements.assignmentEditCancel.disabled = true;
+    elements.assignmentEditMessage.textContent = "Änderung wird sicher gespeichert …";
+    try {
+      const destinationDate = elements.assignmentEditDate.value;
+      await requestJson(`./api/v1/admin/assignments/${encodeURIComponent(editingAssignmentId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          workDate: destinationDate,
+          plannedStartTime: elements.assignmentEditTime.value,
+          changeReason
+        })
+      });
+      closeAssignmentEditor();
+      showToast("Einsatz verschoben · Änderung ist historisch gespeichert.");
+      await Promise.all([refreshAdmin(destinationDate), refreshLiveData()]);
+    } catch (error) {
+      elements.assignmentEditMessage.textContent = error.message;
+    } finally {
+      elements.assignmentEditSave.disabled = false;
+      elements.assignmentEditCancel.disabled = false;
+    }
+  });
+
+  elements.assignmentEditCancel.addEventListener("click", async () => {
+    if (!editingAssignmentId) return;
+    const changeReason = elements.assignmentEditReason.value.trim();
+    if (changeReason.length < 3) {
+      elements.assignmentEditMessage.textContent = "Bitte zuerst einen Stornogrund eingeben.";
+      return;
+    }
+    if (!window.confirm("Diesen Einsatz wirklich stornieren? Die Historie bleibt erhalten.")) return;
+    elements.assignmentEditSave.disabled = true;
+    elements.assignmentEditCancel.disabled = true;
+    elements.assignmentEditMessage.textContent = "Einsatz wird storniert …";
+    try {
+      await requestJson(`./api/v1/admin/assignments/${encodeURIComponent(editingAssignmentId)}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ changeReason })
+      });
+      const selectedWeek = adminState?.weekStart || localDateKey();
+      closeAssignmentEditor();
+      showToast("Einsatz storniert · Historie bleibt erhalten.");
+      await Promise.all([refreshAdmin(selectedWeek), refreshLiveData()]);
+    } catch (error) {
+      elements.assignmentEditMessage.textContent = error.message;
+    } finally {
+      elements.assignmentEditSave.disabled = false;
+      elements.assignmentEditCancel.disabled = false;
+    }
+  });
+
+  elements.assignmentEditClose.addEventListener("click", closeAssignmentEditor);
+  elements.adminWeekPrevious.addEventListener("click", () => {
+    void refreshAdmin(addIsoDays(adminState?.weekStart || localDateKey(), -7));
+  });
+  elements.adminWeekNext.addEventListener("click", () => {
+    void refreshAdmin(addIsoDays(adminState?.weekStart || localDateKey(), 7));
+  });
+
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
   elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
 
@@ -1002,7 +1188,8 @@
       : "Für heute ist noch keine Baustelle freigegeben.");
   });
   elements.showWeek.addEventListener("click", () => {
-    document.querySelector("#week-title").scrollIntoView({ behavior: "smooth", block: "center" });
+    (canPlan() ? elements.adminWeekBoard : document.querySelector("#week-title"))
+      .scrollIntoView({ behavior: "smooth", block: "center" });
   });
   elements.resetDemo.addEventListener("click", () => {
     if (!demoMode || !window.confirm("Alle lokalen Demo-Buchungen auf diesem Gerät zurücksetzen?")) return;
@@ -1018,7 +1205,8 @@
   });
   elements.navWeek.addEventListener("click", () => {
     activateNavigation(elements.navWeek);
-    document.querySelector("#week-title").scrollIntoView({ behavior: "smooth", block: "center" });
+    (canPlan() ? elements.adminWeekBoard : document.querySelector("#week-title"))
+      .scrollIntoView({ behavior: "smooth", block: "center" });
   });
   elements.navMore.addEventListener("click", () => {
     activateNavigation(elements.navMore);

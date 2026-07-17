@@ -91,7 +91,7 @@ Original, dem gewünschten Zeitpunkt und einer Begründung. Er startet mit Statu
 Bei Genehmigung wird das Original lediglich entwertet und bleibt vollständig
 erhalten; anschließend wird der Arbeitstag neu berechnet. Ablehnungen bleiben
 ebenfalls mit Prüfer und Zeitpunkt nachvollziehbar. Die View
-`pending_time_entry_corrections` liefert offene Anträge für die Büroansicht und
+`pending_time_entry_corrections` liefert offene Anträge für die Organisationsansicht und
 der Datenbankkanal `schaefchen_time_correction` bereitet Benachrichtigungen vor.
 
 ## Öffentliche PWA-Demo

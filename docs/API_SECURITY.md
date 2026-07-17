@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 17.07.2026  
-Technischer Stand: V0.7-dev
+Technischer Stand: V0.8-dev
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -63,10 +63,12 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/api/v1/setup` | Status der einmaligen Ersteinrichtung lesen |
 | `POST` | `/api/v1/setup` | Genau den ersten Admin geschützt anlegen |
 | `POST` | `/api/v1/account/initial-password` | Persönliches Startpasswort einmalig ersetzen |
-| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Baustellen und Tagesplanung für Admin/Büro |
+| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Baustellen und Wochenplanung Montag bis Freitag |
 | `POST` | `/api/v1/admin/employees` | Mitarbeiter mit Startpasswort und begrenzter Rolle anlegen |
 | `POST` | `/api/v1/admin/sites` | Kunde, Standort, Projekt und Baustelle gemeinsam anlegen |
 | `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz freigeben |
+| `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung verschieben oder Startzeit ändern |
+| `POST` | `/api/v1/admin/assignments/:id/cancel` | Einsatz mit Begründung stornieren; Historie bleibt erhalten |
 | `POST` | `/api/v1/session` | Mit Firma, Personalnummer und Passwort anmelden |
 | `GET` | `/api/v1/session` | Eigene Firma, Person, Rollen und Ablaufzeit lesen |
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
@@ -82,10 +84,13 @@ Arbeitstag bei Bedarf an. Eine bereits identisch gespeicherte Client-UUID ist
 erfolgreich idempotent; abweichende Daten führen zu `409 Conflict`.
 
 Die Verwaltungsendpunkte prüfen zusätzlich die aktiven Rollen aus der
-serverseitig aufgelösten Sitzung. Admin und Büro dürfen planen. Nur Admin darf
-ein weiteres Bürokonto anlegen; neue Mitarbeiter erhalten höchstens die Rollen
-Monteur, Vorarbeiter oder Büro. Bis zum persönlichen Wechsel des Startpassworts
-sind Fach- und Verwaltungsendpunkte für das neue Konto gesperrt.
+serverseitig aufgelösten Sitzung. Admin, Planer, Projektleiter und Assistenz der
+Geschäftsführung dürfen mit identischen Rechten planen und verwalten. Nur der
+Admin darf diese drei Organisationsrollen vergeben. Bestehende Konten mit der
+früheren Rolle `office` bleiben kompatibel, die Rolle wird aber nicht mehr neu
+angeboten. Monteur und Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum
+persönlichen Wechsel des Startpassworts sind Fach- und Verwaltungsendpunkte für
+das neue Konto gesperrt.
 
 ## Lokale Inbetriebnahme
 
@@ -118,6 +123,7 @@ Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder und Schrittfolge. In
 GitHub Actions werden Migration und Seed zusätzlich mit einem nicht
 privilegierten, Render-ähnlichen Datenbankeigentümer geprüft. Danach folgt der
 echte PostgreSQL-Ablauf: ersten Admin anlegen, PWA ausliefern, anmelden,
-Mitarbeiter und Baustelle anlegen, Einsatz freigeben, Startpasswort persönlich
-ändern, Rollenverbot prüfen, Zeiten idempotent übertragen, Arbeitstag lesen,
-abmelden und den widerrufenen Cookie zurückweisen.
+Planer und Monteur anlegen, Einsatz freigeben, Startpasswort persönlich ändern,
+Rollenverbot prüfen, Einsatz historisiert verschieben und stornieren, Zeiten
+idempotent übertragen, Arbeitstag lesen, abmelden und den widerrufenen Cookie
+zurückweisen.

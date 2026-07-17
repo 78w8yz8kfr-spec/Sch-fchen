@@ -1,6 +1,6 @@
 # Schäfchen
 
-Schäfchen ist eine SaaS-fähige Progressive Web App für Handwerksbetriebe. Die Anwendung verbindet eine besonders einfache Bedienung für Monteure mit einer nachvollziehbaren Organisation für Büro, Vorarbeiter und Administratoren.
+Schäfchen ist eine SaaS-fähige Progressive Web App für Handwerksbetriebe. Die Anwendung verbindet eine besonders einfache Bedienung für Monteure mit einer nachvollziehbaren Organisation für Planer, Projektleiter, Assistenz der Geschäftsführung, Vorarbeiter und Administratoren.
 
 ## Projektstand
 
@@ -19,6 +19,7 @@ Aktuell enthalten:
 - Migrationen `009_create_site_assignments.sql` bis `012_create_time_entries.sql`
 - Migration `013_create_user_sessions.sql` mit widerrufbaren, gehashten Sitzungen
 - Migration `014_create_initial_setup_functions.sql` für die einmalige, geschützte Admin-Ersteinrichtung
+- Migration `015_add_organization_roles.sql` für die gleichberechtigten Organisationsrollen
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -27,7 +28,8 @@ Aktuell enthalten:
 - SQL-Abnahmetests für Nummernvergabe, Status, Historisierung und Mandantenschutz
 - GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
-- mobile Admin-/Büroverwaltung für Mitarbeiter, Baustellen und Tageseinsätze
+- mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
+- historisiertes Verschieben und Stornieren freigegebener Einsätze
 - verpflichtender persönlicher Passwortwechsel nach einem Mitarbeiter-Startpasswort
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
 

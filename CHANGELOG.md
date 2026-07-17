@@ -63,3 +63,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - persönliche Startpasswort-Änderung bei der ersten Anmeldung neuer Mitarbeiter
 - PostgreSQL-Integrationstest für Verwaltung, Rollentrennung, Passwortwechsel und sichtbare Mitarbeiterzuweisung
 - iOS-Cache-Reparaturseite und netzwerkbevorzugte Navigation gegen dauerhaft veraltete PWA-Oberflächen
+- Migration 015 für die gleichberechtigten Rollen Planer, Projektleiter und Assistenz der Geschäftsführung
+- mobile Wochenplanung Montag bis Freitag mit allen Mitarbeitern und Einsätzen
+- begründetes Verschieben und Stornieren von Einsätzen unter Erhalt der Änderungshistorie
+- Versionsstand 0.8.0

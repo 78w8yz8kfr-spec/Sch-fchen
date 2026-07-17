@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 17.07.2026
-Technischer Stand: V0.7-dev
+Technischer Stand: V0.8-dev
 
 ## Abgeschlossen
 
@@ -19,7 +19,7 @@ Technischer Stand: V0.7-dev
 - Backup- und Restore-Befehle vorbereitet
 - Migration 002 `users` mit Personalnummer, optionaler E-Mail, Aktivhistorie und Passwort-Hash-Feld für die spätere API
 - Migration 003 `roles` und `user_roles` mit mehreren historisierten Rollen je Benutzer
-- Standardrollen Admin, Büro, Vorarbeiter und Monteur pro Firma
+- Standardrollen Admin, Planer, Projektleiter, Assistenz der Geschäftsführung, Vorarbeiter und Monteur pro Firma; bestehende Bürokonten bleiben kompatibel
 - Admin-Vollzugriff, firmenübergreifender Fremdschlüsselschutz und erzwungene Row Level Security für die API-Rolle
 - erste dokumentierte und mobiloptimierte PWA-Vorschau für Login und Dashboard
 - lokaler PWA-Smoke-Test und GitHub-Pages-Workflow
@@ -54,8 +54,10 @@ Technischer Stand: V0.7-dev
 - rollenabhängige mobile Verwaltung für Mitarbeiter, Baustellen und freigegebene Tageseinsätze
 - vereinfachte Baustellenanlage, die Kunde, Standort und Projekt konsistent in einer Transaktion erzeugt
 - verpflichtender persönlicher Passwortwechsel nach der Übergabe eines Mitarbeiter-Startpassworts
-- API- und Oberflächenprüfung für Admin/Büro im PostgreSQL-Integrationslauf
+- API- und Oberflächenprüfung für Admin und gleichberechtigte Organisationsrollen im PostgreSQL-Integrationslauf
 - selbstständige iOS-PWA-Cache-Reparatur ohne Löschen lokaler Offline-Fachdaten
+- mobile Wochenplanung Montag bis Freitag mit allen Einsätzen
+- begründetes Verschieben und Stornieren von Einsätzen mit vollständiger Änderungshistorie
 
 ## Noch zu prüfen
 
@@ -70,7 +72,7 @@ Technischer Stand: V0.7-dev
 Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
-- vollständige Wochenansicht und Büroprüfung offener Korrekturen
+- Prüfung offener Zeitkorrekturen durch die Organisationsrollen
 - anschließend Montage- und Bautagesberichte mit PDF-Versionierung
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo

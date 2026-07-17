@@ -8,7 +8,13 @@ const ENTRY_TYPES = new Set([
   "clock_out"
 ]);
 const SITE_TYPES = new Set(["site_arrival", "site_departure", "next_site"]);
-const EMPLOYEE_ROLES = new Set(["installer", "foreman", "office"]);
+const EMPLOYEE_ROLES = new Set([
+  "installer",
+  "foreman",
+  "planner",
+  "project_manager",
+  "executive_assistant"
+]);
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -142,6 +148,32 @@ export function validateAssignment(body) {
     plannedStartTime,
     comment: optionalText(body.comment, "Hinweis", 500)
   };
+}
+
+export function validateAssignmentUpdate(body) {
+  if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
+    throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
+  }
+  const plannedStartTime = optionalText(body.plannedStartTime, "Startzeit", 5);
+  if (plannedStartTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedStartTime)) {
+    throw new InputError("Die Startzeit muss dem Format HH:MM entsprechen.");
+  }
+  return {
+    workDate: validateWorkDate(body.workDate),
+    plannedStartTime,
+    changeReason: text(body.changeReason, "Änderungsgrund", 3, 500)
+  };
+}
+
+export function validateAssignmentCancellation(body) {
+  if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
+    throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
+  }
+  return { changeReason: text(body.changeReason, "Stornogrund", 3, 500) };
+}
+
+export function validateId(value, label = "ID") {
+  return uuid(value, label);
 }
 
 export function validateInitialPasswordChange(body) {

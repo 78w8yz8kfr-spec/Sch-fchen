@@ -53,7 +53,7 @@ sein. Archivierte Standorte bleiben historisch erhalten.
 
 Projektjahresnummern folgen `SE-2026-0001`. Projekte besitzen Status,
 Priorität, interne Notizen, einen kurzen Monteurtext sowie ein optionales
-Budget. Das Budget darf die spätere API nur Büro und Admin ausgeben.
+Budget. Das Budget darf die API nur den Organisationsrollen und dem Admin ausgeben.
 
 `project_locations` historisiert mehrere Standorte je Projekt und stellt
 sicher, dass Projekt und Standort zum selben Kunden gehören.

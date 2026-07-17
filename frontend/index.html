@@ -119,7 +119,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.7.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.8.0</p>
         </div>
       </section>
 
@@ -241,7 +241,7 @@
           <section id="admin-section" class="section admin-section" aria-labelledby="admin-title" hidden>
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Admin und Büro</p>
+                <p class="eyebrow">Planung und Verwaltung</p>
                 <h2 id="admin-title">Verwaltung</h2>
               </div>
               <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
@@ -253,6 +253,43 @@
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
               <div><strong id="admin-assignment-count">0</strong><span>Einsätze</span></div>
             </div>
+
+            <section class="admin-week" aria-labelledby="admin-week-title">
+              <div class="admin-week__header">
+                <button id="admin-week-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
+                <div>
+                  <span>Wochenplanung</span>
+                  <strong id="admin-week-title">Montag bis Freitag</strong>
+                </div>
+                <button id="admin-week-next" class="week-button" type="button" aria-label="Nächste Woche">›</button>
+              </div>
+              <div id="admin-week-board" class="admin-week-board"></div>
+            </section>
+
+            <form id="assignment-edit-form" class="admin-form assignment-edit-form" novalidate hidden>
+              <div>
+                <p class="eyebrow">Einsatz bearbeiten</p>
+                <strong id="assignment-edit-title">Einsatz</strong>
+              </div>
+              <div class="setup-grid">
+                <div>
+                  <label for="assignment-edit-date">Neues Datum</label>
+                  <input id="assignment-edit-date" type="date" required>
+                </div>
+                <div>
+                  <label for="assignment-edit-time">Startzeit</label>
+                  <input id="assignment-edit-time" type="time">
+                </div>
+              </div>
+              <label for="assignment-edit-reason">Begründung</label>
+              <input id="assignment-edit-reason" maxlength="500" placeholder="z. B. Kunde verschiebt Termin" required>
+              <div class="assignment-edit-actions">
+                <button id="assignment-edit-save" class="button button--primary" type="submit">Änderung speichern</button>
+                <button id="assignment-edit-cancel" class="button button--danger" type="button">Einsatz stornieren</button>
+                <button id="assignment-edit-close" class="text-button" type="button">Schließen</button>
+              </div>
+              <p id="assignment-edit-message" class="form-message" aria-live="polite"></p>
+            </form>
 
             <details class="admin-panel">
               <summary>Mitarbeiter anlegen</summary>
@@ -273,7 +310,9 @@
                 <select id="employee-role" required>
                   <option value="installer">Monteur</option>
                   <option value="foreman">Vorarbeiter</option>
-                  <option id="employee-office-role" value="office">Büro</option>
+                  <option data-management-role value="planner">Planer</option>
+                  <option data-management-role value="project_manager">Projektleiter</option>
+                  <option data-management-role value="executive_assistant">Assistenz der Geschäftsführung</option>
                 </select>
                 <label for="employee-temporary-password">Startpasswort</label>
                 <input id="employee-temporary-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>

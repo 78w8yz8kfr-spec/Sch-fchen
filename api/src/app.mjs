@@ -22,7 +22,10 @@ import {
   localDate,
   readJson,
   validateAssignment,
+  validateAssignmentCancellation,
+  validateAssignmentUpdate,
   validateEmployee,
+  validateId,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
@@ -32,6 +35,14 @@ import {
 } from "./validation.mjs";
 
 const DUMMY_HASH = "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$zJbDCEum4Q2YZolIS8tIPfMbbOMR2eM8lXJj1i9Cq2Q";
+const PLANNER_ROLES = new Set([
+  "admin",
+  "office",
+  "planner",
+  "project_manager",
+  "executive_assistant"
+]);
+const ADMIN_ASSIGNED_ROLES = new Set(["planner", "project_manager", "executive_assistant"]);
 
 function json(response, status, body, headers = {}) {
   const encoded = JSON.stringify(body);
@@ -272,8 +283,8 @@ async function activeRoleKeys(client, context) {
 
 async function requirePlanner(client, context) {
   const roles = await activeRoleKeys(client, context);
-  if (!roles.has("admin") && !roles.has("office")) {
-    throw new InputError("Diese Funktion ist nur für Admin und Büro freigeschaltet.", 403, "forbidden");
+  if (![...roles].some((role) => PLANNER_ROLES.has(role))) {
+    throw new InputError("Diese Funktion ist nur für die Planung und Verwaltung freigeschaltet.", 403, "forbidden");
   }
   return roles;
 }
@@ -326,8 +337,27 @@ function siteDto(row) {
   };
 }
 
+function mondayFor(date) {
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekday = value.getUTCDay() || 7;
+  value.setUTCDate(value.getUTCDate() - weekday + 1);
+  return value.toISOString().slice(0, 10);
+}
+
+function addUtcDays(date, days) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function databaseDate(value) {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+}
+
 async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
+  const weekStart = mondayFor(date);
+  const weekEnd = addUtcDays(weekStart, 4);
   const [employeeResult, siteResult, assignmentResult] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
@@ -370,6 +400,7 @@ async function adminOverview(client, context, date) {
     ),
     client.query(
       `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
+              assignment.work_date,
               assignment.sequence_number, assignment.planned_start_time::TEXT,
               account.first_name, account.last_name, site.name AS site_name
        FROM site_assignments AS assignment
@@ -378,34 +409,39 @@ async function adminOverview(client, context, date) {
        JOIN construction_sites AS site
          ON site.company_id = assignment.company_id AND site.id = assignment.construction_site_id
        WHERE assignment.company_id = $1
-         AND assignment.work_date = $2
+         AND assignment.work_date BETWEEN $2 AND $3
          AND assignment.status IN ('draft', 'released')
-       ORDER BY LOWER(account.last_name), LOWER(account.first_name), assignment.sequence_number`,
-      [context.companyId, date]
+       ORDER BY assignment.work_date, LOWER(account.last_name), LOWER(account.first_name), assignment.sequence_number`,
+      [context.companyId, weekStart, weekEnd]
     )
   ]);
 
+  const weekAssignments = assignmentResult.rows.map((row) => ({
+    id: row.id,
+    employeeId: row.user_id,
+    constructionSiteId: row.construction_site_id,
+    workDate: databaseDate(row.work_date),
+    sequenceNumber: row.sequence_number,
+    plannedStartTime: row.planned_start_time,
+    employeeName: `${row.first_name} ${row.last_name}`,
+    siteName: row.site_name
+  }));
+
   return {
     date,
-    canCreateOffice: roles.has("admin"),
+    weekStart,
+    canCreateManagementRoles: roles.has("admin"),
     employees: employeeResult.rows.map(employeeDto),
     sites: siteResult.rows.map(siteDto),
-    assignments: assignmentResult.rows.map((row) => ({
-      id: row.id,
-      employeeId: row.user_id,
-      constructionSiteId: row.construction_site_id,
-      sequenceNumber: row.sequence_number,
-      plannedStartTime: row.planned_start_time,
-      employeeName: `${row.first_name} ${row.last_name}`,
-      siteName: row.site_name
-    }))
+    assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
+    weekAssignments
   };
 }
 
 async function createEmployee(client, context, input) {
   const roles = await requirePlanner(client, context);
-  if (input.role === "office" && !roles.has("admin")) {
-    throw new InputError("Nur ein Admin darf ein Bürokonto anlegen.", 403, "forbidden");
+  if (ADMIN_ASSIGNED_ROLES.has(input.role) && !roles.has("admin")) {
+    throw new InputError("Nur ein Admin darf Rollen für Planung und Verwaltung vergeben.", 403, "forbidden");
   }
   const duplicate = await client.query(
     "SELECT 1 FROM users WHERE company_id = $1 AND personnel_number = $2",
@@ -544,6 +580,88 @@ async function createAssignment(client, context, input) {
     sequenceNumber: inserted.rows[0].sequence_number,
     plannedStartTime: inserted.rows[0].planned_start_time
   };
+}
+
+async function updateAssignment(client, context, assignmentId, input) {
+  await requirePlanner(client, context);
+  const current = await client.query(
+    `SELECT id, user_id, work_date, sequence_number, status
+     FROM site_assignments
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, assignmentId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Einsatz wurde nicht gefunden.", 404, "assignment_not_found");
+  }
+  const assignment = current.rows[0];
+  if (!["draft", "released"].includes(assignment.status)) {
+    throw new InputError("Dieser Einsatz kann nicht mehr geändert werden.", 409, "assignment_locked");
+  }
+
+  let sequenceNumber = assignment.sequence_number;
+  if (databaseDate(assignment.work_date) !== input.workDate) {
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`assignment:${context.companyId}:${assignment.user_id}:${input.workDate}`]
+    );
+    const sequence = await client.query(
+      `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_sequence
+       FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND work_date = $3
+         AND status <> 'cancelled' AND id <> $4`,
+      [context.companyId, assignment.user_id, input.workDate, assignmentId]
+    );
+    sequenceNumber = sequence.rows[0].next_sequence;
+  }
+
+  const updated = await client.query(
+    `UPDATE site_assignments
+     SET work_date = $3,
+         sequence_number = $4,
+         planned_start_time = $5,
+         changed_by_user_id = $6,
+         last_change_reason = $7
+     WHERE company_id = $1 AND id = $2
+     RETURNING id, user_id, construction_site_id, work_date,
+               sequence_number, planned_start_time::TEXT, status`,
+    [
+      context.companyId,
+      assignmentId,
+      input.workDate,
+      sequenceNumber,
+      input.plannedStartTime,
+      context.userId,
+      input.changeReason
+    ]
+  );
+  const row = updated.rows[0];
+  return {
+    id: row.id,
+    employeeId: row.user_id,
+    constructionSiteId: row.construction_site_id,
+    workDate: databaseDate(row.work_date),
+    sequenceNumber: row.sequence_number,
+    plannedStartTime: row.planned_start_time,
+    status: row.status
+  };
+}
+
+async function cancelAssignment(client, context, assignmentId, changeReason) {
+  await requirePlanner(client, context);
+  const updated = await client.query(
+    `UPDATE site_assignments
+     SET status = 'cancelled',
+         changed_by_user_id = $3,
+         last_change_reason = $4
+     WHERE company_id = $1 AND id = $2 AND status IN ('draft', 'released')
+     RETURNING id`,
+    [context.companyId, assignmentId, context.userId, changeReason]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError("Der Einsatz wurde nicht gefunden oder ist bereits abgeschlossen.", 409, "assignment_locked");
+  }
+  return { id: assignmentId, status: "cancelled" };
 }
 
 async function changeInitialPassword(client, context, newPassword) {
@@ -707,7 +825,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
     }
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Max-Age": "600"
       });
@@ -818,6 +936,30 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createAssignment(client, context, input)
         );
         return json(response, 201, { assignment });
+      }
+
+      const adminAssignmentCancelMatch = /^\/api\/v1\/admin\/assignments\/([^/]+)\/cancel$/.exec(url.pathname);
+      if (request.method === "POST" && adminAssignmentCancelMatch) {
+        const assignmentId = validateId(adminAssignmentCancelMatch[1], "Einsatz-ID");
+        const input = validateAssignmentCancellation(await readJson(request));
+        const assignment = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => cancelAssignment(client, context, assignmentId, input.changeReason)
+        );
+        return json(response, 200, { assignment });
+      }
+
+      const adminAssignmentMatch = /^\/api\/v1\/admin\/assignments\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminAssignmentMatch) {
+        const assignmentId = validateId(adminAssignmentMatch[1], "Einsatz-ID");
+        const input = validateAssignmentUpdate(await readJson(request));
+        const assignment = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateAssignment(client, context, assignmentId, input)
+        );
+        return json(response, 200, { assignment });
       }
 
       const workDayMatch = /^\/api\/v1\/work-days\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);

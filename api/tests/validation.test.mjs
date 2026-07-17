@@ -4,6 +4,8 @@ import {
   expectedNextTypes,
   localDate,
   validateAssignment,
+  validateAssignmentCancellation,
+  validateAssignmentUpdate,
   validateEmployee,
   validateInitialPasswordChange,
   validateInitialSetup,
@@ -53,6 +55,12 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
     temporaryPassword: "Startpasswort-2026"
   });
   assert.equal(employee.role, "installer");
+  for (const role of ["planner", "project_manager", "executive_assistant"]) {
+    assert.equal(
+      validateEmployee({ ...employee, role, temporaryPassword: "Startpasswort-2026" }).role,
+      role
+    );
+  }
   assert.throws(
     () => validateEmployee({ ...employee, role: "admin", temporaryPassword: "Startpasswort-2026" }),
     /Mitarbeiterrolle/
@@ -80,6 +88,21 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   assert.throws(
     () => validateAssignment({ ...assignment, plannedStartTime: "25:30" }),
     /Startzeit/
+  );
+
+  const update = validateAssignmentUpdate({
+    workDate: "2026-07-21",
+    plannedStartTime: "08:15",
+    changeReason: "Kunde öffnet später"
+  });
+  assert.equal(update.workDate, "2026-07-21");
+  assert.equal(
+    validateAssignmentCancellation({ changeReason: "Termin abgesagt" }).changeReason,
+    "Termin abgesagt"
+  );
+  assert.throws(
+    () => validateAssignmentUpdate({ ...update, changeReason: "x" }),
+    /Änderungsgrund/
   );
 });
 

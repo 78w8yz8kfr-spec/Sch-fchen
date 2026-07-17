@@ -10,7 +10,7 @@ Schäfchen wird als mandantenfähige Progressive Web App entwickelt. Eine gemein
 
 | Komponente | Aufgabe |
 | --- | --- |
-| PWA | Einfache Bedienoberfläche für Monteure, Vorarbeiter, Büro und Admin |
+| PWA | Einfache Bedienoberfläche für Monteure, Vorarbeiter, Organisationsrollen und Admin |
 | API | Authentifizierung, Berechtigungen, Fachlogik und Mandantenschutz |
 | PostgreSQL | Strukturierte Geschäfts-, Zeit-, Berichts- und VDE-Daten |
 | MinIO | S3-kompatible Ablage für Fotos, Logos, Unterschriften und PDF-Versionen |
@@ -59,8 +59,10 @@ innerhalb dieser Firma eindeutig. E-Mail und Telefon bleiben optional;
 ausgeschiedene Mitarbeiter werden deaktiviert und nicht gelöscht.
 
 `roles` enthält pro Firma anpassbare Rollen und Rechte. Die unveränderlichen
-Systemschlüssel der vier Standardrollen lauten `admin`, `office`, `foreman` und
-`installer`. Der Admin behält immer Vollzugriff. `user_roles` bildet mehrere
+Systemschlüssel der sichtbaren Standardrollen lauten `admin`, `planner`,
+`project_manager`, `executive_assistant`, `foreman` und `installer`. Die drei
+Organisationsrollen besitzen dieselben Verwaltungsrechte; `office` bleibt nur
+für bestehende Konten kompatibel. Der Admin behält immer Vollzugriff. `user_roles` bildet mehrere
 Rollen je Benutzer ab und historisiert Zuweisungen über Zuweisungs- und
 Widerrufszeitpunkt.
 
