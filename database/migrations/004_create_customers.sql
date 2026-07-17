@@ -187,7 +187,7 @@ CREATE POLICY customers_tenant_isolation
     );
 
 GRANT SELECT, INSERT, UPDATE ON customers TO schaefchen_api;
-ALTER TABLE customers FORCE ROW LEVEL SECURITY;
+ALTER TABLE customers NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE customers IS 'Mandantenspezifischer Kundenstamm mit Historie und Dubletten-Zusammenführung.';
 COMMENT ON COLUMN customers.customer_number IS 'Automatische Kundennummer im Format SE-K-00001.';

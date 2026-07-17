@@ -55,3 +55,5 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - mobile Offline-Warteschlange mit idempotenter Synchronisation und benutzergetrenntem Gerätespeicher
 - API für freigegebene eigene Tageseinsätze und serverseitige PWA-Auslieferung mit Sicherheitsheadern
 - Produktionscontainer, automatischer Migrationsstart und Render-Blueprint für Webdienst und PostgreSQL
+- Render-Fix: Migrationseigentümer darf RLS für Schemaaufbau umgehen, während die API-Rolle weiterhin vollständig RLS-gebunden bleibt
+- zusätzlicher CI-Migrationslauf mit einem nicht privilegierten Render-ähnlichen Datenbankeigentümer

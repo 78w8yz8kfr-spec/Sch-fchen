@@ -184,7 +184,7 @@ REVOKE ALL ON FUNCTION api_resolve_session(CHAR) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION api_lookup_login_user(VARCHAR, VARCHAR) TO schaefchen_api;
 GRANT EXECUTE ON FUNCTION api_resolve_session(CHAR) TO schaefchen_api;
 GRANT SELECT, INSERT, UPDATE ON user_sessions TO schaefchen_api;
-ALTER TABLE user_sessions FORCE ROW LEVEL SECURITY;
+ALTER TABLE user_sessions NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE user_sessions IS 'Kurzlebige, widerrufbare API-Sitzungen; gespeichert wird ausschließlich der SHA-256-Hash des Tokens.';
 COMMENT ON COLUMN user_sessions.token_hash IS 'Hexadezimaler SHA-256-Hash; das rohe Sitzungstoken verlässt den API-Prozess nur als HttpOnly-Cookie.';

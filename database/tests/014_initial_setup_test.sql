@@ -1,6 +1,33 @@
 \echo 'Teste Migration 014_create_initial_setup_functions.sql ...'
 
 BEGIN;
+
+DO $$
+DECLARE
+    protected_tables TEXT[] := ARRAY[
+        'companies', 'users', 'roles', 'user_roles', 'customers',
+        'customer_contacts', 'customer_locations', 'projects',
+        'project_locations', 'project_responsibles', 'construction_sites',
+        'site_assignments', 'site_assignment_history', 'site_supervisors',
+        'site_supervisor_history', 'work_days', 'time_entries', 'user_sessions'
+    ];
+    correctly_configured INTEGER;
+BEGIN
+    SELECT COUNT(*)
+    INTO correctly_configured
+    FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = ANY(protected_tables)
+      AND relation.relrowsecurity
+      AND NOT relation.relforcerowsecurity;
+
+    IF correctly_configured <> CARDINALITY(protected_tables) THEN
+        RAISE EXCEPTION 'RLS-Eigentümergrenze ist nicht auf allen Fachtabellen korrekt konfiguriert';
+    END IF;
+END;
+$$;
+
 SET LOCAL ROLE schaefchen_api;
 
 DO $$

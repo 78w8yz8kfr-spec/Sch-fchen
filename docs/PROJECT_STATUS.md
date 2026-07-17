@@ -50,6 +50,7 @@ Technischer Stand: V0.6-dev
 - echter PWA-Login mit benutzergetrennter Offline-Warteschlange und Synchronisation
 - gemeinsame statische PWA-/API-Auslieferung mit Browser-Sicherheitsheadern
 - Produktionscontainer und Render-Blueprint mit automatischem Migrationsstart
+- Render-kompatible Trennung zwischen nicht privilegiertem Datenbankeigentümer und RLS-gebundener API-Rolle
 
 ## Noch zu prüfen
 

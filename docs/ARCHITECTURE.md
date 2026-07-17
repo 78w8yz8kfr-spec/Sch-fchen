@@ -28,8 +28,10 @@ Planung, Zeiterfassung, Berichte, Dokumente und VDE-Prüfungen werden an diesen 
 `companies` ist die Wurzel eines Mandanten. Nachfolgende Tabellen erhalten eine verpflichtende `company_id`. Die API setzt die aktuelle Firma serverseitig aus der authentifizierten Sitzung. Daten aus dem Frontend dürfen die Mandantenzuordnung nicht überschreiben.
 
 PostgreSQL Row Level Security bildet eine zusätzliche Schutzschicht. Die
-Datenbankrolle `schaefchen_api` besitzt nur die freigegebenen Tabellenrechte;
-für alle bisher veröffentlichten Fachtabellen ist RLS erzwungen.
+Datenbankrolle `schaefchen_api` besitzt nur die freigegebenen Tabellenrechte,
+ist kein Tabelleneigentümer und bleibt dadurch für alle Fachtabellen an RLS
+gebunden. Ausschließlich der getrennte Datenbankeigentümer umgeht RLS für
+Migrationen und Seeds; die API verwendet seine Zugangsdaten niemals.
 
 Der technische Login `schaefchen_api_login` besitzt selbst keine Tabellenrechte
 und darf lediglich in die NOLOGIN-Rolle `schaefchen_api` wechseln. Jede

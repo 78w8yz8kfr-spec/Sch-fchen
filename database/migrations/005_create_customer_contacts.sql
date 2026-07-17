@@ -138,7 +138,7 @@ CREATE POLICY customer_contacts_tenant_isolation
     );
 
 GRANT SELECT, INSERT, UPDATE ON customer_contacts TO schaefchen_api;
-ALTER TABLE customer_contacts FORCE ROW LEVEL SECURITY;
+ALTER TABLE customer_contacts NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE customer_contacts IS 'Ansprechpartner eines Kunden mit festen Zuständigkeitsbereichen.';
 COMMENT ON COLUMN customer_contacts.responsibilities IS 'Technik, Einkauf, Rechnung, Bauleitung oder Sonstiges.';

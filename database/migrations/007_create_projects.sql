@@ -322,9 +322,9 @@ CREATE POLICY project_responsibles_tenant_isolation ON project_responsibles
     WITH CHECK (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID);
 
 GRANT SELECT, INSERT, UPDATE ON projects, project_locations, project_responsibles TO schaefchen_api;
-ALTER TABLE projects FORCE ROW LEVEL SECURITY;
-ALTER TABLE project_locations FORCE ROW LEVEL SECURITY;
-ALTER TABLE project_responsibles FORCE ROW LEVEL SECURITY;
+ALTER TABLE projects NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE project_locations NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE project_responsibles NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE projects IS 'Projekte eines Kunden mit Nummernkreis, Status, Priorität und Büro-Budget.';
 COMMENT ON COLUMN projects.project_number IS 'Automatische Jahresnummer im Format SE-2026-0001.';

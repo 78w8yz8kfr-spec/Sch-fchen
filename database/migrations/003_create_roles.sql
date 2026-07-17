@@ -420,10 +420,15 @@ GRANT USAGE ON SCHEMA public TO schaefchen_api;
 GRANT SELECT, UPDATE ON companies TO schaefchen_api;
 GRANT SELECT, INSERT, UPDATE ON users, roles, user_roles TO schaefchen_api;
 
-ALTER TABLE companies FORCE ROW LEVEL SECURITY;
-ALTER TABLE users FORCE ROW LEVEL SECURITY;
-ALTER TABLE roles FORCE ROW LEVEL SECURITY;
-ALTER TABLE user_roles FORCE ROW LEVEL SECURITY;
+-- Der technische API-Login ist kein Tabelleneigentümer und bleibt damit immer
+-- an RLS gebunden. Der Datenbankeigentümer muss RLS dagegen für Migrationen,
+-- Seeds und SECURITY-DEFINER-Funktionen sicher umgehen können. Render stellt
+-- bewusst keinen Superuser bereit; FORCE würde dort bereits die nächste
+-- Migration blockieren.
+ALTER TABLE companies NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE users NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE roles NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE user_roles NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE roles IS 'Mandantenspezifische Rollen und anpassbare Berechtigungen.';
 COMMENT ON COLUMN roles.role_key IS 'Stabiler technischer Schlüssel; Systemrollenschlüssel sind unveränderlich.';

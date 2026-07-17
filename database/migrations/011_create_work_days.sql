@@ -239,7 +239,7 @@ CREATE POLICY work_days_tenant_isolation ON work_days
     WITH CHECK (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID);
 
 GRANT SELECT, INSERT, UPDATE ON work_days TO schaefchen_api;
-ALTER TABLE work_days FORCE ROW LEVEL SECURITY;
+ALTER TABLE work_days NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON COLUMN users.weekly_target_minutes IS 'Individuelle Sollminuten je ISO-Wochentag 1 (Montag) bis 7 (Sonntag).';
 COMMENT ON TABLE work_days IS 'Berechnete Tageszusammenfassung und unveränderlicher Abrechnungs-Sperrstatus.';

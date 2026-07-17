@@ -234,8 +234,8 @@ CREATE POLICY site_assignment_history_tenant_isolation ON site_assignment_histor
 
 GRANT SELECT, INSERT, UPDATE ON site_assignments TO schaefchen_api;
 GRANT SELECT, INSERT ON site_assignment_history TO schaefchen_api;
-ALTER TABLE site_assignments FORCE ROW LEVEL SECURITY;
-ALTER TABLE site_assignment_history FORCE ROW LEVEL SECURITY;
+ALTER TABLE site_assignments NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE site_assignment_history NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE site_assignments IS 'Historisierte Wochen- und Tagesplanung mit mehreren Baustellen je Mitarbeiter und Tag.';
 COMMENT ON COLUMN site_assignments.sequence_number IS 'Verpflichtende Tagesreihenfolge; dieselbe Baustelle darf mehrfach vorkommen.';

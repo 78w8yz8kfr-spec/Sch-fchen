@@ -255,7 +255,7 @@ CREATE POLICY construction_sites_tenant_isolation
     );
 
 GRANT SELECT, INSERT, UPDATE ON construction_sites TO schaefchen_api;
-ALTER TABLE construction_sites FORCE ROW LEVEL SECURITY;
+ALTER TABLE construction_sites NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE construction_sites IS 'Beliebig viele Baustellen eines Projekts mit flachen optionalen Bereichen.';
 COMMENT ON COLUMN construction_sites.site_number IS 'Automatische Jahresnummer im Format SE-B-2026-0001.';

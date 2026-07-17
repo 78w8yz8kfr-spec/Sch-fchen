@@ -198,7 +198,7 @@ CREATE POLICY customer_locations_tenant_isolation
     );
 
 GRANT SELECT, INSERT, UPDATE ON customer_locations TO schaefchen_api;
-ALTER TABLE customer_locations FORCE ROW LEVEL SECURITY;
+ALTER TABLE customer_locations NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE customer_locations IS 'Adressierte Kundenstandorte mit Zugangshinweisen und optionalem Geocoding.';
 COMMENT ON COLUMN customer_locations.location_number IS 'Automatische Standortnummer im Format SE-S-00001.';

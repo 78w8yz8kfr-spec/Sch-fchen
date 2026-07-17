@@ -40,7 +40,11 @@ Cookie. Abmeldung widerruft die Sitzung; ein Hartlöschen ist nicht erlaubt.
 ## Mandantenschutz
 
 Der technische Datenbankbenutzer `schaefchen_api_login` besitzt keine direkten
-Tabellenrechte. Jede Fachtransaktion führt diese Reihenfolge aus:
+Tabellenrechte und ist kein Tabelleneigentümer. Row Level Security gilt für ihn
+daher bei jeder Abfrage. Nur der getrennte Datenbankeigentümer darf RLS für
+Migrationen, Seeds und die eng begrenzten `SECURITY DEFINER`-Funktionen umgehen.
+Er wird nicht für API-Verbindungen verwendet. Jede Fachtransaktion führt diese
+Reihenfolge aus:
 
 1. Transaktion beginnen und lokal in `schaefchen_api` wechseln.
 2. Sitzung über ihren Token-Hash auflösen.
@@ -100,7 +104,8 @@ in Browserdaten.
 
 `npm --prefix api test` prüft Hashing, Cookieattribute, Login-Sperre,
 Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder und Schrittfolge. In
-GitHub Actions kommt ein echter PostgreSQL-Ablauf hinzu: ersten Admin anlegen,
-PWA ausliefern, anmelden, Sitzung und Einsätze lesen, Arbeitsbeginn doppelt
-übertragen, Feierabend buchen, Arbeitstag lesen, abmelden und den widerrufenen
-Cookie zurückweisen.
+GitHub Actions werden Migration und Seed zusätzlich mit einem nicht
+privilegierten, Render-ähnlichen Datenbankeigentümer geprüft. Danach folgt der
+echte PostgreSQL-Ablauf: ersten Admin anlegen, PWA ausliefern, anmelden, Sitzung
+und Einsätze lesen, Arbeitsbeginn doppelt übertragen, Feierabend buchen,
+Arbeitstag lesen, abmelden und den widerrufenen Cookie zurückweisen.

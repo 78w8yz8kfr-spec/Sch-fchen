@@ -272,8 +272,8 @@ CREATE POLICY site_supervisor_history_tenant_isolation ON site_supervisor_histor
 
 GRANT SELECT, INSERT, UPDATE ON site_supervisors TO schaefchen_api;
 GRANT SELECT, INSERT ON site_supervisor_history TO schaefchen_api;
-ALTER TABLE site_supervisors FORCE ROW LEVEL SECURITY;
-ALTER TABLE site_supervisor_history FORCE ROW LEVEL SECURITY;
+ALTER TABLE site_supervisors NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE site_supervisor_history NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE site_supervisors IS 'Zeitlich geplante Vorarbeiterzuweisungen mit automatischer Hauptverantwortungs-Übergabe.';
 COMMENT ON COLUMN site_supervisors.is_primary IS 'Genau ein aktiver Hauptvorarbeiter pro Baustelle.';

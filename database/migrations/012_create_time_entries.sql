@@ -422,7 +422,7 @@ WHERE entry.correction_status = 'pending';
 
 GRANT SELECT, INSERT, UPDATE ON time_entries TO schaefchen_api;
 GRANT SELECT ON pending_time_entry_corrections TO schaefchen_api;
-ALTER TABLE time_entries FORCE ROW LEVEL SECURITY;
+ALTER TABLE time_entries NO FORCE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE time_entries IS 'Offline-fähige, unveränderliche Zeitereignisse ohne GPS-Speicherung.';
 COMMENT ON COLUMN time_entries.client_entry_id IS 'Vom Endgerät einmalig erzeugte UUID zur idempotenten Offline-Synchronisation.';

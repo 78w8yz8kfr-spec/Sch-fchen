@@ -45,6 +45,26 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
 
+      - name: Render-ähnlichen Datenbankeigentümer prüfen
+        env:
+          PGPASSWORD: ci_only_password
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: schaefchen
+          POSTGRES_USER: schaefchen
+        run: |
+          psql --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" \
+            --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" \
+            --set=ON_ERROR_STOP=1 \
+            --command="CREATE ROLE schaefchen_render_owner LOGIN NOSUPERUSER CREATEDB CREATEROLE PASSWORD 'ci_only_render_owner_password'"
+          createdb --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" \
+            --username="$POSTGRES_USER" --owner=schaefchen_render_owner \
+            schaefchen_render_check
+          PGPASSWORD=ci_only_render_owner_password \
+            POSTGRES_DB=schaefchen_render_check \
+            POSTGRES_USER=schaefchen_render_owner \
+            sh database/scripts/run-sql-directories.sh database/migrations database/seeds
+
       - name: Migration, Seed und SQL-Tests ausführen
         env:
           PGPASSWORD: ci_only_password
