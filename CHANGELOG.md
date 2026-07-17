@@ -62,3 +62,4 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - serverseitige Rollenprüfung: Admin und Büro planen, ausschließlich Admin darf Bürokonten anlegen
 - persönliche Startpasswort-Änderung bei der ersten Anmeldung neuer Mitarbeiter
 - PostgreSQL-Integrationstest für Verwaltung, Rollentrennung, Passwortwechsel und sichtbare Mitarbeiterzuweisung
+- iOS-Cache-Reparaturseite und netzwerkbevorzugte Navigation gegen dauerhaft veraltete PWA-Oberflächen

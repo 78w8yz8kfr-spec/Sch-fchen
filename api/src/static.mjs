@@ -41,12 +41,13 @@ export async function serveStatic(request, response, directory, pathname) {
   try {
     if (!(await stat(candidate)).isFile()) return false;
     const content = await readFile(candidate);
-    const cacheControl = relativePath === "index.html" || relativePath === "sw.js"
-      ? "no-cache"
+    const extension = extname(candidate);
+    const cacheControl = extension === ".html" || relativePath === "sw.js" || relativePath === "refresh.js"
+      ? "no-store"
       : "public, max-age=3600";
     response.writeHead(200, {
       ...SECURITY_HEADERS,
-      "Content-Type": CONTENT_TYPES.get(extname(candidate)) || "application/octet-stream",
+      "Content-Type": CONTENT_TYPES.get(extension) || "application/octet-stream",
       "Content-Length": content.length,
       "Cache-Control": cacheControl
     });

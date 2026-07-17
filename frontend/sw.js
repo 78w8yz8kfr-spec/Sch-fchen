@@ -1,4 +1,4 @@
-const CACHE_NAME = "schaefchen-online-v5";
+const CACHE_NAME = "schaefchen-online-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -34,6 +34,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (requestUrl.pathname.startsWith("/api/") || requestUrl.pathname === "/health") {
+    return;
+  }
+
+  if (event.request.mode === "navigate" || requestUrl.pathname === "/" || requestUrl.pathname.endsWith(".html")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then((response) => {
+          if (response?.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
     return;
   }
 

@@ -9,11 +9,13 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, manifestSource, mark, uiSpecification] = await Promise.all([
+const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, uiSpecification] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
   readFrontendFile("app.js"),
   readFrontendFile("sw.js"),
+  readFrontendFile("refresh.html"),
+  readFrontendFile("refresh.js"),
   readFrontendFile("manifest.webmanifest"),
   readFrontendFile("assets/mark.svg"),
   readFile(resolve(repositoryDirectory, "docs/PHASE1_UI_SPEC.md"), "utf8")
@@ -80,6 +82,13 @@ for (const asset of ["./index.html", "./styles.css", "./app.js", "./manifest.web
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
+assert.match(worker, /event\.request\.mode === "navigate"/);
+assert.match(worker, /cache: "no-store"/);
+assert.match(refreshHtml, /Schäfchen wird erneuert/);
+assert.match(refreshScript, /serviceWorker\.getRegistrations/);
+assert.match(refreshScript, /key\.startsWith\("schaefchen-"\)/);
+assert.doesNotMatch(refreshScript, /localStorage|indexedDB/,
+  "Die Cache-Aktualisierung darf lokale Offline-Fachdaten nicht löschen");
 
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);

@@ -55,6 +55,7 @@ Technischer Stand: V0.7-dev
 - vereinfachte Baustellenanlage, die Kunde, Standort und Projekt konsistent in einer Transaktion erzeugt
 - verpflichtender persönlicher Passwortwechsel nach der Übergabe eines Mitarbeiter-Startpassworts
 - API- und Oberflächenprüfung für Admin/Büro im PostgreSQL-Integrationslauf
+- selbstständige iOS-PWA-Cache-Reparatur ohne Löschen lokaler Offline-Fachdaten
 
 ## Noch zu prüfen
 
