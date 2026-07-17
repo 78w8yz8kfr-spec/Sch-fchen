@@ -63,13 +63,12 @@ BEGIN
         (company_id, foreman_one_id, foreman_role_id),
         (company_id, foreman_two_id, foreman_role_id);
 
-    IF NOT EXISTS (
-        SELECT 1 FROM users
-        WHERE id IN (foreman_one_id, foreman_two_id)
-          AND is_foreman
-        GROUP BY company_id
-        HAVING COUNT(*) = 2
-    ) THEN
+    IF (
+        SELECT COUNT(*)
+        FROM users AS candidate
+        WHERE candidate.id IN (foreman_one_id, foreman_two_id)
+          AND candidate.is_foreman
+    ) <> 2 THEN
         RAISE EXCEPTION 'Vorarbeiter-Lesewert wurde nicht aus Rollen gepflegt';
     END IF;
 
