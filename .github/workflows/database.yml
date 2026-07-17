@@ -64,6 +64,12 @@ jobs:
             POSTGRES_DB=schaefchen_render_check \
             POSTGRES_USER=schaefchen_render_owner \
             sh database/scripts/run-sql-directories.sh database/migrations database/seeds
+          PGPASSWORD=ci_only_render_owner_password \
+            POSTGRES_DB=schaefchen_render_check \
+            POSTGRES_USER=schaefchen_render_owner \
+            API_DB_USER=schaefchen_api_login \
+            API_DB_PASSWORD=ci_only_render_api_password \
+            sh database/scripts/configure-api-role.sh
 
       - name: Migration, Seed und SQL-Tests ausführen
         env:
