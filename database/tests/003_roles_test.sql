@@ -212,8 +212,8 @@ BEGIN
         RAISE EXCEPTION 'API-Rolle sieht firmenfremde Benutzer';
     END IF;
 
-    IF visible_roles <> 4 THEN
-        RAISE EXCEPTION 'API-Rolle sieht % Rollen statt der vier eigenen', visible_roles;
+    IF visible_roles <> 7 THEN
+        RAISE EXCEPTION 'API-Rolle sieht % Rollen statt der sieben eigenen', visible_roles;
     END IF;
 END;
 $$;
