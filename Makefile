@@ -1,6 +1,6 @@
 COMPOSE := docker compose --env-file .env
 
-.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-seed db-test backup restore backup-restore-test frontend-test frontend-serve
+.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-api-role db-seed db-test api-up api-test backup restore backup-restore-test frontend-test frontend-serve
 
 check-env:
 	@test -f .env || (echo "Fehler: .env fehlt. Zuerst 'cp .env.example .env' ausführen." && exit 1)
@@ -12,13 +12,30 @@ dev-up: check-env
 db-migrate: check-env
 	$(COMPOSE) run --rm db-migrate
 
+db-api-role: check-env
+	$(COMPOSE) run --rm db-api-role
+
 db-seed: check-env
 	$(COMPOSE) run --rm db-seed
 
 db-test: check-env
 	$(COMPOSE) run --rm db-test
 
-dev-init: dev-up db-migrate db-seed db-test
+api-up: check-env
+	$(COMPOSE) up -d --build api
+
+api-test:
+	npm --prefix api ci --ignore-scripts
+	npm --prefix api test
+
+dev-init: check-env
+	$(MAKE) dev-up
+	$(MAKE) db-migrate
+	$(MAKE) db-api-role
+	$(MAKE) db-seed
+	$(MAKE) db-test
+	$(MAKE) api-test
+	$(MAKE) api-up
 
 dev-down: check-env
 	$(COMPOSE) down

@@ -38,6 +38,13 @@ jobs:
       - name: PostgreSQL-Client installieren
         run: sudo apt-get update && sudo apt-get install --yes postgresql-client
 
+      - name: Node.js einrichten
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
       - name: Migration, Seed und SQL-Tests ausführen
         env:
           PGPASSWORD: ci_only_password
@@ -49,6 +56,32 @@ jobs:
           sh database/scripts/run-sql-directories.sh database/migrations
           sh database/scripts/run-sql-directories.sh database/migrations
           sh database/scripts/run-sql-directories.sh database/seeds database/tests
+
+      - name: Eingeschränkte API-Datenbankrolle konfigurieren
+        env:
+          PGPASSWORD: ci_only_password
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: schaefchen
+          POSTGRES_USER: schaefchen
+          API_DB_USER: schaefchen_api_login
+          API_DB_PASSWORD: ci_only_api_password
+        run: sh database/scripts/configure-api-role.sh
+
+      - name: Node-Abhängigkeiten installieren
+        run: npm --prefix api ci --ignore-scripts
+
+      - name: API-Unit- und PostgreSQL-Integrationstests ausführen
+        env:
+          API_INTEGRATION_TEST: "true"
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: schaefchen
+          POSTGRES_USER: schaefchen
+          POSTGRES_PASSWORD: ci_only_password
+          API_DB_USER: schaefchen_api_login
+          API_DB_PASSWORD: ci_only_api_password
+        run: npm --prefix api test
 
       - name: Backup und Restore prüfen
         env:

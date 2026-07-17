@@ -1,7 +1,7 @@
 # Sprint 2: Planung und Zeiterfassung
 
 Stand: 17.07.2026  
-Technischer Stand: V0.4-dev
+Technischer Stand: V0.5-dev
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
 012. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,
@@ -110,5 +110,6 @@ Für jede Migration existiert ein eigener SQL-Test. Geprüft werden unter andere
 mehrfache Tagesbaustellen, Reihenfolge, Änderungsbegründung, automatische
 Vorarbeiterübergabe, individuelle Sollzeit, Pausen- und Mehrarbeitsberechnung,
 Client-ID-Dubletten, Korrekturen, Sperren, Löschschutz und Mandantentrennung.
-GitHub Actions wendet alle Migrationen zweimal an und prüft anschließend Backup
-und Restore einschließlich der Sprint-2-Tabellen.
+GitHub Actions wendet alle Migrationen zweimal an, prüft Backup und Restore und
+führt anschließend den echten Login-/Session-/Offline-Sync-Ablauf der Node-API
+gegen PostgreSQL aus.

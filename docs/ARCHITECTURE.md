@@ -31,6 +31,12 @@ PostgreSQL Row Level Security bildet eine zusätzliche Schutzschicht. Die
 Datenbankrolle `schaefchen_api` besitzt nur die freigegebenen Tabellenrechte;
 für alle bisher veröffentlichten Fachtabellen ist RLS erzwungen.
 
+Der technische Login `schaefchen_api_login` besitzt selbst keine Tabellenrechte
+und darf lediglich in die NOLOGIN-Rolle `schaefchen_api` wechseln. Jede
+API-Transaktion setzt anschließend `app.current_company_id` und
+`app.current_user_id` aus der serverseitig aufgelösten Sitzung. Übermittelte
+Mandanten- oder Benutzer-IDs werden abgewiesen.
+
 ## Datenhistorie
 
 Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht. Zeitkorrekturen, PDF-Versionen und spätere relevante Änderungen erhalten eine nachvollziehbare Historie. `row_version` bereitet die Konflikterkennung bei konkurrierenden Änderungen vor.
@@ -98,10 +104,25 @@ Offline-Übertragungen idempotent. Korrekturen werden als referenzierender neuer
 Eintrag genehmigt oder abgelehnt; das Original bleibt erhalten. Für die
 Zeiterfassung wird kein GPS gespeichert.
 
-Die PWA-Demo verwendet noch keine API. Sie schreibt gekennzeichnete Demodaten in
+Die öffentliche PWA-Demo verwendet noch keine API. Sie schreibt gekennzeichnete Demodaten in
 den lokalen Browserspeicher und bildet dort denselben Ereignisablauf und die
-Pausenberechnung ab. Produktiv setzt die API Firma und Benutzer aus der Sitzung,
-prüft Rollen und synchronisiert jede Client-ID in einer Transaktion.
+Pausenberechnung ab. Die implementierte API setzt Firma und Benutzer aus der
+Sitzung und synchronisiert jede Client-ID in einer Transaktion. Die Anbindung
+der PWA wird erst aktiviert, wenn eine geschützte API-Adresse bereitsteht.
 
 Die vollständigen Feld-, Rechen- und Korrekturregeln stehen in
 [`SPRINT2_TIME_MODEL.md`](SPRINT2_TIME_MODEL.md).
+
+## API-Grundlage
+
+Migration 013 speichert ausschließlich den SHA-256-Hash eines zufälligen
+Sitzungstokens. Das rohe Token liegt nur im `HttpOnly`-Cookie. Sitzungen laufen
+automatisch ab und werden beim Abmelden widerrufen; historisches Hartlöschen ist
+gesperrt. Passwörter werden mit `scrypt` und individuellem Zufallssalz geprüft.
+
+Die Node-API validiert JSON-Größe, Herkunft, UUIDs, Zeitstempel,
+Baustellenzuweisung und die fachlich nächste Buchungsart. Wiederholte
+`client_entry_id`-Übertragungen liefern das vorhandene Ergebnis; eine
+widersprüchliche Wiederverwendung wird abgelehnt. API- und PostgreSQL-Tests
+laufen gemeinsam in GitHub Actions. Details stehen in
+[`API_SECURITY.md`](API_SECURITY.md).

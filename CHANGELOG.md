@@ -44,3 +44,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - interaktive Sprint-2-PWA-Demo mit zwei Einsätzen, lokalem Stundenzettel und dauerhafter Gerätespeicherung
 - vollständige Sprint-2-Dokumentation für Planung, Zeiterfassung, Korrekturen und Offline-Verhalten
 - Schaaf-Elektro-Farbsystem in Rot, Schwarz und Weiß für PWA, App-Symbol und Browserdarstellung
+- Migration 013 für ablaufende und widerrufbare Benutzersitzungen mit ausschließlich gehashten Tokens
+- technische API-Login-Rolle ohne eigene Tabellenrechte und serverseitiger Mandantenkontext je Transaktion
+- Node-API für Personalnummer-Anmeldung, Sitzungsprüfung, Abmeldung, eigenen Arbeitstag und Offline-Zeitbuchungen
+- `scrypt`-Passwort-Hashing, sichere Cookies, Login-Sperre, exakte Herkunftsprüfung und begrenzte JSON-Anfragen
+- idempotente Offline-Synchronisation mit Schritt-, Zeit-, Baustellen- und Zuweisungsprüfung
+- Docker-API-Dienst, lokale API-Befehle und PostgreSQL-Integrationstest in GitHub Actions

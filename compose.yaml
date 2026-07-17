@@ -108,6 +108,37 @@ services:
       - backend
     restart: unless-stopped
 
+  api:
+    build:
+      context: ./api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_PORT: 3000
+      API_ALLOWED_ORIGIN: ${API_ALLOWED_ORIGIN:?API_ALLOWED_ORIGIN must be set}
+      API_COOKIE_SECURE: ${API_COOKIE_SECURE:-false}
+      API_DB_POOL_SIZE: ${API_DB_POOL_SIZE:-10}
+      API_DB_USER: ${API_DB_USER:?API_DB_USER must be set}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:?API_DB_PASSWORD must be set}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Europe/Berlin}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - backend
+    restart: unless-stopped
+
   db-migrate:
     <<: *database-tool
     entrypoint: [/bin/sh, /database/scripts/run-sql-directories.sh]
@@ -122,6 +153,18 @@ services:
     <<: *database-tool
     entrypoint: [/bin/sh, /database/scripts/run-sql-directories.sh]
     command: [/database/tests]
+
+  db-api-role:
+    <<: *database-tool
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      API_DB_USER: ${API_DB_USER:?API_DB_USER must be set}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:?API_DB_PASSWORD must be set}
+    entrypoint: [/bin/sh, /database/scripts/configure-api-role.sh]
 
 volumes:
   postgres_data:

@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 17.07.2026
-Technischer Stand: V0.4-dev
+Technischer Stand: V0.5-dev
 
 ## Abgeschlossen
 
@@ -38,21 +38,28 @@ Technischer Stand: V0.4-dev
 - automatische Berechnung von Pause, Arbeitszeit, Fahrtzeit und Mehrarbeit
 - SQL-Abnahmetests für Planung, Vorarbeiter, Arbeitstage, Zeitereignisse und Mandantentrennung
 - interaktive PWA-Demo für den vollständigen Monteur-Arbeitsfluss mit lokaler Speicherung
+- Migration 013 `user_sessions` mit Ablauf, Widerruf, Löschschutz und ausschließlich gehashten Tokens
+- Personalnummer-Login mit `scrypt`, konstantem Fehlerbild und begrenzten Fehlversuchen
+- `HttpOnly`-/`SameSite=Strict`-Sitzungscookie und exakter CORS-Herkunft
+- serverseitige Auflösung von Firma, Benutzer und aktiven Rollen
+- getrennte technische Login-Rolle ohne eigene Tabellenrechte
+- API-Endpunkte für Sitzung, eigenen Arbeitstag und idempotente Offline-Zeitbuchungen
+- API-Unit-Tests sowie echter PostgreSQL-Integrationstest im GitHub-Workflow
 
 ## Noch zu prüfen
 
 - vollständiger lokaler Docker-Start auf einem eigenen Rechner mit Docker
 - Backup-/Restore-Abnahme mit einem dauerhaft gespeicherten lokalen Entwicklungsvolumen; der isolierte CI-Durchlauf ist automatisiert
 - genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden bewusst keine Daten erfunden
-- produktive Passwortprüfung und Sitzungsverwaltung; die öffentliche PWA bleibt bis zur API-Anbindung eine gekennzeichnete Vorschau
+- produktive Bereitstellungsadresse mit TLS und Secret-Verwaltung für die API
+- API-Anbindung der öffentlichen PWA; bis dahin bleibt sie eine gekennzeichnete lokale Vorschau
 
 ## Nächster Entwicklungsschritt
 
-Nach der technischen Sprint-2-Abnahme folgt die sichere API-Grenze:
+Nach der sicheren API-Grundlage folgt deren kontrollierte Produktanbindung:
 
-- produktive Personalnummer-Anmeldung und kurzlebige Sitzung
-- serverseitige Ermittlung von Firma, Benutzer und wirksamen Rollen
-- idempotente Synchronisation der lokalen `client_entry_id`
+- Reverse Proxy/TLS und produktive Secret-Verwaltung für die API
+- Umschalten der PWA von lokaler Demo auf Login und Offline-Synchronisation
 - rollenabhängige Wochenplanung und Büroprüfung offener Korrekturen
 - anschließend Montage- und Bautagesberichte mit PDF-Versionierung
 
