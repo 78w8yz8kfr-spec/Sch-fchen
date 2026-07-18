@@ -99,3 +99,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Kunden- und Projektauswahl statt wiederholter Freitexteingabe bei der Baustellenanlage
 - bestehender Excel-Schnellimport und Paket-Endpunkt bleiben kompatibel
 - Versionsstand 0.12.0
+- Excel-Wochenplan als Unterfunktion der Einsatzplanung gruppiert
+- Excel-Baustellenliste als Unterfunktion der Baustellenplanung gruppiert
+- Verwaltungsmenü von einzelnen Import-Hauptpunkten befreit
+- Versionsstand 0.12.1

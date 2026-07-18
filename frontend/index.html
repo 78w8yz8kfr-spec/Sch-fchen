@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.12.0">
-    <script src="./app.js?v=0.12.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.12.1">
+    <script src="./app.js?v=0.12.1" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.12.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.12.1</p>
         </div>
       </section>
 
@@ -267,7 +267,21 @@
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
             </div>
 
-            <details class="admin-panel business-structure-panel" open>
+            <details id="assignment-planning-shell" class="admin-panel planning-shell" open>
+              <summary>Einsatzplanung</summary>
+              <div id="assignment-planning-content" class="planning-group">
+                <p class="planning-intro">Wochenübersicht, einzelne Zuweisung und Excel-Import an einem Ort.</p>
+              </div>
+            </details>
+
+            <details id="site-planning-shell" class="admin-panel planning-shell">
+              <summary>Baustellenplanung</summary>
+              <div id="site-planning-content" class="planning-group">
+                <p class="planning-intro">Kunden, Projekte und Baustellen einzeln oder gesammelt aus Excel anlegen.</p>
+              </div>
+            </details>
+
+            <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
               <summary>Betriebsstruktur</summary>
               <div class="structure-legend" aria-hidden="true">
                 <span>Kunde</span><i>›</i><span>Projekt</span><i>›</i><span>Baustelle</span>
@@ -306,7 +320,7 @@
               <details><summary>Weitere Module</summary><p>VDE, LWL, DGUV und KNX werden hier modular ergänzt.</p></details>
             </section>
 
-            <section class="admin-week" aria-labelledby="admin-week-title">
+            <section id="admin-week" class="admin-week" aria-labelledby="admin-week-title">
               <div class="admin-week__header">
                 <button id="admin-week-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
                 <div>
@@ -380,7 +394,7 @@
             </details>
 
             <details id="site-import-panel" class="admin-panel">
-              <summary>Baustellenliste aus Excel importieren</summary>
+              <summary>Mehrere Baustellen aus Excel anlegen</summary>
               <div class="admin-form">
                 <p class="field-help">Mehrere Kunden, Projekte und Baustellen auf einmal anlegen. Vor dem Speichern erscheint immer eine Vorschau.</p>
                 <a class="download-link" href="./assets/baustellen-import-vorlage.xlsx" download>Excel-Vorlage herunterladen</a>
@@ -410,7 +424,7 @@
               </div>
             </details>
 
-            <details class="admin-panel">
+            <details id="employee-panel" class="admin-panel">
               <summary>Mitarbeiter anlegen</summary>
               <form id="employee-form" class="admin-form" novalidate>
                 <div class="setup-grid">
@@ -442,7 +456,7 @@
               <ul id="employee-list" class="admin-list" aria-label="Aktive Mitarbeiter"></ul>
             </details>
 
-            <details class="admin-panel">
+            <details id="customer-panel" class="admin-panel">
               <summary>Kunde anlegen</summary>
               <form id="customer-form" class="admin-form" novalidate>
                 <label for="customer-type">Kundenart</label>
@@ -501,7 +515,7 @@
               <ul id="customer-list" class="admin-list" aria-label="Aktive Kunden"></ul>
             </details>
 
-            <details class="admin-panel">
+            <details id="project-panel" class="admin-panel">
               <summary>Projekt anlegen</summary>
               <form id="project-form" class="admin-form" novalidate>
                 <label for="project-customer">Kunde</label>
@@ -516,8 +530,8 @@
               <ul id="project-list" class="admin-list" aria-label="Aktive Projekte"></ul>
             </details>
 
-            <details class="admin-panel">
-              <summary>Baustelle anlegen</summary>
+            <details id="site-form-panel" class="admin-panel">
+              <summary>Einzelne Baustelle anlegen</summary>
               <form id="site-form" class="admin-form" novalidate>
                 <label for="site-project">Projekt</label>
                 <select id="site-project" required></select>
@@ -551,8 +565,8 @@
               <ul id="site-list" class="admin-list" aria-label="Aktive Baustellen"></ul>
             </details>
 
-            <details class="admin-panel" open>
-              <summary>Einsatz zuweisen</summary>
+            <details id="assignment-panel" class="admin-panel" open>
+              <summary>Einsatz manuell zuweisen</summary>
               <form id="assignment-form" class="admin-form" novalidate>
                 <label for="assignment-employee">Mitarbeiter</label>
                 <select id="assignment-employee" required></select>

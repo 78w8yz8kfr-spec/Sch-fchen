@@ -94,6 +94,9 @@
     infoCard: document.querySelector(".info-card"),
     adminSection: document.querySelector("#admin-section"),
     adminRefresh: document.querySelector("#admin-refresh"),
+    assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
+    sitePlanningContent: document.querySelector("#site-planning-content"),
+    businessStructurePanel: document.querySelector("#business-structure-panel"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminCustomerCount: document.querySelector("#admin-customer-count"),
     adminProjectCount: document.querySelector("#admin-project-count"),
@@ -107,6 +110,7 @@
     siteDashboardOrder: document.querySelector("#site-dashboard-order"),
     siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
     siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
+    adminWeek: document.querySelector("#admin-week"),
     siteDashboardClose: document.querySelector("#site-dashboard-close"),
     adminWeekPrevious: document.querySelector("#admin-week-previous"),
     adminWeekNext: document.querySelector("#admin-week-next"),
@@ -157,6 +161,7 @@
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
     employeeList: document.querySelector("#employee-list"),
+    customerPanel: document.querySelector("#customer-panel"),
     customerForm: document.querySelector("#customer-form"),
     customerType: document.querySelector("#customer-type"),
     customerCompanyFields: document.querySelector("#customer-company-fields"),
@@ -172,12 +177,14 @@
     customerCity: document.querySelector("#customer-city"),
     customerMessage: document.querySelector("#customer-message"),
     customerList: document.querySelector("#customer-list"),
+    projectPanel: document.querySelector("#project-panel"),
     projectForm: document.querySelector("#project-form"),
     projectCustomer: document.querySelector("#project-customer"),
     projectName: document.querySelector("#project-name"),
     projectShortText: document.querySelector("#project-short-text"),
     projectMessage: document.querySelector("#project-message"),
     projectList: document.querySelector("#project-list"),
+    siteFormPanel: document.querySelector("#site-form-panel"),
     siteForm: document.querySelector("#site-form"),
     siteProject: document.querySelector("#site-project"),
     siteName: document.querySelector("#site-name"),
@@ -188,6 +195,7 @@
     siteCity: document.querySelector("#site-city"),
     siteMessage: document.querySelector("#site-message"),
     siteList: document.querySelector("#site-list"),
+    assignmentPanel: document.querySelector("#assignment-panel"),
     assignmentForm: document.querySelector("#assignment-form"),
     assignmentEmployee: document.querySelector("#assignment-employee"),
     assignmentSite: document.querySelector("#assignment-site"),
@@ -198,6 +206,21 @@
     adminAssignmentList: document.querySelector("#admin-assignment-list"),
     toast: document.querySelector("#toast")
   };
+
+  elements.assignmentPlanningContent.append(
+    elements.adminWeek,
+    elements.assignmentEditForm,
+    elements.assignmentPanel,
+    elements.assignmentImportPanel
+  );
+  elements.sitePlanningContent.append(
+    elements.businessStructurePanel,
+    elements.siteDashboard,
+    elements.customerPanel,
+    elements.projectPanel,
+    elements.siteFormPanel,
+    elements.siteImportPanel
+  );
 
   const dateFormatter = new Intl.DateTimeFormat("de-DE", {
     weekday: "long",
@@ -323,7 +346,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.12.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.12.1 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
