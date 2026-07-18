@@ -8,6 +8,7 @@ const CONTENT_TYPES = new Map([
   [".svg", "image/svg+xml"],
   [".webmanifest", "application/manifest+json; charset=utf-8"],
   [".png", "image/png"],
+  [".webp", "image/webp"],
   [".ico", "image/x-icon"],
   [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
 ]);
