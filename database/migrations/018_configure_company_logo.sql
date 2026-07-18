@@ -1,9 +1,12 @@
 BEGIN;
 
 UPDATE companies
-SET logo_object_key = 'company-logos/schaaf-elektro.png'
+SET logo_object_key = 'company-logos/schaaf-elektro.webp'
 WHERE company_number = 'F-000001'
-  AND NULLIF(BTRIM(logo_object_key), '') IS NULL;
+  AND (
+      NULLIF(BTRIM(logo_object_key), '') IS NULL
+      OR logo_object_key = 'company-logos/schaaf-elektro.png'
+  );
 
 CREATE OR REPLACE FUNCTION api_get_initial_setup_status_v2(
     target_company_number VARCHAR

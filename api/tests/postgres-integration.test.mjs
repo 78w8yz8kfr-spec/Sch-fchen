@@ -70,15 +70,14 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(setupStatus.status, 200);
   const setupStatusBody = await setupStatus.json();
   assert.equal(setupStatusBody.setup.setupRequired, true);
-  assert.equal(setupStatusBody.setup.logoUrl, "./assets/company-logos/schaaf-elektro.png");
+  assert.equal(setupStatusBody.setup.logoUrl, "./assets/company-logos/schaaf-elektro.webp");
 
-  const companyLogo = await fetch(`${baseUrl}/assets/company-logos/schaaf-elektro.png`);
+  const companyLogo = await fetch(`${baseUrl}/assets/company-logos/schaaf-elektro.webp`);
   assert.equal(companyLogo.status, 200);
-  assert.match(companyLogo.headers.get("content-type"), /image\/png/);
-  assert.deepEqual(
-    [...new Uint8Array(await companyLogo.arrayBuffer()).slice(0, 8)],
-    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
-  );
+  assert.match(companyLogo.headers.get("content-type"), /image\/webp/);
+  const companyLogoBytes = new Uint8Array(await companyLogo.arrayBuffer());
+  assert.equal(new TextDecoder().decode(companyLogoBytes.slice(0, 4)), "RIFF");
+  assert.equal(new TextDecoder().decode(companyLogoBytes.slice(8, 12)), "WEBP");
 
   const setup = await fetch(`${baseUrl}/api/v1/setup`, {
     method: "POST",
@@ -102,7 +101,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const cookie = login.headers.get("set-cookie").split(";", 1)[0];
   const loginBody = await login.json();
   assert.equal(loginBody.session.company.number, "F-000001");
-  assert.equal(loginBody.session.company.logoUrl, "./assets/company-logos/schaaf-elektro.png");
+  assert.equal(loginBody.session.company.logoUrl, "./assets/company-logos/schaaf-elektro.webp");
   assert.deepEqual(loginBody.session.user.roles, ["admin"]);
 
   const session = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });

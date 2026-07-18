@@ -4,8 +4,8 @@ import { companyLogoUrl } from "../src/database.mjs";
 
 test("Firmenlogo-Referenzen werden ausschließlich als lokale Asset-URL ausgegeben", () => {
   assert.equal(
-    companyLogoUrl("company-logos/schaaf-elektro.png"),
-    "./assets/company-logos/schaaf-elektro.png"
+    companyLogoUrl("company-logos/schaaf-elektro.webp"),
+    "./assets/company-logos/schaaf-elektro.webp"
   );
   assert.equal(companyLogoUrl(null), null);
   assert.equal(companyLogoUrl("../fremd.png"), null);

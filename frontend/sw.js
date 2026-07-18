@@ -6,7 +6,7 @@ const APP_SHELL = [
   "./app.js?v=0.17.0",
   "./manifest.webmanifest",
   "./assets/mark.svg",
-  "./assets/company-logos/schaaf-elektro.png",
+  "./assets/company-logos/schaaf-elektro.webp",
   "./assets/baustellen-import-vorlage.xlsx"
 ];
 

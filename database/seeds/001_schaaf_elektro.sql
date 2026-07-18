@@ -15,7 +15,7 @@ VALUES (
     'Schaaf Elektro GmbH',
     'Schaaf Elektro GmbH',
     'active',
-    'company-logos/schaaf-elektro.png',
+    'company-logos/schaaf-elektro.webp',
     'DE',
     'development',
     '{"is_initial_tenant": true}'::JSONB

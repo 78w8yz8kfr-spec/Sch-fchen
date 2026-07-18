@@ -8,7 +8,7 @@ BEGIN
         SELECT 1
         FROM companies
         WHERE company_number = 'F-000001'
-          AND logo_object_key = 'company-logos/schaaf-elektro.png'
+          AND logo_object_key = 'company-logos/schaaf-elektro.webp'
     ) THEN
         RAISE EXCEPTION 'Das Firmenlogo der Startfirma ist nicht konfiguriert';
     END IF;
@@ -25,7 +25,7 @@ BEGIN
     INTO returned_logo_key
     FROM api_get_initial_setup_status_v2('F-000001');
 
-    IF returned_logo_key IS DISTINCT FROM 'company-logos/schaaf-elektro.png' THEN
+    IF returned_logo_key IS DISTINCT FROM 'company-logos/schaaf-elektro.webp' THEN
         RAISE EXCEPTION 'Der Einrichtungsstatus liefert nicht das konfigurierte Firmenlogo';
     END IF;
 
