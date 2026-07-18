@@ -108,3 +108,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Mehr auf Mitarbeiterverwaltung und ergänzende Einstellungen reduziert
 - redundante zusätzliche Planungsebene entfernt
 - Versionsstand 0.13.0
+- separate Excel-Aufklappkarten aus Einsatz- und Baustellenplanung entfernt
+- Dateiauswahl und Drag-and-drop ohne zusätzlichen Klick direkt sichtbar gemacht
+- Excel-Import weiterhin mit sicherer Vorschau und ausdrücklicher Bestätigung
+- Versionsstand 0.13.1

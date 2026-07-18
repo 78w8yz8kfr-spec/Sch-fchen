@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.13.0">
-    <script src="./app.js?v=0.13.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.13.1">
+    <script src="./app.js?v=0.13.1" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.13.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.13.1</p>
         </div>
       </section>
 
@@ -355,9 +355,13 @@
               <p id="assignment-edit-message" class="form-message" aria-live="polite"></p>
             </form>
 
-            <details id="assignment-import-panel" class="admin-panel">
-              <summary>Excel-Wochenplan importieren</summary>
-              <div class="admin-form">
+            <section id="assignment-import-panel" class="inline-import">
+              <div class="inline-import__heading">
+                <strong>Wochenplan aus Excel</strong>
+                <span>Datei direkt auswählen oder hineinziehen</span>
+              </div>
+              <div id="assignment-import-body" class="inline-import__body">
+                <div class="admin-form">
                 <p class="field-help">Geeignet für euren Baustellenplan: Mitarbeiter links, Baustellen in Fünferblöcken und X von Montag bis Freitag.</p>
                 <label id="assignment-import-dropzone" class="file-drop" for="assignment-import-file">
                   <input
@@ -388,12 +392,17 @@
                   <button id="assignment-import-confirm" class="button button--primary" type="button">Einsätze importieren</button>
                   <p class="field-help">Bestehende oder nicht eindeutig zugeordnete Tage werden nicht überschrieben.</p>
                 </section>
+                </div>
               </div>
-            </details>
+            </section>
 
-            <details id="site-import-panel" class="admin-panel">
-              <summary>Mehrere Baustellen aus Excel anlegen</summary>
-              <div class="admin-form">
+            <section id="site-import-panel" class="inline-import">
+              <div class="inline-import__heading">
+                <strong>Baustellenliste aus Excel</strong>
+                <span>Datei direkt auswählen oder hineinziehen</span>
+              </div>
+              <div id="site-import-body" class="inline-import__body">
+                <div class="admin-form">
                 <p class="field-help">Mehrere Kunden, Projekte und Baustellen auf einmal anlegen. Vor dem Speichern erscheint immer eine Vorschau.</p>
                 <a class="download-link" href="./assets/baustellen-import-vorlage.xlsx" download>Excel-Vorlage herunterladen</a>
                 <label id="site-import-dropzone" class="file-drop" for="site-import-file">
@@ -419,8 +428,9 @@
                   <button id="site-import-confirm" class="button button--primary" type="button">Baustellen importieren</button>
                   <p class="field-help">Vorhandene Baustellennamen und fehlerhafte Zeilen werden nicht angelegt.</p>
                 </section>
+                </div>
               </div>
-            </details>
+            </section>
 
             <details id="employee-panel" class="admin-panel">
               <summary>Mitarbeiter anlegen</summary>
@@ -529,7 +539,7 @@
             </details>
 
             <details id="site-form-panel" class="admin-panel">
-              <summary>Einzelne Baustelle anlegen</summary>
+              <summary>Baustellen anlegen</summary>
               <form id="site-form" class="admin-form" novalidate>
                 <label for="site-project">Projekt</label>
                 <select id="site-project" required></select>
@@ -564,7 +574,7 @@
             </details>
 
             <details id="assignment-panel" class="admin-panel" open>
-              <summary>Einsatz manuell zuweisen</summary>
+              <summary>Einsätze anlegen</summary>
               <form id="assignment-form" class="admin-form" novalidate>
                 <label for="assignment-employee">Mitarbeiter</label>
                 <select id="assignment-employee" required></select>

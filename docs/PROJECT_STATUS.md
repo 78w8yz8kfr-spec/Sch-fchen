@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 18.07.2026
-Technischer Stand: V0.13.0
+Technischer Stand: V0.13.1
 
 ## Abgeschlossen
 
@@ -77,6 +77,7 @@ Technischer Stand: V0.13.0
 - integrierte Planungsbereiche: Excel-Wochenplan innerhalb der Einsatzplanung und Excel-Baustellenliste innerhalb der Baustellenplanung
 - rollenabhängige Hauptnavigation: Planer erreichen Einsätze und Baustellen direkt; Monteure behalten Start, Woche und Mehr
 - Mitarbeiterverwaltung und Einstellungen bleiben getrennt unter Mehr
+- Excel-Dateiauswahl ohne eigenen Aufklapppunkt direkt und dauerhaft sichtbar in Einsatz- und Baustellenplanung
 
 ## Noch zu prüfen
 

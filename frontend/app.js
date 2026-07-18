@@ -135,6 +135,7 @@
     assignmentEditClose: document.querySelector("#assignment-edit-close"),
     assignmentEditMessage: document.querySelector("#assignment-edit-message"),
     assignmentImportPanel: document.querySelector("#assignment-import-panel"),
+    assignmentImportBody: document.querySelector("#assignment-import-body"),
     assignmentImportDropzone: document.querySelector("#assignment-import-dropzone"),
     assignmentImportFile: document.querySelector("#assignment-import-file"),
     assignmentImportFileName: document.querySelector("#assignment-import-file-name"),
@@ -150,6 +151,7 @@
     assignmentImportList: document.querySelector("#assignment-import-list"),
     assignmentImportConfirm: document.querySelector("#assignment-import-confirm"),
     siteImportPanel: document.querySelector("#site-import-panel"),
+    siteImportBody: document.querySelector("#site-import-body"),
     siteImportDropzone: document.querySelector("#site-import-dropzone"),
     siteImportFile: document.querySelector("#site-import-file"),
     siteImportFileName: document.querySelector("#site-import-file-name"),
@@ -220,16 +222,16 @@
   elements.assignmentPlanningContent.append(
     elements.adminWeek,
     elements.assignmentEditForm,
-    elements.assignmentPanel,
-    elements.assignmentImportPanel
+    elements.assignmentImportPanel,
+    elements.assignmentPanel
   );
   elements.sitePlanningContent.append(
+    elements.siteImportPanel,
     elements.businessStructurePanel,
     elements.siteDashboard,
     elements.customerPanel,
     elements.projectPanel,
-    elements.siteFormPanel,
-    elements.siteImportPanel
+    elements.siteFormPanel
   );
 
   const dateFormatter = new Intl.DateTimeFormat("de-DE", {
@@ -356,7 +358,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.1 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
