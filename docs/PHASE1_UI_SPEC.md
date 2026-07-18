@@ -47,8 +47,10 @@ gesendet und kann mit „Demo zurücksetzen“ vollständig entfernt werden.
 | --- | --- | --- |
 | Monteur | nächster eigener Arbeitsschritt | eigene Planung und eigene Daten |
 | Vorarbeiter | nächster eigener Arbeitsschritt | zusätzlich zugewiesene Baustellen |
-| Planer, Projektleiter, Assistenz der Geschäftsführung | Organisationsübersicht | Planung und freigegebene Korrekturen |
-| Admin | Organisationsübersicht | vollständige Firmenverwaltung |
+| Büro / Disposition | Organisationsübersicht | Kunden-, Baustellen- und Einsatzplanung |
+| Projektleiter | Organisationsübersicht | zugewiesene Projekte und Baustellen |
+| Geschäftsführer | Organisationsübersicht | betriebliche Gesamtsteuerung |
+| Administrator | Organisationsübersicht | technische Firmenverwaltung und Vollzugriff |
 
 Mehrere Rollen je Benutzer sind möglich. Die API liefert später die wirksamen
 Rechte; das Frontend entscheidet Berechtigungen niemals allein.

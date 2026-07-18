@@ -27,6 +27,7 @@
     loginForm: document.querySelector("#login-form"),
     loginMessage: document.querySelector("#login-message"),
     loginSubmit: document.querySelector("#login-submit"),
+    companyNumberField: document.querySelector("#company-number-field"),
     companyNumber: document.querySelector("#company-number"),
     personnelNumber: document.querySelector("#personnel-number"),
     passwordInput: document.querySelector("#password"),
@@ -50,10 +51,19 @@
     openPreview: document.querySelector("#open-preview"),
     previewDivider: document.querySelector("#preview-divider"),
     loginFooter: document.querySelector("#login-footer"),
+    loginCompanyMark: document.querySelector("#login-company-mark"),
+    loginCompanyName: document.querySelector("#login-company-name"),
     closePreview: document.querySelector("#close-preview"),
+    dashboardCompanyMark: document.querySelector("#dashboard-company-mark"),
     dashboardCompany: document.querySelector("#dashboard-company"),
     dashboardTitle: document.querySelector("#dashboard-title"),
     modeBadge: document.querySelector("#mode-badge"),
+    dashboardPanes: [...document.querySelectorAll("[data-dashboard-pane]")],
+    liveStatus: document.querySelector("#live-status"),
+    liveSite: document.querySelector("#live-site"),
+    liveSince: document.querySelector("#live-since"),
+    liveWork: document.querySelector("#live-work"),
+    liveForeman: document.querySelector("#live-foreman"),
     timesheetEyebrow: document.querySelector("#timesheet-eyebrow"),
     storageTitle: document.querySelector("#storage-title"),
     storageText: document.querySelector("#storage-text"),
@@ -90,6 +100,15 @@
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminSiteCount: document.querySelector("#admin-site-count"),
     adminAssignmentCount: document.querySelector("#admin-assignment-count"),
+    siteDashboard: document.querySelector("#site-dashboard"),
+    siteDashboardTitle: document.querySelector("#site-dashboard-title"),
+    siteDashboardMeta: document.querySelector("#site-dashboard-meta"),
+    siteDashboardCustomer: document.querySelector("#site-dashboard-customer"),
+    siteDashboardProject: document.querySelector("#site-dashboard-project"),
+    siteDashboardOrder: document.querySelector("#site-dashboard-order"),
+    siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
+    siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
+    siteDashboardClose: document.querySelector("#site-dashboard-close"),
     adminWeekPrevious: document.querySelector("#admin-week-previous"),
     adminWeekNext: document.querySelector("#admin-week-next"),
     adminWeekTitle: document.querySelector("#admin-week-title"),
@@ -276,6 +295,8 @@
   function configureModeCopy() {
     elements.openPreview.hidden = !demoMode;
     elements.previewDivider.hidden = !demoMode;
+    elements.modeNote.hidden = !demoMode;
+    elements.companyNumberField.hidden = true;
     elements.modeBadge.textContent = demoMode ? "Vorschau" : "Live";
     elements.timesheetEyebrow.textContent = demoMode ? "Live und lokal" : "Live synchronisiert";
     elements.resetDemo.hidden = !demoMode;
@@ -283,7 +304,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.10.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.11.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -308,6 +329,7 @@
     elements.dashboardView.hidden = false;
     document.title = "Start · Schäfchen";
     render();
+    showDashboardPane("start", false);
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
@@ -317,6 +339,7 @@
     elements.loginView.hidden = false;
     elements.setupForm.hidden = true;
     elements.loginForm.hidden = false;
+    configureModeCopy();
     document.title = "Schäfchen";
     elements.passwordInput.value = "";
     elements.loginMessage.textContent = "";
@@ -336,6 +359,9 @@
     elements.companyNumber.readOnly = true;
     elements.loginForm.hidden = true;
     elements.setupForm.hidden = false;
+    elements.modeNote.hidden = false;
+    elements.loginCompanyName.textContent = setup.displayName;
+    elements.loginCompanyMark.textContent = (setup.displayName[0] || "F").toUpperCase();
     elements.modeNoteText.replaceChildren();
     const strong = document.createElement("strong");
     strong.textContent = setup.displayName;
@@ -355,6 +381,8 @@
   function canPlan() {
     const planningRoles = new Set([
       "admin",
+      "managing_director",
+      "dispatch_office",
       "office",
       "planner",
       "project_manager",
@@ -609,14 +637,57 @@
     container.append(warning);
   }
 
-  function appendAdminListItem(list, title, meta) {
+  function appendAdminListItem(list, title, meta, action = null) {
     const item = document.createElement("li");
+    const content = document.createElement("div");
     const strong = document.createElement("strong");
     const span = document.createElement("span");
     strong.textContent = title;
     span.textContent = meta;
-    item.append(strong, span);
+    content.append(strong, span);
+    item.append(content);
+    if (action) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = action.label;
+      button.addEventListener("click", action.handler);
+      item.append(button);
+    }
     list.append(item);
+  }
+
+  function openSiteDashboard(site) {
+    const address = [
+      `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
+      `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
+    ].filter(Boolean).join(", ");
+    const assignedEmployees = new Map();
+    adminState.weekAssignments
+      .filter((assignment) => assignment.constructionSiteId === site.id)
+      .forEach((assignment) => {
+        assignedEmployees.set(assignment.employeeId, assignment.employeeName);
+      });
+
+    elements.siteDashboardTitle.textContent = site.name;
+    elements.siteDashboardMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
+    elements.siteDashboardCustomer.textContent = site.customerName;
+    elements.siteDashboardProject.textContent = site.projectName || site.name;
+    elements.siteDashboardOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
+    elements.siteDashboardNavigation.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    elements.siteDashboardEmployees.replaceChildren();
+    if (assignedEmployees.size === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = "In der gewählten Woche ist noch niemand zugewiesen.";
+      elements.siteDashboardEmployees.append(empty);
+    } else {
+      assignedEmployees.forEach((name) => {
+        appendAdminListItem(elements.siteDashboardEmployees, name, "In dieser Woche eingeplant");
+      });
+    }
+    elements.siteDashboard.hidden = false;
+    elements.siteDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function renderAdminSelect(select, items, placeholder, label) {
@@ -744,11 +815,13 @@
     elements.employeeList.replaceChildren();
     adminState.employees.forEach((employee) => {
       const roleLabels = {
-        admin: "Admin",
+        admin: "Administrator",
+        managing_director: "Geschäftsführer",
+        dispatch_office: "Büro / Disposition",
         office: "Planung (Bestand)",
-        planner: "Planer",
+        planner: "Planer (Bestand)",
         project_manager: "Projektleiter",
-        executive_assistant: "Assistenz der Geschäftsführung",
+        executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
         foreman: "Vorarbeiter",
         installer: "Monteur"
       };
@@ -764,7 +837,8 @@
       appendAdminListItem(
         elements.siteList,
         site.name,
-        `${site.customerName} · ${site.address.street} ${site.address.houseNumber}, ${site.address.postalCode} ${site.address.city}`
+        `${site.customerName} · ${site.address.street} ${site.address.houseNumber}, ${site.address.postalCode} ${site.address.city}`,
+        { label: "Öffnen", handler: () => openSiteDashboard(site) }
       );
     });
 
@@ -1044,6 +1118,22 @@
     elements.startTime.textContent = clockIn ? timeFormatter.format(new Date(clockIn.recordedAt)) : "– – : – –";
   }
 
+  function renderLiveOverview() {
+    const latest = lastEvent();
+    const currentAssignment = assignments[currentSiteIndex()];
+    const isOnSite = latest?.type === "site_arrival";
+    const times = calculatedTimes();
+    elements.liveStatus.textContent = elements.workdayTitle.textContent;
+    elements.liveSite.textContent = isOnSite
+      ? currentAssignment?.constructionSite.name || "–"
+      : "–";
+    elements.liveSince.textContent = latest
+      ? timeFormatter.format(new Date(latest.recordedAt))
+      : "–";
+    elements.liveWork.textContent = formatMinutes(times.work);
+    elements.liveForeman.textContent = session?.user.roles?.includes("foreman") ? "Ja" : "Nein";
+  }
+
   function entryLabel(entry) {
     const labels = {
       clock_in: "Arbeitstag gestartet",
@@ -1118,6 +1208,7 @@
     renderAction();
     renderAssignment();
     renderTimes();
+    renderLiveOverview();
     renderEntries();
     renderWeek();
     updateConnectionState();
@@ -1138,6 +1229,19 @@
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
+  }
+
+  function showDashboardPane(pane, smooth = true) {
+    elements.dashboardPanes.forEach((element) => {
+      const allowed = element !== elements.adminSection || canPlan();
+      element.hidden = element.dataset.dashboardPane !== pane || !allowed;
+    });
+    const activeButton = pane === "week"
+      ? elements.navWeek
+      : pane === "more" ? elements.navMore : elements.navStart;
+    activateNavigation(activeButton);
+    document.title = `${pane === "week" ? "Woche" : pane === "more" ? "Mehr" : "Start"} · Schäfchen`;
+    window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
   }
 
   function serverEntries(workDay) {
@@ -1194,10 +1298,10 @@
       return;
     }
     elements.dashboardCompany.textContent = session.company.displayName;
+    elements.dashboardCompanyMark.textContent = (session.company.displayName[0] || "F").toUpperCase();
     elements.companyNumber.value = session.company.number;
     elements.dashboardTitle.textContent = `Guten Morgen, ${session.user.firstName}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
-    elements.adminSection.hidden = !canPlan();
     if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();
     await Promise.all([refreshLiveData(), refreshAdmin()]);
@@ -1208,6 +1312,8 @@
     try {
       const setupBody = await requestJson("./api/v1/setup");
       elements.companyNumber.value = setupBody.setup.companyNumber;
+      elements.loginCompanyName.textContent = setupBody.setup.displayName;
+      elements.loginCompanyMark.textContent = (setupBody.setup.displayName[0] || "F").toUpperCase();
       if (setupBody.setup.setupRequired) {
         showSetup(setupBody.setup);
         return;
@@ -1650,8 +1756,7 @@
       : "Für heute ist noch keine Baustelle freigegeben.");
   });
   elements.showWeek.addEventListener("click", () => {
-    (canPlan() ? elements.adminWeekBoard : document.querySelector("#week-title"))
-      .scrollIntoView({ behavior: "smooth", block: "center" });
+    showDashboardPane("week");
   });
   elements.resetDemo.addEventListener("click", () => {
     if (!demoMode || !window.confirm("Alle lokalen Demo-Buchungen auf diesem Gerät zurücksetzen?")) return;
@@ -1662,18 +1767,16 @@
   });
 
   elements.navStart.addEventListener("click", () => {
-    activateNavigation(elements.navStart);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    showDashboardPane("start");
   });
   elements.navWeek.addEventListener("click", () => {
-    activateNavigation(elements.navWeek);
-    (canPlan() ? elements.adminWeekBoard : document.querySelector("#week-title"))
-      .scrollIntoView({ behavior: "smooth", block: "center" });
+    showDashboardPane("week");
   });
   elements.navMore.addEventListener("click", () => {
-    activateNavigation(elements.navMore);
-    (canPlan() ? elements.adminSection : elements.infoCard)
-      .scrollIntoView({ behavior: "smooth", block: "start" });
+    showDashboardPane("more");
+  });
+  elements.siteDashboardClose.addEventListener("click", () => {
+    elements.siteDashboard.hidden = true;
   });
 
   elements.todayLabel.textContent = dateFormatter.format(new Date());

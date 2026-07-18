@@ -11,9 +11,9 @@ const SITE_TYPES = new Set(["site_arrival", "site_departure", "next_site"]);
 const EMPLOYEE_ROLES = new Set([
   "installer",
   "foreman",
-  "planner",
-  "project_manager",
-  "executive_assistant"
+  "managing_director",
+  "dispatch_office",
+  "project_manager"
 ]);
 
 export class InputError extends Error {

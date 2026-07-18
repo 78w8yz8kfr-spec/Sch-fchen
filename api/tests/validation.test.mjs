@@ -55,7 +55,7 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
     temporaryPassword: "Startpasswort-2026"
   });
   assert.equal(employee.role, "installer");
-  for (const role of ["planner", "project_manager", "executive_assistant"]) {
+  for (const role of ["managing_director", "dispatch_office", "project_manager"]) {
     assert.equal(
       validateEmployee({ ...employee, role, temporaryPassword: "Startpasswort-2026" }).role,
       role
@@ -63,6 +63,10 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   }
   assert.throws(
     () => validateEmployee({ ...employee, role: "admin", temporaryPassword: "Startpasswort-2026" }),
+    /Mitarbeiterrolle/
+  );
+  assert.throws(
+    () => validateEmployee({ ...employee, role: "planner", temporaryPassword: "Startpasswort-2026" }),
     /Mitarbeiterrolle/
   );
 

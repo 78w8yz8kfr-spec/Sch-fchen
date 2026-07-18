@@ -44,12 +44,15 @@ import {
 const DUMMY_HASH = "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$zJbDCEum4Q2YZolIS8tIPfMbbOMR2eM8lXJj1i9Cq2Q";
 const PLANNER_ROLES = new Set([
   "admin",
+  "managing_director",
+  "dispatch_office",
   "office",
   "planner",
   "project_manager",
   "executive_assistant"
 ]);
-const ADMIN_ASSIGNED_ROLES = new Set(["planner", "project_manager", "executive_assistant"]);
+const MANAGEMENT_ROLES = new Set(["managing_director", "dispatch_office", "project_manager"]);
+const MANAGEMENT_ASSIGNER_ROLES = new Set(["admin", "managing_director"]);
 
 function json(response, status, body, headers = {}) {
   const encoded = JSON.stringify(body);
@@ -437,7 +440,7 @@ async function adminOverview(client, context, date) {
   return {
     date,
     weekStart,
-    canCreateManagementRoles: roles.has("admin"),
+    canCreateManagementRoles: [...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role)),
     employees: employeeResult.rows.map(employeeDto),
     sites: siteResult.rows.map(siteDto),
     assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
@@ -694,8 +697,15 @@ async function importSitesFromWorkbook(client, context, plan) {
 
 async function createEmployee(client, context, input) {
   const roles = await requirePlanner(client, context);
-  if (ADMIN_ASSIGNED_ROLES.has(input.role) && !roles.has("admin")) {
-    throw new InputError("Nur ein Admin darf Rollen für Planung und Verwaltung vergeben.", 403, "forbidden");
+  if (
+    MANAGEMENT_ROLES.has(input.role)
+    && ![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))
+  ) {
+    throw new InputError(
+      "Nur Geschäftsführung oder Administrator dürfen Verwaltungsrollen vergeben.",
+      403,
+      "forbidden"
+    );
   }
   const duplicate = await client.query(
     "SELECT 1 FROM users WHERE company_id = $1 AND personnel_number = $2",

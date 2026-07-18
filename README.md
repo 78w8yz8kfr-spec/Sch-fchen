@@ -1,6 +1,10 @@
 # Schäfchen
 
-Schäfchen ist eine SaaS-fähige Progressive Web App für Handwerksbetriebe. Die Anwendung verbindet eine besonders einfache Bedienung für Monteure mit einer nachvollziehbaren Organisation für Planer, Projektleiter, Assistenz der Geschäftsführung, Vorarbeiter und Administratoren.
+Schäfchen ist eine modulare All-in-One-Unternehmenssoftware für
+Handwerksbetriebe. Die Progressive Web App verbindet eine besonders einfache
+Live-Oberfläche für Monteure mit der Verwaltung für Geschäftsführung,
+Administrator, Büro/Disposition, Projektleitung und Vorarbeiter. VDE ist nur
+eines von mehreren optionalen Spezialmodulen.
 
 ## Projektstand
 
@@ -20,6 +24,7 @@ Aktuell enthalten:
 - Migration `013_create_user_sessions.sql` mit widerrufbaren, gehashten Sitzungen
 - Migration `014_create_initial_setup_functions.sql` für die einmalige, geschützte Admin-Ersteinrichtung
 - Migration `015_add_organization_roles.sql` für die gleichberechtigten Organisationsrollen
+- Migration `016_add_business_roles.sql` für die sichtbaren Betriebsrollen und kompatible Bestandskonten
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -28,6 +33,9 @@ Aktuell enthalten:
 - SQL-Abnahmetests für Nummernvergabe, Status, Historisierung und Mandantenschutz
 - GitHub Actions zur automatischen Prüfung von Compose, idempotenten Migrationen sowie Backup und Restore
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
+- vereinfachter Login mit Personalnummer und Passwort; die Firmennummer bleibt nach der Einrichtung im Hintergrund
+- getrenntes Live-, Wochen- und Verwaltungsdashboard
+- gegliedertes Baustellen-Dashboard ohne Aktivitätschronik
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
 - sicherer Excel-Wochenplanimport mit Vorschau, eindeutiger Zuordnung und Schutz bestehender Einsätze
 - Excel-Baustellenlistenimport mit Vorlage, Zeilenprüfung und Wiederverwendung vorhandener Kunden
@@ -110,10 +118,12 @@ make frontend-serve # PWA unter http://localhost:4173 öffnen
 - Strikte Mandantentrennung je Firma.
 - Das Frontend greift ausschließlich über eine API auf Daten zu.
 - Keine Datenbankänderung ohne Migration, Test und Dokumentationsupdate.
-- LWL ist ausdrücklich nicht Bestandteil von Schäfchen.
+- Ein Datenbestand für alle Module; Dokumente und Stammdaten werden referenziert statt kopiert.
+- VDE, LWL, DGUV und KNX werden als optionale Spezialmodule angebunden.
 
 Die technische Struktur und der aktuelle Umsetzungsstand stehen unter
 [`docs/`](docs/). Das Sprint-2-Modell ist in
 [`docs/SPRINT2_TIME_MODEL.md`](docs/SPRINT2_TIME_MODEL.md) beschrieben. Die
 Sicherheitsgrenze und die Endpunkte der API stehen in
-[`docs/API_SECURITY.md`](docs/API_SECURITY.md).
+[`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die verbindliche fachliche
+Grundlage steht in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).

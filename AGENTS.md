@@ -7,15 +7,16 @@
 - Historie wird erhalten; fachliche Datensätze werden nicht hart gelöscht.
 - Jede fachliche Entität ist einem Mandanten zugeordnet. `company_id` wird später serverseitig aus der Sitzung gesetzt und niemals aus ungeprüften Frontend-Daten übernommen.
 - Das Frontend darf nicht direkt auf PostgreSQL zugreifen.
-- LWL gehört nicht zum Projektumfang.
+- VDE, LWL, DGUV und KNX sind optionale Spezialmodule und gehören nicht zum fachlichen Kern.
+- Alle Module verwenden denselben Firmen-, Kunden-, Projekt-, Baustellen- und Dokumentenbestand.
 
 ## Entwicklungsphasen
 
 1. Login, Zeiterfassung, Live-Stundenzettel und Wochenplanung
 2. Kunden, Projekte, Baustellen, Dokumente und Lieferscheine
-3. Montageberichte, Bautagesberichte und PDF-Versionierung
-4. KI, Foto-Digitalisierung und Sprache
-5. Integriertes VDE-Modul gemäß Roadmap
+3. Aufgaben, Material, Montageberichte, Bautagesberichte und PDF-Versionierung
+4. Optionale Spezialmodule wie VDE, LWL, DGUV und KNX
+5. KI, Foto-Digitalisierung und Sprache
 
 Neue Funktionen bleiben in ihrer Phase, sofern der Nutzer keine ausdrückliche Änderung beschließt.
 

@@ -16,12 +16,22 @@ BEGIN
         SELECT COUNT(*)
         FROM roles
         WHERE company_id = company_a_id
-          AND role_key IN ('planner', 'project_manager', 'executive_assistant')
+          AND role_key IN ('planner', 'executive_assistant')
           AND permissions = expected_permissions
           AND is_system
           AND status = 'active'
-    ) <> 3 THEN
-        RAISE EXCEPTION 'Die drei gleichberechtigten Organisationsrollen fehlen';
+    ) <> 2 THEN
+        RAISE EXCEPTION 'Die kompatiblen Organisationsrollen fehlen';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM roles
+        WHERE company_id = company_a_id
+          AND role_key = 'project_manager'
+          AND status = 'active'
+    ) THEN
+        RAISE EXCEPTION 'Die Projektleiterrolle fehlt';
     END IF;
 
     IF NOT EXISTS (
@@ -42,11 +52,11 @@ BEGIN
         SELECT COUNT(*)
         FROM roles
         WHERE company_id = company_b_id
-          AND role_key IN ('planner', 'project_manager', 'executive_assistant')
+          AND role_key IN ('planner', 'executive_assistant')
           AND permissions = expected_permissions
           AND status = 'active'
-    ) <> 3 THEN
-        RAISE EXCEPTION 'Neue Firmen erhalten die Organisationsrollen nicht automatisch';
+    ) <> 2 THEN
+        RAISE EXCEPTION 'Neue Firmen erhalten die kompatiblen Organisationsrollen nicht automatisch';
     END IF;
 END;
 $$;

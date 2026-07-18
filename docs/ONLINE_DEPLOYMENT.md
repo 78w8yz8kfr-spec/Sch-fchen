@@ -1,9 +1,9 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.10.0
+Technischer Stand: V0.11.0
 
-Nach der Anmeldung können Admin, Planer, Projektleiter und Assistenz der
-Geschäftsführung unter **Mehr → Verwaltung → Excel-Wochenplan importieren**
+Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
+Projektleiter unter **Mehr → Verwaltung → Excel-Wochenplan importieren**
 eine `.xlsx`-Datei auswählen. Erst die Vorschau zeigt, welche X-Zuweisungen
 eindeutig importiert werden können; eine zweite Bestätigung speichert sie.
 Bestehende Mitarbeitertage und nicht eindeutig zugeordnete Namen bleiben
@@ -33,6 +33,10 @@ HttpOnly-Sitzungscookie und die Offline-Synchronisation auch auf dem Handy.
    automatisch **Ersten Admin anlegen**.
 7. Namen, Personalnummer, ein Passwort mit mindestens zwölf Zeichen sowie den
    gleichen Einrichtungsschlüssel eingeben. Danach normal anmelden.
+
+Nach dieser Einrichtung sehen normale Benutzer beim Login nur noch
+Personalnummer und Passwort. Die Firmennummer wird von der bereitgestellten
+Firmeninstanz im Hintergrund gesetzt.
 
 Der Einrichtungsschlüssel liegt nur als geheime Umgebungsvariable bei Render
 und wird nicht in GitHub gespeichert. Ein zweiter Initial-Admin kann über

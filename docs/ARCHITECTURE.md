@@ -4,7 +4,11 @@ Stand: 17.07.2026
 
 ## Zielbild
 
-Schäfchen wird als mandantenfähige Progressive Web App entwickelt. Eine gemeinsame Codebasis bedient Handy und PC. Das Frontend kommuniziert ausschließlich mit einer API; direkte Datenbankzugriffe aus dem Frontend sind ausgeschlossen.
+Schäfchen wird als modulare, mandantenfähige All-in-One-Unternehmenssoftware
+für Handwerksbetriebe entwickelt. Eine gemeinsame PWA-Codebasis bedient Handy
+und PC. Das Frontend kommuniziert ausschließlich mit einer API; direkte
+Datenbankzugriffe aus dem Frontend sind ausgeschlossen. Die fachliche Grundlage
+steht in [`PRODUCT_VISION.md`](PRODUCT_VISION.md).
 
 ## Komponenten
 
@@ -21,7 +25,21 @@ Schäfchen wird als mandantenfähige Progressive Web App entwickelt. Eine gemein
 
 Firma → Kunde → Kundenstandort → Projekt → Baustelle
 
-Planung, Zeiterfassung, Berichte, Dokumente und VDE-Prüfungen werden an diesen Kernpfad angebunden.
+Planung, Zeiterfassung, Berichte, Dokumente und optionale Spezialmodule werden
+an diesen Kernpfad angebunden. VDE, LWL, DGUV und KNX sind Module, nicht der
+fachliche Kern.
+
+## Modul- und Dokumentenprinzip
+
+Alle Module verwenden denselben Firmen-, Kunden-, Projekt-, Baustellen- und
+Benutzerbestand. Ein Dokument wird als eigenständiges Objekt einmal gespeichert
+und über Beziehungen bei Kunde, Projekt, Baustelle, Bericht oder
+Dokumentenverwaltung eingeblendet. Ein Modul darf keine parallelen Stammdaten
+oder Dokumentkopien einführen.
+
+Das Firmenlogo gehört zum Mandanten und wird getrennt vom Schäfchen-Markenlogo
+behandelt. Bis die Logoablage als eigenes Dokumentmodul aktiviert ist, zeigt die
+PWA einen Firmeninitial als neutralen Platzhalter.
 
 ## Mandantentrennung
 
@@ -49,8 +67,9 @@ Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht. 
 2. Login, Benutzer, Rollen, Zeiterfassung und Wochenplanung
 3. Kunden, Standorte, Projekte, Baustellen und Dokumente
 4. Montage- und Bautagesberichte mit PDF-Versionierung
-5. Integriertes VDE-Modul
-6. KI, OCR und Sprache erst nach stabiler Kernfunktion
+5. Dokumenten-, Berichts-, Aufgaben- und Materialmodule
+6. Optionale Spezialmodule wie VDE, LWL, DGUV und KNX
+7. KI, OCR und Sprache erst nach stabiler Kernfunktion
 
 ## Sprint 1: Benutzer und Rollen
 
@@ -59,10 +78,12 @@ innerhalb dieser Firma eindeutig. E-Mail und Telefon bleiben optional;
 ausgeschiedene Mitarbeiter werden deaktiviert und nicht gelöscht.
 
 `roles` enthält pro Firma anpassbare Rollen und Rechte. Die unveränderlichen
-Systemschlüssel der sichtbaren Standardrollen lauten `admin`, `planner`,
-`project_manager`, `executive_assistant`, `foreman` und `installer`. Die drei
-Organisationsrollen besitzen dieselben Verwaltungsrechte; `office` bleibt nur
-für bestehende Konten kompatibel. Der Admin behält immer Vollzugriff. `user_roles` bildet mehrere
+Systemschlüssel der sichtbaren Standardrollen lauten `admin`,
+`managing_director`, `dispatch_office`, `project_manager`, `foreman` und
+`installer`. Geschäftsführung, Disposition und Projektleitung erhalten
+unterschiedliche fachliche Schwerpunkte; nur der Administrator ist technischer
+Vollzugriff. `office`, `planner` und `executive_assistant` bleiben für bestehende
+Konten kompatibel. `user_roles` bildet mehrere
 Rollen je Benutzer ab und historisiert Zuweisungen über Zuweisungs- und
 Widerrufszeitpunkt.
 

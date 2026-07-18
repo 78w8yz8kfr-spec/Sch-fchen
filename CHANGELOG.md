@@ -79,3 +79,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - ausdrückliche Zuordnung unbekannter Mitarbeiter- und Baustellenbezeichnungen aus Wochenplänen
 - Wiederverwendung eindeutig vorhandener Kunden und Schutz vor doppelten aktiven Baustellennamen
 - Versionsstand 0.10.0
+- verbindliche Produktvision für Schäfchen als modulare All-in-One-Unternehmenssoftware
+- Migration 016 für Geschäftsführer, Administrator, Büro/Disposition, Projektleiter, Vorarbeiter und Monteur
+- kompatibler Erhalt früherer Büro-, Planer- und Assistenzrollen ohne Neuanlage in der Oberfläche
+- normaler Login nur mit Personalnummer und Passwort; Firmennummer bleibt nach der Einrichtung verborgen
+- getrennte Start-, Wochen- und Mehr-Ansichten für ein ausschließlich live orientiertes Mitarbeiter-Dashboard
+- kompakte Live-Anzeige für Status, Baustelle, Statusbeginn, Arbeitszeit und Vorarbeiterstatus
+- gegliedertes Baustellen-Dashboard mit aufklappbaren Themenbereichen statt Aktivitätschronik
+- dokumentiertes Ein-Dokument-Prinzip, Mandantenlogo-Grenze und modularer Ausbaupfad
+- Versionsstand 0.11.0

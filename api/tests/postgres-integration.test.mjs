@@ -104,6 +104,9 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const plannerPersonnelNumber = `PLAN-${suffix}`;
   const plannerTemporaryPassword = "Planung-Start-2026!";
   const plannerPassword = "Planung-Eigen-2026!";
+  const directorPersonnelNumber = `GF-${suffix}`;
+  const directorTemporaryPassword = "Leitung-Start-2026!";
+  const directorPassword = "Leitung-Eigen-2026!";
 
   const initialOverview = await fetch(
     `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
@@ -119,12 +122,12 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       personnelNumber: plannerPersonnelNumber,
       firstName: "Paula",
       lastName: "Planung",
-      role: "planner",
+      role: "dispatch_office",
       temporaryPassword: plannerTemporaryPassword
     })
   });
   assert.equal(plannerResponse.status, 201, await plannerResponse.clone().text());
-  assert.deepEqual((await plannerResponse.json()).employee.roles, ["planner"]);
+  assert.deepEqual((await plannerResponse.json()).employee.roles, ["dispatch_office"]);
 
   const plannerLogin = await fetch(`${baseUrl}/api/v1/session`, {
     method: "POST",
@@ -163,6 +166,57 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     })
   });
   assert.equal(forbiddenManagementRole.status, 403);
+
+  const directorResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      personnelNumber: directorPersonnelNumber,
+      firstName: "Gesa",
+      lastName: "Geschäftsführung",
+      role: "managing_director",
+      temporaryPassword: directorTemporaryPassword
+    })
+  });
+  assert.equal(directorResponse.status, 201, await directorResponse.clone().text());
+
+  const directorLogin = await fetch(`${baseUrl}/api/v1/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+    body: JSON.stringify({
+      companyNumber: "F-000001",
+      personnelNumber: directorPersonnelNumber,
+      password: directorTemporaryPassword
+    })
+  });
+  assert.equal(directorLogin.status, 201);
+  const directorCookie = directorLogin.headers.get("set-cookie").split(";", 1)[0];
+  const directorPasswordChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: directorCookie },
+    body: JSON.stringify({ newPassword: directorPassword })
+  });
+  assert.equal(directorPasswordChange.status, 200);
+
+  const directorOverview = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: directorCookie } }
+  );
+  assert.equal(directorOverview.status, 200);
+  assert.equal((await directorOverview.json()).overview.canCreateManagementRoles, true);
+
+  const directorCreatesProjectManager = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: directorCookie },
+    body: JSON.stringify({
+      personnelNumber: `PL-${suffix}`,
+      firstName: "Petra",
+      lastName: "Projektleitung",
+      role: "project_manager",
+      temporaryPassword: "Projektleitung-2026!"
+    })
+  });
+  assert.equal(directorCreatesProjectManager.status, 201, await directorCreatesProjectManager.clone().text());
 
   const employeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
     method: "POST",

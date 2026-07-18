@@ -24,14 +24,14 @@
           </div>
 
           <div class="company-context">
-            <span class="company-context__mark" aria-hidden="true">S</span>
+            <span id="login-company-mark" class="company-context__mark" aria-hidden="true">S</span>
             <div>
               <span>Firma</span>
-              <strong>Schaaf Elektro GmbH</strong>
+              <strong id="login-company-name">Schaaf Elektro GmbH</strong>
             </div>
           </div>
 
-          <div id="mode-note" class="preview-note" role="note">
+          <div id="mode-note" class="preview-note" role="note" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
             </svg>
@@ -39,15 +39,17 @@
           </div>
 
           <form id="login-form" class="login-form" novalidate>
-            <label for="company-number">Firmennummer</label>
-            <input
-              id="company-number"
-              name="company-number"
-              type="text"
-              autocomplete="organization"
-              value="F-000001"
-              maxlength="20"
-            >
+            <div id="company-number-field" hidden>
+              <label for="company-number">Firmennummer</label>
+              <input
+                id="company-number"
+                name="company-number"
+                type="text"
+                autocomplete="organization"
+                value="F-000001"
+                maxlength="20"
+              >
+            </div>
 
             <label for="personnel-number">Personalnummer</label>
             <input
@@ -119,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.10.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.11.0</p>
         </div>
       </section>
 
@@ -152,7 +154,10 @@
             <img src="./assets/mark.svg" alt="" width="40" height="40">
             <div>
               <strong>Schäfchen</strong>
-              <span id="dashboard-company">Schaaf Elektro GmbH</span>
+              <span class="company-brand-line">
+                <i id="dashboard-company-mark" aria-hidden="true">S</i>
+                <span id="dashboard-company">Schaaf Elektro GmbH</span>
+              </span>
             </div>
           </div>
           <div class="topbar__actions">
@@ -165,7 +170,7 @@
         </header>
 
         <div class="dashboard-content">
-          <div class="welcome-row">
+          <div class="welcome-row" data-dashboard-pane="start">
             <div>
               <p id="today-label" class="eyebrow">Heute</p>
               <h1 id="dashboard-title">Guten Morgen</h1>
@@ -173,7 +178,15 @@
             <span id="mode-badge" class="preview-badge">Vorschau</span>
           </div>
 
-          <section class="status-card" aria-labelledby="workday-title">
+          <section class="live-overview" data-dashboard-pane="start" aria-label="Live-Status">
+            <div><span>Status</span><strong id="live-status">Nicht gestartet</strong></div>
+            <div><span>Aktuelle Baustelle</span><strong id="live-site">–</strong></div>
+            <div><span>Seit</span><strong id="live-since">–</strong></div>
+            <div><span>Arbeitszeit</span><strong id="live-work">00:00</strong></div>
+            <div><span>Vorarbeiter</span><strong id="live-foreman">Nein</strong></div>
+          </section>
+
+          <section class="status-card" data-dashboard-pane="start" aria-labelledby="workday-title">
             <div class="status-card__top">
               <div id="workday-icon" class="status-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
@@ -194,7 +207,7 @@
             <p id="action-hint" class="action-hint">Dein nächster logischer Schritt</p>
           </section>
 
-          <section class="section" aria-labelledby="today-assignment-title">
+          <section class="section" data-dashboard-pane="start" aria-labelledby="today-assignment-title">
             <div class="section-heading">
               <h2 id="today-assignment-title">Heutiger Einsatz</h2>
               <button id="assignment-details" class="text-button" type="button">Details</button>
@@ -211,7 +224,7 @@
             </article>
           </section>
 
-          <section id="timesheet-section" class="section" aria-labelledby="timesheet-title">
+          <section id="timesheet-section" class="section" data-dashboard-pane="start" aria-labelledby="timesheet-title">
             <div class="section-heading">
               <div>
                 <p id="timesheet-eyebrow" class="eyebrow">Live und lokal</p>
@@ -230,7 +243,7 @@
             </ol>
           </section>
 
-          <section class="section" aria-labelledby="week-title">
+          <section id="week-section" class="section" data-dashboard-pane="week" aria-labelledby="week-title" hidden>
             <div class="section-heading">
               <h2 id="week-title">Diese Woche</h2>
               <button id="show-week" class="text-button" type="button">Alle Tage</button>
@@ -238,7 +251,7 @@
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
           </section>
 
-          <section id="admin-section" class="section admin-section" aria-labelledby="admin-title" hidden>
+          <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Planung und Verwaltung</p>
@@ -253,6 +266,37 @@
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
               <div><strong id="admin-assignment-count">0</strong><span>Einsätze</span></div>
             </div>
+
+            <section id="site-dashboard" class="site-dashboard" aria-labelledby="site-dashboard-title" hidden>
+              <div class="site-dashboard__header">
+                <div>
+                  <p class="eyebrow">Baustellen-Dashboard</p>
+                  <h3 id="site-dashboard-title">Baustelle</h3>
+                  <p id="site-dashboard-meta"></p>
+                </div>
+                <button id="site-dashboard-close" class="text-button" type="button">Schließen</button>
+              </div>
+              <details open>
+                <summary>Überblick</summary>
+                <dl class="site-facts">
+                  <div><dt>Kunde</dt><dd id="site-dashboard-customer">–</dd></div>
+                  <div><dt>Projekt</dt><dd id="site-dashboard-project">–</dd></div>
+                  <div><dt>Arbeitsauftrag</dt><dd id="site-dashboard-order">–</dd></div>
+                </dl>
+                <a id="site-dashboard-navigation" class="download-link" target="_blank" rel="noopener">Navigation öffnen</a>
+              </details>
+              <details>
+                <summary>Mitarbeiter</summary>
+                <ul id="site-dashboard-employees" class="admin-list"></ul>
+              </details>
+              <details><summary>Berichte</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
+              <details><summary>Dokumente</summary><p>Dokumente werden künftig zentral gespeichert und hier nur verknüpft.</p></details>
+              <details><summary>Fotos</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
+              <details><summary>Aufgaben</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
+              <details><summary>Material</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
+              <details><summary>Notizen</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
+              <details><summary>Weitere Module</summary><p>VDE, LWL, DGUV und KNX werden hier modular ergänzt.</p></details>
+            </section>
 
             <section class="admin-week" aria-labelledby="admin-week-title">
               <div class="admin-week__header">
@@ -377,9 +421,9 @@
                 <select id="employee-role" required>
                   <option value="installer">Monteur</option>
                   <option value="foreman">Vorarbeiter</option>
-                  <option data-management-role value="planner">Planer</option>
+                  <option data-management-role value="managing_director">Geschäftsführer</option>
+                  <option data-management-role value="dispatch_office">Büro / Disposition</option>
                   <option data-management-role value="project_manager">Projektleiter</option>
-                  <option data-management-role value="executive_assistant">Assistenz der Geschäftsführung</option>
                 </select>
                 <label for="employee-temporary-password">Startpasswort</label>
                 <input id="employee-temporary-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
@@ -453,7 +497,7 @@
             </details>
           </section>
 
-          <aside class="info-card">
+          <aside class="info-card" data-dashboard-pane="more" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
             <div>
               <strong id="storage-title">Lokale, sichere Demo.</strong>

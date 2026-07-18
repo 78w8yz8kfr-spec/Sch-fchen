@@ -1,7 +1,7 @@
 # Projektstatus
 
-Stand: 17.07.2026
-Technischer Stand: V0.10.0
+Stand: 18.07.2026
+Technischer Stand: V0.11.0
 
 ## Abgeschlossen
 
@@ -19,7 +19,7 @@ Technischer Stand: V0.10.0
 - Backup- und Restore-Befehle vorbereitet
 - Migration 002 `users` mit Personalnummer, optionaler E-Mail, Aktivhistorie und Passwort-Hash-Feld für die spätere API
 - Migration 003 `roles` und `user_roles` mit mehreren historisierten Rollen je Benutzer
-- Standardrollen Admin, Planer, Projektleiter, Assistenz der Geschäftsführung, Vorarbeiter und Monteur pro Firma; bestehende Bürokonten bleiben kompatibel
+- sichtbare Standardrollen Geschäftsführer, Administrator, Büro/Disposition, Projektleiter, Vorarbeiter und Monteur; frühere Organisationsrollen bleiben kompatibel
 - Admin-Vollzugriff, firmenübergreifender Fremdschlüsselschutz und erzwungene Row Level Security für die API-Rolle
 - erste dokumentierte und mobiloptimierte PWA-Vorschau für Login und Dashboard
 - lokaler PWA-Smoke-Test und GitHub-Pages-Workflow
@@ -64,6 +64,12 @@ Technischer Stand: V0.10.0
 - Excel-Baustellenlistenimport mit eigener Vorlage, Vorschau und zeilengenaue Fehleranzeige
 - Wiederverwendung eindeutiger Kunden und Schutz vor doppelten aktiven Baustellennamen
 - ausdrückliche Auswahl für unbekannte Mitarbeiter- und Baustellenbezeichnungen im Wochenplan
+- verbindliche modulare Produktvision mit gemeinsamem Datenbestand und optionalen Spezialmodulen
+- normaler Login nur mit Personalnummer und Passwort; die eingerichtete Firmennummer bleibt im Hintergrund
+- getrennte Ansichten für Live-Arbeitstag, Woche und Verwaltung
+- Live-Übersicht mit Status, aktueller Baustelle, Statusbeginn, Arbeitszeit und Vorarbeiterstatus
+- gegliedertes Baustellen-Dashboard für Mitarbeiter, Berichte, Dokumente, Fotos, Aufgaben, Material, Notizen und weitere Module
+- Migration 016 mit neuem Betriebsrollenmodell und differenzierten Berechtigungsgrundlagen
 
 ## Noch zu prüfen
 
@@ -78,8 +84,9 @@ Technischer Stand: V0.10.0
 Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
-- Prüfung offener Zeitkorrekturen durch die Organisationsrollen
-- anschließend Montage- und Bautagesberichte mit PDF-Versionierung
+- zentrale Dokumenttabelle und Referenzen zu Kunde, Projekt, Baustelle und Bericht
+- Firmenlogo als geschütztes Mandantendokument mit Initial-Platzhalter
+- danach Aufgaben, Material sowie Montage- und Bautagesberichte mit PDF-Versionierung
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo
 gekennzeichnet; die echte Anmeldung läuft ausschließlich auf der gemeinsamen

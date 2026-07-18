@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 17.07.2026  
-Technischer Stand: V0.10.0
+Stand: 18.07.2026  
+Technischer Stand: V0.11.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -20,7 +20,10 @@ Datenbanktransaktion mit `scrypt` gehasht.
 
 ## Anmeldung und Sitzung
 
-Die Anmeldung erwartet Firmennummer, Personalnummer und Passwort. Die Funktion
+Die interne API-Anmeldung erwartet Firmennummer, Personalnummer und Passwort.
+Die PWA übernimmt die bei der Ersteinrichtung serverseitig festgelegte
+Firmennummer im Hintergrund; normale Benutzer sehen nur Personalnummer und
+Passwort. Die Funktion
 `api_lookup_login_user` führt die eng begrenzte Suche vor dem Mandantenkontext
 aus. Sie ist nur für die NOLOGIN-Rolle `schaefchen_api` ausführbar.
 
@@ -88,11 +91,12 @@ Arbeitstag bei Bedarf an. Eine bereits identisch gespeicherte Client-UUID ist
 erfolgreich idempotent; abweichende Daten führen zu `409 Conflict`.
 
 Die Verwaltungsendpunkte prüfen zusätzlich die aktiven Rollen aus der
-serverseitig aufgelösten Sitzung. Admin, Planer, Projektleiter und Assistenz der
-Geschäftsführung dürfen mit identischen Rechten planen und verwalten. Nur der
-Admin darf diese drei Organisationsrollen vergeben. Bestehende Konten mit der
-früheren Rolle `office` bleiben kompatibel, die Rolle wird aber nicht mehr neu
-angeboten. Monteur und Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum
+serverseitig aufgelösten Sitzung. Administrator, Geschäftsführer,
+Büro/Disposition und Projektleiter dürfen entsprechend ihrer fachlichen Rolle
+planen und verwalten. Verwaltungsrollen dürfen nur Administrator und
+Geschäftsführer vergeben. Bestehende Konten mit `office`, `planner` oder
+`executive_assistant` bleiben kompatibel, diese Rollen werden aber nicht mehr
+neu angeboten. Monteur und Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum
 persönlichen Wechsel des Startpassworts sind Fach- und Verwaltungsendpunkte für
 das neue Konto gesperrt.
 
@@ -102,7 +106,7 @@ Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
 normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
 sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
 der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
-Sonderkürzel werden lediglich gezählt; V0.10.0 legt daraus keine Fachdaten an.
+Sonderkürzel werden lediglich gezählt; V0.11.0 legt daraus keine Fachdaten an.
 Unbekannte Mitarbeiter- oder Baustellenbezeichnungen können ausdrücklich auf
 eine aktive ID des Sitzungsmandanten abgebildet werden. Der Server validiert
 jede Zuordnung erneut und akzeptiert keine fremden oder frei erfundenen IDs.
@@ -145,7 +149,7 @@ Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder und Schrittfolge. In
 GitHub Actions werden Migration und Seed zusätzlich mit einem nicht
 privilegierten, Render-ähnlichen Datenbankeigentümer geprüft. Danach folgt der
 echte PostgreSQL-Ablauf: ersten Admin anlegen, PWA ausliefern, anmelden,
-Planer und Monteur anlegen, Excel-Import vorschauen und doppelt geschützt
+Büro/Disposition und Monteur anlegen, Excel-Import vorschauen und doppelt geschützt
 ausführen, Einsatz freigeben, Startpasswort persönlich ändern,
 Rollenverbot prüfen, Einsatz historisiert verschieben und stornieren, Zeiten
 idempotent übertragen, Arbeitstag lesen, abmelden und den widerrufenen Cookie
