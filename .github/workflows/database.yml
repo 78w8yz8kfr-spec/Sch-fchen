@@ -63,7 +63,7 @@ jobs:
           PGPASSWORD=ci_only_render_owner_password \
             POSTGRES_DB=schaefchen_render_check \
             POSTGRES_USER=schaefchen_render_owner \
-            sh database/scripts/run-sql-directories.sh database/migrations database/seeds
+            sh database/scripts/run-sql-directories.sh database/preflight database/migrations database/seeds
           PGPASSWORD=ci_only_render_owner_password \
             POSTGRES_DB=schaefchen_render_check \
             POSTGRES_USER=schaefchen_render_owner \
@@ -79,8 +79,9 @@ jobs:
           POSTGRES_DB: schaefchen
           POSTGRES_USER: schaefchen
         run: |
-          sh database/scripts/run-sql-directories.sh database/migrations
-          sh database/scripts/run-sql-directories.sh database/migrations
+          sh database/scripts/run-sql-directories.sh database/preflight database/migrations
+          sh database/scripts/run-sql-directories.sh database/test-fixtures
+          sh database/scripts/run-sql-directories.sh database/preflight database/migrations
           sh database/scripts/run-sql-directories.sh database/seeds database/tests
 
       - name: Eingeschränkte API-Datenbankrolle konfigurieren

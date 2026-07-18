@@ -150,3 +150,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Logo-URL ausschließlich aus der serverseitig aufgelösten Firma; Initial bleibt der neutrale Fallback
 - Firmenlogo im Offline-App-Cache und als gemeinsames Original für spätere PDFs und E-Mails
 - Versionsstand 0.17.0
+- Produktions-Upgradepfad für den kurzzeitig erweiterten alten Setup-Funktionsvertrag abgesichert
+- Migration 019 prüft die stabilen getrennten V1-/V2-Verträge der Ersteinrichtung
+- CI bildet den betroffenen Produktionsstand nach und prüft Vorabreparatur, Migrationen und Neustart
+- Versionsstand 0.17.1

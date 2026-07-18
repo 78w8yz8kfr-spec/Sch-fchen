@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 19.07.2026
-Technischer Stand: V0.17.0
+Technischer Stand: V0.17.1
 
 ## Abgeschlossen
 
@@ -92,6 +92,9 @@ Technischer Stand: V0.17.0
 - Migration 018 mit serverseitiger Zuordnung des originalen Schaaf-Elektro-Firmenlogos
 - getrennte Anzeige von Schäfchen-Softwaremarke und Firmenlogo im Login sowie im App-Kopfbereich
 - Firmenlogo im Offline-App-Cache und sicher aus dem Sitzungsmandanten abgeleitete Logo-URL
+- Migration 019 stabilisiert die getrennten V1-/V2-Vertraege der Ersteinrichtung
+- sicherer Produktions-Vorabcheck repariert den kurzzeitig veroeffentlichten V1-Logovertrag vor den normalen Migrationen
+- CI prueft den echten Upgradepfad vom betroffenen Produktionsstand bis zum erfolgreichen Neustart
 
 ## Noch zu prüfen
 

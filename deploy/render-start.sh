@@ -10,7 +10,7 @@ set -- \
   --set=ON_ERROR_STOP=1 \
   --command="SELECT pg_advisory_lock(hashtext('schaefchen-production-start'));"
 
-for file in database/migrations/*.sql database/seeds/*.sql; do
+for file in database/preflight/*.sql database/migrations/*.sql database/seeds/*.sql; do
   if [ ! -f "$file" ]; then
     echo "Erforderliche SQL-Datei fehlt: $file" >&2
     exit 1
