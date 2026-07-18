@@ -88,13 +88,22 @@
     timesheetSection: document.querySelector("#timesheet-section"),
     showWeek: document.querySelector("#show-week"),
     resetDemo: document.querySelector("#reset-demo"),
+    bottomNav: document.querySelector(".bottom-nav"),
     navStart: document.querySelector("#nav-start"),
     navWeek: document.querySelector("#nav-week"),
+    navAssignments: document.querySelector("#nav-assignments"),
+    navSites: document.querySelector("#nav-sites"),
     navMore: document.querySelector("#nav-more"),
     infoCard: document.querySelector(".info-card"),
     adminSection: document.querySelector("#admin-section"),
+    adminEyebrow: document.querySelector("#admin-eyebrow"),
+    adminTitle: document.querySelector("#admin-title"),
+    adminIntro: document.querySelector("#admin-intro"),
+    adminSummary: document.querySelector("#admin-summary"),
     adminRefresh: document.querySelector("#admin-refresh"),
+    assignmentPlanningShell: document.querySelector("#assignment-planning-shell"),
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
+    sitePlanningShell: document.querySelector("#site-planning-shell"),
     sitePlanningContent: document.querySelector("#site-planning-content"),
     businessStructurePanel: document.querySelector("#business-structure-panel"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
@@ -161,6 +170,7 @@
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
     employeeList: document.querySelector("#employee-list"),
+    employeePanel: document.querySelector("#employee-panel"),
     customerPanel: document.querySelector("#customer-panel"),
     customerForm: document.querySelector("#customer-form"),
     customerType: document.querySelector("#customer-type"),
@@ -346,7 +356,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.12.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -369,6 +379,10 @@
     elements.loginView.hidden = true;
     elements.passwordChangeView.hidden = true;
     elements.dashboardView.hidden = false;
+    const planner = canPlan();
+    elements.navAssignments.hidden = !planner;
+    elements.navSites.hidden = !planner;
+    elements.bottomNav.classList.toggle("bottom-nav--planner", planner);
     document.title = "Start · Schäfchen";
     render();
     showDashboardPane("start", false);
@@ -1353,7 +1367,7 @@
   }
 
   function activateNavigation(activeButton) {
-    [elements.navStart, elements.navWeek, elements.navMore].forEach((button) => {
+    [elements.navStart, elements.navWeek, elements.navAssignments, elements.navSites, elements.navMore].forEach((button) => {
       const active = button === activeButton;
       button.classList.toggle("nav-item--active", active);
       if (active) button.setAttribute("aria-current", "page");
@@ -1362,15 +1376,44 @@
   }
 
   function showDashboardPane(pane, smooth = true) {
+    const adminPanes = new Set(["assignments", "sites", "more"]);
     elements.dashboardPanes.forEach((element) => {
-      const allowed = element !== elements.adminSection || canPlan();
-      element.hidden = element.dataset.dashboardPane !== pane || !allowed;
+      if (element === elements.adminSection) {
+        element.hidden = !canPlan() || !adminPanes.has(pane);
+        return;
+      }
+      element.hidden = element.dataset.dashboardPane !== pane;
     });
-    const activeButton = pane === "week"
-      ? elements.navWeek
-      : pane === "more" ? elements.navMore : elements.navStart;
+
+    if (canPlan()) {
+      elements.assignmentPlanningShell.hidden = pane !== "assignments";
+      elements.sitePlanningShell.hidden = pane !== "sites";
+      elements.employeePanel.hidden = pane !== "more";
+      elements.adminSummary.hidden = pane === "more";
+      const copy = {
+        assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
+        sites: ["Kunden, Projekte und Orte", "Baustellenplanung", "Baustellen einzeln oder gesammelt aus Excel anlegen."],
+        more: ["Verwaltung", "Mehr", "Mitarbeiter und weitere Einstellungen verwalten."]
+      }[pane];
+      if (copy) {
+        [elements.adminEyebrow.textContent, elements.adminTitle.textContent, elements.adminIntro.textContent] = copy;
+      }
+    }
+
+    const activeButton = {
+      week: elements.navWeek,
+      assignments: elements.navAssignments,
+      sites: elements.navSites,
+      more: elements.navMore
+    }[pane] || elements.navStart;
     activateNavigation(activeButton);
-    document.title = `${pane === "week" ? "Woche" : pane === "more" ? "Mehr" : "Start"} · Schäfchen`;
+    const title = {
+      week: "Woche",
+      assignments: "Einsätze",
+      sites: "Baustellen",
+      more: "Mehr"
+    }[pane] || "Start";
+    document.title = `${title} · Schäfchen`;
     window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
   }
 
@@ -1956,6 +1999,12 @@
   });
   elements.navWeek.addEventListener("click", () => {
     showDashboardPane("week");
+  });
+  elements.navAssignments.addEventListener("click", () => {
+    showDashboardPane("assignments");
+  });
+  elements.navSites.addEventListener("click", () => {
+    showDashboardPane("sites");
   });
   elements.navMore.addEventListener("click", () => {
     showDashboardPane("more");

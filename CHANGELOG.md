@@ -103,3 +103,8 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Excel-Baustellenliste als Unterfunktion der Baustellenplanung gruppiert
 - Verwaltungsmenü von einzelnen Import-Hauptpunkten befreit
 - Versionsstand 0.12.1
+- direkte Navigationspunkte für Einsätze und Baustellen bei Planungsrollen
+- rollenabhängige Navigation mit fünf Bereichen für Planer und unverändert drei Bereichen für Monteure
+- Mehr auf Mitarbeiterverwaltung und ergänzende Einstellungen reduziert
+- redundante zusätzliche Planungsebene entfernt
+- Versionsstand 0.13.0

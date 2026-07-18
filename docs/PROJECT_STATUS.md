@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 18.07.2026
-Technischer Stand: V0.12.1
+Technischer Stand: V0.13.0
 
 ## Abgeschlossen
 
@@ -75,6 +75,8 @@ Technischer Stand: V0.12.1
 - aufklappbare Betriebsstruktur Kunde → Projekt → Baustelle mit direktem Einstieg ins Baustellen-Dashboard
 - serverseitige Prüfung, dass Projekt und Baustelle zu aktiven Datensätzen desselben Mandanten gehören
 - integrierte Planungsbereiche: Excel-Wochenplan innerhalb der Einsatzplanung und Excel-Baustellenliste innerhalb der Baustellenplanung
+- rollenabhängige Hauptnavigation: Planer erreichen Einsätze und Baustellen direkt; Monteure behalten Start, Woche und Mehr
+- Mitarbeiterverwaltung und Einstellungen bleiben getrennt unter Mehr
 
 ## Noch zu prüfen
 

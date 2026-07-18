@@ -1630,6 +1630,24 @@ select:focus-visible {
   backdrop-filter: blur(18px);
 }
 
+.bottom-nav--planner {
+  grid-template-columns: repeat(5, 1fr);
+  padding-right: max(5px, calc((100vw - 540px) / 2));
+  padding-left: max(5px, calc((100vw - 540px) / 2));
+}
+
+.bottom-nav--planner .nav-item {
+  padding-right: 2px;
+  padding-left: 2px;
+  border-radius: 12px;
+  font-size: 0.58rem;
+}
+
+.bottom-nav--planner .nav-item svg {
+  width: 20px;
+  height: 20px;
+}
+
 .nav-item {
   display: grid;
   min-height: 58px;

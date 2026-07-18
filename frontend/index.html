@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.12.1">
-    <script src="./app.js?v=0.12.1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.13.0">
+    <script src="./app.js?v=0.13.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.12.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.13.0</p>
         </div>
       </section>
 
@@ -253,33 +253,31 @@
           <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Planung und Verwaltung</p>
+                <p id="admin-eyebrow" class="eyebrow">Planung und Verwaltung</p>
                 <h2 id="admin-title">Verwaltung</h2>
               </div>
               <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
             </div>
-            <p class="admin-intro">Kunden, Projekte, Baustellen und Einsätze – eindeutig verknüpft und direkt vom Handy verwaltet.</p>
+            <p id="admin-intro" class="admin-intro">Kunden, Projekte, Baustellen und Einsätze – eindeutig verknüpft und direkt vom Handy verwaltet.</p>
 
-            <div class="admin-summary" aria-label="Verwaltungsübersicht">
+            <div id="admin-summary" class="admin-summary" aria-label="Verwaltungsübersicht">
               <div><strong id="admin-employee-count">0</strong><span>Mitarbeiter</span></div>
               <div><strong id="admin-customer-count">0</strong><span>Kunden</span></div>
               <div><strong id="admin-project-count">0</strong><span>Projekte</span></div>
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
             </div>
 
-            <details id="assignment-planning-shell" class="admin-panel planning-shell" open>
-              <summary>Einsatzplanung</summary>
+            <section id="assignment-planning-shell" class="planning-shell-direct">
               <div id="assignment-planning-content" class="planning-group">
                 <p class="planning-intro">Wochenübersicht, einzelne Zuweisung und Excel-Import an einem Ort.</p>
               </div>
-            </details>
+            </section>
 
-            <details id="site-planning-shell" class="admin-panel planning-shell">
-              <summary>Baustellenplanung</summary>
+            <section id="site-planning-shell" class="planning-shell-direct" hidden>
               <div id="site-planning-content" class="planning-group">
                 <p class="planning-intro">Kunden, Projekte und Baustellen einzeln oder gesammelt aus Excel anlegen.</p>
               </div>
-            </details>
+            </section>
 
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
               <summary>Betriebsstruktur</summary>
@@ -609,6 +607,14 @@
           <button id="nav-week" class="nav-item" type="button">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/></svg>
             <span>Woche</span>
+          </button>
+          <button id="nav-assignments" class="nav-item" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
+            <span>Einsätze</span>
+          </button>
+          <button id="nav-sites" class="nav-item" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
+            <span>Baustellen</span>
           </button>
           <button id="nav-more" class="nav-item" type="button">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
