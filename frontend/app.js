@@ -95,8 +95,10 @@
     adminSection: document.querySelector("#admin-section"),
     adminRefresh: document.querySelector("#admin-refresh"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
+    adminCustomerCount: document.querySelector("#admin-customer-count"),
+    adminProjectCount: document.querySelector("#admin-project-count"),
     adminSiteCount: document.querySelector("#admin-site-count"),
-    adminAssignmentCount: document.querySelector("#admin-assignment-count"),
+    businessHierarchy: document.querySelector("#business-hierarchy"),
     siteDashboard: document.querySelector("#site-dashboard"),
     siteDashboardTitle: document.querySelector("#site-dashboard-title"),
     siteDashboardMeta: document.querySelector("#site-dashboard-meta"),
@@ -155,10 +157,30 @@
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
     employeeList: document.querySelector("#employee-list"),
+    customerForm: document.querySelector("#customer-form"),
+    customerType: document.querySelector("#customer-type"),
+    customerCompanyFields: document.querySelector("#customer-company-fields"),
+    customerPrivateFields: document.querySelector("#customer-private-fields"),
+    customerCompanyName: document.querySelector("#customer-company-name"),
+    customerFirstName: document.querySelector("#customer-first-name"),
+    customerLastName: document.querySelector("#customer-last-name"),
+    customerEmail: document.querySelector("#customer-email"),
+    customerPhone: document.querySelector("#customer-phone"),
+    customerStreet: document.querySelector("#customer-street"),
+    customerHouseNumber: document.querySelector("#customer-house-number"),
+    customerPostalCode: document.querySelector("#customer-postal-code"),
+    customerCity: document.querySelector("#customer-city"),
+    customerMessage: document.querySelector("#customer-message"),
+    customerList: document.querySelector("#customer-list"),
+    projectForm: document.querySelector("#project-form"),
+    projectCustomer: document.querySelector("#project-customer"),
+    projectName: document.querySelector("#project-name"),
+    projectShortText: document.querySelector("#project-short-text"),
+    projectMessage: document.querySelector("#project-message"),
+    projectList: document.querySelector("#project-list"),
     siteForm: document.querySelector("#site-form"),
-    siteCustomerName: document.querySelector("#site-customer-name"),
+    siteProject: document.querySelector("#site-project"),
     siteName: document.querySelector("#site-name"),
-    siteProjectName: document.querySelector("#site-project-name"),
     siteShortText: document.querySelector("#site-short-text"),
     siteStreet: document.querySelector("#site-street"),
     siteHouseNumber: document.querySelector("#site-house-number"),
@@ -301,7 +323,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.11.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.12.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -703,6 +725,74 @@
     if (items.some((item) => item.id === selected)) select.value = selected;
   }
 
+  function hierarchySummary(title, meta) {
+    const summary = document.createElement("summary");
+    const content = document.createElement("span");
+    const strong = document.createElement("strong");
+    const small = document.createElement("small");
+    strong.textContent = title;
+    small.textContent = meta;
+    content.append(strong, small);
+    summary.append(content);
+    return summary;
+  }
+
+  function renderBusinessHierarchy() {
+    elements.businessHierarchy.replaceChildren();
+    if (adminState.customers.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "hierarchy-empty";
+      empty.textContent = "Noch kein Kunde angelegt. Beginne mit dem ersten Kunden.";
+      elements.businessHierarchy.append(empty);
+      return;
+    }
+
+    adminState.customers.forEach((customer) => {
+      const customerNode = document.createElement("details");
+      customerNode.className = "hierarchy-customer";
+      customerNode.append(hierarchySummary(customer.displayName, customer.number));
+      const projects = adminState.projects.filter((project) => project.customerId === customer.id);
+      if (projects.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "hierarchy-empty";
+        empty.textContent = "Noch kein Projekt für diesen Kunden.";
+        customerNode.append(empty);
+      } else {
+        projects.forEach((project) => {
+          const projectNode = document.createElement("details");
+          projectNode.className = "hierarchy-project";
+          projectNode.append(hierarchySummary(project.name, `${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`));
+          const sites = adminState.sites.filter((site) => site.projectId === project.id);
+          if (sites.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "hierarchy-empty";
+            empty.textContent = "Noch keine Baustelle in diesem Projekt.";
+            projectNode.append(empty);
+          } else {
+            const list = document.createElement("ul");
+            list.className = "hierarchy-sites";
+            sites.forEach((site) => {
+              const item = document.createElement("li");
+              const button = document.createElement("button");
+              const title = document.createElement("strong");
+              const meta = document.createElement("span");
+              button.type = "button";
+              title.textContent = site.name;
+              meta.textContent = `${site.number} · ${site.address.city}`;
+              button.append(title, meta);
+              button.addEventListener("click", () => openSiteDashboard(site));
+              item.append(button);
+              list.append(item);
+            });
+            projectNode.append(list);
+          }
+          customerNode.append(projectNode);
+        });
+      }
+      elements.businessHierarchy.append(customerNode);
+    });
+  }
+
   function closeAssignmentEditor() {
     editingAssignmentId = null;
     elements.assignmentEditForm.hidden = true;
@@ -783,8 +873,9 @@
   function renderAdmin() {
     if (!adminState) return;
     elements.adminEmployeeCount.textContent = String(adminState.employees.length);
+    elements.adminCustomerCount.textContent = String(adminState.customers.length);
+    elements.adminProjectCount.textContent = String(adminState.projects.length);
     elements.adminSiteCount.textContent = String(adminState.sites.length);
-    elements.adminAssignmentCount.textContent = String(adminState.weekAssignments.length);
     elements.employeeManagementRoles.forEach((option) => {
       option.hidden = !adminState.canCreateManagementRoles;
       option.disabled = !adminState.canCreateManagementRoles;
@@ -796,6 +887,18 @@
       elements.employeeRole.value = "installer";
     }
 
+    renderAdminSelect(
+      elements.projectCustomer,
+      adminState.customers,
+      "Kunde auswählen",
+      (customer) => `${customer.displayName} · ${customer.number}`
+    );
+    renderAdminSelect(
+      elements.siteProject,
+      adminState.projects,
+      "Projekt auswählen",
+      (project) => `${project.customerName} · ${project.name}`
+    );
     renderAdminSelect(
       elements.assignmentEmployee,
       adminState.employees,
@@ -829,6 +932,25 @@
       );
     });
 
+    elements.customerList.replaceChildren();
+    adminState.customers.forEach((customer) => {
+      const contact = [customer.email, customer.phone].filter(Boolean).join(" · ");
+      appendAdminListItem(
+        elements.customerList,
+        customer.displayName,
+        [customer.number, contact].filter(Boolean).join(" · ")
+      );
+    });
+
+    elements.projectList.replaceChildren();
+    adminState.projects.forEach((project) => {
+      appendAdminListItem(
+        elements.projectList,
+        project.name,
+        `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`
+      );
+    });
+
     elements.siteList.replaceChildren();
     adminState.sites.forEach((site) => {
       appendAdminListItem(
@@ -855,6 +977,7 @@
         );
       });
     }
+    renderBusinessHierarchy();
     renderAdminWeek();
   }
 
@@ -1410,23 +1533,78 @@
     await refreshAdmin();
   });
 
+  function updateCustomerTypeFields() {
+    const privateCustomer = elements.customerType.value === "private";
+    elements.customerCompanyFields.hidden = privateCustomer;
+    elements.customerPrivateFields.hidden = !privateCustomer;
+    elements.customerCompanyName.required = !privateCustomer;
+    elements.customerFirstName.required = privateCustomer;
+    elements.customerLastName.required = privateCustomer;
+  }
+
+  elements.customerType.addEventListener("change", updateCustomerTypeFields);
+  updateCustomerTypeFields();
+
+  elements.customerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const saved = await submitAdminForm(
+      elements.customerForm,
+      elements.customerMessage,
+      "./api/v1/admin/customers",
+      {
+        customerType: elements.customerType.value,
+        companyName: elements.customerCompanyName.value,
+        firstName: elements.customerFirstName.value,
+        lastName: elements.customerLastName.value,
+        email: elements.customerEmail.value,
+        phone: elements.customerPhone.value,
+        street: elements.customerStreet.value,
+        houseNumber: elements.customerHouseNumber.value,
+        postalCode: elements.customerPostalCode.value,
+        city: elements.customerCity.value
+      },
+      "Kunde angelegt · jetzt kann ein Projekt zugeordnet werden."
+    );
+    if (!saved) return;
+    elements.customerForm.reset();
+    updateCustomerTypeFields();
+    await refreshAdmin();
+  });
+
+  elements.projectForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const saved = await submitAdminForm(
+      elements.projectForm,
+      elements.projectMessage,
+      "./api/v1/admin/projects",
+      {
+        customerId: elements.projectCustomer.value,
+        name: elements.projectName.value,
+        installerShortText: elements.projectShortText.value
+      },
+      "Projekt angelegt · jetzt kann eine Baustelle hinzugefügt werden."
+    );
+    if (!saved) return;
+    elements.projectForm.reset();
+    await refreshAdmin();
+  });
+
   elements.siteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const saved = await submitAdminForm(
       elements.siteForm,
       elements.siteMessage,
-      "./api/v1/admin/sites",
+      "./api/v1/admin/construction-sites",
       {
-        customerName: elements.siteCustomerName.value,
-        projectName: elements.siteProjectName.value,
-        siteName: elements.siteName.value,
+        projectId: elements.siteProject.value,
+        name: elements.siteName.value,
         installerShortText: elements.siteShortText.value,
         street: elements.siteStreet.value,
         houseNumber: elements.siteHouseNumber.value,
         postalCode: elements.sitePostalCode.value,
         city: elements.siteCity.value
       },
-      "Kunde und Baustelle wurden angelegt."
+      "Baustelle angelegt · sie kann jetzt Mitarbeitern zugewiesen werden."
     );
     if (!saved) return;
     elements.siteForm.reset();

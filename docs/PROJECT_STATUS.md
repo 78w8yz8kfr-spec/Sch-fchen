@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 18.07.2026
-Technischer Stand: V0.11.1
+Technischer Stand: V0.12.0
 
 ## Abgeschlossen
 
@@ -71,6 +71,9 @@ Technischer Stand: V0.11.1
 - gegliedertes Baustellen-Dashboard für Mitarbeiter, Berichte, Dokumente, Fotos, Aufgaben, Material, Notizen und weitere Module
 - Migration 016 mit neuem Betriebsrollenmodell und differenzierten Berechtigungsgrundlagen
 - vereinfachte Arbeitskarte ohne doppelten Live-Block sowie versionierte PWA-Assets gegen gemischte iPhone-Cache-Stände
+- getrennte mobile Anlage von Kunden, Projekten und Baustellen entlang der verbindlichen Hierarchie
+- aufklappbare Betriebsstruktur Kunde → Projekt → Baustelle mit direktem Einstieg ins Baustellen-Dashboard
+- serverseitige Prüfung, dass Projekt und Baustelle zu aktiven Datensätzen desselben Mandanten gehören
 
 ## Noch zu prüfen
 

@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: 17.07.2026
+Stand: 18.07.2026
 
 ## Zielbild
 
@@ -28,6 +28,11 @@ Firma → Kunde → Kundenstandort → Projekt → Baustelle
 Planung, Zeiterfassung, Berichte, Dokumente und optionale Spezialmodule werden
 an diesen Kernpfad angebunden. VDE, LWL, DGUV und KNX sind Module, nicht der
 fachliche Kern.
+
+Die Verwaltungsoberfläche bildet diesen Pfad in drei getrennten Schreibschritten
+ab: Kunde anlegen, Projekt einem Kunden zuordnen und Baustelle einem Projekt
+zuordnen. Der bisherige Paket-Endpunkt bleibt ausschließlich für kompatible
+Import- und Übergangsabläufe erhalten.
 
 ## Modul- und Dokumentenprinzip
 

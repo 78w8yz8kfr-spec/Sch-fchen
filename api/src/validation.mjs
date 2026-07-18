@@ -133,6 +133,67 @@ export function validateSiteBundle(body) {
   };
 }
 
+export function validateCustomer(body) {
+  rejectTenantFields(body);
+  const customerType = text(body.customerType, "Kundenart", 3, 20).toLowerCase();
+  if (!new Set(["company", "private"]).has(customerType)) {
+    throw new InputError("Die Kundenart ist ungültig.");
+  }
+  const companyName = optionalText(body.companyName, "Firmenname", 200);
+  const firstName = optionalText(body.firstName, "Vorname", 100);
+  const lastName = optionalText(body.lastName, "Nachname", 100);
+  if (customerType === "company" && !companyName) {
+    throw new InputError("Firmenname fehlt.");
+  }
+  if (customerType === "private" && (!firstName || !lastName)) {
+    throw new InputError("Vorname und Nachname fehlen.");
+  }
+
+  const street = optionalText(body.street, "Straße", 150);
+  const houseNumber = optionalText(body.houseNumber, "Hausnummer", 20);
+  const postalCode = optionalText(body.postalCode, "Postleitzahl", 12);
+  const city = optionalText(body.city, "Ort", 100);
+  const addressParts = [street, houseNumber, postalCode, city];
+  if (addressParts.some(Boolean) && !addressParts.every(Boolean)) {
+    throw new InputError("Die Rechnungsadresse ist unvollständig.");
+  }
+
+  return {
+    customerType,
+    companyName: customerType === "company" ? companyName : null,
+    firstName: customerType === "private" ? firstName : null,
+    lastName: customerType === "private" ? lastName : null,
+    email: optionalText(body.email, "E-Mail", 254),
+    phone: optionalText(body.phone, "Telefon", 50),
+    street,
+    houseNumber,
+    postalCode,
+    city
+  };
+}
+
+export function validateProject(body) {
+  rejectTenantFields(body);
+  return {
+    customerId: uuid(body.customerId, "Kunde"),
+    name: text(body.name, "Projektname", 2, 200),
+    installerShortText: optionalText(body.installerShortText, "Kurztext", 300)
+  };
+}
+
+export function validateConstructionSite(body) {
+  rejectTenantFields(body);
+  return {
+    projectId: uuid(body.projectId, "Projekt"),
+    name: text(body.name, "Baustellenname", 2, 200),
+    installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    street: text(body.street, "Straße", 1, 150),
+    houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
+    postalCode: text(body.postalCode, "Postleitzahl", 1, 12),
+    city: text(body.city, "Ort", 1, 100)
+  };
+}
+
 export function validateAssignment(body) {
   if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
     throw new InputError("companyId wird ausschließlich vom Server bestimmt.");

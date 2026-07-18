@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 18.07.2026  
-Technischer Stand: V0.11.1
+Technischer Stand: V0.12.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -66,9 +66,12 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/api/v1/setup` | Status der einmaligen Ersteinrichtung lesen |
 | `POST` | `/api/v1/setup` | Genau den ersten Admin geschützt anlegen |
 | `POST` | `/api/v1/account/initial-password` | Persönliches Startpasswort einmalig ersetzen |
-| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Baustellen und Wochenplanung Montag bis Freitag |
+| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Kunden, Projekte, Baustellen und Wochenplanung Montag bis Freitag |
 | `POST` | `/api/v1/admin/employees` | Mitarbeiter mit Startpasswort und begrenzter Rolle anlegen |
-| `POST` | `/api/v1/admin/sites` | Kunde, Standort, Projekt und Baustelle gemeinsam anlegen |
+| `POST` | `/api/v1/admin/customers` | Firmen- oder Privatkunden getrennt anlegen |
+| `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden zuordnen |
+| `POST` | `/api/v1/admin/construction-sites` | Baustelle mit Standort einem aktiven Projekt zuordnen |
+| `POST` | `/api/v1/admin/sites` | Kompatibler Paket-Endpunkt für bestehende Integrationen |
 | `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz freigeben |
 | `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung verschieben oder Startzeit ändern |
 | `POST` | `/api/v1/admin/assignments/:id/cancel` | Einsatz mit Begründung stornieren; Historie bleibt erhalten |
@@ -106,7 +109,7 @@ Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
 normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
 sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
 der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
-Sonderkürzel werden lediglich gezählt; V0.11.1 legt daraus keine Fachdaten an.
+Sonderkürzel werden lediglich gezählt; V0.12.0 legt daraus keine Fachdaten an.
 Unbekannte Mitarbeiter- oder Baustellenbezeichnungen können ausdrücklich auf
 eine aktive ID des Sitzungsmandanten abgebildet werden. Der Server validiert
 jede Zuordnung erneut und akzeptiert keine fremden oder frei erfundenen IDs.
@@ -117,6 +120,12 @@ werden einzeln gemeldet. Vorhandene aktive Baustellennamen werden nicht erneut
 angelegt. Eindeutig vorhandene Firmenkunden werden wiederverwendet, neue Kunden
 werden gemeinsam mit Standort, Projekt und Baustelle in derselben Transaktion
 angelegt. Eine mandantenbezogene Sperre verhindert konkurrierende Doppelimporte.
+
+Bei der normalen mobilen Anlage werden Kunde, Projekt und Baustelle bewusst
+nacheinander gespeichert. Kunden- und Projekt-IDs werden in jeder Transaktion
+erneut gegen den Sitzungsmandanten sowie ihren Aktivstatus geprüft. Dadurch kann
+das Frontend weder fremde Projekte verwenden noch Baustellen ohne eindeutigen
+Kunden- und Projektbezug erzeugen.
 
 ## Lokale Inbetriebnahme
 

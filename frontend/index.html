@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.11.1">
-    <script src="./app.js?v=0.11.1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.12.0">
+    <script src="./app.js?v=0.12.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.11.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.12.0</p>
         </div>
       </section>
 
@@ -258,13 +258,22 @@
               </div>
               <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
             </div>
-            <p class="admin-intro">Mitarbeiter, Baustellen und freigegebene Einsätze – einfach direkt vom Handy.</p>
+            <p class="admin-intro">Kunden, Projekte, Baustellen und Einsätze – eindeutig verknüpft und direkt vom Handy verwaltet.</p>
 
             <div class="admin-summary" aria-label="Verwaltungsübersicht">
               <div><strong id="admin-employee-count">0</strong><span>Mitarbeiter</span></div>
+              <div><strong id="admin-customer-count">0</strong><span>Kunden</span></div>
+              <div><strong id="admin-project-count">0</strong><span>Projekte</span></div>
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
-              <div><strong id="admin-assignment-count">0</strong><span>Einsätze</span></div>
             </div>
+
+            <details class="admin-panel business-structure-panel" open>
+              <summary>Betriebsstruktur</summary>
+              <div class="structure-legend" aria-hidden="true">
+                <span>Kunde</span><i>›</i><span>Projekt</span><i>›</i><span>Baustelle</span>
+              </div>
+              <div id="business-hierarchy" class="business-hierarchy"></div>
+            </details>
 
             <section id="site-dashboard" class="site-dashboard" aria-labelledby="site-dashboard-title" hidden>
               <div class="site-dashboard__header">
@@ -434,14 +443,86 @@
             </details>
 
             <details class="admin-panel">
+              <summary>Kunde anlegen</summary>
+              <form id="customer-form" class="admin-form" novalidate>
+                <label for="customer-type">Kundenart</label>
+                <select id="customer-type" required>
+                  <option value="company">Firma</option>
+                  <option value="private">Privatkunde</option>
+                </select>
+                <div id="customer-company-fields">
+                  <label for="customer-company-name">Firmenname</label>
+                  <input id="customer-company-name" maxlength="200" autocomplete="organization" required>
+                </div>
+                <div id="customer-private-fields" class="setup-grid" hidden>
+                  <div>
+                    <label for="customer-first-name">Vorname</label>
+                    <input id="customer-first-name" maxlength="100" autocomplete="given-name">
+                  </div>
+                  <div>
+                    <label for="customer-last-name">Nachname</label>
+                    <input id="customer-last-name" maxlength="100" autocomplete="family-name">
+                  </div>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="customer-email">E-Mail <span>(optional)</span></label>
+                    <input id="customer-email" type="email" maxlength="254" autocomplete="email">
+                  </div>
+                  <div>
+                    <label for="customer-phone">Telefon <span>(optional)</span></label>
+                    <input id="customer-phone" type="tel" maxlength="50" autocomplete="tel">
+                  </div>
+                </div>
+                <p class="field-help">Rechnungsadresse optional – wenn angegeben, bitte vollständig.</p>
+                <div class="address-grid">
+                  <div>
+                    <label for="customer-street">Straße</label>
+                    <input id="customer-street" maxlength="150" autocomplete="street-address">
+                  </div>
+                  <div>
+                    <label for="customer-house-number">Nr.</label>
+                    <input id="customer-house-number" maxlength="20">
+                  </div>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="customer-postal-code">PLZ</label>
+                    <input id="customer-postal-code" maxlength="12" inputmode="numeric" autocomplete="postal-code">
+                  </div>
+                  <div>
+                    <label for="customer-city">Ort</label>
+                    <input id="customer-city" maxlength="100" autocomplete="address-level2">
+                  </div>
+                </div>
+                <button class="button button--primary" type="submit">Kunde anlegen</button>
+                <p id="customer-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="customer-list" class="admin-list" aria-label="Aktive Kunden"></ul>
+            </details>
+
+            <details class="admin-panel">
+              <summary>Projekt anlegen</summary>
+              <form id="project-form" class="admin-form" novalidate>
+                <label for="project-customer">Kunde</label>
+                <select id="project-customer" required></select>
+                <label for="project-name">Projektname</label>
+                <input id="project-name" maxlength="200" required>
+                <label for="project-short-text">Kurzbeschreibung <span>(optional)</span></label>
+                <input id="project-short-text" maxlength="300" placeholder="z. B. Elektroinstallation Neubau">
+                <button class="button button--primary" type="submit">Projekt anlegen</button>
+                <p id="project-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="project-list" class="admin-list" aria-label="Aktive Projekte"></ul>
+            </details>
+
+            <details class="admin-panel">
               <summary>Baustelle anlegen</summary>
               <form id="site-form" class="admin-form" novalidate>
-                <label for="site-customer-name">Kunde/Firma</label>
-                <input id="site-customer-name" maxlength="200" autocomplete="organization" required>
+                <label for="site-project">Projekt</label>
+                <select id="site-project" required></select>
                 <label for="site-name">Baustellenname</label>
                 <input id="site-name" maxlength="200" required>
-                <label for="site-project-name">Projektname <span>(optional)</span></label>
-                <input id="site-project-name" maxlength="200">
                 <label for="site-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
                 <input id="site-short-text" maxlength="300" placeholder="z. B. Verteilung erneuern">
                 <div class="address-grid">
@@ -464,7 +545,7 @@
                     <input id="site-city" maxlength="100" autocomplete="address-level2" required>
                   </div>
                 </div>
-                <button class="button button--primary" type="submit">Kunde und Baustelle anlegen</button>
+                <button class="button button--primary" type="submit">Baustelle anlegen</button>
                 <p id="site-message" class="form-message" aria-live="polite"></p>
               </form>
               <ul id="site-list" class="admin-list" aria-label="Aktive Baustellen"></ul>

@@ -6,10 +6,13 @@ import {
   validateAssignment,
   validateAssignmentCancellation,
   validateAssignmentUpdate,
+  validateConstructionSite,
+  validateCustomer,
   validateEmployee,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
+  validateProject,
   validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
@@ -107,6 +110,57 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   assert.throws(
     () => validateAssignmentUpdate({ ...update, changeReason: "x" }),
     /Änderungsgrund/
+  );
+});
+
+test("Kunde, Projekt und Baustelle werden als getrennte Hierarchie validiert", () => {
+  const customer = validateCustomer({
+    customerType: "company",
+    companyName: "Musterkunde GmbH",
+    email: "buero@example.invalid",
+    street: "Musterweg",
+    houseNumber: "4",
+    postalCode: "12345",
+    city: "Musterstadt"
+  });
+  assert.equal(customer.companyName, "Musterkunde GmbH");
+  assert.equal(customer.firstName, null);
+
+  const privateCustomer = validateCustomer({
+    customerType: "private",
+    firstName: "Erika",
+    lastName: "Musterfrau"
+  });
+  assert.equal(privateCustomer.companyName, null);
+  assert.equal(privateCustomer.lastName, "Musterfrau");
+  assert.throws(
+    () => validateCustomer({ customerType: "company", companyName: "Muster", street: "Unvollständig" }),
+    /unvollständig/
+  );
+  assert.throws(
+    () => validateCustomer({ customerType: "private", firstName: "Erika" }),
+    /Vorname und Nachname/
+  );
+
+  const project = validateProject({
+    customerId: "11111111-1111-4111-8111-111111111111",
+    name: "Neubau Musterweg",
+    installerShortText: "Elektroinstallation"
+  });
+  assert.equal(project.name, "Neubau Musterweg");
+
+  const site = validateConstructionSite({
+    projectId: "22222222-2222-4222-8222-222222222222",
+    name: "Musterweg 4",
+    street: "Musterweg",
+    houseNumber: "4",
+    postalCode: "12345",
+    city: "Musterstadt"
+  });
+  assert.equal(site.projectId, "22222222-2222-4222-8222-222222222222");
+  assert.throws(
+    () => validateConstructionSite({ ...site, projectId: "falsch" }),
+    /Projekt/
   );
 });
 

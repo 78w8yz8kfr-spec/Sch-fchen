@@ -234,6 +234,65 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(employee.mustChangePassword, true);
   assert.deepEqual(employee.roles, ["installer"]);
 
+  const customerResponse = await fetch(`${baseUrl}/api/v1/admin/customers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      customerType: "company",
+      companyName: `Struktur Kunde ${suffix} GmbH`,
+      email: "struktur@example.invalid",
+      street: "Kundenweg",
+      houseNumber: "3",
+      postalCode: "12345",
+      city: "Teststadt"
+    })
+  });
+  assert.equal(customerResponse.status, 201, await customerResponse.clone().text());
+  const customer = (await customerResponse.json()).customer;
+  assert.match(customer.number, /^SE-K-\d{5}$/);
+
+  const projectResponse = await fetch(`${baseUrl}/api/v1/admin/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      customerId: customer.id,
+      name: `Struktur Projekt ${suffix}`,
+      installerShortText: "Elektroinstallation"
+    })
+  });
+  assert.equal(projectResponse.status, 201, await projectResponse.clone().text());
+  const project = (await projectResponse.json()).project;
+  assert.equal(project.customerId, customer.id);
+  assert.match(project.number, /^SE-\d{4}-\d{4}$/);
+
+  const structuredSiteResponse = await fetch(`${baseUrl}/api/v1/admin/construction-sites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      projectId: project.id,
+      name: `Struktur Baustelle ${suffix}`,
+      installerShortText: "Unterverteilung montieren",
+      street: "Baustellenweg",
+      houseNumber: "8",
+      postalCode: "12345",
+      city: "Teststadt"
+    })
+  });
+  assert.equal(structuredSiteResponse.status, 201, await structuredSiteResponse.clone().text());
+  const structuredSite = (await structuredSiteResponse.json()).site;
+  assert.equal(structuredSite.projectId, project.id);
+  assert.equal(structuredSite.customerId, customer.id);
+
+  const structureOverviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=2026-07-20`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(structureOverviewResponse.status, 200, await structureOverviewResponse.clone().text());
+  const structureOverview = (await structureOverviewResponse.json()).overview;
+  assert.ok(structureOverview.customers.some((item) => item.id === customer.id));
+  assert.ok(structureOverview.projects.some((item) => item.id === project.id && item.siteCount === 1));
+  assert.ok(structureOverview.sites.some((item) => item.id === structuredSite.id && item.projectId === project.id));
+
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },

@@ -93,3 +93,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Vorarbeiterkennzeichnung erscheint nur für tatsächliche Vorarbeiter
 - CSS und JavaScript werden versionsgebunden geladen, damit iPhones keine alte Gestaltung mit neuem HTML mischen
 - Versionsstand 0.11.1
+- getrennte Anlage von Firmen- und Privatkunden, Projekten und Baustellen
+- eindeutige serverseitige Zuordnung Projekt → Kunde und Baustelle → Projekt mit Mandantenschutz
+- mobile Betriebsstruktur mit aufklappbarer Hierarchie Kunde → Projekt → Baustelle
+- Kunden- und Projektauswahl statt wiederholter Freitexteingabe bei der Baustellenanlage
+- bestehender Excel-Schnellimport und Paket-Endpunkt bleiben kompatibel
+- Versionsstand 0.12.0

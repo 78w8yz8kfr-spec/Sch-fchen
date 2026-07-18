@@ -1,6 +1,6 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.11.1
+Technischer Stand: V0.12.0
 
 Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
 Projektleiter unter **Mehr → Verwaltung → Excel-Wochenplan importieren**

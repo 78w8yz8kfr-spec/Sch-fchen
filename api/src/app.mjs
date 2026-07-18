@@ -31,11 +31,14 @@ import {
   validateAssignment,
   validateAssignmentCancellation,
   validateAssignmentUpdate,
+  validateConstructionSite,
+  validateCustomer,
   validateEmployee,
   validateId,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
+  validateProject,
   validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
@@ -333,6 +336,8 @@ function employeeDto(row) {
 function siteDto(row) {
   return {
     id: row.id,
+    projectId: row.project_id,
+    customerId: row.customer_id,
     number: row.site_number,
     name: row.name,
     shortText: row.installer_short_text,
@@ -344,6 +349,41 @@ function siteDto(row) {
       postalCode: row.postal_code,
       city: row.city
     }
+  };
+}
+
+function customerDto(row) {
+  return {
+    id: row.id,
+    number: row.customer_number,
+    type: row.customer_type,
+    displayName: row.customer_type === "company"
+      ? row.company_name
+      : `${row.first_name} ${row.last_name}`,
+    companyName: row.company_name,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    address: {
+      street: row.billing_street,
+      houseNumber: row.billing_house_number,
+      postalCode: row.billing_postal_code,
+      city: row.billing_city
+    }
+  };
+}
+
+function projectDto(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    number: row.project_number,
+    name: row.name,
+    shortText: row.installer_short_text,
+    customerName: row.customer_name,
+    status: row.status,
+    siteCount: Number(row.site_count || 0)
   };
 }
 
@@ -368,7 +408,7 @@ async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
   const weekStart = mondayFor(date);
   const weekEnd = addUtcDays(weekStart, 4);
-  const [employeeResult, siteResult, assignmentResult] = await Promise.all([
+  const [employeeResult, customerResult, projectResult, siteResult, assignmentResult] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
               account.must_change_password,
@@ -392,9 +432,35 @@ async function adminOverview(client, context, date) {
       [context.companyId]
     ),
     client.query(
-      `SELECT site.id, site.site_number, site.name, site.installer_short_text,
+      `SELECT id, customer_number, customer_type, company_name, first_name, last_name,
+              email, phone, billing_street, billing_house_number, billing_postal_code, billing_city
+       FROM customers
+       WHERE company_id = $1 AND status = 'active'
+       ORDER BY LOWER(COALESCE(company_name, last_name)), LOWER(COALESCE(first_name, '')), customer_number`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT project.id, project.customer_id, project.project_number, project.name,
+              project.installer_short_text, project.status,
+              COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
+              COUNT(site.id) FILTER (
+                WHERE site.status IN ('planned', 'active', 'on_hold', 'delayed')
+              ) AS site_count
+       FROM projects AS project
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       LEFT JOIN construction_sites AS site
+         ON site.company_id = project.company_id AND site.project_id = project.id
+       WHERE project.company_id = $1
+         AND project.status IN ('planned', 'active', 'on_hold')
+       GROUP BY project.id, customer.id
+       ORDER BY LOWER(COALESCE(customer.company_name, customer.last_name)), LOWER(project.name), project.project_number`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT site.id, site.project_id, project.customer_id, site.site_number, site.name, site.installer_short_text,
               project.name AS project_name,
-              customer.company_name AS customer_name,
+              COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
               location.street, location.house_number, location.postal_code, location.city
        FROM construction_sites AS site
        JOIN projects AS project
@@ -442,6 +508,8 @@ async function adminOverview(client, context, date) {
     weekStart,
     canCreateManagementRoles: [...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role)),
     employees: employeeResult.rows.map(employeeDto),
+    customers: customerResult.rows.map(customerDto),
+    projects: projectResult.rows.map(projectDto),
     sites: siteResult.rows.map(siteDto),
     assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
     weekAssignments
@@ -736,6 +804,160 @@ async function createEmployee(client, context, input) {
   return employeeDto({ ...inserted.rows[0], roles: [input.role] });
 }
 
+async function createCustomer(client, context, input) {
+  await requirePlanner(client, context);
+  const existing = await client.query(
+    `SELECT customer_type, company_name, first_name, last_name
+     FROM customers
+     WHERE company_id = $1 AND status = 'active'`,
+    [context.companyId]
+  );
+  const requestedName = input.customerType === "company"
+    ? input.companyName
+    : `${input.firstName} ${input.lastName}`;
+  const duplicate = existing.rows.some((row) => {
+    if (row.customer_type !== input.customerType) return false;
+    const existingName = row.customer_type === "company"
+      ? row.company_name
+      : `${row.first_name} ${row.last_name}`;
+    return normalizeImportText(existingName) === normalizeImportText(requestedName);
+  });
+  if (duplicate) {
+    throw new InputError("Ein aktiver Kunde mit diesem Namen existiert bereits.", 409, "customer_name_exists");
+  }
+
+  const inserted = await client.query(
+    `INSERT INTO customers (
+       company_id, customer_type, company_name, first_name, last_name,
+       email, phone, billing_street, billing_house_number, billing_postal_code, billing_city
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     RETURNING id, customer_number, customer_type, company_name, first_name, last_name,
+               email, phone, billing_street, billing_house_number, billing_postal_code, billing_city`,
+    [
+      context.companyId,
+      input.customerType,
+      input.companyName,
+      input.firstName,
+      input.lastName,
+      input.email,
+      input.phone,
+      input.street,
+      input.houseNumber,
+      input.postalCode,
+      input.city
+    ]
+  );
+  return customerDto(inserted.rows[0]);
+}
+
+async function createProject(client, context, input) {
+  await requirePlanner(client, context);
+  const customer = await client.query(
+    `SELECT id, customer_type, company_name, first_name, last_name
+     FROM customers
+     WHERE company_id = $1 AND id = $2 AND status = 'active'`,
+    [context.companyId, input.customerId]
+  );
+  if (customer.rowCount !== 1) {
+    throw new InputError("Der Kunde wurde nicht gefunden.", 404, "customer_not_found");
+  }
+  const existing = await client.query(
+    `SELECT name FROM projects
+     WHERE company_id = $1 AND customer_id = $2
+       AND status IN ('planned', 'active', 'on_hold')`,
+    [context.companyId, input.customerId]
+  );
+  if (existing.rows.some((row) => normalizeImportText(row.name) === normalizeImportText(input.name))) {
+    throw new InputError("Für diesen Kunden existiert bereits ein aktives Projekt mit diesem Namen.", 409, "project_name_exists");
+  }
+  const inserted = await client.query(
+    `INSERT INTO projects (company_id, customer_id, name, status, installer_short_text)
+     VALUES ($1, $2, $3, 'active', $4)
+     RETURNING id, customer_id, project_number, name, installer_short_text, status`,
+    [context.companyId, input.customerId, input.name, input.installerShortText]
+  );
+  const row = customer.rows[0];
+  return projectDto({
+    ...inserted.rows[0],
+    customer_name: row.customer_type === "company"
+      ? row.company_name
+      : `${row.first_name} ${row.last_name}`,
+    site_count: 0
+  });
+}
+
+async function createConstructionSite(client, context, input) {
+  await requirePlanner(client, context);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`sites:${context.companyId}`]
+  );
+  const project = await client.query(
+    `SELECT project.id, project.name, project.customer_id,
+            customer.customer_type, customer.company_name, customer.first_name, customer.last_name
+     FROM projects AS project
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id AND customer.id = project.customer_id
+     WHERE project.company_id = $1 AND project.id = $2
+       AND project.status IN ('planned', 'active', 'on_hold')
+       AND customer.status = 'active'`,
+    [context.companyId, input.projectId]
+  );
+  if (project.rowCount !== 1) {
+    throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
+  }
+  const existingNames = await client.query(
+    `SELECT name FROM construction_sites
+     WHERE company_id = $1 AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId]
+  );
+  if (existingNames.rows.some((row) => normalizeImportText(row.name) === normalizeImportText(input.name))) {
+    throw new InputError("Eine aktive Baustelle mit diesem Namen existiert bereits.", 409, "site_name_exists");
+  }
+
+  const projectRow = project.rows[0];
+  const location = await client.query(
+    `INSERT INTO customer_locations (
+       company_id, customer_id, name, location_type, street, house_number,
+       postal_code, city, is_billing_location
+     ) VALUES ($1, $2, $3, 'construction', $4, $5, $6, $7, FALSE)
+     RETURNING id`,
+    [
+      context.companyId,
+      projectRow.customer_id,
+      input.name,
+      input.street,
+      input.houseNumber,
+      input.postalCode,
+      input.city
+    ]
+  );
+  await client.query(
+    `INSERT INTO project_locations (company_id, project_id, customer_location_id)
+     VALUES ($1, $2, $3)`,
+    [context.companyId, input.projectId, location.rows[0].id]
+  );
+  const inserted = await client.query(
+    `INSERT INTO construction_sites (
+       company_id, project_id, customer_location_id, name, installer_short_text, status
+     ) VALUES ($1, $2, $3, $4, $5, 'active')
+     RETURNING id, project_id, site_number, name, installer_short_text`,
+    [context.companyId, input.projectId, location.rows[0].id, input.name, input.installerShortText]
+  );
+  return siteDto({
+    ...inserted.rows[0],
+    customer_id: projectRow.customer_id,
+    customer_name: projectRow.customer_type === "company"
+      ? projectRow.company_name
+      : `${projectRow.first_name} ${projectRow.last_name}`,
+    project_name: projectRow.name,
+    street: input.street,
+    house_number: input.houseNumber,
+    postal_code: input.postalCode,
+    city: input.city
+  });
+}
+
 async function createSiteBundle(client, context, input) {
   await requirePlanner(client, context);
   await client.query(
@@ -790,11 +1012,12 @@ async function createSiteBundle(client, context, input) {
     `INSERT INTO construction_sites (
        company_id, project_id, customer_location_id, name, installer_short_text, status
      ) VALUES ($1, $2, $3, $4, $5, 'active')
-     RETURNING id, site_number, name, installer_short_text`,
+     RETURNING id, project_id, site_number, name, installer_short_text`,
     [context.companyId, project.rows[0].id, location.rows[0].id, input.siteName, input.installerShortText]
   );
   return siteDto({
     ...site.rows[0],
+    customer_id: customer.rows[0].id,
     customer_name: input.customerName,
     project_name: input.projectName || input.siteName,
     street: input.street,
@@ -1240,6 +1463,36 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createEmployee(client, context, input)
         );
         return json(response, 201, { employee });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/customers") {
+        const input = validateCustomer(await readJson(request));
+        const customer = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createCustomer(client, context, input)
+        );
+        return json(response, 201, { customer });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/projects") {
+        const input = validateProject(await readJson(request));
+        const project = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createProject(client, context, input)
+        );
+        return json(response, 201, { project });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/construction-sites") {
+        const input = validateConstructionSite(await readJson(request));
+        const site = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createConstructionSite(client, context, input)
+        );
+        return json(response, 201, { site });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/sites") {
