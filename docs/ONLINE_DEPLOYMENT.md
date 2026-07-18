@@ -1,20 +1,20 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.13.1
+Technischer Stand: V0.13.2
 
 Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
-Projektleiter unter **Mehr → Verwaltung → Excel-Wochenplan importieren**
-eine `.xlsx`-Datei auswählen. Erst die Vorschau zeigt, welche X-Zuweisungen
+Projektleiter im Hauptbereich **Einsätze** über die kompakte Excel-Aktion eine
+`.xlsx`-Datei auswählen. Erst die Vorschau zeigt, welche X-Zuweisungen
 eindeutig importiert werden können; eine zweite Bestätigung speichert sie.
 Bestehende Mitarbeitertage und nicht eindeutig zugeordnete Namen bleiben
 unverändert.
 
 Unbekannte Mitarbeiter- oder Baustellennamen werden in der Vorschau mit einem
 Auswahlfeld angezeigt und können dort einem vorhandenen Eintrag zugeordnet
-werden. Unter **Mehr → Verwaltung → Baustellenliste aus Excel importieren**
-steht außerdem eine fertige Excel-Vorlage bereit. Nach dem Ausfüllen werden
-neue Baustellen ebenfalls erst geprüft und dann bestätigt; vorhandene Namen
-werden nicht doppelt angelegt.
+werden. Im Hauptbereich **Baustellen** sitzt der Excel-Import dauerhaft direkt
+unter der Schaltfläche **Baustelle anlegen**. Dort steht auch eine fertige
+Excel-Vorlage bereit. Nach dem Ausfüllen werden neue Baustellen ebenfalls erst
+geprüft und dann bestätigt; vorhandene Namen werden nicht doppelt angelegt.
 
 Die Produktionsvorlage in `render.yaml` startet die PWA, die API und PostgreSQL
 unter einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere

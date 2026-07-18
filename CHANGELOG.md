@@ -112,3 +112,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Dateiauswahl und Drag-and-drop ohne zusätzlichen Klick direkt sichtbar gemacht
 - Excel-Import weiterhin mit sicherer Vorschau und ausdrücklicher Bestätigung
 - Versionsstand 0.13.1
+- roter Button „Baustelle anlegen“ bleibt unverändert als wichtigste manuelle Aktion erhalten
+- kompakte, dauerhaft sichtbare Excel-Fläche direkt unter „Baustelle anlegen“ integriert
+- Dateiauswahl und Vorlagenlink sofort sichtbar; Dateiname und Prüfung erst nach Auswahl eingeblendet
+- Versionsstand 0.13.2

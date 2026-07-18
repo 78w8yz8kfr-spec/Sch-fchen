@@ -100,6 +100,7 @@
     adminTitle: document.querySelector("#admin-title"),
     adminIntro: document.querySelector("#admin-intro"),
     adminSummary: document.querySelector("#admin-summary"),
+    adminImport: document.querySelector("#admin-import"),
     adminRefresh: document.querySelector("#admin-refresh"),
     assignmentPlanningShell: document.querySelector("#assignment-planning-shell"),
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
@@ -135,8 +136,6 @@
     assignmentEditClose: document.querySelector("#assignment-edit-close"),
     assignmentEditMessage: document.querySelector("#assignment-edit-message"),
     assignmentImportPanel: document.querySelector("#assignment-import-panel"),
-    assignmentImportBody: document.querySelector("#assignment-import-body"),
-    assignmentImportDropzone: document.querySelector("#assignment-import-dropzone"),
     assignmentImportFile: document.querySelector("#assignment-import-file"),
     assignmentImportFileName: document.querySelector("#assignment-import-file-name"),
     assignmentImportPreviewButton: document.querySelector("#assignment-import-preview-button"),
@@ -151,9 +150,9 @@
     assignmentImportList: document.querySelector("#assignment-import-list"),
     assignmentImportConfirm: document.querySelector("#assignment-import-confirm"),
     siteImportPanel: document.querySelector("#site-import-panel"),
-    siteImportBody: document.querySelector("#site-import-body"),
-    siteImportDropzone: document.querySelector("#site-import-dropzone"),
     siteImportFile: document.querySelector("#site-import-file"),
+    siteImportChoose: document.querySelector("#site-import-choose"),
+    siteImportSelection: document.querySelector("#site-import-selection"),
     siteImportFileName: document.querySelector("#site-import-file-name"),
     siteImportPreviewButton: document.querySelector("#site-import-preview-button"),
     siteImportMessage: document.querySelector("#site-import-message"),
@@ -226,13 +225,13 @@
     elements.assignmentPanel
   );
   elements.sitePlanningContent.append(
-    elements.siteImportPanel,
     elements.businessStructurePanel,
     elements.siteDashboard,
     elements.customerPanel,
     elements.projectPanel,
     elements.siteFormPanel
   );
+  elements.siteForm.querySelector('button[type="submit"]').after(elements.siteImportPanel);
 
   const dateFormatter = new Intl.DateTimeFormat("de-DE", {
     weekday: "long",
@@ -358,7 +357,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.2 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -403,11 +402,13 @@
     elements.loginMessage.textContent = "";
     assignmentImportFile = null;
     elements.assignmentImportFile.value = "";
-    elements.assignmentImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+    elements.assignmentImportFileName.textContent = "Keine Datei ausgewählt";
+    elements.assignmentImportPanel.hidden = true;
     resetAssignmentImportPreview();
     siteImportFile = null;
     elements.siteImportFile.value = "";
-    elements.siteImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+    elements.siteImportFileName.textContent = "Keine Datei ausgewählt";
+    elements.siteImportSelection.hidden = true;
     resetSiteImportPreview();
   }
 
@@ -491,6 +492,7 @@
     resetAssignmentImportPreview();
     assignmentImportFile = file || null;
     elements.assignmentImportMessage.textContent = "";
+    elements.assignmentImportPanel.hidden = !file;
     const valid = Boolean(
       file
       && file.name.toLocaleLowerCase("de-DE").endsWith(".xlsx")
@@ -499,7 +501,7 @@
     );
     elements.assignmentImportPreviewButton.disabled = !valid;
     if (!file) {
-      elements.assignmentImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      elements.assignmentImportFileName.textContent = "Keine Datei ausgewählt";
       return;
     }
     elements.assignmentImportFileName.textContent = `${file.name} · ${Math.ceil(file.size / 1024)} KB`;
@@ -636,6 +638,7 @@
     resetSiteImportPreview();
     siteImportFile = file || null;
     elements.siteImportMessage.textContent = "";
+    elements.siteImportSelection.hidden = !file;
     const valid = Boolean(
       file
       && file.name.toLocaleLowerCase("de-DE").endsWith(".xlsx")
@@ -644,7 +647,7 @@
     );
     elements.siteImportPreviewButton.disabled = !valid;
     if (!file) {
-      elements.siteImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      elements.siteImportFileName.textContent = "Keine Datei ausgewählt";
       return;
     }
     elements.siteImportFileName.textContent = `${file.name} · ${Math.ceil(file.size / 1024)} KB`;
@@ -1392,6 +1395,8 @@
       elements.sitePlanningShell.hidden = pane !== "sites";
       elements.employeePanel.hidden = pane !== "more";
       elements.adminSummary.hidden = pane === "more";
+      elements.adminImport.hidden = pane !== "assignments";
+      elements.adminImport.setAttribute("aria-label", "Wochenplan aus Excel auswählen");
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
         sites: ["Kunden, Projekte und Orte", "Baustellenplanung", "Baustellen einzeln oder gesammelt aus Excel anlegen."],
@@ -1704,22 +1709,6 @@
     selectAssignmentImportFile(elements.assignmentImportFile.files?.[0] || null);
   });
 
-  for (const eventName of ["dragenter", "dragover"]) {
-    elements.assignmentImportDropzone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      elements.assignmentImportDropzone.classList.add("file-drop--active");
-    });
-  }
-  for (const eventName of ["dragleave", "drop"]) {
-    elements.assignmentImportDropzone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      elements.assignmentImportDropzone.classList.remove("file-drop--active");
-    });
-  }
-  elements.assignmentImportDropzone.addEventListener("drop", (event) => {
-    selectAssignmentImportFile(event.dataTransfer?.files?.[0] || null);
-  });
-
   elements.assignmentImportPreviewButton.addEventListener("click", async () => {
     if (!assignmentImportFile) return;
     elements.assignmentImportPreviewButton.disabled = true;
@@ -1801,7 +1790,8 @@
       const importedCount = body.import.importedCount;
       assignmentImportFile = null;
       elements.assignmentImportFile.value = "";
-      elements.assignmentImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      elements.assignmentImportFileName.textContent = "Keine Datei ausgewählt";
+      elements.assignmentImportPanel.hidden = true;
       resetAssignmentImportPreview();
       elements.assignmentImportMessage.textContent = `${importedCount} Einsätze wurden sicher importiert.`;
       showToast(`${importedCount} Excel-Einsätze sind jetzt in der Wochenplanung.`);
@@ -1817,22 +1807,7 @@
   elements.siteImportFile.addEventListener("change", () => {
     selectSiteImportFile(elements.siteImportFile.files?.[0] || null);
   });
-
-  for (const eventName of ["dragenter", "dragover"]) {
-    elements.siteImportDropzone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      elements.siteImportDropzone.classList.add("file-drop--active");
-    });
-  }
-  for (const eventName of ["dragleave", "drop"]) {
-    elements.siteImportDropzone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      elements.siteImportDropzone.classList.remove("file-drop--active");
-    });
-  }
-  elements.siteImportDropzone.addEventListener("drop", (event) => {
-    selectSiteImportFile(event.dataTransfer?.files?.[0] || null);
-  });
+  elements.siteImportChoose.addEventListener("click", () => elements.siteImportFile.click());
 
   elements.siteImportPreviewButton.addEventListener("click", async () => {
     if (!siteImportFile) return;
@@ -1872,7 +1847,8 @@
       const createdCount = body.import.createdCount;
       siteImportFile = null;
       elements.siteImportFile.value = "";
-      elements.siteImportFileName.textContent = "oder hier ablegen · maximal 1,5 MB";
+      elements.siteImportFileName.textContent = "Keine Datei ausgewählt";
+      elements.siteImportSelection.hidden = true;
       resetSiteImportPreview();
       elements.siteImportMessage.textContent = `${createdCount} Baustellen wurden sicher angelegt.`;
       showToast(`${createdCount} Excel-Baustellen sind jetzt verfügbar.`);
@@ -1954,6 +1930,9 @@
   });
 
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
+  elements.adminImport.addEventListener("click", () => {
+    if (!elements.assignmentPlanningShell.hidden) elements.assignmentImportFile.click();
+  });
   elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
 
   elements.togglePassword.addEventListener("click", () => {

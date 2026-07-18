@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.13.1">
-    <script src="./app.js?v=0.13.1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.13.2">
+    <script src="./app.js?v=0.13.2" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.13.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.13.2</p>
         </div>
       </section>
 
@@ -256,7 +256,13 @@
                 <p id="admin-eyebrow" class="eyebrow">Planung und Verwaltung</p>
                 <h2 id="admin-title">Verwaltung</h2>
               </div>
-              <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
+              <div class="section-heading__actions">
+                <button id="admin-import" class="compact-import-button" type="button" hidden>
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5"/></svg>
+                  <span>Excel</span>
+                </button>
+                <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
+              </div>
             </div>
             <p id="admin-intro" class="admin-intro">Kunden, Projekte, Baustellen und Einsätze – eindeutig verknüpft und direkt vom Handy verwaltet.</p>
 
@@ -355,27 +361,23 @@
               <p id="assignment-edit-message" class="form-message" aria-live="polite"></p>
             </form>
 
-            <section id="assignment-import-panel" class="inline-import">
-              <div class="inline-import__heading">
-                <strong>Wochenplan aus Excel</strong>
-                <span>Datei direkt auswählen oder hineinziehen</span>
+            <section id="assignment-import-panel" class="inline-import" hidden>
+              <input
+                id="assignment-import-file"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+              >
+              <div class="selected-file-row">
+                <div>
+                  <span>Excel-Wochenplan</span>
+                  <strong id="assignment-import-file-name">Keine Datei ausgewählt</strong>
+                </div>
+                <button id="assignment-import-preview-button" class="button button--secondary" type="button" disabled>Prüfen</button>
               </div>
-              <div id="assignment-import-body" class="inline-import__body">
-                <div class="admin-form">
-                <p class="field-help">Geeignet für euren Baustellenplan: Mitarbeiter links, Baustellen in Fünferblöcken und X von Montag bis Freitag.</p>
-                <label id="assignment-import-dropzone" class="file-drop" for="assignment-import-file">
-                  <input
-                    id="assignment-import-file"
-                    type="file"
-                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  >
-                  <strong>Excel-Datei auswählen</strong>
-                  <span id="assignment-import-file-name">oder hier ablegen · maximal 1,5 MB</span>
-                </label>
-                <button id="assignment-import-preview-button" class="button button--secondary" type="button" disabled>Excel sicher prüfen</button>
-                <p id="assignment-import-message" class="form-message" aria-live="polite"></p>
+              <p id="assignment-import-message" class="form-message" aria-live="polite"></p>
 
-                <section id="assignment-import-preview" class="import-preview" aria-labelledby="assignment-import-title" hidden>
+              <section id="assignment-import-preview" class="import-preview" aria-labelledby="assignment-import-title" hidden>
                   <div>
                     <p class="eyebrow">Importvorschau</p>
                     <strong id="assignment-import-title">Wochenplan</strong>
@@ -391,33 +393,36 @@
                   <ul id="assignment-import-list" class="import-list" aria-label="Importierbare Einsätze"></ul>
                   <button id="assignment-import-confirm" class="button button--primary" type="button">Einsätze importieren</button>
                   <p class="field-help">Bestehende oder nicht eindeutig zugeordnete Tage werden nicht überschrieben.</p>
-                </section>
-                </div>
-              </div>
+              </section>
             </section>
 
-            <section id="site-import-panel" class="inline-import">
-              <div class="inline-import__heading">
-                <strong>Baustellenliste aus Excel</strong>
-                <span>Datei direkt auswählen oder hineinziehen</span>
+            <section id="site-import-panel" class="inline-import inline-import--site">
+              <input
+                id="site-import-file"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+              >
+              <div class="excel-import-bar">
+                <button id="site-import-choose" class="excel-import-choose" type="button">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5"/></svg>
+                  <span>
+                    <strong>Baustellen aus Excel</strong>
+                    <small>Datei auswählen</small>
+                  </span>
+                </button>
+                <a class="download-link" href="./assets/baustellen-import-vorlage.xlsx" download>Vorlage</a>
               </div>
-              <div id="site-import-body" class="inline-import__body">
-                <div class="admin-form">
-                <p class="field-help">Mehrere Kunden, Projekte und Baustellen auf einmal anlegen. Vor dem Speichern erscheint immer eine Vorschau.</p>
-                <a class="download-link" href="./assets/baustellen-import-vorlage.xlsx" download>Excel-Vorlage herunterladen</a>
-                <label id="site-import-dropzone" class="file-drop" for="site-import-file">
-                  <input
-                    id="site-import-file"
-                    type="file"
-                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  >
-                  <strong>Baustellenliste auswählen</strong>
-                  <span id="site-import-file-name">oder hier ablegen · maximal 1,5 MB</span>
-                </label>
-                <button id="site-import-preview-button" class="button button--secondary" type="button" disabled>Baustellen sicher prüfen</button>
-                <p id="site-import-message" class="form-message" aria-live="polite"></p>
+              <div id="site-import-selection" class="selected-file-row" hidden>
+                <div>
+                  <span>Excel-Baustellenliste</span>
+                  <strong id="site-import-file-name">Keine Datei ausgewählt</strong>
+                </div>
+                <button id="site-import-preview-button" class="button button--secondary" type="button" disabled>Prüfen</button>
+              </div>
+              <p id="site-import-message" class="form-message" aria-live="polite"></p>
 
-                <section id="site-import-preview" class="import-preview" aria-labelledby="site-import-title" hidden>
+              <section id="site-import-preview" class="import-preview" aria-labelledby="site-import-title" hidden>
                   <div>
                     <p class="eyebrow">Importvorschau</p>
                     <strong id="site-import-title">Baustellenliste</strong>
@@ -427,9 +432,7 @@
                   <ul id="site-import-list" class="import-list" aria-label="Importierbare Baustellen"></ul>
                   <button id="site-import-confirm" class="button button--primary" type="button">Baustellen importieren</button>
                   <p class="field-help">Vorhandene Baustellennamen und fehlerhafte Zeilen werden nicht angelegt.</p>
-                </section>
-                </div>
-              </div>
+              </section>
             </section>
 
             <details id="employee-panel" class="admin-panel">
