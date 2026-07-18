@@ -136,3 +136,11 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Archivierung eines Kunden nur ohne aktive Projekte; Projektabschluss nur ohne aktive Baustellen
 - aktive Auswahllisten und Betriebsstruktur blenden abgeschlossene oder archivierte Stammdaten aus
 - Versionsstand 0.15.0
+- Migration 017 für zentrale Dokumentmetadaten, getrennten Dateiinhalt und Verknüpfungen zu Kunde, Projekt und Baustelle
+- Ein-Dokument-Prinzip mit SHA-256-Dublettenschutz und Wiederverwendung vorhandener Dateien ohne Kopie
+- sicherer Upload von PDF, Bild, Text, XLSX und DOCX bis 5 MB sowie sitzungsgeschützter Download
+- automatische Ableitung von Projekt und Kunde bei Dokumentzuordnung zu einer Baustelle
+- Dokumentarchivierung und Reaktivierung mit Versionskonflikt-, Lösch- und Mandantenschutz
+- sichtbare zentrale Dokumentverwaltung im Bereich Baustellen sowie Dokumente direkt im Baustellen-Dashboard
+- Dokumentanzahl und direkter Einstieg aus Kunden- und Projektverwaltung
+- Versionsstand 0.16.0

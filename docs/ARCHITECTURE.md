@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: 18.07.2026
+Stand: 19.07.2026
 
 ## Zielbild
 
@@ -45,6 +45,13 @@ oder Dokumentkopien einführen.
 Das Firmenlogo gehört zum Mandanten und wird getrennt vom Schäfchen-Markenlogo
 behandelt. Bis die Logoablage als eigenes Dokumentmodul aktiviert ist, zeigt die
 PWA einen Firmeninitial als neutralen Platzhalter.
+
+Migration 017 setzt dieses Prinzip erstmals um. `documents` hält das fachliche
+Dokument, `document_contents` vorübergehend den auf 5 MB begrenzten Inhalt und
+`document_links` die unabhängigen Verknüpfungen. Die Inhaltstabelle bildet eine
+klare Austauschgrenze für den späteren Umzug in MinIO oder einen anderen
+S3-kompatiblen Objektspeicher. Details stehen in
+[`DOCUMENT_MODEL.md`](DOCUMENT_MODEL.md).
 
 ## Mandantentrennung
 

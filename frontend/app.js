@@ -120,6 +120,10 @@
     siteDashboardOrder: document.querySelector("#site-dashboard-order"),
     siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
     siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
+    siteDashboardDocumentsPanel: document.querySelector("#site-dashboard-documents-panel"),
+    siteDashboardDocumentCount: document.querySelector("#site-dashboard-document-count"),
+    siteDashboardDocuments: document.querySelector("#site-dashboard-documents"),
+    siteDashboardAddDocument: document.querySelector("#site-dashboard-add-document"),
     siteDashboardEdit: document.querySelector("#site-dashboard-edit"),
     adminWeek: document.querySelector("#admin-week"),
     siteDashboardClose: document.querySelector("#site-dashboard-close"),
@@ -258,6 +262,22 @@
     siteStatusFilter: document.querySelector("#site-status-filter"),
     siteListSummary: document.querySelector("#site-list-summary"),
     siteList: document.querySelector("#site-list"),
+    documentManagementPanel: document.querySelector("#document-management-panel"),
+    documentForm: document.querySelector("#document-form"),
+    documentTitle: document.querySelector("#document-title"),
+    documentCategory: document.querySelector("#document-category"),
+    documentCustomer: document.querySelector("#document-customer"),
+    documentProject: document.querySelector("#document-project"),
+    documentSite: document.querySelector("#document-site"),
+    documentFile: document.querySelector("#document-file"),
+    documentFileChoose: document.querySelector("#document-file-choose"),
+    documentFileName: document.querySelector("#document-file-name"),
+    documentSubmit: document.querySelector("#document-submit"),
+    documentMessage: document.querySelector("#document-message"),
+    documentSearch: document.querySelector("#document-search"),
+    documentStatusFilter: document.querySelector("#document-status-filter"),
+    documentListSummary: document.querySelector("#document-list-summary"),
+    documentList: document.querySelector("#document-list"),
     assignmentPanel: document.querySelector("#assignment-panel"),
     assignmentForm: document.querySelector("#assignment-form"),
     assignmentEmployee: document.querySelector("#assignment-employee"),
@@ -283,6 +303,7 @@
     elements.projectManagementPanel,
     elements.siteFormPanel,
     elements.siteManagementPanel,
+    elements.documentManagementPanel,
     elements.siteDashboard
   );
   elements.assignmentForm.querySelector('button[type="submit"]').after(elements.assignmentImportPanel);
@@ -313,6 +334,7 @@
   let siteImportFile = null;
   let siteImportPayload = null;
   let siteImportState = null;
+  let documentFile = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -415,7 +437,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.15.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.16.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -799,6 +821,168 @@
     return "active";
   }
 
+  function documentCategoryLabel(category) {
+    return {
+      general: "Allgemein",
+      order: "Auftrag",
+      plan: "Plan",
+      report: "Bericht",
+      delivery_note: "Lieferschein",
+      invoice: "Rechnung",
+      photo: "Foto"
+    }[category] || category;
+  }
+
+  function documentsForEntity(entityType, entityId, includeArchived = false) {
+    if (!adminState) return [];
+    return adminState.documents.filter((document) => (
+      (includeArchived || document.status === "active")
+      && document.links.some((link) => (
+        link.entityType === entityType
+        && (link.customerId || link.projectId || link.constructionSiteId) === entityId
+      ))
+    ));
+  }
+
+  function formatFileSize(sizeBytes) {
+    if (sizeBytes < 1024) return `${sizeBytes} B`;
+    if (sizeBytes < 1024 * 1024) return `${Math.ceil(sizeBytes / 1024)} KB`;
+    return `${(sizeBytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
+  }
+
+  function documentSearchText(document) {
+    return [
+      document.number,
+      document.title,
+      document.fileName,
+      documentCategoryLabel(document.category),
+      ...document.links.map((link) => link.targetName)
+    ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function documentDownloadLink(documentItem, compact = false) {
+    const link = document.createElement("a");
+    link.className = compact ? "text-button document-download" : "download-link document-download";
+    link.href = `./api/v1/admin/documents/${encodeURIComponent(documentItem.id)}/content`;
+    link.download = documentItem.fileName;
+    link.textContent = "Öffnen";
+    return link;
+  }
+
+  function setDocumentTargets({ customerId = "", projectId = "", constructionSiteId = "" } = {}) {
+    elements.documentCustomer.value = customerId;
+    elements.documentProject.value = projectId;
+    elements.documentSite.value = constructionSiteId;
+  }
+
+  function focusDocumentsForEntity(entityType, entity) {
+    const targets = {
+      customer: { customerId: entity.id },
+      project: { customerId: entity.customerId, projectId: entity.id },
+      construction_site: {
+        customerId: entity.customerId,
+        projectId: entity.projectId,
+        constructionSiteId: entity.id
+      }
+    }[entityType];
+    setDocumentTargets(targets);
+    elements.documentSearch.value = entity.displayName || entity.name;
+    renderDocumentList();
+    elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderDocumentList() {
+    if (!adminState) return;
+    const query = elements.documentSearch.value.trim().toLocaleLowerCase("de-DE");
+    const status = elements.documentStatusFilter.value;
+    const documents = adminState.documents.filter((document) => (
+      (status === "all" || document.status === status)
+      && (!query || documentSearchText(document).includes(query))
+    ));
+    elements.documentListSummary.textContent = `${documents.length} von ${adminState.documents.length}`;
+    elements.documentList.replaceChildren();
+
+    if (documents.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query
+        ? "Kein Dokument passt zur Suche."
+        : "Noch kein Dokument in diesem Status.";
+      elements.documentList.append(empty);
+      return;
+    }
+
+    documents.forEach((documentItem) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      const statusButton = document.createElement("button");
+      title.textContent = documentItem.title;
+      badge.className = `site-status site-status--${documentItem.status === "active" ? "active" : "archived"}`;
+      badge.textContent = documentItem.status === "active" ? documentCategoryLabel(documentItem.category) : "Archiviert";
+      meta.textContent = [
+        documentItem.number,
+        documentItem.fileName,
+        formatFileSize(documentItem.sizeBytes),
+        ...documentItem.links.map((link) => link.targetName)
+      ].filter(Boolean).join(" · ");
+      heading.append(title, badge);
+      content.append(heading, meta);
+      actions.className = "document-actions";
+      statusButton.type = "button";
+      statusButton.className = "text-button";
+      statusButton.textContent = documentItem.status === "active" ? "Archivieren" : "Aktivieren";
+      statusButton.addEventListener("click", async () => {
+        const nextStatus = documentItem.status === "active" ? "archived" : "active";
+        if (nextStatus === "archived" && !window.confirm("Dokument archivieren? Die Datei und alle Verknüpfungen bleiben erhalten.")) return;
+        statusButton.disabled = true;
+        try {
+          await requestJson(`./api/v1/admin/documents/${encodeURIComponent(documentItem.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: nextStatus, rowVersion: documentItem.rowVersion })
+          });
+          await refreshAdmin();
+          showToast(nextStatus === "active" ? "Dokument wieder aktiviert." : "Dokument archiviert.");
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          statusButton.disabled = false;
+        }
+      });
+      actions.append(documentDownloadLink(documentItem), statusButton);
+      item.append(content, actions);
+      elements.documentList.append(item);
+    });
+  }
+
+  function renderSiteDocuments(siteId) {
+    const documents = documentsForEntity("construction_site", siteId);
+    elements.siteDashboardDocumentCount.textContent = String(documents.length);
+    elements.siteDashboardDocuments.replaceChildren();
+    if (documents.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = "Noch kein Dokument mit dieser Baustelle verknüpft.";
+      elements.siteDashboardDocuments.append(empty);
+      return;
+    }
+    documents.forEach((documentItem) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      title.textContent = documentItem.title;
+      meta.textContent = `${documentCategoryLabel(documentItem.category)} · ${formatFileSize(documentItem.sizeBytes)}`;
+      content.append(title, meta);
+      item.append(content, documentDownloadLink(documentItem, true));
+      elements.siteDashboardDocuments.append(item);
+    });
+  }
+
   function projectStatusLabel(status) {
     return {
       planned: "Geplant",
@@ -855,6 +1039,9 @@
       const badge = document.createElement("span");
       const meta = document.createElement("span");
       const button = document.createElement("button");
+      const documentsButton = document.createElement("button");
+      const actions = document.createElement("div");
+      const documentCount = documentsForEntity("customer", customer.id).length;
       const location = [customer.address?.postalCode, customer.address?.city].filter(Boolean).join(" ");
       title.textContent = customer.displayName;
       badge.className = `site-status site-status--${customerStatusGroup(customer.status)}`;
@@ -862,6 +1049,7 @@
       meta.textContent = [
         customer.number,
         `${customer.projectCount} Projekt${customer.projectCount === 1 ? "" : "e"}`,
+        `${documentCount} Dokument${documentCount === 1 ? "" : "e"}`,
         location,
         customer.email || customer.phone
       ].filter(Boolean).join(" · ");
@@ -871,7 +1059,13 @@
       button.className = "text-button";
       button.textContent = "Bearbeiten";
       button.addEventListener("click", () => openCustomerEditor(customer));
-      item.append(content, button);
+      documentsButton.type = "button";
+      documentsButton.className = "text-button";
+      documentsButton.textContent = "Dokumente";
+      documentsButton.addEventListener("click", () => focusDocumentsForEntity("customer", customer));
+      actions.className = "list-actions";
+      actions.append(documentsButton, button);
+      item.append(content, actions);
       elements.customerList.append(item);
     });
   }
@@ -903,17 +1097,26 @@
       const badge = document.createElement("span");
       const meta = document.createElement("span");
       const button = document.createElement("button");
+      const documentsButton = document.createElement("button");
+      const actions = document.createElement("div");
+      const documentCount = documentsForEntity("project", project.id).length;
       title.textContent = project.name;
       badge.className = `site-status site-status--${projectStatusGroup(project.status)}`;
       badge.textContent = projectStatusLabel(project.status);
-      meta.textContent = `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`;
+      meta.textContent = `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"} · ${documentCount} Dokument${documentCount === 1 ? "" : "e"}`;
       heading.append(title, badge);
       content.append(heading, meta);
       button.type = "button";
       button.className = "text-button";
       button.textContent = "Bearbeiten";
       button.addEventListener("click", () => openProjectEditor(project));
-      item.append(content, button);
+      documentsButton.type = "button";
+      documentsButton.className = "text-button";
+      documentsButton.textContent = "Dokumente";
+      documentsButton.addEventListener("click", () => focusDocumentsForEntity("project", project));
+      actions.className = "list-actions";
+      actions.append(documentsButton, button);
+      item.append(content, actions);
       elements.projectList.append(item);
     });
   }
@@ -1010,6 +1213,7 @@
       meta.textContent = [
         site.customerName,
         site.projectName,
+        `${documentsForEntity("construction_site", site.id).length} Dokumente`,
         `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
         `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
       ].filter(Boolean).join(" · ");
@@ -1056,6 +1260,7 @@
         appendAdminListItem(elements.siteDashboardEmployees, name, "In dieser Woche eingeplant");
       });
     }
+    renderSiteDocuments(site.id);
     elements.siteEditForm.hidden = true;
     elements.siteEditMessage.textContent = "";
     elements.siteDashboardEdit.hidden = false;
@@ -1298,6 +1503,24 @@
       "Baustelle auswählen",
       (site) => `${site.name} · ${site.address.city}`
     );
+    renderAdminSelect(
+      elements.documentCustomer,
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
+      "Kunde auswählen",
+      (customer) => `${customer.displayName} · ${customer.number}`
+    );
+    renderAdminSelect(
+      elements.documentProject,
+      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active"),
+      "Projekt auswählen (optional)",
+      (project) => `${project.customerName} · ${project.name}`
+    );
+    renderAdminSelect(
+      elements.documentSite,
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
+      "Baustelle auswählen (optional)",
+      (site) => `${site.name} · ${site.address.city}`
+    );
 
     elements.employeeList.replaceChildren();
     adminState.employees.forEach((employee) => {
@@ -1322,6 +1545,8 @@
     renderCustomerList();
     renderProjectList();
     renderSiteList();
+    renderDocumentList();
+    if (openedSiteId && !elements.siteDashboard.hidden) renderSiteDocuments(openedSiteId);
 
     elements.adminAssignmentList.replaceChildren();
     if (adminState.assignments.length === 0) {
@@ -2152,6 +2377,121 @@
     } finally {
       submit.disabled = false;
     }
+  });
+
+  elements.documentSearch.addEventListener("input", renderDocumentList);
+  elements.documentStatusFilter.addEventListener("change", renderDocumentList);
+  elements.documentFileChoose.addEventListener("click", () => elements.documentFile.click());
+  elements.documentFile.addEventListener("change", () => {
+    documentFile = elements.documentFile.files?.[0] || null;
+    elements.documentMessage.textContent = "";
+    const allowedExtension = Boolean(
+      documentFile
+      && /\.(pdf|jpe?g|png|webp|txt|xlsx|docx)$/i.test(documentFile.name)
+      && documentFile.size > 0
+      && documentFile.size <= 5_000_000
+    );
+    elements.documentSubmit.disabled = !allowedExtension;
+    if (!documentFile) {
+      elements.documentFileName.textContent = "Noch keine Datei gewählt";
+      return;
+    }
+    elements.documentFileName.textContent = `${documentFile.name} · ${formatFileSize(documentFile.size)}`;
+    if (!elements.documentTitle.value.trim()) {
+      elements.documentTitle.value = documentFile.name.replace(/\.[^.]+$/, "");
+    }
+    if (!allowedExtension) {
+      elements.documentMessage.textContent = "Bitte eine unterstützte Datei mit höchstens 5 MB auswählen.";
+    }
+  });
+
+  elements.documentProject.addEventListener("change", () => {
+    const project = adminState?.projects.find((candidate) => candidate.id === elements.documentProject.value);
+    if (!project) return;
+    elements.documentCustomer.value = project.customerId;
+    const selectedSite = adminState.sites.find((site) => site.id === elements.documentSite.value);
+    if (selectedSite && selectedSite.projectId !== project.id) elements.documentSite.value = "";
+  });
+  elements.documentSite.addEventListener("change", () => {
+    const site = adminState?.sites.find((candidate) => candidate.id === elements.documentSite.value);
+    if (!site) return;
+    elements.documentProject.value = site.projectId;
+    elements.documentCustomer.value = site.customerId;
+  });
+  elements.documentCustomer.addEventListener("change", () => {
+    const project = adminState?.projects.find((candidate) => candidate.id === elements.documentProject.value);
+    if (project && project.customerId !== elements.documentCustomer.value) {
+      elements.documentProject.value = "";
+      elements.documentSite.value = "";
+    }
+  });
+
+  elements.documentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!documentFile) {
+      elements.documentMessage.textContent = "Bitte zuerst eine Datei auswählen.";
+      return;
+    }
+    if (!elements.documentCustomer.value && !elements.documentProject.value && !elements.documentSite.value) {
+      elements.documentMessage.textContent = "Bitte mindestens einen Kunden, ein Projekt oder eine Baustelle auswählen.";
+      return;
+    }
+    elements.documentSubmit.disabled = true;
+    elements.documentFileChoose.disabled = true;
+    elements.documentMessage.textContent = "Dokument wird einmalig und sicher gespeichert …";
+    try {
+      const extension = documentFile.name.split(".").at(-1).toLowerCase();
+      const mimeType = {
+        pdf: "application/pdf",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp",
+        txt: "text/plain",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      }[extension];
+      const body = await requestJson("./api/v1/admin/documents", {
+        method: "POST",
+        body: JSON.stringify({
+          title: elements.documentTitle.value,
+          category: elements.documentCategory.value,
+          fileName: documentFile.name,
+          mimeType,
+          contentBase64: arrayBufferToBase64(await documentFile.arrayBuffer()),
+          customerId: elements.documentCustomer.value,
+          projectId: elements.documentProject.value,
+          constructionSiteId: elements.documentSite.value
+        })
+      });
+      const reused = body.reused;
+      documentFile = null;
+      elements.documentFile.value = "";
+      elements.documentForm.reset();
+      elements.documentFileName.textContent = "Noch keine Datei gewählt";
+      elements.documentSearch.value = "";
+      elements.documentStatusFilter.value = "active";
+      elements.documentMessage.textContent = "";
+      await refreshAdmin();
+      showToast(reused
+        ? "Datei war bereits vorhanden und wurde ohne Kopie neu verknüpft."
+        : "Dokument gespeichert und zentral verknüpft.");
+    } catch (error) {
+      elements.documentMessage.textContent = error.message;
+    } finally {
+      elements.documentFileChoose.disabled = false;
+      elements.documentSubmit.disabled = !documentFile;
+    }
+  });
+
+  elements.siteDashboardAddDocument.addEventListener("click", () => {
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    elements.documentSearch.value = "";
+    setDocumentTargets({ customerId: site.customerId, projectId: site.projectId, constructionSiteId: site.id });
+    renderDocumentList();
+    elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    elements.documentTitle.focus({ preventScroll: true });
   });
 
   elements.assignmentForm.addEventListener("submit", async (event) => {

@@ -332,6 +332,85 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(structuredSite.status, "active");
   assert.equal(structuredSite.rowVersion, 1);
 
+  const documentContent = Buffer.from(`%PDF-1.4\nSchäfchen Dokument ${suffix}`, "utf8");
+  const documentUploadResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      title: `Montageplan ${suffix}`,
+      category: "plan",
+      fileName: `Montageplan-${suffix}.pdf`,
+      mimeType: "application/pdf",
+      contentBase64: documentContent.toString("base64"),
+      constructionSiteId: structuredSite.id
+    })
+  });
+  assert.equal(documentUploadResponse.status, 201, await documentUploadResponse.clone().text());
+  const uploadedDocumentBody = await documentUploadResponse.json();
+  const uploadedDocument = uploadedDocumentBody.document;
+  assert.equal(uploadedDocumentBody.reused, false);
+  assert.match(uploadedDocument.number, /^SE-D-\d{4}-\d{5}$/);
+  assert.equal(uploadedDocument.links.length, 3);
+  assert.ok(uploadedDocument.links.some((link) => link.customerId === customer.id));
+  assert.ok(uploadedDocument.links.some((link) => link.projectId === project.id));
+  assert.ok(uploadedDocument.links.some((link) => link.constructionSiteId === structuredSite.id));
+
+  const mismatchedDocumentResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      title: "Falsch zugeordnet",
+      category: "general",
+      fileName: "Falsch.txt",
+      mimeType: "text/plain",
+      contentBase64: Buffer.from("Falsch").toString("base64"),
+      customerId: randomUUID(),
+      constructionSiteId: structuredSite.id
+    })
+  });
+  assert.equal(mismatchedDocumentResponse.status, 409);
+  assert.equal((await mismatchedDocumentResponse.json()).error.code, "document_target_conflict");
+
+  const documentDownloadResponse = await fetch(
+    `${baseUrl}/api/v1/admin/documents/${uploadedDocument.id}/content`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(documentDownloadResponse.status, 200);
+  assert.equal(documentDownloadResponse.headers.get("content-type"), "application/pdf");
+  assert.match(documentDownloadResponse.headers.get("content-disposition"), /attachment/);
+  assert.deepEqual(Buffer.from(await documentDownloadResponse.arrayBuffer()), documentContent);
+
+  const archiveDocumentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/documents/${uploadedDocument.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ status: "archived", rowVersion: uploadedDocument.rowVersion })
+    }
+  );
+  assert.equal(archiveDocumentResponse.status, 200, await archiveDocumentResponse.clone().text());
+  const archivedDocument = (await archiveDocumentResponse.json()).document;
+  assert.equal(archivedDocument.status, "archived");
+  assert.equal(archivedDocument.rowVersion, uploadedDocument.rowVersion + 1);
+
+  const duplicateDocumentResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      title: "Dieselbe Datei ohne Kopie",
+      category: "general",
+      fileName: `Kopie-${suffix}.pdf`,
+      mimeType: "application/pdf",
+      contentBase64: documentContent.toString("base64"),
+      customerId: customer.id
+    })
+  });
+  assert.equal(duplicateDocumentResponse.status, 201, await duplicateDocumentResponse.clone().text());
+  const reusedDocumentBody = await duplicateDocumentResponse.json();
+  assert.equal(reusedDocumentBody.reused, true);
+  assert.equal(reusedDocumentBody.document.id, uploadedDocument.id);
+  assert.equal(reusedDocumentBody.document.status, "active");
+
   const blockedProjectCompletion = await fetch(
     `${baseUrl}/api/v1/admin/projects/${project.id}`,
     {
@@ -412,6 +491,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     && item.name === updatedStructuredSite.name
     && item.rowVersion === 2
   )));
+  assert.equal(
+    structureOverview.documents.filter((item) => item.id === uploadedDocument.id).length,
+    1
+  );
 
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",

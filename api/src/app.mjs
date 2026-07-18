@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   sessionView,
   withApiTransaction,
@@ -35,6 +35,8 @@ import {
   validateConstructionSiteUpdate,
   validateCustomer,
   validateCustomerUpdate,
+  validateDocumentStatusUpdate,
+  validateDocumentUpload,
   validateEmployee,
   validateId,
   validateInitialPasswordChange,
@@ -70,6 +72,24 @@ function json(response, status, body, headers = {}) {
     ...headers
   });
   response.end(encoded);
+}
+
+function attachment(response, document) {
+  const fallbackName = document.fileName
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "dokument";
+  const encodedName = encodeURIComponent(document.fileName).replace(/[!'()*]/g, (character) => (
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  ));
+  response.writeHead(200, {
+    "Content-Type": document.mimeType,
+    "Content-Length": document.content.length,
+    "Content-Disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
+    "Cache-Control": "no-store",
+    ...securityHeaders()
+  });
+  response.end(document.content);
 }
 
 async function setupStatus(pool, companyNumber) {
@@ -399,6 +419,25 @@ function projectDto(row) {
   };
 }
 
+function documentDto(row) {
+  return {
+    id: row.id,
+    number: row.document_number,
+    title: row.title,
+    category: row.category,
+    fileName: row.original_file_name,
+    mimeType: row.mime_type,
+    sizeBytes: Number(row.size_bytes),
+    sha256: row.sha256_hex,
+    status: row.status,
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    uploadedByName: row.uploaded_by_name,
+    links: Array.isArray(row.links) ? row.links : []
+  };
+}
+
 function mondayFor(date) {
   const value = new Date(`${date}T00:00:00Z`);
   const weekday = value.getUTCDay() || 7;
@@ -420,7 +459,7 @@ async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
   const weekStart = mondayFor(date);
   const weekEnd = addUtcDays(weekStart, 4);
-  const [employeeResult, customerResult, projectResult, siteResult, assignmentResult] = await Promise.all([
+  const [employeeResult, customerResult, projectResult, siteResult, assignmentResult, documentResult] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
               account.must_change_password,
@@ -519,6 +558,45 @@ async function adminOverview(client, context, date) {
          AND assignment.status IN ('draft', 'released')
        ORDER BY assignment.work_date, LOWER(account.last_name), LOWER(account.first_name), assignment.sequence_number`,
       [context.companyId, weekStart, weekEnd]
+    ),
+    client.query(
+      `SELECT document.id, document.document_number, document.title, document.category,
+              document.original_file_name, document.mime_type, document.size_bytes,
+              document.sha256_hex, document.status, document.row_version,
+              document.created_at, document.updated_at,
+              uploader.first_name || ' ' || uploader.last_name AS uploaded_by_name,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'entityType', link.entity_type,
+                    'customerId', link.customer_id,
+                    'projectId', link.project_id,
+                    'constructionSiteId', link.construction_site_id,
+                    'targetName', CASE link.entity_type
+                      WHEN 'customer' THEN COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name)
+                      WHEN 'project' THEN project.name
+                      WHEN 'construction_site' THEN site.name
+                    END
+                  ) ORDER BY link.created_at, link.id
+                ) FILTER (WHERE link.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS links
+       FROM documents AS document
+       JOIN users AS uploader
+         ON uploader.company_id = document.company_id AND uploader.id = document.uploaded_by_user_id
+       LEFT JOIN document_links AS link
+         ON link.company_id = document.company_id AND link.document_id = document.id
+       LEFT JOIN customers AS customer
+         ON customer.company_id = link.company_id AND customer.id = link.customer_id
+       LEFT JOIN projects AS project
+         ON project.company_id = link.company_id AND project.id = link.project_id
+       LEFT JOIN construction_sites AS site
+         ON site.company_id = link.company_id AND site.id = link.construction_site_id
+       WHERE document.company_id = $1
+       GROUP BY document.id, uploader.id
+       ORDER BY CASE document.status WHEN 'active' THEN 1 ELSE 2 END,
+                document.created_at DESC, document.document_number DESC`,
+      [context.companyId]
     )
   ]);
 
@@ -541,9 +619,250 @@ async function adminOverview(client, context, date) {
     customers: customerResult.rows.map(customerDto),
     projects: projectResult.rows.map(projectDto),
     sites: siteResult.rows.map(siteDto),
+    documents: documentResult.rows.map(documentDto),
     assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
     weekAssignments
   };
+}
+
+async function getDocumentRecord(client, context, documentId) {
+  const result = await client.query(
+    `SELECT document.id, document.document_number, document.title, document.category,
+            document.original_file_name, document.mime_type, document.size_bytes,
+            document.sha256_hex, document.status, document.row_version,
+            document.created_at, document.updated_at,
+            uploader.first_name || ' ' || uploader.last_name AS uploaded_by_name,
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'entityType', link.entity_type,
+                  'customerId', link.customer_id,
+                  'projectId', link.project_id,
+                  'constructionSiteId', link.construction_site_id,
+                  'targetName', CASE link.entity_type
+                    WHEN 'customer' THEN COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name)
+                    WHEN 'project' THEN project.name
+                    WHEN 'construction_site' THEN site.name
+                  END
+                ) ORDER BY link.created_at, link.id
+              ) FILTER (WHERE link.id IS NOT NULL),
+              '[]'::jsonb
+            ) AS links
+     FROM documents AS document
+     JOIN users AS uploader
+       ON uploader.company_id = document.company_id AND uploader.id = document.uploaded_by_user_id
+     LEFT JOIN document_links AS link
+       ON link.company_id = document.company_id AND link.document_id = document.id
+     LEFT JOIN customers AS customer
+       ON customer.company_id = link.company_id AND customer.id = link.customer_id
+     LEFT JOIN projects AS project
+       ON project.company_id = link.company_id AND project.id = link.project_id
+     LEFT JOIN construction_sites AS site
+       ON site.company_id = link.company_id AND site.id = link.construction_site_id
+     WHERE document.company_id = $1 AND document.id = $2
+     GROUP BY document.id, uploader.id`,
+    [context.companyId, documentId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Das Dokument wurde nicht gefunden.", 404, "document_not_found");
+  }
+  return documentDto(result.rows[0]);
+}
+
+async function resolveDocumentTargets(client, context, input) {
+  if (input.constructionSiteId) {
+    const result = await client.query(
+      `SELECT site.id AS construction_site_id, project.id AS project_id, customer.id AS customer_id
+       FROM construction_sites AS site
+       JOIN projects AS project
+         ON project.company_id = site.company_id AND project.id = site.project_id
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       WHERE site.company_id = $1 AND site.id = $2
+         AND site.status <> 'cancelled' AND project.status <> 'cancelled' AND customer.status <> 'merged'`,
+      [context.companyId, input.constructionSiteId]
+    );
+    if (result.rowCount !== 1) {
+      throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
+    }
+    const target = result.rows[0];
+    if (
+      (input.projectId && input.projectId !== target.project_id)
+      || (input.customerId && input.customerId !== target.customer_id)
+    ) {
+      throw new InputError(
+        "Kunde, Projekt und Baustelle gehören nicht zusammen.",
+        409,
+        "document_target_conflict"
+      );
+    }
+    return target;
+  }
+
+  if (input.projectId) {
+    const result = await client.query(
+      `SELECT project.id AS project_id, customer.id AS customer_id
+       FROM projects AS project
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       WHERE project.company_id = $1 AND project.id = $2
+         AND project.status <> 'cancelled' AND customer.status <> 'merged'`,
+      [context.companyId, input.projectId]
+    );
+    if (result.rowCount !== 1) {
+      throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
+    }
+    const target = result.rows[0];
+    if (input.customerId && input.customerId !== target.customer_id) {
+      throw new InputError(
+        "Kunde und Projekt gehören nicht zusammen.",
+        409,
+        "document_target_conflict"
+      );
+    }
+    return { ...target, construction_site_id: null };
+  }
+
+  const result = await client.query(
+    `SELECT id AS customer_id
+     FROM customers
+     WHERE company_id = $1 AND id = $2 AND status <> 'merged'`,
+    [context.companyId, input.customerId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Der Kunde wurde nicht gefunden.", 404, "customer_not_found");
+  }
+  return { ...result.rows[0], project_id: null, construction_site_id: null };
+}
+
+async function insertDocumentLinks(client, context, documentId, targets) {
+  const links = [
+    ["customer", targets.customer_id, null, null],
+    ["project", null, targets.project_id, null],
+    ["construction_site", null, null, targets.construction_site_id]
+  ].filter(([, customerId, projectId, siteId]) => customerId || projectId || siteId);
+
+  for (const [entityType, customerId, projectId, constructionSiteId] of links) {
+    await client.query(
+      `INSERT INTO document_links (
+         company_id, document_id, entity_type, customer_id, project_id,
+         construction_site_id, created_by_user_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT DO NOTHING`,
+      [
+        context.companyId,
+        documentId,
+        entityType,
+        customerId,
+        projectId,
+        constructionSiteId,
+        context.userId
+      ]
+    );
+  }
+}
+
+async function createDocument(client, context, input) {
+  await requirePlanner(client, context);
+  const targets = await resolveDocumentTargets(client, context, input);
+  const sha256 = createHash("sha256").update(input.content).digest("hex");
+  const inserted = await client.query(
+    `INSERT INTO documents (
+       company_id, document_number, title, category, original_file_name,
+       mime_type, size_bytes, sha256_hex, uploaded_by_user_id
+     ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (company_id, sha256_hex) DO NOTHING
+     RETURNING id`,
+    [
+      context.companyId,
+      input.title,
+      input.category,
+      input.fileName,
+      input.mimeType,
+      input.content.length,
+      sha256,
+      context.userId
+    ]
+  );
+
+  const reused = inserted.rowCount === 0;
+  let documentId = inserted.rows[0]?.id;
+  if (reused) {
+    const existing = await client.query(
+      `SELECT id, status FROM documents
+       WHERE company_id = $1 AND sha256_hex = $2
+       FOR UPDATE`,
+      [context.companyId, sha256]
+    );
+    if (existing.rowCount !== 1) {
+      throw new InputError("Das Dokument konnte nicht eindeutig gespeichert werden.", 409, "document_conflict");
+    }
+    documentId = existing.rows[0].id;
+    if (existing.rows[0].status === "archived") {
+      await client.query(
+        "UPDATE documents SET status = 'active' WHERE company_id = $1 AND id = $2",
+        [context.companyId, documentId]
+      );
+    }
+  } else {
+    await client.query(
+      `INSERT INTO document_contents (company_id, document_id, content)
+       VALUES ($1, $2, $3)`,
+      [context.companyId, documentId, input.content]
+    );
+  }
+
+  await insertDocumentLinks(client, context, documentId, targets);
+  return { document: await getDocumentRecord(client, context, documentId), reused };
+}
+
+async function getDocumentContent(client, context, documentId) {
+  await requirePlanner(client, context);
+  const result = await client.query(
+    `SELECT document.original_file_name, document.mime_type, content.content
+     FROM documents AS document
+     JOIN document_contents AS content
+       ON content.company_id = document.company_id AND content.document_id = document.id
+     WHERE document.company_id = $1 AND document.id = $2`,
+    [context.companyId, documentId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Das Dokument wurde nicht gefunden.", 404, "document_not_found");
+  }
+  return {
+    fileName: result.rows[0].original_file_name,
+    mimeType: result.rows[0].mime_type,
+    content: result.rows[0].content
+  };
+}
+
+async function updateDocumentStatus(client, context, documentId, input) {
+  await requirePlanner(client, context);
+  const current = await client.query(
+    `SELECT status, row_version
+     FROM documents
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, documentId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Das Dokument wurde nicht gefunden.", 404, "document_not_found");
+  }
+  if (Number(current.rows[0].row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Das Dokument wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  if (current.rows[0].status !== input.status) {
+    await client.query(
+      `UPDATE documents SET status = $3
+       WHERE company_id = $1 AND id = $2 AND row_version = $4`,
+      [context.companyId, documentId, input.status, input.rowVersion]
+    );
+  }
+  return getDocumentRecord(client, context, documentId);
 }
 
 function publicAssignmentImportPreview(preview) {
@@ -1782,6 +2101,39 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/documents") {
+        const input = validateDocumentUpload(await readJson(request, 7_000_000));
+        const created = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createDocument(client, context, input)
+        );
+        return json(response, 201, created);
+      }
+
+      const adminDocumentContentMatch = /^\/api\/v1\/admin\/documents\/([^/]+)\/content$/.exec(url.pathname);
+      if (request.method === "GET" && adminDocumentContentMatch) {
+        const documentId = validateId(adminDocumentContentMatch[1], "Dokument-ID");
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getDocumentContent(client, context, documentId)
+        );
+        return attachment(response, document);
+      }
+
+      const adminDocumentMatch = /^\/api\/v1\/admin\/documents\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminDocumentMatch) {
+        const documentId = validateId(adminDocumentMatch[1], "Dokument-ID");
+        const input = validateDocumentStatusUpdate(await readJson(request));
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateDocumentStatus(client, context, documentId, input)
+        );
+        return json(response, 200, { document });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports/preview") {

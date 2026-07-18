@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.15.0">
-    <script src="./app.js?v=0.15.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.16.0">
+    <script src="./app.js?v=0.16.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.15.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.16.0</p>
         </div>
       </section>
 
@@ -360,7 +360,13 @@
                 <ul id="site-dashboard-employees" class="admin-list"></ul>
               </details>
               <details><summary>Berichte</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
-              <details><summary>Dokumente</summary><p>Dokumente werden künftig zentral gespeichert und hier nur verknüpft.</p></details>
+              <details id="site-dashboard-documents-panel">
+                <summary>Dokumente <span id="site-dashboard-document-count" class="module-count">0</span></summary>
+                <div class="site-document-module">
+                  <button id="site-dashboard-add-document" class="button button--secondary" type="button">Dokument hinzufügen</button>
+                  <ul id="site-dashboard-documents" class="document-compact-list" aria-label="Dokumente dieser Baustelle"></ul>
+                </div>
+              </details>
               <details><summary>Fotos</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
               <details><summary>Aufgaben</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
               <details><summary>Material</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
@@ -795,6 +801,78 @@
                 </label>
               </div>
               <ul id="site-list" class="admin-list site-management-list" aria-label="Baustellen"></ul>
+            </section>
+
+            <section id="document-management-panel" class="site-management-panel document-management-panel" aria-labelledby="document-management-title">
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Einmal speichern · überall verwenden</p>
+                  <h3 id="document-management-title">Dokumente</h3>
+                </div>
+                <span id="document-list-summary" class="site-list-summary" aria-live="polite"></span>
+              </div>
+              <form id="document-form" class="admin-form document-form" novalidate>
+                <div class="document-form__heading">
+                  <strong>Neues Dokument</strong>
+                  <span>PDF, Bild, Word, Excel oder Text · max. 5 MB</span>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="document-title">Titel</label>
+                    <input id="document-title" maxlength="200" required>
+                  </div>
+                  <div>
+                    <label for="document-category">Dokumentart</label>
+                    <select id="document-category" required>
+                      <option value="general">Allgemein</option>
+                      <option value="order">Auftrag</option>
+                      <option value="plan">Plan</option>
+                      <option value="report">Bericht</option>
+                      <option value="delivery_note">Lieferschein</option>
+                      <option value="invoice">Rechnung</option>
+                      <option value="photo">Foto</option>
+                    </select>
+                  </div>
+                </div>
+                <label for="document-customer">Zuordnung</label>
+                <select id="document-customer">
+                  <option value="">Kunde auswählen</option>
+                </select>
+                <select id="document-project" aria-label="Projekt für Dokument">
+                  <option value="">Projekt auswählen (optional)</option>
+                </select>
+                <select id="document-site" aria-label="Baustelle für Dokument">
+                  <option value="">Baustelle auswählen (optional)</option>
+                </select>
+                <p class="field-help">Bei Auswahl einer Baustelle wird das Dokument automatisch auch dem Projekt und Kunden zugeordnet.</p>
+                <input
+                  id="document-file"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.xlsx,.docx"
+                  hidden
+                >
+                <button id="document-file-choose" class="document-file-choose" type="button">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5"/></svg>
+                  <span><strong>Datei auswählen</strong><small id="document-file-name">Noch keine Datei gewählt</small></span>
+                </button>
+                <button id="document-submit" class="button button--primary" type="submit" disabled>Dokument speichern</button>
+                <p id="document-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <div class="site-list-toolbar">
+                <label for="document-search">
+                  <span>Dokumente durchsuchen</span>
+                  <input id="document-search" type="search" maxlength="120" placeholder="Titel, Nummer, Datei oder Zuordnung">
+                </label>
+                <label for="document-status-filter">
+                  <span>Status</span>
+                  <select id="document-status-filter">
+                    <option value="active">Aktiv</option>
+                    <option value="archived">Archiviert</option>
+                    <option value="all">Alle</option>
+                  </select>
+                </label>
+              </div>
+              <ul id="document-list" class="document-list" aria-label="Zentrale Dokumente"></ul>
             </section>
 
             <details id="assignment-panel" class="admin-panel" open>

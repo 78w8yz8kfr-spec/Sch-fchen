@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 19.07.2026
-Technischer Stand: V0.15.0
+Technischer Stand: V0.16.0
 
 ## Abgeschlossen
 
@@ -84,6 +84,11 @@ Technischer Stand: V0.15.0
 - dauerhaft sichtbare Kunden- und Projektlisten mit Suche, Statusfilter und Bearbeitungsformular
 - geschützte Statuswechsel: Kunden mit aktiven Projekten und Projekte mit aktiven Baustellen bleiben aktiv
 - Versionskonfliktschutz für Kunden-, Projekt- und Baustellenänderungen
+- Migration 017 mit zentralen Dokumentmetadaten, einmaligem Dateiinhalt und mehrfachen Verknüpfungen zu Kunde, Projekt und Baustelle
+- SHA-256-Dublettenschutz: identische Dateien werden ohne Kopie mit weiteren Fachebenen verknüpft
+- sicherer Upload für PDF, Bild, Text, Excel und Word bis 5 MB sowie geschützter Download
+- Dokumentarchivierung mit Versionskonfliktschutz, Löschschutz und vollständiger Mandantentrennung
+- sichtbarer Dokumentenbereich innerhalb der Baustellenverwaltung sowie Dokumentlisten im Baustellen-Dashboard
 
 ## Noch zu prüfen
 
@@ -98,7 +103,8 @@ Technischer Stand: V0.15.0
 Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
-- zentrale Dokumenttabelle und Referenzen zu Kunde, Projekt, Baustelle und Bericht
+- Objektspeicher-Anbindung für größere Dokumentmengen und betriebliche Aufbewahrungsregeln
+- Dokumentverknüpfung zu Berichten und versionierten PDF-Ausgaben
 - Firmenlogo als geschütztes Mandantendokument mit Initial-Platzhalter
 - danach Aufgaben, Material sowie Montage- und Bautagesberichte mit PDF-Versionierung
 

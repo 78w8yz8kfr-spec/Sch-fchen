@@ -18,6 +18,25 @@ const EMPLOYEE_ROLES = new Set([
 const MANAGEABLE_SITE_STATUSES = new Set(["active", "completed", "archived"]);
 const MANAGEABLE_CUSTOMER_STATUSES = new Set(["active", "archived"]);
 const MANAGEABLE_PROJECT_STATUSES = new Set(["planned", "active", "on_hold", "completed", "archived"]);
+const DOCUMENT_CATEGORIES = new Set([
+  "general",
+  "order",
+  "plan",
+  "report",
+  "delivery_note",
+  "invoice",
+  "photo"
+]);
+const DOCUMENT_MIME_TYPES = new Map([
+  ["application/pdf", new Set(["pdf"])],
+  ["image/jpeg", new Set(["jpg", "jpeg"])],
+  ["image/png", new Set(["png"])],
+  ["image/webp", new Set(["webp"])],
+  ["text/plain", new Set(["txt"])],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new Set(["xlsx"])],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", new Set(["docx"])]
+]);
+const MAXIMUM_DOCUMENT_BYTES = 5_000_000;
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -70,6 +89,11 @@ function uuid(value, label) {
   const normalized = text(value, label, 36, 36);
   if (!UUID.test(normalized)) throw new InputError(`${label} ist keine gültige UUID.`);
   return normalized;
+}
+
+function optionalUuid(value, label) {
+  if (value === undefined || value === null || value === "") return null;
+  return uuid(value, label);
 }
 
 function password(value) {
@@ -296,6 +320,79 @@ export function validateId(value, label = "ID") {
 export function validateInitialPasswordChange(body) {
   rejectTenantFields(body);
   return { newPassword: password(body.newPassword) };
+}
+
+export function validateDocumentUpload(body) {
+  rejectTenantFields(body);
+  const category = text(body.category, "Dokumentart", 2, 30).toLowerCase();
+  if (!DOCUMENT_CATEGORIES.has(category)) {
+    throw new InputError("Die Dokumentart ist ungültig.");
+  }
+
+  const fileName = text(body.fileName, "Dateiname", 1, 255);
+  if (/[\\/\u0000-\u001f\u007f]/.test(fileName)) {
+    throw new InputError("Der Dateiname enthält unzulässige Zeichen.");
+  }
+  const extension = fileName.includes(".") ? fileName.split(".").at(-1).toLowerCase() : "";
+  const mimeType = text(body.mimeType, "Dateityp", 3, 120).toLowerCase();
+  const allowedExtensions = DOCUMENT_MIME_TYPES.get(mimeType);
+  if (!allowedExtensions || !allowedExtensions.has(extension)) {
+    throw new InputError("Dieser Dateityp wird nicht unterstützt.", 415, "unsupported_document_type");
+  }
+
+  if (typeof body.contentBase64 !== "string") {
+    throw new InputError("Der Dateiinhalt fehlt.");
+  }
+  const contentBase64 = body.contentBase64.trim();
+  if (
+    contentBase64.length === 0
+    || contentBase64.length % 4 !== 0
+    || !/^[A-Za-z0-9+/]+={0,2}$/.test(contentBase64)
+  ) {
+    throw new InputError("Der Dateiinhalt ist ungültig.");
+  }
+  const content = Buffer.from(contentBase64, "base64");
+  if (content.toString("base64") !== contentBase64) {
+    throw new InputError("Der Dateiinhalt ist ungültig.");
+  }
+  if (content.length < 1 || content.length > MAXIMUM_DOCUMENT_BYTES) {
+    throw new InputError(
+      "Dokumente dürfen höchstens 5 MB groß sein.",
+      413,
+      "document_too_large"
+    );
+  }
+
+  const customerId = optionalUuid(body.customerId, "Kunde");
+  const projectId = optionalUuid(body.projectId, "Projekt");
+  const constructionSiteId = optionalUuid(body.constructionSiteId, "Baustelle");
+  if (!customerId && !projectId && !constructionSiteId) {
+    throw new InputError("Bitte das Dokument mindestens einem Kunden, Projekt oder einer Baustelle zuordnen.");
+  }
+
+  return {
+    title: text(body.title, "Dokumenttitel", 2, 200),
+    category,
+    fileName,
+    mimeType,
+    content,
+    customerId,
+    projectId,
+    constructionSiteId
+  };
+}
+
+export function validateDocumentStatusUpdate(body) {
+  rejectTenantFields(body);
+  const status = text(body.status, "Dokumentstatus", 2, 20).toLowerCase();
+  if (!new Set(["active", "archived"]).has(status)) {
+    throw new InputError("Der Dokumentstatus ist ungültig.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Dokumentversion ist ungültig.");
+  }
+  return { status, rowVersion };
 }
 
 export function validateWorkDate(value) {

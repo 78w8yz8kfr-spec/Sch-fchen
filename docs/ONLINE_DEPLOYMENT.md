@@ -1,6 +1,6 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.15.0
+Technischer Stand: V0.16.0
 
 Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
 Projektleiter im Hauptbereich **Einsätze** direkt unter **Einsatz freigeben**
@@ -26,6 +26,13 @@ sichtbare, durchsuchbare Verwaltung. Die Anlegeformulare bleiben kompakt
 aufklappbar. Über **Bearbeiten** lassen sich Stammdaten und Status pflegen;
 aktive Projekte beziehungsweise Baustellen verhindern ein versehentliches
 Archivieren des übergeordneten Datensatzes.
+
+Im Bereich **Baustellen** steht außerdem die zentrale Dokumentenverwaltung.
+Eine Datei wird einem Kunden, Projekt oder einer Baustelle zugeordnet. Bei
+einer Baustelle ergänzt Schäfchen Projekt und Kunde automatisch. Dieselbe Datei
+erscheint anschließend in allen passenden Ebenen und wird nicht kopiert.
+Unterstützt werden PDF, Bilder, Text, XLSX und DOCX bis 5 MB. Vor größeren
+produktiven Dateimengen muss der vorbereitete Objektspeicher aktiviert werden.
 
 Die Produktionsvorlage in `render.yaml` startet die PWA, die API und PostgreSQL
 unter einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere

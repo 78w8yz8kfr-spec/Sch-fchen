@@ -10,6 +10,8 @@ import {
   validateConstructionSiteUpdate,
   validateCustomer,
   validateCustomerUpdate,
+  validateDocumentStatusUpdate,
+  validateDocumentUpload,
   validateEmployee,
   validateInitialPasswordChange,
   validateInitialSetup,
@@ -20,6 +22,62 @@ import {
   validateTimeEntry,
   validateWorkDate
 } from "../src/validation.mjs";
+
+test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
+  const document = validateDocumentUpload({
+    title: "Montageplan Erdgeschoss",
+    category: "plan",
+    fileName: "Montageplan.pdf",
+    mimeType: "application/pdf",
+    contentBase64: Buffer.from("%PDF-1.4\nTest", "utf8").toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  });
+  assert.equal(document.category, "plan");
+  assert.equal(document.content.toString("utf8"), "%PDF-1.4\nTest");
+  assert.equal(document.customerId, null);
+
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Ohne Zuordnung",
+      category: "general",
+      fileName: "Notiz.txt",
+      mimeType: "text/plain",
+      contentBase64: Buffer.from("Test").toString("base64")
+    }),
+    /mindestens einem Kunden/
+  );
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Falsche Endung",
+      category: "general",
+      fileName: "Datei.exe",
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from("Test").toString("base64"),
+      customerId: "11111111-1111-4111-8111-111111111111"
+    }),
+    /Dateityp/
+  );
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Pfad",
+      category: "general",
+      fileName: "../Datei.pdf",
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from("Test").toString("base64"),
+      customerId: "11111111-1111-4111-8111-111111111111"
+    }),
+    /Dateiname/
+  );
+
+  assert.deepEqual(
+    validateDocumentStatusUpdate({ status: "archived", rowVersion: 2 }),
+    { status: "archived", rowVersion: 2 }
+  );
+  assert.throws(
+    () => validateDocumentStatusUpdate({ status: "deleted", rowVersion: 2 }),
+    /Dokumentstatus/
+  );
+});
 
 test("Ersteinrichtung verlangt lange Schlüssel und starke Passwörter", () => {
   const setup = validateInitialSetup({
