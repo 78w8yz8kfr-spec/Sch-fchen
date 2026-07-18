@@ -437,7 +437,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.16.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.17.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -454,6 +454,29 @@
       elements.storageTitle.textContent = "Sicher synchronisiert.";
       elements.storageText.textContent = "Buchungen werden verschlüsselt übertragen. Ohne Verbindung warten sie mit eindeutiger Offline-ID auf diesem Gerät. GPS wird nicht erfasst.";
     }
+  }
+
+  function setCompanyMark(element, displayName, logoUrl) {
+    const fallback = (displayName?.[0] || "F").toUpperCase();
+    const logoClass = element === elements.loginCompanyMark
+      ? "company-context__mark--logo"
+      : "company-brand-line__mark--logo";
+    element.classList.remove(logoClass);
+    element.replaceChildren();
+    if (!logoUrl) {
+      element.textContent = fallback;
+      return;
+    }
+
+    const image = document.createElement("img");
+    image.src = logoUrl;
+    image.alt = "";
+    image.addEventListener("error", () => {
+      element.classList.remove(logoClass);
+      element.textContent = fallback;
+    }, { once: true });
+    element.classList.add(logoClass);
+    element.append(image);
   }
 
   function showDashboard() {
@@ -507,7 +530,7 @@
     elements.setupForm.hidden = false;
     elements.modeNote.hidden = false;
     elements.loginCompanyName.textContent = setup.displayName;
-    elements.loginCompanyMark.textContent = (setup.displayName[0] || "F").toUpperCase();
+    setCompanyMark(elements.loginCompanyMark, setup.displayName, setup.logoUrl);
     elements.modeNoteText.replaceChildren();
     const strong = document.createElement("strong");
     strong.textContent = setup.displayName;
@@ -2021,7 +2044,7 @@
       return;
     }
     elements.dashboardCompany.textContent = session.company.displayName;
-    elements.dashboardCompanyMark.textContent = (session.company.displayName[0] || "F").toUpperCase();
+    setCompanyMark(elements.dashboardCompanyMark, session.company.displayName, session.company.logoUrl);
     elements.companyNumber.value = session.company.number;
     elements.dashboardTitle.textContent = `Guten Morgen, ${session.user.firstName}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
@@ -2036,7 +2059,11 @@
       const setupBody = await requestJson("./api/v1/setup");
       elements.companyNumber.value = setupBody.setup.companyNumber;
       elements.loginCompanyName.textContent = setupBody.setup.displayName;
-      elements.loginCompanyMark.textContent = (setupBody.setup.displayName[0] || "F").toUpperCase();
+      setCompanyMark(
+        elements.loginCompanyMark,
+        setupBody.setup.displayName,
+        setupBody.setup.logoUrl
+      );
       if (setupBody.setup.setupRequired) {
         showSetup(setupBody.setup);
         return;

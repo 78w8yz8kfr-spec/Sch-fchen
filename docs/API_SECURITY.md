@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 19.07.2026  
-Technischer Stand: V0.16.0
+Technischer Stand: V0.17.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -11,7 +11,9 @@ Sitzungscookie nie einen fremden Ursprung benötigt.
 ## Einmalige Ersteinrichtung
 
 `api_get_initial_setup_status` gibt für die fest konfigurierte Startfirma nur
-Name, Nummer und den Einrichtungsstatus zurück. Solange noch kein Benutzer
+Name, Nummer, die konfigurierte Firmenlogo-Referenz und den Einrichtungsstatus zurück. Die API
+wandelt die interne Referenz in eine lokale Logo-URL um; das Frontend bestimmt
+keinen Mandanten und keinen Logo-Schlüssel selbst. Solange noch kein Benutzer
 existiert, kann `api_create_initial_admin` genau ein Konto mit der aktiven
 Admin-Systemrolle anlegen. Der API-Endpunkt verlangt zusätzlich einen
 mindestens 24 Zeichen langen geheimen Einrichtungsschlüssel, vergleicht ihn
@@ -115,7 +117,7 @@ Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
 normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
 sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
 der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
-Sonderkürzel werden lediglich gezählt; V0.16.0 legt daraus keine Fachdaten an.
+Sonderkürzel werden lediglich gezählt; V0.17.0 legt daraus keine Fachdaten an.
 Unbekannte Mitarbeiter- oder Baustellenbezeichnungen können ausdrücklich auf
 eine aktive ID des Sitzungsmandanten abgebildet werden. Der Server validiert
 jede Zuordnung erneut und akzeptiert keine fremden oder frei erfundenen IDs.

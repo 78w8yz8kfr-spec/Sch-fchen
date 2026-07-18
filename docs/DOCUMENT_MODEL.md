@@ -1,7 +1,7 @@
 # Zentrales Dokumentenmodell
 
 Stand: 19.07.2026  
-Technischer Stand: V0.16.0
+Technischer Stand: V0.17.0
 
 ## Grundsatz
 

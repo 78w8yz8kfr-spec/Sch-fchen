@@ -3,6 +3,18 @@ import { InputError } from "./validation.mjs";
 
 const { Pool } = pg;
 
+export function companyLogoUrl(objectKey) {
+  if (typeof objectKey !== "string" || objectKey.length === 0) return null;
+  const segments = objectKey.split("/");
+  if (segments.some((segment) => (
+    segment === ""
+    || segment === "."
+    || segment === ".."
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(segment)
+  ))) return null;
+  return `./assets/${segments.map(encodeURIComponent).join("/")}`;
+}
+
 export function createPool(databaseConfig) {
   return new Pool(databaseConfig);
 }
@@ -68,6 +80,7 @@ export async function sessionView(client, context) {
     `SELECT
        company.company_number,
        company.display_name,
+       company.logo_object_key,
        account.id AS user_id,
        account.personnel_number,
        account.first_name,
@@ -89,7 +102,7 @@ export async function sessionView(client, context) {
       AND role.id = assignment.role_id
       AND role.status = 'active'
      WHERE account.company_id = $1 AND account.id = $2
-     GROUP BY company.company_number, company.display_name, account.id`,
+     GROUP BY company.company_number, company.display_name, company.logo_object_key, account.id`,
     [context.companyId, context.userId]
   );
   if (result.rowCount !== 1) {
@@ -98,7 +111,11 @@ export async function sessionView(client, context) {
   const row = result.rows[0];
   return {
     expiresAt: new Date(context.expiresAt).toISOString(),
-    company: { number: row.company_number, displayName: row.display_name },
+    company: {
+      number: row.company_number,
+      displayName: row.display_name,
+      logoUrl: companyLogoUrl(row.logo_object_key)
+    },
     user: {
       id: row.user_id,
       personnelNumber: row.personnel_number,

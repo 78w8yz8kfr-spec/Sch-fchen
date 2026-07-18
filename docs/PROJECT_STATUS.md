@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 19.07.2026
-Technischer Stand: V0.16.0
+Technischer Stand: V0.17.0
 
 ## Abgeschlossen
 
@@ -89,6 +89,9 @@ Technischer Stand: V0.16.0
 - sicherer Upload für PDF, Bild, Text, Excel und Word bis 5 MB sowie geschützter Download
 - Dokumentarchivierung mit Versionskonfliktschutz, Löschschutz und vollständiger Mandantentrennung
 - sichtbarer Dokumentenbereich innerhalb der Baustellenverwaltung sowie Dokumentlisten im Baustellen-Dashboard
+- Migration 018 mit serverseitiger Zuordnung des originalen Schaaf-Elektro-Firmenlogos
+- getrennte Anzeige von Schäfchen-Softwaremarke und Firmenlogo im Login sowie im App-Kopfbereich
+- Firmenlogo im Offline-App-Cache und sicher aus dem Sitzungsmandanten abgeleitete Logo-URL
 
 ## Noch zu prüfen
 
@@ -105,7 +108,7 @@ Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
 - Objektspeicher-Anbindung für größere Dokumentmengen und betriebliche Aufbewahrungsregeln
 - Dokumentverknüpfung zu Berichten und versionierten PDF-Ausgaben
-- Firmenlogo als geschütztes Mandantendokument mit Initial-Platzhalter
+- allgemeine Logo-Verwaltung als geschütztes Mandantendokument; bis dahin bleibt bei Firmen ohne Logo der Initial-Platzhalter
 - danach Aufgaben, Material sowie Montage- und Bautagesberichte mit PDF-Versionierung
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo

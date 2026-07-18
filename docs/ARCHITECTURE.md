@@ -43,8 +43,12 @@ Dokumentenverwaltung eingeblendet. Ein Modul darf keine parallelen Stammdaten
 oder Dokumentkopien einführen.
 
 Das Firmenlogo gehört zum Mandanten und wird getrennt vom Schäfchen-Markenlogo
-behandelt. Bis die Logoablage als eigenes Dokumentmodul aktiviert ist, zeigt die
-PWA einen Firmeninitial als neutralen Platzhalter.
+behandelt. Migration 018 ordnet der Startfirma das aus dem bestehenden
+VDE-Prüfprotokoll übernommene Original zu. Die API liefert nur die zum
+serverseitig aufgelösten Mandanten gehörende Logo-URL. Firmen ohne hinterlegtes
+Logo sehen weiterhin einen neutralen Firmeninitial. Eine spätere
+Logo-Verwaltung nutzt das zentrale Dokumentenmodell und ersetzt diese erste
+statische Ablage, ohne den Firmenbezug zu ändern.
 
 Migration 017 setzt dieses Prinzip erstmals um. `documents` hält das fachliche
 Dokument, `document_contents` vorübergehend den auf 5 MB begrenzten Inhalt und

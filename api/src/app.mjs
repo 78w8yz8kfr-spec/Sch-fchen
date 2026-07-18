@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  companyLogoUrl,
   sessionView,
   withApiTransaction,
   withSessionTransaction,
@@ -95,7 +96,7 @@ function attachment(response, document) {
 async function setupStatus(pool, companyNumber) {
   return withApiTransaction(pool, async (client) => {
     const result = await client.query(
-      `SELECT company_number, display_name, setup_required
+      `SELECT company_number, display_name, logo_object_key, setup_required
        FROM api_get_initial_setup_status($1::VARCHAR)`,
       [companyNumber]
     );
@@ -106,6 +107,7 @@ async function setupStatus(pool, companyNumber) {
     return {
       companyNumber: row.company_number,
       displayName: row.display_name,
+      logoUrl: companyLogoUrl(row.logo_object_key),
       setupRequired: row.setup_required
     };
   });

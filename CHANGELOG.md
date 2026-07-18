@@ -144,3 +144,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - sichtbare zentrale Dokumentverwaltung im Bereich Baustellen sowie Dokumente direkt im Baustellen-Dashboard
 - Dokumentanzahl und direkter Einstieg aus Kunden- und Projektverwaltung
 - Versionsstand 0.16.0
+- Migration 018 für die serverseitige Firmenlogo-Zuordnung der Startfirma
+- originales Schaaf-Elektro-Firmenlogo aus dem bestehenden VDE-Prüfprotokoll in Login und Kopfbereich
+- getrennte Darstellung von Firmenlogo und unverändertem Schäfchen-Markenlogo
+- Logo-URL ausschließlich aus der serverseitig aufgelösten Firma; Initial bleibt der neutrale Fallback
+- Firmenlogo im Offline-App-Cache und als gemeinsames Original für spätere PDFs und E-Mails
+- Versionsstand 0.17.0

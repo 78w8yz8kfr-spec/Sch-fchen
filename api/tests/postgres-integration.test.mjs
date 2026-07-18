@@ -68,7 +68,17 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   const setupStatus = await fetch(`${baseUrl}/api/v1/setup`);
   assert.equal(setupStatus.status, 200);
-  assert.equal((await setupStatus.json()).setup.setupRequired, true);
+  const setupStatusBody = await setupStatus.json();
+  assert.equal(setupStatusBody.setup.setupRequired, true);
+  assert.equal(setupStatusBody.setup.logoUrl, "./assets/company-logos/schaaf-elektro.png");
+
+  const companyLogo = await fetch(`${baseUrl}/assets/company-logos/schaaf-elektro.png`);
+  assert.equal(companyLogo.status, 200);
+  assert.match(companyLogo.headers.get("content-type"), /image\/png/);
+  assert.deepEqual(
+    [...new Uint8Array(await companyLogo.arrayBuffer()).slice(0, 8)],
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+  );
 
   const setup = await fetch(`${baseUrl}/api/v1/setup`, {
     method: "POST",
@@ -92,6 +102,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const cookie = login.headers.get("set-cookie").split(";", 1)[0];
   const loginBody = await login.json();
   assert.equal(loginBody.session.company.number, "F-000001");
+  assert.equal(loginBody.session.company.logoUrl, "./assets/company-logos/schaaf-elektro.png");
   assert.deepEqual(loginBody.session.user.roles, ["admin"]);
 
   const session = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });

@@ -9,7 +9,7 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, uiSpecification, siteTemplate] = await Promise.all([
+const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
   readFrontendFile("app.js"),
@@ -18,6 +18,7 @@ const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, ma
   readFrontendFile("refresh.js"),
   readFrontendFile("manifest.webmanifest"),
   readFrontendFile("assets/mark.svg"),
+  readFile(resolve(frontendDirectory, "assets/company-logos/schaaf-elektro.png")),
   readFile(resolve(repositoryDirectory, "docs/PHASE1_UI_SPEC.md"), "utf8"),
   readFile(resolve(frontendDirectory, "assets/baustellen-import-vorlage.xlsx"))
 ]);
@@ -94,6 +95,7 @@ assert.doesNotMatch(html, /value="executive_assistant">Assistenz der Geschäftsf
 assert.doesNotMatch(html, /value="office"/);
 assert.match(html, /id="company-number"/);
 assert.match(html, /id="company-number-field" hidden/);
+assert.match(html, /assets\/company-logos\/schaaf-elektro\.png/);
 assert.doesNotMatch(html, /class="live-overview"/);
 assert.match(html, /id="status-since"/);
 assert.match(html, /id="status-work-time"/);
@@ -110,8 +112,8 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.16\.0/);
-assert.match(html, /app\.js\?v=0\.16\.0/);
+assert.match(html, /styles\.css\?v=0\.17\.0/);
+assert.match(html, /app\.js\?v=0\.17\.0/);
 assert.match(html, /id="site-dashboard"/);
 assert.match(html, /aria-live="polite"/);
 assert.match(html, /Öffentliche Demo/);
@@ -142,6 +144,8 @@ assert.match(styles, /\.download-link/);
 assert.match(styles, /\.document-management-panel/);
 assert.match(styles, /\.document-file-choose/);
 assert.match(styles, /\.document-compact-list/);
+assert.match(styles, /\.company-context__mark--logo/);
+assert.match(styles, /\.company-brand-line__mark--logo/);
 assert.match(styles, /--brand: #e30613/);
 assert.match(styles, /--ink: #111111/);
 assert.doesNotMatch(styles, /#173c34|#b9e65a|#7da82a/i, "Alte grüne Markenfarben dürfen nicht verbleiben");
@@ -162,6 +166,8 @@ assert.match(app, /\.\/api\/v1\/admin\/documents/);
 assert.match(app, /contentBase64: arrayBufferToBase64/);
 assert.match(app, /renderDocumentList/);
 assert.match(app, /renderSiteDocuments/);
+assert.match(app, /function setCompanyMark/);
+assert.match(app, /session\.company\.logoUrl/);
 assert.match(app, /method: "PATCH"/);
 assert.match(app, /renderSiteList/);
 assert.match(app, /renderCustomerList/);
@@ -205,14 +211,20 @@ assert.ok(manifest.icons.length > 0);
 assert.match(mark, /fill="#111111"/);
 assert.match(mark, /fill="#e30613"/);
 assert.doesNotMatch(mark, /#173c34|#b9e65a/i);
+assert.deepEqual([...companyLogo.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 assert.equal(siteTemplate[0], 0x50);
 assert.equal(siteTemplate[1], 0x4b);
 
-for (const asset of ["./index.html", "./manifest.webmanifest", "./assets/mark.svg"]) {
+for (const asset of [
+  "./index.html",
+  "./manifest.webmanifest",
+  "./assets/mark.svg",
+  "./assets/company-logos/schaaf-elektro.png"
+]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.16.0"'));
-assert.ok(worker.includes('"./app.js?v=0.16.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.17.0"'));
+assert.ok(worker.includes('"./app.js?v=0.17.0"'));
 assert.ok(worker.includes('"./assets/baustellen-import-vorlage.xlsx"'));
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 assert.match(worker, /event\.request\.mode === "navigate"/);

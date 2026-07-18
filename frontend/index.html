@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.16.0">
-    <script src="./app.js?v=0.16.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.17.0">
+    <script src="./app.js?v=0.17.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -24,7 +24,9 @@
           </div>
 
           <div class="company-context">
-            <span id="login-company-mark" class="company-context__mark" aria-hidden="true">S</span>
+            <span id="login-company-mark" class="company-context__mark company-context__mark--logo" aria-hidden="true">
+              <img src="./assets/company-logos/schaaf-elektro.png" alt="">
+            </span>
             <div>
               <span>Firma</span>
               <strong id="login-company-name">Schaaf Elektro GmbH</strong>
@@ -121,7 +123,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.16.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.17.0</p>
         </div>
       </section>
 
@@ -155,7 +157,9 @@
             <div>
               <strong>Schäfchen</strong>
               <span class="company-brand-line">
-                <i id="dashboard-company-mark" aria-hidden="true">S</i>
+                <i id="dashboard-company-mark" class="company-brand-line__mark--logo" aria-hidden="true">
+                  <img src="./assets/company-logos/schaaf-elektro.png" alt="">
+                </i>
                 <span id="dashboard-company">Schaaf Elektro GmbH</span>
               </span>
             </div>

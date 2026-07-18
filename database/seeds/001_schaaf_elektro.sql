@@ -5,6 +5,7 @@ INSERT INTO companies (
     legal_name,
     display_name,
     status,
+    logo_object_key,
     country_code,
     license_plan,
     settings
@@ -14,6 +15,7 @@ VALUES (
     'Schaaf Elektro GmbH',
     'Schaaf Elektro GmbH',
     'active',
+    'company-logos/schaaf-elektro.png',
     'DE',
     'development',
     '{"is_initial_tenant": true}'::JSONB
