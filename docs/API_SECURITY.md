@@ -10,7 +10,7 @@ Sitzungscookie nie einen fremden Ursprung benötigt.
 
 ## Einmalige Ersteinrichtung
 
-`api_get_initial_setup_status` gibt für die fest konfigurierte Startfirma nur
+`api_get_initial_setup_status_v2` gibt für die fest konfigurierte Startfirma nur
 Name, Nummer, die konfigurierte Firmenlogo-Referenz und den Einrichtungsstatus zurück. Die API
 wandelt die interne Referenz in eine lokale Logo-URL um; das Frontend bestimmt
 keinen Mandanten und keinen Logo-Schlüssel selbst. Solange noch kein Benutzer

@@ -97,7 +97,7 @@ async function setupStatus(pool, companyNumber) {
   return withApiTransaction(pool, async (client) => {
     const result = await client.query(
       `SELECT company_number, display_name, logo_object_key, setup_required
-       FROM api_get_initial_setup_status($1::VARCHAR)`,
+       FROM api_get_initial_setup_status_v2($1::VARCHAR)`,
       [companyNumber]
     );
     if (result.rowCount !== 1) {

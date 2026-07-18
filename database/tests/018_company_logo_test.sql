@@ -23,7 +23,7 @@ DECLARE
 BEGIN
     SELECT logo_object_key
     INTO returned_logo_key
-    FROM api_get_initial_setup_status('F-000001');
+    FROM api_get_initial_setup_status_v2('F-000001');
 
     IF returned_logo_key IS DISTINCT FROM 'company-logos/schaaf-elektro.png' THEN
         RAISE EXCEPTION 'Der Einrichtungsstatus liefert nicht das konfigurierte Firmenlogo';
@@ -31,7 +31,7 @@ BEGIN
 
     IF EXISTS (
         SELECT 1
-        FROM api_get_initial_setup_status('NICHT-VORHANDEN')
+        FROM api_get_initial_setup_status_v2('NICHT-VORHANDEN')
     ) THEN
         RAISE EXCEPTION 'Eine unbekannte Firma wurde durch die Logoabfrage offengelegt';
     END IF;
