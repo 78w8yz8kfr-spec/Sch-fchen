@@ -100,7 +100,6 @@
     adminTitle: document.querySelector("#admin-title"),
     adminIntro: document.querySelector("#admin-intro"),
     adminSummary: document.querySelector("#admin-summary"),
-    adminImport: document.querySelector("#admin-import"),
     adminRefresh: document.querySelector("#admin-refresh"),
     assignmentPlanningShell: document.querySelector("#assignment-planning-shell"),
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
@@ -137,6 +136,8 @@
     assignmentEditMessage: document.querySelector("#assignment-edit-message"),
     assignmentImportPanel: document.querySelector("#assignment-import-panel"),
     assignmentImportFile: document.querySelector("#assignment-import-file"),
+    assignmentImportChoose: document.querySelector("#assignment-import-choose"),
+    assignmentImportSelection: document.querySelector("#assignment-import-selection"),
     assignmentImportFileName: document.querySelector("#assignment-import-file-name"),
     assignmentImportPreviewButton: document.querySelector("#assignment-import-preview-button"),
     assignmentImportMessage: document.querySelector("#assignment-import-message"),
@@ -221,7 +222,6 @@
   elements.assignmentPlanningContent.append(
     elements.adminWeek,
     elements.assignmentEditForm,
-    elements.assignmentImportPanel,
     elements.assignmentPanel
   );
   elements.sitePlanningContent.append(
@@ -231,6 +231,7 @@
     elements.projectPanel,
     elements.siteFormPanel
   );
+  elements.assignmentForm.querySelector('button[type="submit"]').after(elements.assignmentImportPanel);
   elements.siteForm.querySelector('button[type="submit"]').after(elements.siteImportPanel);
 
   const dateFormatter = new Intl.DateTimeFormat("de-DE", {
@@ -357,7 +358,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.2 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.3 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -403,7 +404,7 @@
     assignmentImportFile = null;
     elements.assignmentImportFile.value = "";
     elements.assignmentImportFileName.textContent = "Keine Datei ausgewählt";
-    elements.assignmentImportPanel.hidden = true;
+    elements.assignmentImportSelection.hidden = true;
     resetAssignmentImportPreview();
     siteImportFile = null;
     elements.siteImportFile.value = "";
@@ -492,7 +493,7 @@
     resetAssignmentImportPreview();
     assignmentImportFile = file || null;
     elements.assignmentImportMessage.textContent = "";
-    elements.assignmentImportPanel.hidden = !file;
+    elements.assignmentImportSelection.hidden = !file;
     const valid = Boolean(
       file
       && file.name.toLocaleLowerCase("de-DE").endsWith(".xlsx")
@@ -1395,8 +1396,6 @@
       elements.sitePlanningShell.hidden = pane !== "sites";
       elements.employeePanel.hidden = pane !== "more";
       elements.adminSummary.hidden = pane === "more";
-      elements.adminImport.hidden = pane !== "assignments";
-      elements.adminImport.setAttribute("aria-label", "Wochenplan aus Excel auswählen");
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
         sites: ["Kunden, Projekte und Orte", "Baustellenplanung", "Baustellen einzeln oder gesammelt aus Excel anlegen."],
@@ -1708,6 +1707,7 @@
   elements.assignmentImportFile.addEventListener("change", () => {
     selectAssignmentImportFile(elements.assignmentImportFile.files?.[0] || null);
   });
+  elements.assignmentImportChoose.addEventListener("click", () => elements.assignmentImportFile.click());
 
   elements.assignmentImportPreviewButton.addEventListener("click", async () => {
     if (!assignmentImportFile) return;
@@ -1791,7 +1791,7 @@
       assignmentImportFile = null;
       elements.assignmentImportFile.value = "";
       elements.assignmentImportFileName.textContent = "Keine Datei ausgewählt";
-      elements.assignmentImportPanel.hidden = true;
+      elements.assignmentImportSelection.hidden = true;
       resetAssignmentImportPreview();
       elements.assignmentImportMessage.textContent = `${importedCount} Einsätze wurden sicher importiert.`;
       showToast(`${importedCount} Excel-Einsätze sind jetzt in der Wochenplanung.`);
@@ -1930,9 +1930,6 @@
   });
 
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
-  elements.adminImport.addEventListener("click", () => {
-    if (!elements.assignmentPlanningShell.hidden) elements.assignmentImportFile.click();
-  });
   elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
 
   elements.togglePassword.addEventListener("click", () => {

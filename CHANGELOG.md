@@ -116,3 +116,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - kompakte, dauerhaft sichtbare Excel-Fläche direkt unter „Baustelle anlegen“ integriert
 - Dateiauswahl und Vorlagenlink sofort sichtbar; Dateiname und Prüfung erst nach Auswahl eingeblendet
 - Versionsstand 0.13.2
+- „Einsatz freigeben“ bleibt als wichtigste manuelle Aktion unverändert erhalten
+- Excel-Wochenplan dauerhaft und kompakt direkt unter „Einsatz freigeben“ integriert
+- freigegebene Einsatzliste folgt erst nach manueller und Excel-Planung
+- Versionsstand 0.13.3

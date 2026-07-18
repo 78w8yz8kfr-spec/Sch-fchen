@@ -1,9 +1,9 @@
-const CACHE_NAME = "schaefchen-online-v13-2";
+const CACHE_NAME = "schaefchen-online-v13-3";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=0.13.2",
-  "./app.js?v=0.13.2",
+  "./styles.css?v=0.13.3",
+  "./app.js?v=0.13.3",
   "./manifest.webmanifest",
   "./assets/mark.svg",
   "./assets/baustellen-import-vorlage.xlsx"

@@ -1,10 +1,10 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.13.2
+Technischer Stand: V0.13.3
 
 Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
-Projektleiter im Hauptbereich **Einsätze** über die kompakte Excel-Aktion eine
-`.xlsx`-Datei auswählen. Erst die Vorschau zeigt, welche X-Zuweisungen
+Projektleiter im Hauptbereich **Einsätze** direkt unter **Einsatz freigeben**
+eine `.xlsx`-Datei auswählen. Erst die Vorschau zeigt, welche X-Zuweisungen
 eindeutig importiert werden können; eine zweite Bestätigung speichert sie.
 Bestehende Mitarbeitertage und nicht eindeutig zugeordnete Namen bleiben
 unverändert.
