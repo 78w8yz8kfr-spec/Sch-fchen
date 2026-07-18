@@ -250,6 +250,34 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(customerResponse.status, 201, await customerResponse.clone().text());
   const customer = (await customerResponse.json()).customer;
   assert.match(customer.number, /^SE-K-\d{5}$/);
+  assert.equal(customer.status, "active");
+  assert.equal(customer.rowVersion, 1);
+
+  const customerUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/admin/customers/${customer.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        customerType: customer.type,
+        companyName: customer.companyName,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        email: "verwaltung@example.invalid",
+        phone: "+49 123 456789",
+        street: customer.address.street,
+        houseNumber: customer.address.houseNumber,
+        postalCode: customer.address.postalCode,
+        city: customer.address.city,
+        status: "active",
+        rowVersion: customer.rowVersion
+      })
+    }
+  );
+  assert.equal(customerUpdateResponse.status, 200, await customerUpdateResponse.clone().text());
+  const updatedCustomer = (await customerUpdateResponse.json()).customer;
+  assert.equal(updatedCustomer.email, "verwaltung@example.invalid");
+  assert.equal(updatedCustomer.rowVersion, 2);
 
   const projectResponse = await fetch(`${baseUrl}/api/v1/admin/projects`, {
     method: "POST",
@@ -264,6 +292,25 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const project = (await projectResponse.json()).project;
   assert.equal(project.customerId, customer.id);
   assert.match(project.number, /^SE-\d{4}-\d{4}$/);
+  assert.equal(project.rowVersion, 1);
+
+  const projectUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/admin/projects/${project.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        name: `${project.name} aktualisiert`,
+        installerShortText: "Elektroinstallation und Dokumentation",
+        status: "active",
+        rowVersion: project.rowVersion
+      })
+    }
+  );
+  assert.equal(projectUpdateResponse.status, 200, await projectUpdateResponse.clone().text());
+  const updatedProject = (await projectUpdateResponse.json()).project;
+  assert.equal(updatedProject.shortText, "Elektroinstallation und Dokumentation");
+  assert.equal(updatedProject.rowVersion, 2);
 
   const structuredSiteResponse = await fetch(`${baseUrl}/api/v1/admin/construction-sites`, {
     method: "POST",
@@ -284,6 +331,46 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(structuredSite.customerId, customer.id);
   assert.equal(structuredSite.status, "active");
   assert.equal(structuredSite.rowVersion, 1);
+
+  const blockedProjectCompletion = await fetch(
+    `${baseUrl}/api/v1/admin/projects/${project.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        name: updatedProject.name,
+        installerShortText: updatedProject.shortText,
+        status: "completed",
+        rowVersion: updatedProject.rowVersion
+      })
+    }
+  );
+  assert.equal(blockedProjectCompletion.status, 409);
+  assert.equal((await blockedProjectCompletion.json()).error.code, "project_has_active_sites");
+
+  const blockedCustomerArchive = await fetch(
+    `${baseUrl}/api/v1/admin/customers/${customer.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        customerType: updatedCustomer.type,
+        companyName: updatedCustomer.companyName,
+        firstName: updatedCustomer.firstName,
+        lastName: updatedCustomer.lastName,
+        email: updatedCustomer.email,
+        phone: updatedCustomer.phone,
+        street: updatedCustomer.address.street,
+        houseNumber: updatedCustomer.address.houseNumber,
+        postalCode: updatedCustomer.address.postalCode,
+        city: updatedCustomer.address.city,
+        status: "archived",
+        rowVersion: updatedCustomer.rowVersion
+      })
+    }
+  );
+  assert.equal(blockedCustomerArchive.status, 409);
+  assert.equal((await blockedCustomerArchive.json()).error.code, "customer_has_active_projects");
 
   const structuredSiteUpdateResponse = await fetch(
     `${baseUrl}/api/v1/admin/construction-sites/${structuredSite.id}`,

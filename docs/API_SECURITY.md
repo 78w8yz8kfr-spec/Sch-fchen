@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 18.07.2026  
-Technischer Stand: V0.14.0
+Stand: 19.07.2026  
+Technischer Stand: V0.15.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -69,8 +69,11 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Kunden, Projekte, Baustellen und Wochenplanung Montag bis Freitag |
 | `POST` | `/api/v1/admin/employees` | Mitarbeiter mit Startpasswort und begrenzter Rolle anlegen |
 | `POST` | `/api/v1/admin/customers` | Firmen- oder Privatkunden getrennt anlegen |
+| `PATCH` | `/api/v1/admin/customers/:id` | Kundenstammdaten und Archivstatus versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden zuordnen |
+| `PATCH` | `/api/v1/admin/projects/:id` | Projektdaten und Status versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/construction-sites` | Baustelle mit Standort einem aktiven Projekt zuordnen |
+| `PATCH` | `/api/v1/admin/construction-sites/:id` | Baustellendaten und Status versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/sites` | Kompatibler Paket-Endpunkt für bestehende Integrationen |
 | `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz freigeben |
 | `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung verschieben oder Startzeit ändern |
@@ -109,7 +112,7 @@ Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
 normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
 sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
 der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
-Sonderkürzel werden lediglich gezählt; V0.14.0 legt daraus keine Fachdaten an.
+Sonderkürzel werden lediglich gezählt; V0.15.0 legt daraus keine Fachdaten an.
 Unbekannte Mitarbeiter- oder Baustellenbezeichnungen können ausdrücklich auf
 eine aktive ID des Sitzungsmandanten abgebildet werden. Der Server validiert
 jede Zuordnung erneut und akzeptiert keine fremden oder frei erfundenen IDs.
@@ -118,6 +121,13 @@ Baustellenänderungen laufen mandantengebunden über einen geschützten
 `PATCH`-Endpunkt. Der Client muss die aktuelle `rowVersion` mitsenden; veraltete
 Bearbeitungsstände werden mit Konflikt abgewiesen. Abschluss und Archivierung
 sind gesperrt, solange aktuelle oder zukünftige freigegebene Einsätze bestehen.
+
+Kunden- und Projektänderungen verwenden dieselbe mandantengebundene
+Versionsprüfung. Ein Kunde kann erst archiviert werden, wenn keine geplanten,
+aktiven oder pausierten Projekte mehr bestehen. Projekte können erst
+abgeschlossen oder archiviert werden, wenn ihre Baustellen nicht mehr aktiv
+sind. Eine Reaktivierung ist nur mit einem aktiven übergeordneten Datensatz
+zulässig.
 
 Der Baustellenlistenimport verlangt die Spalten Kunde, Baustelle, Straße,
 Hausnummer, PLZ und Ort; Projekt und Aufgabe sind optional. Fehlerhafte Zeilen

@@ -16,6 +16,8 @@ const EMPLOYEE_ROLES = new Set([
   "project_manager"
 ]);
 const MANAGEABLE_SITE_STATUSES = new Set(["active", "completed", "archived"]);
+const MANAGEABLE_CUSTOMER_STATUSES = new Set(["active", "archived"]);
+const MANAGEABLE_PROJECT_STATUSES = new Set(["planned", "active", "on_hold", "completed", "archived"]);
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -173,12 +175,43 @@ export function validateCustomer(body) {
   };
 }
 
+export function validateCustomerUpdate(body) {
+  const customer = validateCustomer(body);
+  const status = text(body.status, "Kundenstatus", 2, 20).toLowerCase();
+  if (!MANAGEABLE_CUSTOMER_STATUSES.has(status)) {
+    throw new InputError("Der Kundenstatus ist ungültig.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Kundenversion ist ungültig.");
+  }
+  return { ...customer, status, rowVersion };
+}
+
 export function validateProject(body) {
   rejectTenantFields(body);
   return {
     customerId: uuid(body.customerId, "Kunde"),
     name: text(body.name, "Projektname", 2, 200),
     installerShortText: optionalText(body.installerShortText, "Kurztext", 300)
+  };
+}
+
+export function validateProjectUpdate(body) {
+  rejectTenantFields(body);
+  const status = text(body.status, "Projektstatus", 2, 20).toLowerCase();
+  if (!MANAGEABLE_PROJECT_STATUSES.has(status)) {
+    throw new InputError("Der Projektstatus ist ungültig.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Projektversion ist ungültig.");
+  }
+  return {
+    name: text(body.name, "Projektname", 2, 200),
+    installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    status,
+    rowVersion
   };
 }
 

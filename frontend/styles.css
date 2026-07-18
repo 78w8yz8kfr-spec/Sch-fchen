@@ -1616,6 +1616,10 @@ select:focus-visible {
   background: #fafafa;
 }
 
+.entity-management-panel {
+  scroll-margin-top: 112px;
+}
+
 .site-management-panel__heading {
   display: flex;
   align-items: flex-end;
@@ -1675,6 +1679,16 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+.entity-edit-form {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: #fffafa;
+}
+
+.entity-edit-form[hidden] {
+  display: none;
 }
 
 .site-status {

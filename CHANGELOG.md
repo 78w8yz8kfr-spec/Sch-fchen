@@ -128,3 +128,11 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Schutz vor Abschluss oder Archivierung bei aktuellen und zukünftigen Einsätzen
 - Reaktivierung abgeschlossener oder archivierter Baustellen bei aktivem Kunden und Projekt
 - Versionsstand 0.14.0
+- dauerhaft sichtbare Kunden- und Projektverwaltung getrennt von den jeweiligen Anlegeformularen
+- Suche nach Kundenname, Nummer, Kontakt und Ort sowie Projektname, Nummer und Kunde
+- Statusfilter für aktive und archivierte Kunden sowie laufende, abgeschlossene und archivierte Projekte
+- geschützte Bearbeitung von Kundenstammdaten, Rechnungsadresse, Projektname, Kurztext und Status
+- optimistische Versionsprüfung für Kunden und Projekte gegen paralleles Überschreiben
+- Archivierung eines Kunden nur ohne aktive Projekte; Projektabschluss nur ohne aktive Baustellen
+- aktive Auswahllisten und Betriebsstruktur blenden abgeschlossene oder archivierte Stammdaten aus
+- Versionsstand 0.15.0

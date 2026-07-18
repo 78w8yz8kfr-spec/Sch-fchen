@@ -34,12 +34,14 @@ import {
   validateConstructionSite,
   validateConstructionSiteUpdate,
   validateCustomer,
+  validateCustomerUpdate,
   validateEmployee,
   validateId,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
   validateProject,
+  validateProjectUpdate,
   validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
@@ -369,6 +371,10 @@ function customerDto(row) {
     lastName: row.last_name,
     email: row.email,
     phone: row.phone,
+    status: row.status || "active",
+    rowVersion: Number(row.row_version || 1),
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+    projectCount: Number(row.project_count || 0),
     address: {
       street: row.billing_street,
       houseNumber: row.billing_house_number,
@@ -387,6 +393,8 @@ function projectDto(row) {
     shortText: row.installer_short_text,
     customerName: row.customer_name,
     status: row.status,
+    rowVersion: Number(row.row_version || 1),
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
     siteCount: Number(row.site_count || 0)
   };
 }
@@ -436,29 +444,41 @@ async function adminOverview(client, context, date) {
       [context.companyId]
     ),
     client.query(
-      `SELECT id, customer_number, customer_type, company_name, first_name, last_name,
-              email, phone, billing_street, billing_house_number, billing_postal_code, billing_city
-       FROM customers
-       WHERE company_id = $1 AND status = 'active'
-       ORDER BY LOWER(COALESCE(company_name, last_name)), LOWER(COALESCE(first_name, '')), customer_number`,
+      `SELECT customer.id, customer.customer_number, customer.customer_type,
+              customer.company_name, customer.first_name, customer.last_name,
+              customer.email, customer.phone, customer.billing_street,
+              customer.billing_house_number, customer.billing_postal_code, customer.billing_city,
+              customer.status, customer.row_version, customer.updated_at,
+              COUNT(project.id) FILTER (WHERE project.status <> 'cancelled') AS project_count
+       FROM customers AS customer
+       LEFT JOIN projects AS project
+         ON project.company_id = customer.company_id AND project.customer_id = customer.id
+       WHERE customer.company_id = $1 AND customer.status <> 'merged'
+       GROUP BY customer.id
+       ORDER BY CASE customer.status WHEN 'active' THEN 1 ELSE 2 END,
+                LOWER(COALESCE(customer.company_name, customer.last_name)),
+                LOWER(COALESCE(customer.first_name, '')), customer.customer_number`,
       [context.companyId]
     ),
     client.query(
       `SELECT project.id, project.customer_id, project.project_number, project.name,
-              project.installer_short_text, project.status,
+              project.installer_short_text, project.status, project.row_version, project.updated_at,
               COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
-              COUNT(site.id) FILTER (
-                WHERE site.status IN ('planned', 'active', 'on_hold', 'delayed')
-              ) AS site_count
+              COUNT(site.id) FILTER (WHERE site.status <> 'cancelled') AS site_count
        FROM projects AS project
        JOIN customers AS customer
          ON customer.company_id = project.company_id AND customer.id = project.customer_id
        LEFT JOIN construction_sites AS site
          ON site.company_id = project.company_id AND site.project_id = project.id
        WHERE project.company_id = $1
-         AND project.status IN ('planned', 'active', 'on_hold')
+         AND project.status <> 'cancelled'
        GROUP BY project.id, customer.id
-       ORDER BY LOWER(COALESCE(customer.company_name, customer.last_name)), LOWER(project.name), project.project_number`,
+       ORDER BY CASE project.status
+                  WHEN 'active' THEN 1 WHEN 'planned' THEN 1 WHEN 'on_hold' THEN 1
+                  WHEN 'completed' THEN 2 WHEN 'archived' THEN 3 ELSE 4
+                END,
+                LOWER(COALESCE(customer.company_name, customer.last_name)),
+                LOWER(project.name), project.project_number`,
       [context.companyId]
     ),
     client.query(
@@ -842,7 +862,8 @@ async function createCustomer(client, context, input) {
        email, phone, billing_street, billing_house_number, billing_postal_code, billing_city
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id, customer_number, customer_type, company_name, first_name, last_name,
-               email, phone, billing_street, billing_house_number, billing_postal_code, billing_city`,
+               email, phone, billing_street, billing_house_number, billing_postal_code, billing_city,
+               status, row_version, updated_at`,
     [
       context.companyId,
       input.customerType,
@@ -858,6 +879,107 @@ async function createCustomer(client, context, input) {
     ]
   );
   return customerDto(inserted.rows[0]);
+}
+
+async function updateCustomer(client, context, customerId, input) {
+  await requirePlanner(client, context);
+  const current = await client.query(
+    `SELECT id, status, row_version
+     FROM customers
+     WHERE company_id = $1 AND id = $2 AND status <> 'merged'
+     FOR UPDATE`,
+    [context.companyId, customerId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Kunde wurde nicht gefunden.", 404, "customer_not_found");
+  }
+  const currentCustomer = current.rows[0];
+  if (Number(currentCustomer.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der Kunde wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
+      409,
+      "row_version_conflict"
+    );
+  }
+
+  const requestedName = input.customerType === "company"
+    ? input.companyName
+    : `${input.firstName} ${input.lastName}`;
+  if (input.status === "active") {
+    const activeCustomers = await client.query(
+      `SELECT id, customer_type, company_name, first_name, last_name
+       FROM customers
+       WHERE company_id = $1 AND status = 'active' AND id <> $2`,
+      [context.companyId, customerId]
+    );
+    const duplicate = activeCustomers.rows.some((row) => {
+      if (row.customer_type !== input.customerType) return false;
+      const existingName = row.customer_type === "company"
+        ? row.company_name
+        : `${row.first_name} ${row.last_name}`;
+      return normalizeImportText(existingName) === normalizeImportText(requestedName);
+    });
+    if (duplicate) {
+      throw new InputError("Ein aktiver Kunde mit diesem Namen existiert bereits.", 409, "customer_name_exists");
+    }
+  }
+
+  if (currentCustomer.status === "active" && input.status === "archived") {
+    const used = await client.query(
+      `SELECT 1
+       FROM projects
+       WHERE company_id = $1 AND customer_id = $2
+         AND status IN ('planned', 'active', 'on_hold')
+       LIMIT 1`,
+      [context.companyId, customerId]
+    );
+    if (used.rowCount > 0) {
+      throw new InputError(
+        "Der Kunde besitzt noch aktive Projekte und kann deshalb nicht archiviert werden.",
+        409,
+        "customer_has_active_projects"
+      );
+    }
+  }
+
+  const updated = await client.query(
+    `UPDATE customers
+     SET customer_type = $3, company_name = $4, first_name = $5, last_name = $6,
+         email = $7, phone = $8, billing_street = $9, billing_house_number = $10,
+         billing_postal_code = $11, billing_city = $12, status = $13,
+         archived_at = CASE
+           WHEN $13 = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
+           ELSE NULL
+         END
+     WHERE company_id = $1 AND id = $2 AND row_version = $14
+     RETURNING id, customer_number, customer_type, company_name, first_name, last_name,
+               email, phone, billing_street, billing_house_number, billing_postal_code, billing_city,
+               status, row_version, updated_at`,
+    [
+      context.companyId,
+      customerId,
+      input.customerType,
+      input.companyName,
+      input.firstName,
+      input.lastName,
+      input.email,
+      input.phone,
+      input.street,
+      input.houseNumber,
+      input.postalCode,
+      input.city,
+      input.status,
+      input.rowVersion
+    ]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Der Kunde wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return customerDto(updated.rows[0]);
 }
 
 async function createProject(client, context, input) {
@@ -883,7 +1005,8 @@ async function createProject(client, context, input) {
   const inserted = await client.query(
     `INSERT INTO projects (company_id, customer_id, name, status, installer_short_text)
      VALUES ($1, $2, $3, 'active', $4)
-     RETURNING id, customer_id, project_number, name, installer_short_text, status`,
+     RETURNING id, customer_id, project_number, name, installer_short_text,
+               status, row_version, updated_at`,
     [context.companyId, input.customerId, input.name, input.installerShortText]
   );
   const row = customer.rows[0];
@@ -892,6 +1015,112 @@ async function createProject(client, context, input) {
     customer_name: row.customer_type === "company"
       ? row.company_name
       : `${row.first_name} ${row.last_name}`,
+    site_count: 0
+  });
+}
+
+async function updateProject(client, context, projectId, input) {
+  await requirePlanner(client, context);
+  const current = await client.query(
+    `SELECT project.id, project.customer_id, project.status, project.row_version,
+            customer.status AS customer_status,
+            COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name
+     FROM projects AS project
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id AND customer.id = project.customer_id
+     WHERE project.company_id = $1 AND project.id = $2 AND project.status <> 'cancelled'
+     FOR UPDATE OF project`,
+    [context.companyId, projectId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
+  }
+  const currentProject = current.rows[0];
+  if (Number(currentProject.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Das Projekt wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  if (["planned", "active", "on_hold"].includes(input.status) && currentProject.customer_status !== "active") {
+    throw new InputError(
+      "Das Projekt kann nur mit einem aktiven Kunden aktiviert werden.",
+      409,
+      "project_customer_archived"
+    );
+  }
+
+  const duplicate = await client.query(
+    `SELECT name
+     FROM projects
+     WHERE company_id = $1 AND customer_id = $2 AND id <> $3
+       AND status IN ('planned', 'active', 'on_hold')`,
+    [context.companyId, currentProject.customer_id, projectId]
+  );
+  if (
+    ["planned", "active", "on_hold"].includes(input.status)
+    && duplicate.rows.some((row) => normalizeImportText(row.name) === normalizeImportText(input.name))
+  ) {
+    throw new InputError(
+      "Für diesen Kunden existiert bereits ein aktives Projekt mit diesem Namen.",
+      409,
+      "project_name_exists"
+    );
+  }
+
+  if (
+    ["planned", "active", "on_hold"].includes(currentProject.status)
+    && ["completed", "archived"].includes(input.status)
+  ) {
+    const used = await client.query(
+      `SELECT 1
+       FROM construction_sites
+       WHERE company_id = $1 AND project_id = $2
+         AND status IN ('planned', 'active', 'on_hold', 'delayed')
+       LIMIT 1`,
+      [context.companyId, projectId]
+    );
+    if (used.rowCount > 0) {
+      throw new InputError(
+        "Das Projekt besitzt noch aktive Baustellen und kann deshalb nicht abgeschlossen werden.",
+        409,
+        "project_has_active_sites"
+      );
+    }
+  }
+
+  const updated = await client.query(
+    `UPDATE projects
+     SET name = $3, installer_short_text = $4, status = $5,
+         completed_at = CASE
+           WHEN $5 = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
+           ELSE NULL
+         END,
+         archived_at = CASE
+           WHEN $5 = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
+           ELSE NULL
+         END,
+         reopened_at = CASE
+           WHEN status IN ('completed', 'archived') AND $5 IN ('planned', 'active', 'on_hold')
+             THEN CURRENT_TIMESTAMP
+           ELSE reopened_at
+         END
+     WHERE company_id = $1 AND id = $2 AND row_version = $6
+     RETURNING id, customer_id, project_number, name, installer_short_text,
+               status, row_version, updated_at`,
+    [context.companyId, projectId, input.name, input.installerShortText, input.status, input.rowVersion]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Das Projekt wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return projectDto({
+    ...updated.rows[0],
+    customer_name: currentProject.customer_name,
     site_count: 0
   });
 }
@@ -1623,6 +1852,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 201, { customer });
       }
 
+      const adminCustomerMatch = /^\/api\/v1\/admin\/customers\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminCustomerMatch) {
+        const customerId = validateId(adminCustomerMatch[1], "Kunden-ID");
+        const input = validateCustomerUpdate(await readJson(request));
+        const customer = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateCustomer(client, context, customerId, input)
+        );
+        return json(response, 200, { customer });
+      }
+
       if (request.method === "POST" && url.pathname === "/api/v1/admin/projects") {
         const input = validateProject(await readJson(request));
         const project = await withReadySession(
@@ -1631,6 +1872,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createProject(client, context, input)
         );
         return json(response, 201, { project });
+      }
+
+      const adminProjectMatch = /^\/api\/v1\/admin\/projects\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminProjectMatch) {
+        const projectId = validateId(adminProjectMatch[1], "Projekt-ID");
+        const input = validateProjectUpdate(await readJson(request));
+        const project = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateProject(client, context, projectId, input)
+        );
+        return json(response, 200, { project });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/construction-sites") {

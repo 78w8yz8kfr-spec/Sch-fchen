@@ -1,7 +1,7 @@
 # Projektstatus
 
-Stand: 18.07.2026
-Technischer Stand: V0.14.0
+Stand: 19.07.2026
+Technischer Stand: V0.15.0
 
 ## Abgeschlossen
 
@@ -81,6 +81,9 @@ Technischer Stand: V0.14.0
 - durchsuchbare Baustellenverwaltung mit Filtern für aktive, abgeschlossene und archivierte Baustellen
 - geschützte Bearbeitung von Baustellenname, Monteurauftrag, Adresse und Status mit Versionskonfliktschutz
 - Abschluss und Archivierung werden blockiert, solange aktuelle oder zukünftige Einsätze bestehen
+- dauerhaft sichtbare Kunden- und Projektlisten mit Suche, Statusfilter und Bearbeitungsformular
+- geschützte Statuswechsel: Kunden mit aktiven Projekten und Projekte mit aktiven Baustellen bleiben aktiv
+- Versionskonfliktschutz für Kunden-, Projekt- und Baustellenänderungen
 
 ## Noch zu prüfen
 

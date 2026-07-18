@@ -202,14 +202,47 @@
     customerPostalCode: document.querySelector("#customer-postal-code"),
     customerCity: document.querySelector("#customer-city"),
     customerMessage: document.querySelector("#customer-message"),
+    customerManagementPanel: document.querySelector("#customer-management-panel"),
+    customerSearch: document.querySelector("#customer-search"),
+    customerStatusFilter: document.querySelector("#customer-status-filter"),
+    customerListSummary: document.querySelector("#customer-list-summary"),
     customerList: document.querySelector("#customer-list"),
+    customerEditForm: document.querySelector("#customer-edit-form"),
+    customerEditNumber: document.querySelector("#customer-edit-number"),
+    customerEditType: document.querySelector("#customer-edit-type"),
+    customerEditCompanyFields: document.querySelector("#customer-edit-company-fields"),
+    customerEditPrivateFields: document.querySelector("#customer-edit-private-fields"),
+    customerEditCompanyName: document.querySelector("#customer-edit-company-name"),
+    customerEditFirstName: document.querySelector("#customer-edit-first-name"),
+    customerEditLastName: document.querySelector("#customer-edit-last-name"),
+    customerEditEmail: document.querySelector("#customer-edit-email"),
+    customerEditPhone: document.querySelector("#customer-edit-phone"),
+    customerEditStreet: document.querySelector("#customer-edit-street"),
+    customerEditHouseNumber: document.querySelector("#customer-edit-house-number"),
+    customerEditPostalCode: document.querySelector("#customer-edit-postal-code"),
+    customerEditCity: document.querySelector("#customer-edit-city"),
+    customerEditStatus: document.querySelector("#customer-edit-status"),
+    customerEditCancel: document.querySelector("#customer-edit-cancel"),
+    customerEditMessage: document.querySelector("#customer-edit-message"),
     projectPanel: document.querySelector("#project-panel"),
     projectForm: document.querySelector("#project-form"),
     projectCustomer: document.querySelector("#project-customer"),
     projectName: document.querySelector("#project-name"),
     projectShortText: document.querySelector("#project-short-text"),
     projectMessage: document.querySelector("#project-message"),
+    projectManagementPanel: document.querySelector("#project-management-panel"),
+    projectSearch: document.querySelector("#project-search"),
+    projectStatusFilter: document.querySelector("#project-status-filter"),
+    projectListSummary: document.querySelector("#project-list-summary"),
     projectList: document.querySelector("#project-list"),
+    projectEditForm: document.querySelector("#project-edit-form"),
+    projectEditNumber: document.querySelector("#project-edit-number"),
+    projectEditCustomer: document.querySelector("#project-edit-customer"),
+    projectEditName: document.querySelector("#project-edit-name"),
+    projectEditShortText: document.querySelector("#project-edit-short-text"),
+    projectEditStatus: document.querySelector("#project-edit-status"),
+    projectEditCancel: document.querySelector("#project-edit-cancel"),
+    projectEditMessage: document.querySelector("#project-edit-message"),
     siteFormPanel: document.querySelector("#site-form-panel"),
     siteManagementPanel: document.querySelector("#site-management-panel"),
     siteForm: document.querySelector("#site-form"),
@@ -243,12 +276,14 @@
     elements.assignmentPanel
   );
   elements.sitePlanningContent.append(
-    elements.siteFormPanel,
-    elements.siteManagementPanel,
-    elements.siteDashboard,
     elements.businessStructurePanel,
     elements.customerPanel,
-    elements.projectPanel
+    elements.customerManagementPanel,
+    elements.projectPanel,
+    elements.projectManagementPanel,
+    elements.siteFormPanel,
+    elements.siteManagementPanel,
+    elements.siteDashboard
   );
   elements.assignmentForm.querySelector('button[type="submit"]').after(elements.assignmentImportPanel);
   elements.siteForm.querySelector('button[type="submit"]').after(elements.siteImportPanel);
@@ -269,6 +304,8 @@
   let session = null;
   let adminState = null;
   let editingAssignmentId = null;
+  let openedCustomerId = null;
+  let openedProjectId = null;
   let openedSiteId = null;
   let assignmentImportFile = null;
   let assignmentImportPayload = null;
@@ -378,7 +415,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.14.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.15.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -421,7 +458,11 @@
     document.title = "Schäfchen";
     elements.passwordInput.value = "";
     elements.loginMessage.textContent = "";
+    openedCustomerId = null;
+    openedProjectId = null;
     openedSiteId = null;
+    elements.customerEditForm.hidden = true;
+    elements.projectEditForm.hidden = true;
     elements.siteDashboard.hidden = true;
     elements.siteEditForm.hidden = true;
     assignmentImportFile = null;
@@ -748,6 +789,167 @@
     return "active";
   }
 
+  function customerStatusGroup(status) {
+    return status === "archived" ? "archived" : "active";
+  }
+
+  function projectStatusGroup(status) {
+    if (status === "completed") return "completed";
+    if (["archived", "cancelled"].includes(status)) return "archived";
+    return "active";
+  }
+
+  function projectStatusLabel(status) {
+    return {
+      planned: "Geplant",
+      active: "Aktiv",
+      on_hold: "Pausiert",
+      completed: "Abgeschlossen",
+      archived: "Archiviert",
+      cancelled: "Storniert"
+    }[status] || status;
+  }
+
+  function customerSearchText(customer) {
+    return [
+      customer.number,
+      customer.displayName,
+      customer.email,
+      customer.phone,
+      customer.address?.street,
+      customer.address?.houseNumber,
+      customer.address?.postalCode,
+      customer.address?.city
+    ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function projectSearchText(project) {
+    return [project.number, project.name, project.shortText, project.customerName]
+      .filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function renderCustomerList() {
+    if (!adminState) return;
+    const query = elements.customerSearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.customerStatusFilter.value;
+    const customers = adminState.customers.filter((customer) => (
+      (statusFilter === "all" || customerStatusGroup(customer.status) === statusFilter)
+      && (!query || customerSearchText(customer).includes(query))
+    ));
+
+    elements.customerList.replaceChildren();
+    elements.customerListSummary.textContent = `${customers.length} von ${adminState.customers.length} Kunde${adminState.customers.length === 1 ? "" : "n"}`;
+    if (customers.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query ? "Kein Kunde passt zur Suche." : "In diesem Status gibt es noch keinen Kunden.";
+      elements.customerList.append(empty);
+      return;
+    }
+
+    customers.forEach((customer) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const button = document.createElement("button");
+      const location = [customer.address?.postalCode, customer.address?.city].filter(Boolean).join(" ");
+      title.textContent = customer.displayName;
+      badge.className = `site-status site-status--${customerStatusGroup(customer.status)}`;
+      badge.textContent = customer.status === "archived" ? "Archiviert" : "Aktiv";
+      meta.textContent = [
+        customer.number,
+        `${customer.projectCount} Projekt${customer.projectCount === 1 ? "" : "e"}`,
+        location,
+        customer.email || customer.phone
+      ].filter(Boolean).join(" · ");
+      heading.append(title, badge);
+      content.append(heading, meta);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Bearbeiten";
+      button.addEventListener("click", () => openCustomerEditor(customer));
+      item.append(content, button);
+      elements.customerList.append(item);
+    });
+  }
+
+  function renderProjectList() {
+    if (!adminState) return;
+    const query = elements.projectSearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.projectStatusFilter.value;
+    const projects = adminState.projects.filter((project) => (
+      (statusFilter === "all" || projectStatusGroup(project.status) === statusFilter)
+      && (!query || projectSearchText(project).includes(query))
+    ));
+
+    elements.projectList.replaceChildren();
+    elements.projectListSummary.textContent = `${projects.length} von ${adminState.projects.length} Projekt${adminState.projects.length === 1 ? "" : "en"}`;
+    if (projects.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query ? "Kein Projekt passt zur Suche." : "In diesem Status gibt es noch kein Projekt.";
+      elements.projectList.append(empty);
+      return;
+    }
+
+    projects.forEach((project) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const button = document.createElement("button");
+      title.textContent = project.name;
+      badge.className = `site-status site-status--${projectStatusGroup(project.status)}`;
+      badge.textContent = projectStatusLabel(project.status);
+      meta.textContent = `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`;
+      heading.append(title, badge);
+      content.append(heading, meta);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Bearbeiten";
+      button.addEventListener("click", () => openProjectEditor(project));
+      item.append(content, button);
+      elements.projectList.append(item);
+    });
+  }
+
+  function openCustomerEditor(customer) {
+    openedCustomerId = customer.id;
+    elements.customerEditNumber.textContent = customer.number;
+    elements.customerEditType.value = customer.type;
+    elements.customerEditCompanyName.value = customer.companyName || "";
+    elements.customerEditFirstName.value = customer.firstName || "";
+    elements.customerEditLastName.value = customer.lastName || "";
+    elements.customerEditEmail.value = customer.email || "";
+    elements.customerEditPhone.value = customer.phone || "";
+    elements.customerEditStreet.value = customer.address?.street || "";
+    elements.customerEditHouseNumber.value = customer.address?.houseNumber || "";
+    elements.customerEditPostalCode.value = customer.address?.postalCode || "";
+    elements.customerEditCity.value = customer.address?.city || "";
+    elements.customerEditStatus.value = customer.status;
+    elements.customerEditMessage.textContent = "";
+    updateCustomerEditTypeFields();
+    elements.customerEditForm.hidden = false;
+    elements.customerEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openProjectEditor(project) {
+    openedProjectId = project.id;
+    elements.projectEditNumber.textContent = project.number;
+    elements.projectEditCustomer.textContent = project.customerName;
+    elements.projectEditName.value = project.name;
+    elements.projectEditShortText.value = project.shortText || "";
+    elements.projectEditStatus.value = project.status;
+    elements.projectEditMessage.textContent = "";
+    elements.projectEditForm.hidden = false;
+    elements.projectEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function siteStatusLabel(status) {
     return {
       active: "Aktiv",
@@ -909,19 +1111,26 @@
 
   function renderBusinessHierarchy() {
     elements.businessHierarchy.replaceChildren();
-    if (adminState.customers.length === 0) {
+    const activeCustomers = adminState.customers.filter(
+      (customer) => customerStatusGroup(customer.status) === "active"
+    );
+    if (activeCustomers.length === 0) {
       const empty = document.createElement("p");
       empty.className = "hierarchy-empty";
-      empty.textContent = "Noch kein Kunde angelegt. Beginne mit dem ersten Kunden.";
+      empty.textContent = adminState.customers.length === 0
+        ? "Noch kein Kunde angelegt. Beginne mit dem ersten Kunden."
+        : "Aktuell gibt es keinen aktiven Kunden.";
       elements.businessHierarchy.append(empty);
       return;
     }
 
-    adminState.customers.forEach((customer) => {
+    activeCustomers.forEach((customer) => {
       const customerNode = document.createElement("details");
       customerNode.className = "hierarchy-customer";
       customerNode.append(hierarchySummary(customer.displayName, customer.number));
-      const projects = adminState.projects.filter((project) => project.customerId === customer.id);
+      const projects = adminState.projects.filter((project) => (
+        project.customerId === customer.id && projectStatusGroup(project.status) === "active"
+      ));
       if (projects.length === 0) {
         const empty = document.createElement("p");
         empty.className = "hierarchy-empty";
@@ -1045,8 +1254,12 @@
   function renderAdmin() {
     if (!adminState) return;
     elements.adminEmployeeCount.textContent = String(adminState.employees.length);
-    elements.adminCustomerCount.textContent = String(adminState.customers.length);
-    elements.adminProjectCount.textContent = String(adminState.projects.length);
+    elements.adminCustomerCount.textContent = String(
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active").length
+    );
+    elements.adminProjectCount.textContent = String(
+      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active").length
+    );
     elements.adminSiteCount.textContent = String(
       adminState.sites.filter((site) => siteStatusGroup(site.status) === "active").length
     );
@@ -1063,13 +1276,13 @@
 
     renderAdminSelect(
       elements.projectCustomer,
-      adminState.customers,
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
       "Kunde auswählen",
       (customer) => `${customer.displayName} · ${customer.number}`
     );
     renderAdminSelect(
       elements.siteProject,
-      adminState.projects,
+      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active"),
       "Projekt auswählen",
       (project) => `${project.customerName} · ${project.name}`
     );
@@ -1106,25 +1319,8 @@
       );
     });
 
-    elements.customerList.replaceChildren();
-    adminState.customers.forEach((customer) => {
-      const contact = [customer.email, customer.phone].filter(Boolean).join(" · ");
-      appendAdminListItem(
-        elements.customerList,
-        customer.displayName,
-        [customer.number, contact].filter(Boolean).join(" · ")
-      );
-    });
-
-    elements.projectList.replaceChildren();
-    adminState.projects.forEach((project) => {
-      appendAdminListItem(
-        elements.projectList,
-        project.name,
-        `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`
-      );
-    });
-
+    renderCustomerList();
+    renderProjectList();
     renderSiteList();
 
     elements.adminAssignmentList.replaceChildren();
@@ -1521,7 +1717,7 @@
       elements.adminSummary.hidden = pane === "more";
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
-        sites: ["Kunden, Projekte und Orte", "Baustellenplanung", "Baustellen einzeln oder gesammelt aus Excel anlegen."],
+        sites: ["Kunden, Projekte und Baustellen", "Baustellenplanung", "Stammdaten durchsuchen, bearbeiten und eindeutig zuordnen."],
         more: ["Verwaltung", "Mehr", "Mitarbeiter und weitere Einstellungen verwalten."]
       }[pane];
       if (copy) {
@@ -1737,8 +1933,19 @@
     elements.customerLastName.required = privateCustomer;
   }
 
+  function updateCustomerEditTypeFields() {
+    const privateCustomer = elements.customerEditType.value === "private";
+    elements.customerEditCompanyFields.hidden = privateCustomer;
+    elements.customerEditPrivateFields.hidden = !privateCustomer;
+    elements.customerEditCompanyName.required = !privateCustomer;
+    elements.customerEditFirstName.required = privateCustomer;
+    elements.customerEditLastName.required = privateCustomer;
+  }
+
   elements.customerType.addEventListener("change", updateCustomerTypeFields);
+  elements.customerEditType.addEventListener("change", updateCustomerEditTypeFields);
   updateCustomerTypeFields();
+  updateCustomerEditTypeFields();
 
   elements.customerForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1766,6 +1973,57 @@
     await refreshAdmin();
   });
 
+  elements.customerSearch.addEventListener("input", renderCustomerList);
+  elements.customerStatusFilter.addEventListener("change", renderCustomerList);
+  elements.customerEditCancel.addEventListener("click", () => {
+    openedCustomerId = null;
+    elements.customerEditForm.hidden = true;
+    elements.customerEditMessage.textContent = "";
+  });
+
+  elements.customerEditForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const customer = adminState?.customers.find((candidate) => candidate.id === openedCustomerId);
+    if (!customer) return;
+    const nextStatus = elements.customerEditStatus.value;
+    if (
+      customerStatusGroup(customer.status) === "active"
+      && nextStatus === "archived"
+      && !window.confirm("Kunde wirklich archivieren? Aktive Projekte müssen vorher abgeschlossen sein.")
+    ) return;
+
+    const submit = elements.customerEditForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    elements.customerEditMessage.textContent = "Änderungen werden sicher gespeichert …";
+    try {
+      await requestJson(`./api/v1/admin/customers/${encodeURIComponent(customer.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          customerType: elements.customerEditType.value,
+          companyName: elements.customerEditCompanyName.value,
+          firstName: elements.customerEditFirstName.value,
+          lastName: elements.customerEditLastName.value,
+          email: elements.customerEditEmail.value,
+          phone: elements.customerEditPhone.value,
+          street: elements.customerEditStreet.value,
+          houseNumber: elements.customerEditHouseNumber.value,
+          postalCode: elements.customerEditPostalCode.value,
+          city: elements.customerEditCity.value,
+          status: nextStatus,
+          rowVersion: customer.rowVersion
+        })
+      });
+      openedCustomerId = null;
+      elements.customerEditForm.hidden = true;
+      await refreshAdmin();
+      showToast("Kunde aktualisiert.");
+    } catch (error) {
+      elements.customerEditMessage.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   elements.projectForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const saved = await submitAdminForm(
@@ -1782,6 +2040,53 @@
     if (!saved) return;
     elements.projectForm.reset();
     await refreshAdmin();
+  });
+
+  elements.projectSearch.addEventListener("input", renderProjectList);
+  elements.projectStatusFilter.addEventListener("change", renderProjectList);
+  elements.projectEditCancel.addEventListener("click", () => {
+    openedProjectId = null;
+    elements.projectEditForm.hidden = true;
+    elements.projectEditMessage.textContent = "";
+  });
+
+  elements.projectEditForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const project = adminState?.projects.find((candidate) => candidate.id === openedProjectId);
+    if (!project) return;
+    const nextStatus = elements.projectEditStatus.value;
+    if (
+      projectStatusGroup(project.status) === "active"
+      && ["completed", "archived"].includes(nextStatus)
+      && !window.confirm(
+        nextStatus === "completed"
+          ? "Projekt wirklich abschließen? Aktive Baustellen müssen vorher abgeschlossen sein."
+          : "Projekt wirklich archivieren? Aktive Baustellen müssen vorher abgeschlossen sein."
+      )
+    ) return;
+
+    const submit = elements.projectEditForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    elements.projectEditMessage.textContent = "Änderungen werden sicher gespeichert …";
+    try {
+      await requestJson(`./api/v1/admin/projects/${encodeURIComponent(project.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: elements.projectEditName.value,
+          installerShortText: elements.projectEditShortText.value,
+          status: nextStatus,
+          rowVersion: project.rowVersion
+        })
+      });
+      openedProjectId = null;
+      elements.projectEditForm.hidden = true;
+      await refreshAdmin();
+      showToast("Projekt aktualisiert.");
+    } catch (error) {
+      elements.projectEditMessage.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
   });
 
   elements.siteForm.addEventListener("submit", async (event) => {

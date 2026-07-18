@@ -1,6 +1,6 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.14.0
+Technischer Stand: V0.15.0
 
 Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
 Projektleiter im Hauptbereich **Einsätze** direkt unter **Einsatz freigeben**
@@ -20,6 +20,12 @@ Die Baustellenliste kann nach Name, Kunde, Projekt und Ort durchsucht sowie nach
 Status gefiltert werden. Über **Öffnen → Bearbeiten** lassen sich Auftrag,
 Adresse und Status pflegen. Abschluss oder Archivierung sind nur möglich, wenn
 keine aktuellen oder zukünftigen Einsätze mehr an der Baustelle hängen.
+
+Kunden und Projekte besitzen im Bereich **Baustellen** jeweils eine dauerhaft
+sichtbare, durchsuchbare Verwaltung. Die Anlegeformulare bleiben kompakt
+aufklappbar. Über **Bearbeiten** lassen sich Stammdaten und Status pflegen;
+aktive Projekte beziehungsweise Baustellen verhindern ein versehentliches
+Archivieren des übergeordneten Datensatzes.
 
 Die Produktionsvorlage in `render.yaml` startet die PWA, die API und PostgreSQL
 unter einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere

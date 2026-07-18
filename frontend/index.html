@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.14.0">
-    <script src="./app.js?v=0.14.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.15.0">
+    <script src="./app.js?v=0.15.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.14.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.15.0</p>
         </div>
       </section>
 
@@ -576,8 +576,100 @@
                 <button class="button button--primary" type="submit">Kunde anlegen</button>
                 <p id="customer-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="customer-list" class="admin-list" aria-label="Aktive Kunden"></ul>
             </details>
+
+            <section id="customer-management-panel" class="site-management-panel entity-management-panel" aria-labelledby="customer-management-title">
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Stammdaten</p>
+                  <h3 id="customer-management-title">Kunden verwalten</h3>
+                </div>
+                <span id="customer-list-summary" class="site-list-summary" aria-live="polite"></span>
+              </div>
+              <div class="site-list-toolbar">
+                <label for="customer-search">
+                  <span>Kunden durchsuchen</span>
+                  <input id="customer-search" type="search" maxlength="120" placeholder="Name, Nummer, Ort oder Kontakt">
+                </label>
+                <label for="customer-status-filter">
+                  <span>Status</span>
+                  <select id="customer-status-filter">
+                    <option value="active">Aktiv</option>
+                    <option value="archived">Archiviert</option>
+                    <option value="all">Alle</option>
+                  </select>
+                </label>
+              </div>
+              <form id="customer-edit-form" class="admin-form entity-edit-form" novalidate hidden>
+                <div class="site-edit-form__heading">
+                  <div>
+                    <p class="eyebrow">Kunde bearbeiten</p>
+                    <strong id="customer-edit-number">Kundennummer</strong>
+                  </div>
+                </div>
+                <label for="customer-edit-type">Kundenart</label>
+                <select id="customer-edit-type" required>
+                  <option value="company">Firma</option>
+                  <option value="private">Privatkunde</option>
+                </select>
+                <div id="customer-edit-company-fields">
+                  <label for="customer-edit-company-name">Firmenname</label>
+                  <input id="customer-edit-company-name" maxlength="200" autocomplete="organization">
+                </div>
+                <div id="customer-edit-private-fields" class="setup-grid" hidden>
+                  <div>
+                    <label for="customer-edit-first-name">Vorname</label>
+                    <input id="customer-edit-first-name" maxlength="100" autocomplete="given-name">
+                  </div>
+                  <div>
+                    <label for="customer-edit-last-name">Nachname</label>
+                    <input id="customer-edit-last-name" maxlength="100" autocomplete="family-name">
+                  </div>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="customer-edit-email">E-Mail <span>(optional)</span></label>
+                    <input id="customer-edit-email" type="email" maxlength="254" autocomplete="email">
+                  </div>
+                  <div>
+                    <label for="customer-edit-phone">Telefon <span>(optional)</span></label>
+                    <input id="customer-edit-phone" type="tel" maxlength="50" autocomplete="tel">
+                  </div>
+                </div>
+                <p class="field-help">Rechnungsadresse optional – wenn angegeben, bitte vollständig.</p>
+                <div class="address-grid">
+                  <div>
+                    <label for="customer-edit-street">Straße</label>
+                    <input id="customer-edit-street" maxlength="150" autocomplete="street-address">
+                  </div>
+                  <div>
+                    <label for="customer-edit-house-number">Nr.</label>
+                    <input id="customer-edit-house-number" maxlength="20">
+                  </div>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="customer-edit-postal-code">PLZ</label>
+                    <input id="customer-edit-postal-code" maxlength="12" inputmode="numeric" autocomplete="postal-code">
+                  </div>
+                  <div>
+                    <label for="customer-edit-city">Ort</label>
+                    <input id="customer-edit-city" maxlength="100" autocomplete="address-level2">
+                  </div>
+                </div>
+                <label for="customer-edit-status">Status</label>
+                <select id="customer-edit-status" required>
+                  <option value="active">Aktiv</option>
+                  <option value="archived">Archiviert</option>
+                </select>
+                <div class="site-edit-form__actions">
+                  <button class="button button--primary" type="submit">Änderungen speichern</button>
+                  <button id="customer-edit-cancel" class="text-button" type="button">Abbrechen</button>
+                </div>
+                <p id="customer-edit-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="customer-list" class="admin-list site-management-list" aria-label="Kunden"></ul>
+            </section>
 
             <details id="project-panel" class="admin-panel">
               <summary>Projekt anlegen</summary>
@@ -591,8 +683,59 @@
                 <button class="button button--primary" type="submit">Projekt anlegen</button>
                 <p id="project-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="project-list" class="admin-list" aria-label="Aktive Projekte"></ul>
             </details>
+
+            <section id="project-management-panel" class="site-management-panel entity-management-panel" aria-labelledby="project-management-title">
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Aufträge</p>
+                  <h3 id="project-management-title">Projekte verwalten</h3>
+                </div>
+                <span id="project-list-summary" class="site-list-summary" aria-live="polite"></span>
+              </div>
+              <div class="site-list-toolbar">
+                <label for="project-search">
+                  <span>Projekte durchsuchen</span>
+                  <input id="project-search" type="search" maxlength="120" placeholder="Projekt, Nummer oder Kunde">
+                </label>
+                <label for="project-status-filter">
+                  <span>Status</span>
+                  <select id="project-status-filter">
+                    <option value="active">Laufend</option>
+                    <option value="completed">Abgeschlossen</option>
+                    <option value="archived">Archiviert</option>
+                    <option value="all">Alle</option>
+                  </select>
+                </label>
+              </div>
+              <form id="project-edit-form" class="admin-form entity-edit-form" novalidate hidden>
+                <div class="site-edit-form__heading">
+                  <div>
+                    <p class="eyebrow">Projekt bearbeiten</p>
+                    <strong id="project-edit-number">Projektnummer</strong>
+                  </div>
+                  <span id="project-edit-customer">Kunde</span>
+                </div>
+                <label for="project-edit-name">Projektname</label>
+                <input id="project-edit-name" maxlength="200" required>
+                <label for="project-edit-short-text">Kurzbeschreibung <span>(optional)</span></label>
+                <input id="project-edit-short-text" maxlength="300">
+                <label for="project-edit-status">Status</label>
+                <select id="project-edit-status" required>
+                  <option value="planned">Geplant</option>
+                  <option value="active">Aktiv</option>
+                  <option value="on_hold">Pausiert</option>
+                  <option value="completed">Abgeschlossen</option>
+                  <option value="archived">Archiviert</option>
+                </select>
+                <div class="site-edit-form__actions">
+                  <button class="button button--primary" type="submit">Änderungen speichern</button>
+                  <button id="project-edit-cancel" class="text-button" type="button">Abbrechen</button>
+                </div>
+                <p id="project-edit-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <ul id="project-list" class="admin-list site-management-list" aria-label="Projekte"></ul>
+            </section>
 
             <details id="site-form-panel" class="admin-panel">
               <summary>Baustellen anlegen</summary>

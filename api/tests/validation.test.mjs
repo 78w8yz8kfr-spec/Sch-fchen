@@ -9,11 +9,13 @@ import {
   validateConstructionSite,
   validateConstructionSiteUpdate,
   validateCustomer,
+  validateCustomerUpdate,
   validateEmployee,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
   validateProject,
+  validateProjectUpdate,
   validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
@@ -185,6 +187,35 @@ test("Baustellenänderungen erlauben nur sichere Status und Versionsstände", ()
   assert.throws(
     () => validateConstructionSiteUpdate({ ...update, rowVersion: 0 }),
     /Baustellenversion/
+  );
+});
+
+test("Kunden- und Projektänderungen verlangen Status und Versionsstand", () => {
+  const customer = validateCustomerUpdate({
+    customerType: "company",
+    companyName: "Musterkunde GmbH",
+    email: "info@example.invalid",
+    status: "archived",
+    rowVersion: 2
+  });
+  assert.equal(customer.status, "archived");
+  assert.equal(customer.rowVersion, 2);
+  assert.throws(
+    () => validateCustomerUpdate({ ...customer, status: "merged" }),
+    /Kundenstatus/
+  );
+
+  const project = validateProjectUpdate({
+    name: "Neubau Musterweg",
+    installerShortText: "Elektroinstallation",
+    status: "on_hold",
+    rowVersion: 4
+  });
+  assert.equal(project.status, "on_hold");
+  assert.equal(project.rowVersion, 4);
+  assert.throws(
+    () => validateProjectUpdate({ ...project, rowVersion: 0 }),
+    /Projektversion/
   );
 });
 
