@@ -946,9 +946,9 @@ async function updateCustomer(client, context, customerId, input) {
     `UPDATE customers
      SET customer_type = $3, company_name = $4, first_name = $5, last_name = $6,
          email = $7, phone = $8, billing_street = $9, billing_house_number = $10,
-         billing_postal_code = $11, billing_city = $12, status = $13,
+         billing_postal_code = $11, billing_city = $12, status = $13::VARCHAR,
          archived_at = CASE
-           WHEN $13 = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
+           WHEN $13::VARCHAR = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
            ELSE NULL
          END
      WHERE company_id = $1 AND id = $2 AND row_version = $14
@@ -1092,17 +1092,17 @@ async function updateProject(client, context, projectId, input) {
 
   const updated = await client.query(
     `UPDATE projects
-     SET name = $3, installer_short_text = $4, status = $5,
+     SET name = $3, installer_short_text = $4, status = $5::VARCHAR,
          completed_at = CASE
-           WHEN $5 = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
+           WHEN $5::VARCHAR = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
            ELSE NULL
          END,
          archived_at = CASE
-           WHEN $5 = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
+           WHEN $5::VARCHAR = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
            ELSE NULL
          END,
          reopened_at = CASE
-           WHEN status IN ('completed', 'archived') AND $5 IN ('planned', 'active', 'on_hold')
+           WHEN status IN ('completed', 'archived') AND $5::VARCHAR IN ('planned', 'active', 'on_hold')
              THEN CURRENT_TIMESTAMP
            ELSE reopened_at
          END
