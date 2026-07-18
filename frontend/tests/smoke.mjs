@@ -57,7 +57,12 @@ assert.doesNotMatch(html, /value="executive_assistant">Assistenz der Geschäftsf
 assert.doesNotMatch(html, /value="office"/);
 assert.match(html, /id="company-number"/);
 assert.match(html, /id="company-number-field" hidden/);
-assert.match(html, /id="live-status"/);
+assert.doesNotMatch(html, /class="live-overview"/);
+assert.match(html, /id="status-since"/);
+assert.match(html, /id="status-work-time"/);
+assert.match(html, /id="foreman-badge"/);
+assert.match(html, /styles\.css\?v=0\.11\.1/);
+assert.match(html, /app\.js\?v=0\.11\.1/);
 assert.match(html, /id="site-dashboard"/);
 assert.match(html, /aria-live="polite"/);
 assert.match(html, /Öffentliche Demo/);
@@ -68,6 +73,8 @@ assert.match(styles, /env\(safe-area-inset-bottom\)/);
 assert.match(styles, /:focus-visible/);
 assert.match(styles, /min-width: 320px/);
 assert.match(styles, /\.time-summary/);
+assert.match(styles, /\.status-timer/);
+assert.doesNotMatch(styles, /\.live-overview/);
 assert.match(styles, /\.entry-list/);
 assert.match(styles, /\.file-drop/);
 assert.match(styles, /\.import-preview/);
@@ -116,9 +123,11 @@ assert.doesNotMatch(mark, /#173c34|#b9e65a/i);
 assert.equal(siteTemplate[0], 0x50);
 assert.equal(siteTemplate[1], 0x4b);
 
-for (const asset of ["./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./assets/mark.svg"]) {
+for (const asset of ["./index.html", "./manifest.webmanifest", "./assets/mark.svg"]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
+assert.ok(worker.includes('"./styles.css?v=0.11.1"'));
+assert.ok(worker.includes('"./app.js?v=0.11.1"'));
 assert.ok(worker.includes('"./assets/baustellen-import-vorlage.xlsx"'));
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 assert.match(worker, /event\.request\.mode === "navigate"/);

@@ -58,12 +58,8 @@
     dashboardCompany: document.querySelector("#dashboard-company"),
     dashboardTitle: document.querySelector("#dashboard-title"),
     modeBadge: document.querySelector("#mode-badge"),
+    foremanBadge: document.querySelector("#foreman-badge"),
     dashboardPanes: [...document.querySelectorAll("[data-dashboard-pane]")],
-    liveStatus: document.querySelector("#live-status"),
-    liveSite: document.querySelector("#live-site"),
-    liveSince: document.querySelector("#live-since"),
-    liveWork: document.querySelector("#live-work"),
-    liveForeman: document.querySelector("#live-foreman"),
     timesheetEyebrow: document.querySelector("#timesheet-eyebrow"),
     storageTitle: document.querySelector("#storage-title"),
     storageText: document.querySelector("#storage-text"),
@@ -72,7 +68,8 @@
     primaryActionLabel: document.querySelector("#primary-action-label"),
     secondaryAction: document.querySelector("#secondary-action"),
     workdayTitle: document.querySelector("#workday-title"),
-    startTime: document.querySelector("#start-time"),
+    statusSince: document.querySelector("#status-since"),
+    statusWorkTime: document.querySelector("#status-work-time"),
     actionHint: document.querySelector("#action-hint"),
     connectionState: document.querySelector("#connection-state"),
     todayLabel: document.querySelector("#today-label"),
@@ -304,7 +301,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.11.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.11.1 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1114,24 +1111,12 @@
     elements.breakTime.textContent = formatMinutes(times.pause);
     elements.workTime.textContent = formatMinutes(times.work);
     elements.travelTime.textContent = formatMinutes(times.travel);
-    const clockIn = state.events.find((entry) => entry.type === "clock_in");
-    elements.startTime.textContent = clockIn ? timeFormatter.format(new Date(clockIn.recordedAt)) : "– – : – –";
-  }
-
-  function renderLiveOverview() {
     const latest = lastEvent();
-    const currentAssignment = assignments[currentSiteIndex()];
-    const isOnSite = latest?.type === "site_arrival";
-    const times = calculatedTimes();
-    elements.liveStatus.textContent = elements.workdayTitle.textContent;
-    elements.liveSite.textContent = isOnSite
-      ? currentAssignment?.constructionSite.name || "–"
-      : "–";
-    elements.liveSince.textContent = latest
-      ? timeFormatter.format(new Date(latest.recordedAt))
-      : "–";
-    elements.liveWork.textContent = formatMinutes(times.work);
-    elements.liveForeman.textContent = session?.user.roles?.includes("foreman") ? "Ja" : "Nein";
+    elements.statusWorkTime.textContent = formatMinutes(times.work);
+    elements.statusSince.textContent = !latest
+      ? "Bereit zum Start"
+      : `${latest.type === "clock_out" ? "Beendet um" : "Seit"} ${timeFormatter.format(new Date(latest.recordedAt))} Uhr`;
+    elements.foremanBadge.hidden = !session?.user.roles?.includes("foreman");
   }
 
   function entryLabel(entry) {
@@ -1208,7 +1193,6 @@
     renderAction();
     renderAssignment();
     renderTimes();
-    renderLiveOverview();
     renderEntries();
     renderWeek();
     updateConnectionState();

@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 18.07.2026
-Technischer Stand: V0.11.0
+Technischer Stand: V0.11.1
 
 ## Abgeschlossen
 
@@ -70,6 +70,7 @@ Technischer Stand: V0.11.0
 - Live-Übersicht mit Status, aktueller Baustelle, Statusbeginn, Arbeitszeit und Vorarbeiterstatus
 - gegliedertes Baustellen-Dashboard für Mitarbeiter, Berichte, Dokumente, Fotos, Aufgaben, Material, Notizen und weitere Module
 - Migration 016 mit neuem Betriebsrollenmodell und differenzierten Berechtigungsgrundlagen
+- vereinfachte Arbeitskarte ohne doppelten Live-Block sowie versionierte PWA-Assets gegen gemischte iPhone-Cache-Stände
 
 ## Noch zu prüfen
 

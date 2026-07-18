@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 18.07.2026  
-Technischer Stand: V0.11.0
+Technischer Stand: V0.11.1
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -106,7 +106,7 @@ Zuweisungszahl begrenzt. Mitarbeiter und Baustellen werden nur bei genau einem
 normalisierten Treffer übernommen. Ein unbekannter oder mehrdeutiger Wert
 sperrt den vollständigen Mitarbeitertag. Bereits geplante Tage werden weder in
 der Vorschau noch beim transaktionalen Import überschrieben. Abwesenheits- und
-Sonderkürzel werden lediglich gezählt; V0.11.0 legt daraus keine Fachdaten an.
+Sonderkürzel werden lediglich gezählt; V0.11.1 legt daraus keine Fachdaten an.
 Unbekannte Mitarbeiter- oder Baustellenbezeichnungen können ausdrücklich auf
 eine aktive ID des Sitzungsmandanten abgebildet werden. Der Server validiert
 jede Zuordnung erneut und akzeptiert keine fremden oder frei erfundenen IDs.

@@ -88,3 +88,8 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - gegliedertes Baustellen-Dashboard mit aufklappbaren Themenbereichen statt Aktivitätschronik
 - dokumentiertes Ein-Dokument-Prinzip, Mandantenlogo-Grenze und modularer Ausbaupfad
 - Versionsstand 0.11.0
+- unruhigen, doppelten Live-Übersichtsblock wieder entfernt
+- Statusbeginn und Arbeitszeit platzsparend in die bestehende Arbeitskarte integriert
+- Vorarbeiterkennzeichnung erscheint nur für tatsächliche Vorarbeiter
+- CSS und JavaScript werden versionsgebunden geladen, damit iPhones keine alte Gestaltung mit neuem HTML mischen
+- Versionsstand 0.11.1
