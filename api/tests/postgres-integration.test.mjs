@@ -282,6 +282,34 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const structuredSite = (await structuredSiteResponse.json()).site;
   assert.equal(structuredSite.projectId, project.id);
   assert.equal(structuredSite.customerId, customer.id);
+  assert.equal(structuredSite.status, "active");
+  assert.equal(structuredSite.rowVersion, 1);
+
+  const structuredSiteUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/admin/construction-sites/${structuredSite.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        name: `Struktur Baustelle aktualisiert ${suffix}`,
+        installerShortText: "Unterverteilung und Dokumentation",
+        street: "Neuer Baustellenweg",
+        houseNumber: "8a",
+        postalCode: "12345",
+        city: "Teststadt",
+        status: "active",
+        rowVersion: structuredSite.rowVersion
+      })
+    }
+  );
+  assert.equal(
+    structuredSiteUpdateResponse.status,
+    200,
+    await structuredSiteUpdateResponse.clone().text()
+  );
+  const updatedStructuredSite = (await structuredSiteUpdateResponse.json()).site;
+  assert.equal(updatedStructuredSite.address.street, "Neuer Baustellenweg");
+  assert.equal(updatedStructuredSite.rowVersion, 2);
 
   const structureOverviewResponse = await fetch(
     `${baseUrl}/api/v1/admin/overview?date=2026-07-20`,
@@ -291,7 +319,12 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const structureOverview = (await structureOverviewResponse.json()).overview;
   assert.ok(structureOverview.customers.some((item) => item.id === customer.id));
   assert.ok(structureOverview.projects.some((item) => item.id === project.id && item.siteCount === 1));
-  assert.ok(structureOverview.sites.some((item) => item.id === structuredSite.id && item.projectId === project.id));
+  assert.ok(structureOverview.sites.some((item) => (
+    item.id === structuredSite.id
+    && item.projectId === project.id
+    && item.name === updatedStructuredSite.name
+    && item.rowVersion === 2
+  )));
 
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",
@@ -451,6 +484,26 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
   assert.equal(assignmentResponse.status, 201, await assignmentResponse.clone().text());
   const assignment = (await assignmentResponse.json()).assignment;
+
+  const blockedArchiveResponse = await fetch(
+    `${baseUrl}/api/v1/admin/construction-sites/${site.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        name: site.name,
+        installerShortText: site.shortText,
+        street: site.address.street,
+        houseNumber: site.address.houseNumber,
+        postalCode: site.address.postalCode,
+        city: site.address.city,
+        status: "archived",
+        rowVersion: site.rowVersion
+      })
+    }
+  );
+  assert.equal(blockedArchiveResponse.status, 409);
+  assert.equal((await blockedArchiveResponse.json()).error.code, "site_has_assignments");
 
   const employeeLogin = await fetch(`${baseUrl}/api/v1/session`, {
     method: "POST",

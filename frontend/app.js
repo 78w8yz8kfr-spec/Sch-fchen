@@ -114,13 +114,27 @@
     siteDashboard: document.querySelector("#site-dashboard"),
     siteDashboardTitle: document.querySelector("#site-dashboard-title"),
     siteDashboardMeta: document.querySelector("#site-dashboard-meta"),
+    siteDashboardStatus: document.querySelector("#site-dashboard-status"),
     siteDashboardCustomer: document.querySelector("#site-dashboard-customer"),
     siteDashboardProject: document.querySelector("#site-dashboard-project"),
     siteDashboardOrder: document.querySelector("#site-dashboard-order"),
     siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
     siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
+    siteDashboardEdit: document.querySelector("#site-dashboard-edit"),
     adminWeek: document.querySelector("#admin-week"),
     siteDashboardClose: document.querySelector("#site-dashboard-close"),
+    siteEditForm: document.querySelector("#site-edit-form"),
+    siteEditNumber: document.querySelector("#site-edit-number"),
+    siteEditProject: document.querySelector("#site-edit-project"),
+    siteEditName: document.querySelector("#site-edit-name"),
+    siteEditShortText: document.querySelector("#site-edit-short-text"),
+    siteEditStreet: document.querySelector("#site-edit-street"),
+    siteEditHouseNumber: document.querySelector("#site-edit-house-number"),
+    siteEditPostalCode: document.querySelector("#site-edit-postal-code"),
+    siteEditCity: document.querySelector("#site-edit-city"),
+    siteEditStatus: document.querySelector("#site-edit-status"),
+    siteEditCancel: document.querySelector("#site-edit-cancel"),
+    siteEditMessage: document.querySelector("#site-edit-message"),
     adminWeekPrevious: document.querySelector("#admin-week-previous"),
     adminWeekNext: document.querySelector("#admin-week-next"),
     adminWeekTitle: document.querySelector("#admin-week-title"),
@@ -197,6 +211,7 @@
     projectMessage: document.querySelector("#project-message"),
     projectList: document.querySelector("#project-list"),
     siteFormPanel: document.querySelector("#site-form-panel"),
+    siteManagementPanel: document.querySelector("#site-management-panel"),
     siteForm: document.querySelector("#site-form"),
     siteProject: document.querySelector("#site-project"),
     siteName: document.querySelector("#site-name"),
@@ -206,6 +221,9 @@
     sitePostalCode: document.querySelector("#site-postal-code"),
     siteCity: document.querySelector("#site-city"),
     siteMessage: document.querySelector("#site-message"),
+    siteSearch: document.querySelector("#site-search"),
+    siteStatusFilter: document.querySelector("#site-status-filter"),
+    siteListSummary: document.querySelector("#site-list-summary"),
     siteList: document.querySelector("#site-list"),
     assignmentPanel: document.querySelector("#assignment-panel"),
     assignmentForm: document.querySelector("#assignment-form"),
@@ -225,11 +243,12 @@
     elements.assignmentPanel
   );
   elements.sitePlanningContent.append(
-    elements.businessStructurePanel,
+    elements.siteFormPanel,
+    elements.siteManagementPanel,
     elements.siteDashboard,
+    elements.businessStructurePanel,
     elements.customerPanel,
-    elements.projectPanel,
-    elements.siteFormPanel
+    elements.projectPanel
   );
   elements.assignmentForm.querySelector('button[type="submit"]').after(elements.assignmentImportPanel);
   elements.siteForm.querySelector('button[type="submit"]').after(elements.siteImportPanel);
@@ -250,6 +269,7 @@
   let session = null;
   let adminState = null;
   let editingAssignmentId = null;
+  let openedSiteId = null;
   let assignmentImportFile = null;
   let assignmentImportPayload = null;
   let assignmentImportState = null;
@@ -358,7 +378,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.13.3 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.14.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -401,6 +421,9 @@
     document.title = "Schäfchen";
     elements.passwordInput.value = "";
     elements.loginMessage.textContent = "";
+    openedSiteId = null;
+    elements.siteDashboard.hidden = true;
+    elements.siteEditForm.hidden = true;
     assignmentImportFile = null;
     elements.assignmentImportFile.value = "";
     elements.assignmentImportFileName.textContent = "Keine Datei ausgewählt";
@@ -719,6 +742,86 @@
     list.append(item);
   }
 
+  function siteStatusGroup(status) {
+    if (["completed"].includes(status)) return "completed";
+    if (["archived", "cancelled"].includes(status)) return "archived";
+    return "active";
+  }
+
+  function siteStatusLabel(status) {
+    return {
+      active: "Aktiv",
+      planned: "Geplant",
+      on_hold: "Pausiert",
+      delayed: "Verzögert",
+      completed: "Abgeschlossen",
+      archived: "Archiviert",
+      cancelled: "Storniert"
+    }[status] || status;
+  }
+
+  function siteSearchText(site) {
+    return [
+      site.number,
+      site.name,
+      site.customerName,
+      site.projectName,
+      site.address?.street,
+      site.address?.houseNumber,
+      site.address?.postalCode,
+      site.address?.city
+    ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function renderSiteList() {
+    if (!adminState) return;
+    const query = elements.siteSearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.siteStatusFilter.value;
+    const sites = adminState.sites.filter((site) => {
+      const statusMatches = statusFilter === "all" || siteStatusGroup(site.status) === statusFilter;
+      return statusMatches && (!query || siteSearchText(site).includes(query));
+    });
+
+    elements.siteList.replaceChildren();
+    elements.siteListSummary.textContent = `${sites.length} von ${adminState.sites.length} Baustelle${adminState.sites.length === 1 ? "" : "n"}`;
+    if (sites.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query
+        ? "Keine Baustelle passt zur Suche."
+        : "In diesem Status gibt es noch keine Baustelle.";
+      elements.siteList.append(empty);
+      return;
+    }
+
+    sites.forEach((site) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const button = document.createElement("button");
+      title.textContent = site.name;
+      badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
+      badge.textContent = siteStatusLabel(site.status);
+      meta.textContent = [
+        site.customerName,
+        site.projectName,
+        `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
+        `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
+      ].filter(Boolean).join(" · ");
+      heading.append(title, badge);
+      content.append(heading, meta);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Öffnen";
+      button.addEventListener("click", () => openSiteDashboard(site));
+      item.append(content, button);
+      elements.siteList.append(item);
+    });
+  }
+
   function openSiteDashboard(site) {
     const address = [
       `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
@@ -731,8 +834,11 @@
         assignedEmployees.set(assignment.employeeId, assignment.employeeName);
       });
 
+    openedSiteId = site.id;
     elements.siteDashboardTitle.textContent = site.name;
     elements.siteDashboardMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
+    elements.siteDashboardStatus.textContent = siteStatusLabel(site.status);
+    elements.siteDashboardStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
     elements.siteDashboardCustomer.textContent = site.customerName;
     elements.siteDashboardProject.textContent = site.projectName || site.name;
     elements.siteDashboardOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
@@ -748,8 +854,29 @@
         appendAdminListItem(elements.siteDashboardEmployees, name, "In dieser Woche eingeplant");
       });
     }
+    elements.siteEditForm.hidden = true;
+    elements.siteEditMessage.textContent = "";
+    elements.siteDashboardEdit.hidden = false;
     elements.siteDashboard.hidden = false;
     elements.siteDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openSiteEditor() {
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    elements.siteEditNumber.textContent = site.number;
+    elements.siteEditProject.textContent = `${site.customerName} · ${site.projectName}`;
+    elements.siteEditName.value = site.name;
+    elements.siteEditShortText.value = site.shortText || "";
+    elements.siteEditStreet.value = site.address.street || "";
+    elements.siteEditHouseNumber.value = site.address.houseNumber || "";
+    elements.siteEditPostalCode.value = site.address.postalCode || "";
+    elements.siteEditCity.value = site.address.city || "";
+    elements.siteEditStatus.value = siteStatusGroup(site.status);
+    elements.siteEditMessage.textContent = "";
+    elements.siteEditForm.hidden = false;
+    elements.siteDashboardEdit.hidden = true;
+    elements.siteEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function renderAdminSelect(select, items, placeholder, label) {
@@ -805,7 +932,9 @@
           const projectNode = document.createElement("details");
           projectNode.className = "hierarchy-project";
           projectNode.append(hierarchySummary(project.name, `${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`));
-          const sites = adminState.sites.filter((site) => site.projectId === project.id);
+          const sites = adminState.sites.filter((site) => (
+            site.projectId === project.id && siteStatusGroup(site.status) === "active"
+          ));
           if (sites.length === 0) {
             const empty = document.createElement("p");
             empty.className = "hierarchy-empty";
@@ -918,7 +1047,9 @@
     elements.adminEmployeeCount.textContent = String(adminState.employees.length);
     elements.adminCustomerCount.textContent = String(adminState.customers.length);
     elements.adminProjectCount.textContent = String(adminState.projects.length);
-    elements.adminSiteCount.textContent = String(adminState.sites.length);
+    elements.adminSiteCount.textContent = String(
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active").length
+    );
     elements.employeeManagementRoles.forEach((option) => {
       option.hidden = !adminState.canCreateManagementRoles;
       option.disabled = !adminState.canCreateManagementRoles;
@@ -950,7 +1081,7 @@
     );
     renderAdminSelect(
       elements.assignmentSite,
-      adminState.sites,
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
       "Baustelle auswählen",
       (site) => `${site.name} · ${site.address.city}`
     );
@@ -994,15 +1125,7 @@
       );
     });
 
-    elements.siteList.replaceChildren();
-    adminState.sites.forEach((site) => {
-      appendAdminListItem(
-        elements.siteList,
-        site.name,
-        `${site.customerName} · ${site.address.street} ${site.address.houseNumber}, ${site.address.postalCode} ${site.address.city}`,
-        { label: "Öffnen", handler: () => openSiteDashboard(site) }
-      );
-    });
+    renderSiteList();
 
     elements.adminAssignmentList.replaceChildren();
     if (adminState.assignments.length === 0) {
@@ -1683,6 +1806,49 @@
     await refreshAdmin();
   });
 
+  elements.siteEditForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    const nextStatus = elements.siteEditStatus.value;
+    if (
+      nextStatus !== "active"
+      && siteStatusGroup(site.status) === "active"
+      && !window.confirm(
+        nextStatus === "completed"
+          ? "Baustelle wirklich als abgeschlossen markieren?"
+          : "Baustelle wirklich archivieren? Sie kann später wieder aktiviert werden."
+      )
+    ) return;
+
+    const submit = elements.siteEditForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    elements.siteEditMessage.textContent = "Änderungen werden sicher gespeichert …";
+    try {
+      await requestJson(`./api/v1/admin/construction-sites/${encodeURIComponent(site.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: elements.siteEditName.value,
+          installerShortText: elements.siteEditShortText.value,
+          street: elements.siteEditStreet.value,
+          houseNumber: elements.siteEditHouseNumber.value,
+          postalCode: elements.siteEditPostalCode.value,
+          city: elements.siteEditCity.value,
+          status: nextStatus,
+          rowVersion: site.rowVersion
+        })
+      });
+      await refreshAdmin();
+      const updated = adminState.sites.find((candidate) => candidate.id === site.id);
+      if (updated) openSiteDashboard(updated);
+      showToast("Baustelle aktualisiert.");
+    } catch (error) {
+      elements.siteEditMessage.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   elements.assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const saved = await submitAdminForm(
@@ -1988,8 +2154,18 @@
     showDashboardPane("more");
   });
   elements.siteDashboardClose.addEventListener("click", () => {
+    openedSiteId = null;
+    elements.siteEditForm.hidden = true;
     elements.siteDashboard.hidden = true;
   });
+  elements.siteDashboardEdit.addEventListener("click", openSiteEditor);
+  elements.siteEditCancel.addEventListener("click", () => {
+    elements.siteEditForm.hidden = true;
+    elements.siteDashboardEdit.hidden = false;
+    elements.siteEditMessage.textContent = "";
+  });
+  elements.siteSearch.addEventListener("input", renderSiteList);
+  elements.siteStatusFilter.addEventListener("change", renderSiteList);
 
   elements.todayLabel.textContent = dateFormatter.format(new Date());
   configureModeCopy();

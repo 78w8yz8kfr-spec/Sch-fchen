@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 18.07.2026
-Technischer Stand: V0.13.3
+Technischer Stand: V0.14.0
 
 ## Abgeschlossen
 
@@ -78,6 +78,9 @@ Technischer Stand: V0.13.3
 - rollenabhängige Hauptnavigation: Planer erreichen Einsätze und Baustellen direkt; Monteure behalten Start, Woche und Mehr
 - Mitarbeiterverwaltung und Einstellungen bleiben getrennt unter Mehr
 - Excel-Wochenplan dauerhaft direkt unter „Einsatz freigeben“; Excel-Baustellenimport dauerhaft direkt unter „Baustelle anlegen“
+- durchsuchbare Baustellenverwaltung mit Filtern für aktive, abgeschlossene und archivierte Baustellen
+- geschützte Bearbeitung von Baustellenname, Monteurauftrag, Adresse und Status mit Versionskonfliktschutz
+- Abschluss und Archivierung werden blockiert, solange aktuelle oder zukünftige Einsätze bestehen
 
 ## Noch zu prüfen
 

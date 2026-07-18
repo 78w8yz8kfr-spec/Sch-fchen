@@ -120,3 +120,11 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Excel-Wochenplan dauerhaft und kompakt direkt unter „Einsatz freigeben“ integriert
 - freigegebene Einsatzliste folgt erst nach manueller und Excel-Planung
 - Versionsstand 0.13.3
+- durchsuchbare Baustellenliste nach Name, Kunde, Projekt, Nummer, Adresse und Ort
+- Statusfilter für aktive, abgeschlossene, archivierte oder alle Baustellen
+- Baustellen-Dashboard mit sichtbarem Status und vollständiger Bearbeitungsmaske
+- Änderung von Baustellenname, Monteurauftrag, Adresse und Status
+- optimistische Versionsprüfung gegen unbeabsichtigtes Überschreiben paralleler Änderungen
+- Schutz vor Abschluss oder Archivierung bei aktuellen und zukünftigen Einsätzen
+- Reaktivierung abgeschlossener oder archivierter Baustellen bei aktivem Kunden und Projekt
+- Versionsstand 0.14.0

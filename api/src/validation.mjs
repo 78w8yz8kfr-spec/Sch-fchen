@@ -15,6 +15,7 @@ const EMPLOYEE_ROLES = new Set([
   "dispatch_office",
   "project_manager"
 ]);
+const MANAGEABLE_SITE_STATUSES = new Set(["active", "completed", "archived"]);
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -191,6 +192,28 @@ export function validateConstructionSite(body) {
     houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
     postalCode: text(body.postalCode, "Postleitzahl", 1, 12),
     city: text(body.city, "Ort", 1, 100)
+  };
+}
+
+export function validateConstructionSiteUpdate(body) {
+  rejectTenantFields(body);
+  const status = text(body.status, "Baustellenstatus", 2, 20).toLowerCase();
+  if (!MANAGEABLE_SITE_STATUSES.has(status)) {
+    throw new InputError("Der Baustellenstatus ist ungültig.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Baustellenversion ist ungültig.");
+  }
+  return {
+    name: text(body.name, "Baustellenname", 2, 200),
+    installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    street: text(body.street, "Straße", 1, 150),
+    houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
+    postalCode: text(body.postalCode, "Postleitzahl", 1, 12),
+    city: text(body.city, "Ort", 1, 100),
+    status,
+    rowVersion
   };
 }
 

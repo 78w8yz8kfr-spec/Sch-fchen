@@ -7,6 +7,7 @@ import {
   validateAssignmentCancellation,
   validateAssignmentUpdate,
   validateConstructionSite,
+  validateConstructionSiteUpdate,
   validateCustomer,
   validateEmployee,
   validateInitialPasswordChange,
@@ -161,6 +162,29 @@ test("Kunde, Projekt und Baustelle werden als getrennte Hierarchie validiert", (
   assert.throws(
     () => validateConstructionSite({ ...site, projectId: "falsch" }),
     /Projekt/
+  );
+});
+
+test("Baustellenänderungen erlauben nur sichere Status und Versionsstände", () => {
+  const update = validateConstructionSiteUpdate({
+    name: "Musterbaustelle",
+    installerShortText: "Verteilung prüfen",
+    street: "Musterstraße",
+    houseNumber: "12",
+    postalCode: "12345",
+    city: "Musterstadt",
+    status: "completed",
+    rowVersion: 3
+  });
+  assert.equal(update.status, "completed");
+  assert.equal(update.rowVersion, 3);
+  assert.throws(
+    () => validateConstructionSiteUpdate({ ...update, status: "cancelled" }),
+    /Baustellenstatus/
+  );
+  assert.throws(
+    () => validateConstructionSiteUpdate({ ...update, rowVersion: 0 }),
+    /Baustellenversion/
   );
 });
 

@@ -32,6 +32,7 @@ import {
   validateAssignmentCancellation,
   validateAssignmentUpdate,
   validateConstructionSite,
+  validateConstructionSiteUpdate,
   validateCustomer,
   validateEmployee,
   validateId,
@@ -341,6 +342,9 @@ function siteDto(row) {
     number: row.site_number,
     name: row.name,
     shortText: row.installer_short_text,
+    status: row.status || "active",
+    rowVersion: Number(row.row_version || 1),
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
     customerName: row.customer_name,
     projectName: row.project_name,
     address: {
@@ -459,6 +463,7 @@ async function adminOverview(client, context, date) {
     ),
     client.query(
       `SELECT site.id, site.project_id, project.customer_id, site.site_number, site.name, site.installer_short_text,
+              site.status, site.row_version, site.updated_at,
               project.name AS project_name,
               COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
               location.street, location.house_number, location.postal_code, location.city
@@ -470,8 +475,13 @@ async function adminOverview(client, context, date) {
        LEFT JOIN customer_locations AS location
          ON location.company_id = site.company_id AND location.id = site.customer_location_id
        WHERE site.company_id = $1
-         AND site.status IN ('planned', 'active', 'on_hold', 'delayed')
-       ORDER BY LOWER(site.name), site.site_number`,
+         AND site.status <> 'cancelled'
+       ORDER BY
+         CASE site.status
+           WHEN 'active' THEN 1 WHEN 'planned' THEN 1 WHEN 'on_hold' THEN 1 WHEN 'delayed' THEN 1
+           WHEN 'completed' THEN 2 WHEN 'archived' THEN 3 ELSE 4
+         END,
+         LOWER(site.name), site.site_number`,
       [context.companyId]
     ),
     client.query(
@@ -941,7 +951,7 @@ async function createConstructionSite(client, context, input) {
     `INSERT INTO construction_sites (
        company_id, project_id, customer_location_id, name, installer_short_text, status
      ) VALUES ($1, $2, $3, $4, $5, 'active')
-     RETURNING id, project_id, site_number, name, installer_short_text`,
+     RETURNING id, project_id, site_number, name, installer_short_text, status, row_version, updated_at`,
     [context.companyId, input.projectId, location.rows[0].id, input.name, input.installerShortText]
   );
   return siteDto({
@@ -951,6 +961,144 @@ async function createConstructionSite(client, context, input) {
       ? projectRow.company_name
       : `${projectRow.first_name} ${projectRow.last_name}`,
     project_name: projectRow.name,
+    street: input.street,
+    house_number: input.houseNumber,
+    postal_code: input.postalCode,
+    city: input.city
+  });
+}
+
+async function updateConstructionSite(client, context, siteId, input) {
+  await requirePlanner(client, context);
+  const current = await client.query(
+    `SELECT site.id, site.project_id, site.customer_location_id, site.site_number,
+            site.name, site.status, site.row_version,
+            project.customer_id, project.name AS project_name, project.status AS project_status,
+            customer.customer_type, customer.company_name, customer.first_name, customer.last_name,
+            customer.status AS customer_status
+     FROM construction_sites AS site
+     JOIN projects AS project
+       ON project.company_id = site.company_id AND project.id = site.project_id
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id AND customer.id = project.customer_id
+     WHERE site.company_id = $1 AND site.id = $2
+     FOR UPDATE OF site`,
+    [context.companyId, siteId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
+  }
+  const currentSite = current.rows[0];
+  if (Number(currentSite.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Die Baustelle wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "site_version_conflict"
+    );
+  }
+
+  if (input.status === "active") {
+    if (
+      !["planned", "active", "on_hold"].includes(currentSite.project_status)
+      || currentSite.customer_status !== "active"
+    ) {
+      throw new InputError(
+        "Die Baustelle kann nur mit einem aktiven Kunden und Projekt aktiviert werden.",
+        409,
+        "site_parent_inactive"
+      );
+    }
+    const existingNames = await client.query(
+      `SELECT name FROM construction_sites
+       WHERE company_id = $1 AND id <> $2
+         AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+      [context.companyId, siteId]
+    );
+    if (existingNames.rows.some((row) => normalizeImportText(row.name) === normalizeImportText(input.name))) {
+      throw new InputError("Eine aktive Baustelle mit diesem Namen existiert bereits.", 409, "site_name_exists");
+    }
+  }
+
+  if (input.status !== "active" && !["completed", "archived"].includes(currentSite.status)) {
+    const futureAssignments = await client.query(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM site_assignments
+       WHERE company_id = $1 AND construction_site_id = $2
+         AND work_date >= CURRENT_DATE AND status IN ('draft', 'released')`,
+      [context.companyId, siteId]
+    );
+    if (futureAssignments.rows[0].count > 0) {
+      throw new InputError(
+        "Die Baustelle besitzt noch aktuelle oder zukünftige Einsätze. Bitte diese zuerst verschieben oder stornieren.",
+        409,
+        "site_has_assignments"
+      );
+    }
+  }
+
+  let locationId = currentSite.customer_location_id;
+  if (locationId) {
+    await client.query(
+      `UPDATE customer_locations
+       SET name = $3, street = $4, house_number = $5, postal_code = $6, city = $7
+       WHERE company_id = $1 AND id = $2`,
+      [context.companyId, locationId, input.name, input.street, input.houseNumber, input.postalCode, input.city]
+    );
+  } else {
+    const location = await client.query(
+      `INSERT INTO customer_locations (
+         company_id, customer_id, name, location_type, street, house_number,
+         postal_code, city, is_billing_location
+       ) VALUES ($1, $2, $3, 'construction', $4, $5, $6, $7, FALSE)
+       RETURNING id`,
+      [
+        context.companyId,
+        currentSite.customer_id,
+        input.name,
+        input.street,
+        input.houseNumber,
+        input.postalCode,
+        input.city
+      ]
+    );
+    locationId = location.rows[0].id;
+    await client.query(
+      `INSERT INTO project_locations (company_id, project_id, customer_location_id)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [context.companyId, currentSite.project_id, locationId]
+    );
+  }
+
+  const updated = await client.query(
+    `UPDATE construction_sites
+     SET customer_location_id = $3, name = $4, installer_short_text = $5, status = $6
+     WHERE company_id = $1 AND id = $2 AND row_version = $7
+     RETURNING id, project_id, site_number, name, installer_short_text,
+               status, row_version, updated_at`,
+    [
+      context.companyId,
+      siteId,
+      locationId,
+      input.name,
+      input.installerShortText,
+      input.status,
+      input.rowVersion
+    ]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Die Baustelle wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "site_version_conflict"
+    );
+  }
+  return siteDto({
+    ...updated.rows[0],
+    customer_id: currentSite.customer_id,
+    customer_name: currentSite.customer_type === "company"
+      ? currentSite.company_name
+      : `${currentSite.first_name} ${currentSite.last_name}`,
+    project_name: currentSite.project_name,
     street: input.street,
     house_number: input.houseNumber,
     postal_code: input.postalCode,
@@ -1012,7 +1160,7 @@ async function createSiteBundle(client, context, input) {
     `INSERT INTO construction_sites (
        company_id, project_id, customer_location_id, name, installer_short_text, status
      ) VALUES ($1, $2, $3, $4, $5, 'active')
-     RETURNING id, project_id, site_number, name, installer_short_text`,
+     RETURNING id, project_id, site_number, name, installer_short_text, status, row_version, updated_at`,
     [context.companyId, project.rows[0].id, location.rows[0].id, input.siteName, input.installerShortText]
   );
   return siteDto({
@@ -1493,6 +1641,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createConstructionSite(client, context, input)
         );
         return json(response, 201, { site });
+      }
+
+      const adminSiteMatch = /^\/api\/v1\/admin\/construction-sites\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminSiteMatch) {
+        const siteId = validateId(adminSiteMatch[1], "Baustellen-ID");
+        const input = validateConstructionSiteUpdate(await readJson(request));
+        const site = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateConstructionSite(client, context, siteId, input)
+        );
+        return json(response, 200, { site });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/sites") {

@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.13.3">
-    <script src="./app.js?v=0.13.3" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.14.0">
+    <script src="./app.js?v=0.14.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -121,7 +121,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.13.3</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.14.0</p>
         </div>
       </section>
 
@@ -296,11 +296,59 @@
                   <h3 id="site-dashboard-title">Baustelle</h3>
                   <p id="site-dashboard-meta"></p>
                 </div>
-                <button id="site-dashboard-close" class="text-button" type="button">Schließen</button>
+                <div class="site-dashboard__actions">
+                  <button id="site-dashboard-edit" class="text-button" type="button">Bearbeiten</button>
+                  <button id="site-dashboard-close" class="text-button" type="button">Schließen</button>
+                </div>
               </div>
+              <form id="site-edit-form" class="admin-form site-edit-form" novalidate hidden>
+                <div class="site-edit-form__heading">
+                  <div>
+                    <p class="eyebrow">Baustelle bearbeiten</p>
+                    <strong id="site-edit-number">Baustellennummer</strong>
+                  </div>
+                  <span id="site-edit-project">Kunde · Projekt</span>
+                </div>
+                <label for="site-edit-name">Baustellenname</label>
+                <input id="site-edit-name" maxlength="200" required>
+                <label for="site-edit-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
+                <input id="site-edit-short-text" maxlength="300">
+                <div class="address-grid">
+                  <div>
+                    <label for="site-edit-street">Straße</label>
+                    <input id="site-edit-street" maxlength="150" autocomplete="street-address" required>
+                  </div>
+                  <div>
+                    <label for="site-edit-house-number">Nr.</label>
+                    <input id="site-edit-house-number" maxlength="20" required>
+                  </div>
+                </div>
+                <div class="setup-grid">
+                  <div>
+                    <label for="site-edit-postal-code">PLZ</label>
+                    <input id="site-edit-postal-code" maxlength="12" inputmode="numeric" autocomplete="postal-code" required>
+                  </div>
+                  <div>
+                    <label for="site-edit-city">Ort</label>
+                    <input id="site-edit-city" maxlength="100" autocomplete="address-level2" required>
+                  </div>
+                </div>
+                <label for="site-edit-status">Status</label>
+                <select id="site-edit-status" required>
+                  <option value="active">Aktiv</option>
+                  <option value="completed">Abgeschlossen</option>
+                  <option value="archived">Archiviert</option>
+                </select>
+                <div class="site-edit-form__actions">
+                  <button class="button button--primary" type="submit">Änderungen speichern</button>
+                  <button id="site-edit-cancel" class="text-button" type="button">Abbrechen</button>
+                </div>
+                <p id="site-edit-message" class="form-message" aria-live="polite"></p>
+              </form>
               <details open>
                 <summary>Überblick</summary>
                 <dl class="site-facts">
+                  <div><dt>Status</dt><dd id="site-dashboard-status">Aktiv</dd></div>
                   <div><dt>Kunde</dt><dd id="site-dashboard-customer">–</dd></div>
                   <div><dt>Projekt</dt><dd id="site-dashboard-project">–</dd></div>
                   <div><dt>Arbeitsauftrag</dt><dd id="site-dashboard-order">–</dd></div>
@@ -578,8 +626,33 @@
                 <button class="button button--primary" type="submit">Baustelle anlegen</button>
                 <p id="site-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="site-list" class="admin-list" aria-label="Aktive Baustellen"></ul>
             </details>
+
+            <section id="site-management-panel" class="site-management-panel" aria-labelledby="site-management-title">
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Übersicht</p>
+                  <h3 id="site-management-title">Baustellen verwalten</h3>
+                </div>
+                <span id="site-list-summary" class="site-list-summary" aria-live="polite"></span>
+              </div>
+              <div class="site-list-toolbar">
+                <label class="site-search" for="site-search">
+                  <span>Baustellen durchsuchen</span>
+                  <input id="site-search" type="search" maxlength="120" placeholder="Name, Kunde, Projekt oder Ort">
+                </label>
+                <label class="site-status-filter" for="site-status-filter">
+                  <span>Status</span>
+                  <select id="site-status-filter">
+                    <option value="active">Aktiv</option>
+                    <option value="completed">Abgeschlossen</option>
+                    <option value="archived">Archiviert</option>
+                    <option value="all">Alle</option>
+                  </select>
+                </label>
+              </div>
+              <ul id="site-list" class="admin-list site-management-list" aria-label="Baustellen"></ul>
+            </section>
 
             <details id="assignment-panel" class="admin-panel" open>
               <summary>Einsätze anlegen</summary>

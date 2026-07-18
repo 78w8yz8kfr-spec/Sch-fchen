@@ -1,6 +1,6 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.13.3
+Technischer Stand: V0.14.0
 
 Nach der Anmeldung können Administrator, Geschäftsführer, Büro/Disposition und
 Projektleiter im Hauptbereich **Einsätze** direkt unter **Einsatz freigeben**
@@ -15,6 +15,11 @@ werden. Im Hauptbereich **Baustellen** sitzt der Excel-Import dauerhaft direkt
 unter der Schaltfläche **Baustelle anlegen**. Dort steht auch eine fertige
 Excel-Vorlage bereit. Nach dem Ausfüllen werden neue Baustellen ebenfalls erst
 geprüft und dann bestätigt; vorhandene Namen werden nicht doppelt angelegt.
+
+Die Baustellenliste kann nach Name, Kunde, Projekt und Ort durchsucht sowie nach
+Status gefiltert werden. Über **Öffnen → Bearbeiten** lassen sich Auftrag,
+Adresse und Status pflegen. Abschluss oder Archivierung sind nur möglich, wenn
+keine aktuellen oder zukünftigen Einsätze mehr an der Baustelle hängen.
 
 Die Produktionsvorlage in `render.yaml` startet die PWA, die API und PostgreSQL
 unter einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere
