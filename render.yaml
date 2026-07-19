@@ -9,7 +9,7 @@ services:
     dockerContext: .
     dockerCommand: sh deploy/render-start.sh
     healthCheckPath: /health
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     numInstances: 1
     envVars:
       - key: NODE_ENV
