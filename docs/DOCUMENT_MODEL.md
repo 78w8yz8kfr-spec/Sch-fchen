@@ -1,7 +1,7 @@
 # Zentrales Dokumentenmodell
 
 Stand: 21.07.2026
-Technischer Stand: V0.19.1
+Technischer Stand: V0.20.0
 
 ## Grundsatz
 
@@ -15,6 +15,11 @@ Wird beim Upload eine Baustelle ausgewählt, ermittelt die API das zugehörige
 Projekt und den Kunden serverseitig und legt alle drei Verknüpfungen an. Bei
 identischem SHA-256-Inhalt wird das vorhandene Dokument wiederverwendet und nur
 die fehlende Verknüpfung ergänzt.
+
+Freigegebene Montage- und Bautagesberichte erzeugen genau eine unveränderliche
+PDF-Datei. Sie enthält historische Firmen- und Auftragsdaten sowie beide
+Unterschriften und wird über dieselben Verknüpfungen bei Kunde, Projekt,
+Baustelle und Dokumentenverwaltung sichtbar.
 
 ## Erster Online-Stand
 

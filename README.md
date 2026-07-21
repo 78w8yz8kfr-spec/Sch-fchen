@@ -25,6 +25,7 @@ Aktuell enthalten:
 - Migration `014_create_initial_setup_functions.sql` für die einmalige, geschützte Admin-Ersteinrichtung
 - Migration `015_add_organization_roles.sql` für die gleichberechtigten Organisationsrollen
 - Migration `016_add_business_roles.sql` für die sichtbaren Betriebsrollen und kompatible Bestandskonten
+- Migrationen `017_create_documents.sql` bis `023_finalize_site_reports.sql` für zentrale Dokumente, Baustellenarbeit und unveränderliche Berichtsabschlüsse
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -43,6 +44,7 @@ Aktuell enthalten:
 - historisiertes Verschieben und Stornieren freigegebener Einsätze
 - verpflichtender persönlicher Passwortwechsel nach einem Mitarbeiter-Startpasswort
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
+- doppelte Touch-Unterschrift und unveränderliche Abschluss-PDF für Montage- und Bautagesberichte
 
 ## Öffentliche Vorschau
 

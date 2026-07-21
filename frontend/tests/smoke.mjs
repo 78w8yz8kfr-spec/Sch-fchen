@@ -122,9 +122,12 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.19\.1/);
-assert.match(html, /app\.js\?v=0\.19\.1/);
-assert.match(html, /version\.js\?v=0\.19\.1/);
+assert.match(html, /styles\.css\?v=0\.20\.0/);
+assert.match(html, /app\.js\?v=0\.20\.0/);
+assert.match(html, /version\.js\?v=0\.20\.0/);
+assert.match(html, /id="site-report-finalize-form"/);
+assert.match(html, /id="site-report-employee-signature"/);
+assert.match(html, /id="site-report-customer-signature"/);
 assert.match(html, /id="site-dashboard"/);
 assert.match(html, /aria-live="polite"/);
 assert.match(html, /Öffentliche Demo/);
@@ -245,9 +248,9 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.19.1"'));
-assert.ok(worker.includes('"./app.js?v=0.19.1"'));
-assert.ok(worker.includes('"./version.js?v=0.19.1"'));
+assert.ok(worker.includes('"./styles.css?v=0.20.0"'));
+assert.ok(worker.includes('"./app.js?v=0.20.0"'));
+assert.ok(worker.includes('"./version.js?v=0.20.0"'));
 assert.match(
   styles,
   /\.login-form input,\s*\.admin-form input,\s*\.admin-form select\s*\{\s*height: 52px;/,

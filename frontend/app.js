@@ -136,6 +136,17 @@
     siteReportSubmit: document.querySelector("#site-report-submit"),
     siteReportCancel: document.querySelector("#site-report-cancel"),
     siteReportMessage: document.querySelector("#site-report-message"),
+    siteReportFinalizeForm: document.querySelector("#site-report-finalize-form"),
+    siteReportFinalizeNumber: document.querySelector("#site-report-finalize-number"),
+    siteReportEmployeeSignatureName: document.querySelector("#site-report-employee-signature-name"),
+    siteReportEmployeeSignature: document.querySelector("#site-report-employee-signature"),
+    siteReportEmployeeSignatureClear: document.querySelector("#site-report-employee-signature-clear"),
+    siteReportCustomerSignatureName: document.querySelector("#site-report-customer-signature-name"),
+    siteReportCustomerSignature: document.querySelector("#site-report-customer-signature"),
+    siteReportCustomerSignatureClear: document.querySelector("#site-report-customer-signature-clear"),
+    siteReportFinalizeSubmit: document.querySelector("#site-report-finalize-submit"),
+    siteReportFinalizeCancel: document.querySelector("#site-report-finalize-cancel"),
+    siteReportFinalizeMessage: document.querySelector("#site-report-finalize-message"),
     siteDashboardDocumentsPanel: document.querySelector("#site-dashboard-documents-panel"),
     siteDashboardDocumentCount: document.querySelector("#site-dashboard-document-count"),
     siteDashboardDocuments: document.querySelector("#site-dashboard-documents"),
@@ -383,10 +394,78 @@
   let documentFile = null;
   let deliveryNoteFile = null;
   let reportPhotoFile = null;
+  let finalizingReportId = null;
   let speechRecognition = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
+
+  function createSignaturePad(canvas, clearButton) {
+    const context = canvas.getContext("2d");
+    let drawing = false;
+    let hasInk = false;
+
+    function clear() {
+      context.save();
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.restore();
+      hasInk = false;
+    }
+
+    function point(event) {
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - bounds.left) * canvas.width / bounds.width,
+        y: (event.clientY - bounds.top) * canvas.height / bounds.height
+      };
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      drawing = true;
+      hasInk = true;
+      canvas.setPointerCapture(event.pointerId);
+      const current = point(event);
+      context.beginPath();
+      context.moveTo(current.x, current.y);
+      event.preventDefault();
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (!drawing) return;
+      const current = point(event);
+      context.lineWidth = 4;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.strokeStyle = "#111111";
+      context.lineTo(current.x, current.y);
+      context.stroke();
+      event.preventDefault();
+    });
+    const stop = (event) => {
+      if (!drawing) return;
+      drawing = false;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      event.preventDefault();
+    };
+    canvas.addEventListener("pointerup", stop);
+    canvas.addEventListener("pointercancel", stop);
+    clearButton.addEventListener("click", clear);
+    clear();
+    return {
+      clear,
+      hasInk: () => hasInk,
+      dataUrl: () => canvas.toDataURL("image/png")
+    };
+  }
+
+  const employeeSignaturePad = createSignaturePad(
+    elements.siteReportEmployeeSignature,
+    elements.siteReportEmployeeSignatureClear
+  );
+  const customerSignaturePad = createSignaturePad(
+    elements.siteReportCustomerSignature,
+    elements.siteReportCustomerSignatureClear
+  );
 
   function localDateKey(date = new Date()) {
     const year = date.getFullYear();
@@ -486,7 +565,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.19.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.20.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1141,6 +1220,16 @@
     return { digital: "Digital", photo: "Originalfoto", speech: "Diktiert" }[source] || source;
   }
 
+  function reportStatusLabel(status) {
+    return {
+      draft: "Entwurf",
+      submitted: "Zur Unterschrift",
+      approved: "Abgeschlossen",
+      returned: "Zurückgegeben",
+      archived: "Archiviert"
+    }[status] || status;
+  }
+
   function appendSiteModuleEmpty(list, message) {
     const empty = document.createElement("li");
     empty.className = "site-module-list__empty";
@@ -1279,25 +1368,72 @@
       const heading = document.createElement("div");
       const title = document.createElement("strong");
       const badge = document.createElement("small");
+      const statusBadge = document.createElement("small");
       const meta = document.createElement("span");
+      const actions = document.createElement("div");
       title.textContent = report.summary;
       badge.className = "module-chip";
       badge.textContent = reportTypeLabel(report.reportType);
-      heading.append(title, badge);
+      statusBadge.className = `module-chip module-chip--${report.status}`;
+      statusBadge.textContent = reportStatusLabel(report.status);
+      heading.append(title, badge, statusBadge);
       meta.textContent = [
         report.number,
         new Intl.DateTimeFormat("de-DE").format(new Date(`${report.workDate}T12:00:00`)),
         reportSourceLabel(report.sourceMode),
         report.authorName,
+        report.status === "approved" ? `signiert von ${report.employeeSignatureName} und ${report.customerSignatureName}` : null,
         report.details
       ].filter(Boolean).join(" · ");
       content.append(heading, meta);
       item.className = "site-module-item";
       item.append(content);
+      actions.className = "site-module-item__actions";
       const sourceDocument = adminState.documents.find((documentItem) => documentItem.id === report.sourceDocumentId);
-      if (sourceDocument) item.append(documentDownloadLink(sourceDocument, true));
+      if (sourceDocument) {
+        const originalLink = documentDownloadLink(sourceDocument, true);
+        originalLink.textContent = "Original";
+        actions.append(originalLink);
+      }
+      const finalDocument = adminState.documents.find((documentItem) => documentItem.id === report.finalDocumentId);
+      if (finalDocument) {
+        const pdfLink = documentDownloadLink(finalDocument, true);
+        pdfLink.textContent = "PDF";
+        actions.append(pdfLink);
+      }
+      if (report.status === "submitted") {
+        const finalize = document.createElement("button");
+        finalize.type = "button";
+        finalize.className = "text-button site-module-item__action";
+        finalize.textContent = "Unterschreiben";
+        finalize.addEventListener("click", () => openSiteReportFinalization(report));
+        actions.append(finalize);
+      }
+      if (actions.childElementCount > 0) item.append(actions);
       elements.siteDashboardReports.append(item);
     });
+  }
+
+  function resetSiteReportFinalization() {
+    finalizingReportId = null;
+    elements.siteReportFinalizeForm.reset();
+    elements.siteReportFinalizeForm.hidden = true;
+    elements.siteReportFinalizeMessage.textContent = "";
+    elements.siteReportFinalizeSubmit.disabled = false;
+    employeeSignaturePad.clear();
+    customerSignaturePad.clear();
+  }
+
+  function openSiteReportFinalization(report) {
+    finalizingReportId = report.id;
+    elements.siteReportFinalizeForm.reset();
+    elements.siteReportFinalizeNumber.textContent = report.number;
+    elements.siteReportEmployeeSignatureName.value = report.authorName || "";
+    elements.siteReportFinalizeMessage.textContent = "";
+    employeeSignaturePad.clear();
+    customerSignaturePad.clear();
+    elements.siteReportFinalizeForm.hidden = false;
+    elements.siteReportFinalizeForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function resetSiteTaskForm() {
@@ -3089,6 +3225,43 @@
       elements.siteReportSubmit.disabled = false;
     }
   });
+  elements.siteReportFinalizeCancel.addEventListener("click", resetSiteReportFinalization);
+  elements.siteReportFinalizeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const report = adminState?.siteReports.find((candidate) => candidate.id === finalizingReportId);
+    if (!report) {
+      elements.siteReportFinalizeMessage.textContent = "Der Bericht wurde nicht gefunden. Bitte neu laden.";
+      return;
+    }
+    if (!elements.siteReportEmployeeSignatureName.value.trim() || !elements.siteReportCustomerSignatureName.value.trim()) {
+      elements.siteReportFinalizeMessage.textContent = "Bitte beide Namen vollständig eintragen.";
+      return;
+    }
+    if (!employeeSignaturePad.hasInk() || !customerSignaturePad.hasInk()) {
+      elements.siteReportFinalizeMessage.textContent = "Bitte beide Unterschriften direkt in den Feldern leisten.";
+      return;
+    }
+    elements.siteReportFinalizeSubmit.disabled = true;
+    elements.siteReportFinalizeMessage.textContent = "Unterschriften und unveränderliche PDF-Version werden gespeichert …";
+    try {
+      await requestJson(`./api/v1/admin/site-reports/${encodeURIComponent(report.id)}/finalize`, {
+        method: "POST",
+        body: JSON.stringify({
+          rowVersion: report.rowVersion,
+          employeeSignatureName: elements.siteReportEmployeeSignatureName.value,
+          employeeSignatureData: employeeSignaturePad.dataUrl(),
+          customerSignatureName: elements.siteReportCustomerSignatureName.value,
+          customerSignatureData: customerSignaturePad.dataUrl()
+        })
+      });
+      resetSiteReportFinalization();
+      await refreshAdmin();
+      showToast("Bericht abgeschlossen. Die unveränderliche PDF ist jetzt verfügbar.");
+    } catch (error) {
+      elements.siteReportFinalizeMessage.textContent = error.message;
+      elements.siteReportFinalizeSubmit.disabled = false;
+    }
+  });
 
   elements.assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -3396,6 +3569,7 @@
   });
   elements.siteDashboardClose.addEventListener("click", () => {
     resetSiteReportForm();
+    resetSiteReportFinalization();
     resetSiteTaskForm();
     resetSiteMaterialForm();
     openedSiteId = null;

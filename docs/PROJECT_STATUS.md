@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 21.07.2026
-Technischer Stand: V0.19.1
+Technischer Stand: V0.20.0
 
 ## Abgeschlossen
 
@@ -109,6 +109,11 @@ Technischer Stand: V0.19.1
 - fotografierte Papierberichte verwenden das zentrale Ein-Dokument-Prinzip und bleiben mit der Baustelle verknüpft
 - ruhige mobile Gestaltung nach den festgelegten Spezifikationen; nicht aktivierte Platzhalterbereiche wurden ausgeblendet
 - RLS, Mandanten-Fremdschlüssel, Versionsschutz, Löschschutz sowie SQL-, API- und Oberflächentests für alle drei Module
+- Migration 023 für doppelte Touch-Unterschrift, historische Firmen-/Auftragssnapshots und unveränderliche Abschlussdokumente
+- Montage- und Bautagesberichte lassen sich nach Mitarbeiter- und Auftraggeberunterschrift kontrolliert abschließen
+- serverseitig erzeugte PDF-Ausgabe mit Firmenlogo, Kunde, Projekt, Baustelle, Berichtsdaten und beiden Unterschriften
+- freigegebene PDFs werden einmal zentral gespeichert und automatisch mit Kunde, Projekt und Baustelle verknüpft
+- freigegebene Berichte und ihre Abschluss-PDF bleiben technisch unveränderlich
 
 ## Noch zu prüfen
 
@@ -124,9 +129,8 @@ Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
 - Objektspeicher-Anbindung für größere Dokumentmengen und betriebliche Aufbewahrungsregeln
-- Freigabe, Unterschrift und unveränderliche PDF-Ausgaben für Montage- und Bautagesberichte
 - allgemeine Logo-Verwaltung als geschütztes Mandantendokument; bis dahin bleibt bei Firmen ohne Logo der Initial-Platzhalter
-- danach begrenzte mobile Berichtsrechte für Vorarbeiter und zugewiesene Monteure
+- begrenzte mobile Berichtsrechte für Vorarbeiter und zugewiesene Monteure
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo
 gekennzeichnet; die echte Anmeldung läuft ausschließlich auf der gemeinsamen

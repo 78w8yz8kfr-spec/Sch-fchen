@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Material und Berichte
 
 Stand: 21.07.2026
-Technischer Stand: V0.19.1
+Technischer Stand: V0.20.0
 
 ## Bedienkonzept
 
@@ -62,9 +62,18 @@ keine Dokumentkopie.
 - RLS, zusammengesetzte Fremdschlüssel, Versionsprüfung und Löschschutz gelten
   für alle drei Module.
 
+## Freigabe und Abschluss-PDF
+
+Eingereichte Montage- und Bautagesberichte werden erst abgeschlossen, wenn
+Mitarbeiter beziehungsweise Vorarbeiter und Auftraggeber direkt auf dem Gerät
+unterschrieben haben. Die API erzeugt daraus eine PDF-Datei mit dem zu diesem
+Zeitpunkt gültigen Firmenlogo sowie historischen Firmen-, Kunden-, Projekt- und
+Baustellendaten. PDF und Bericht sind anschließend unveränderlich. Die PDF wird
+als zentrales Dokument einmal gespeichert und automatisch mit Kunde, Projekt
+und Baustelle verknüpft.
+
 ## Nächster Ausbau
 
-Als nächstes erhalten Berichte Entwurf, Freigabe, Unterschrift und eine
-unveränderliche PDF-Version mit dem zum Erstellzeitpunkt gültigen Firmenlogo und
-den historischen Firmendaten. Danach werden klar begrenzte mobile Rechte für
-Vorarbeiter und Monteure ergänzt.
+Als nächstes werden klar begrenzte mobile Rechte für Vorarbeiter und Monteure
+ergänzt. Dabei prüft das Backend Rolle, Baustellenzuweisung, Arbeitstag und den
+zugewiesenen Vorarbeiter.

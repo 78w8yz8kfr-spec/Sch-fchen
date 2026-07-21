@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.19.1">
-    <script src="./app.js?v=0.19.1" defer></script>
-    <script src="./version.js?v=0.19.1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.20.0">
+    <script src="./app.js?v=0.20.0" defer></script>
+    <script src="./version.js?v=0.20.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.19.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.20.0</p>
         </div>
       </section>
 
@@ -406,6 +406,30 @@
                     <p id="site-report-message" class="form-message" aria-live="polite"></p>
                   </form>
                   <ul id="site-dashboard-reports" class="site-module-list" aria-label="Berichte dieser Baustelle"></ul>
+                  <form id="site-report-finalize-form" class="site-module-form report-finalize-form" novalidate hidden>
+                    <div class="site-module-form__heading">
+                      <strong>Bericht unterschreiben und abschließen</strong>
+                      <span id="site-report-finalize-number"></span>
+                    </div>
+                    <label for="site-report-employee-signature-name">Mitarbeiter / Vorarbeiter</label>
+                    <input id="site-report-employee-signature-name" maxlength="200" autocomplete="name" required placeholder="Vor- und Nachname">
+                    <div class="signature-pad">
+                      <canvas id="site-report-employee-signature" width="600" height="220" aria-label="Unterschrift Mitarbeiter"></canvas>
+                      <button id="site-report-employee-signature-clear" class="text-button" type="button">Unterschrift löschen</button>
+                    </div>
+                    <label for="site-report-customer-signature-name">Auftraggeber / Kunde</label>
+                    <input id="site-report-customer-signature-name" maxlength="200" autocomplete="name" required placeholder="Vor- und Nachname">
+                    <div class="signature-pad">
+                      <canvas id="site-report-customer-signature" width="600" height="220" aria-label="Unterschrift Auftraggeber"></canvas>
+                      <button id="site-report-customer-signature-clear" class="text-button" type="button">Unterschrift löschen</button>
+                    </div>
+                    <p class="site-module-form__note">Mit dem Abschluss werden beide Unterschriften und eine unveränderliche PDF-Version gespeichert.</p>
+                    <div class="site-module-form__actions">
+                      <button id="site-report-finalize-submit" class="button button--primary" type="submit">Unterschreiben &amp; PDF erstellen</button>
+                      <button id="site-report-finalize-cancel" class="text-button" type="button">Abbrechen</button>
+                    </div>
+                    <p id="site-report-finalize-message" class="form-message" aria-live="polite"></p>
+                  </form>
                 </div>
               </details>
               <details id="site-dashboard-documents-panel">

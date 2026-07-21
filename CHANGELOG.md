@@ -172,3 +172,8 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - ursprüngliche mobile Höhe der Loginfelder und Position der Passwortanzeige wiederhergestellt
 - neuer Frontend-Cache für die sofort sichtbare Korrektur auf installierten Geräten
 - Versionsstand 0.19.1
+- Migration 023 für Berichtfreigabe, zwei Unterschriften, historische Snapshots und Abschlussdokument
+- mobile Touch-Unterschriften für Mitarbeiter beziehungsweise Vorarbeiter und Auftraggeber
+- serverseitige, unveränderliche PDF-Ausgabe mit Firmenlogo und vollständigem Auftragsbezug
+- automatische zentrale PDF-Verknüpfung zu Kunde, Projekt und Baustelle
+- Versionsstand 0.20.0

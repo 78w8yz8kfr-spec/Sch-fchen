@@ -457,6 +457,34 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(siteReport.sourceDocumentId, reportPhoto.id);
   assert.equal(siteReport.status, "submitted");
 
+  const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const finalizationResponse = await fetch(
+    `${baseUrl}/api/v1/admin/site-reports/${siteReport.id}/finalize`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        rowVersion: siteReport.rowVersion,
+        employeeSignatureName: "API Integration",
+        employeeSignatureData: signatureData,
+        customerSignatureName: "Klara Kundin",
+        customerSignatureData: signatureData
+      })
+    }
+  );
+  assert.equal(finalizationResponse.status, 200, await finalizationResponse.clone().text());
+  const finalizedReport = (await finalizationResponse.json()).siteReport;
+  assert.equal(finalizedReport.status, "approved");
+  assert.equal(finalizedReport.employeeSignatureName, "API Integration");
+  assert.ok(finalizedReport.finalDocumentId);
+  const finalPdfResponse = await fetch(
+    `${baseUrl}/api/v1/admin/documents/${finalizedReport.finalDocumentId}/content`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(finalPdfResponse.status, 200);
+  assert.match(finalPdfResponse.headers.get("content-type"), /application\/pdf/);
+  assert.equal(Buffer.from(await finalPdfResponse.arrayBuffer()).subarray(0, 5).toString("ascii"), "%PDF-");
+
   const mismatchedDocumentResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },

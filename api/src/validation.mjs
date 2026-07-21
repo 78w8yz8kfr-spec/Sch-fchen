@@ -43,6 +43,7 @@ const SITE_TASK_STATUSES = new Set(["open", "in_progress", "done", "archived"]);
 const SITE_MATERIAL_STATUSES = new Set(["planned", "ordered", "available", "used", "archived"]);
 const SITE_REPORT_TYPES = new Set(["montage", "daily"]);
 const SITE_REPORT_SOURCES = new Set(["digital", "photo", "speech"]);
+const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -479,6 +480,45 @@ export function validateSiteReport(body) {
     summary: text(body.summary, "Berichtstitel", 2, 200),
     details: optionalText(body.details, "Berichtsinhalt", 5000),
     sourceDocumentId
+  };
+}
+
+function signaturePng(value, label) {
+  if (typeof value !== "string" || !value.startsWith(PNG_DATA_URL_PREFIX)) {
+    throw new InputError(`${label} fehlt oder ist ungültig.`);
+  }
+  const contentBase64 = value.slice(PNG_DATA_URL_PREFIX.length);
+  if (
+    contentBase64.length === 0
+    || contentBase64.length % 4 !== 0
+    || !/^[A-Za-z0-9+/]+={0,2}$/.test(contentBase64)
+  ) {
+    throw new InputError(`${label} ist ungültig.`);
+  }
+  const content = Buffer.from(contentBase64, "base64");
+  if (
+    content.toString("base64") !== contentBase64
+    || content.length < 50
+    || content.length > 500000
+    || !content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    throw new InputError(`${label} ist ungültig oder zu groß.`);
+  }
+  return content;
+}
+
+export function validateSiteReportFinalization(body) {
+  rejectTenantFields(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Berichtsversion ist ungültig.");
+  }
+  return {
+    rowVersion,
+    employeeSignatureName: text(body.employeeSignatureName, "Name des Mitarbeiters", 2, 200),
+    employeeSignatureData: signaturePng(body.employeeSignatureData, "Mitarbeiterunterschrift"),
+    customerSignatureName: text(body.customerSignatureName, "Name des Auftraggebers", 2, 200),
+    customerSignatureData: signaturePng(body.customerSignatureData, "Auftraggeberunterschrift")
   };
 }
 

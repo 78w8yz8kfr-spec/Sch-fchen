@@ -21,6 +21,7 @@ import {
   validateSiteMaterial,
   validateSiteMaterialUpdate,
   validateSiteReport,
+  validateSiteReportFinalization,
   validateSiteTask,
   validateSiteTaskUpdate,
   validateSiteBundle,
@@ -160,6 +161,24 @@ test("Baustellenmodule validieren Aufgaben, Material und Berichte", () => {
     summary: "Digitaler Bericht",
     sourceDocumentId: documentId
   }), /nur einem fotografierten Papierbericht/);
+
+  const signature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const finalization = validateSiteReportFinalization({
+    rowVersion: 1,
+    employeeSignatureName: "Max Monteur",
+    employeeSignatureData: signature,
+    customerSignatureName: "Klara Kundin",
+    customerSignatureData: signature
+  });
+  assert.equal(finalization.employeeSignatureName, "Max Monteur");
+  assert.ok(Buffer.isBuffer(finalization.customerSignatureData));
+  assert.throws(() => validateSiteReportFinalization({
+    rowVersion: 1,
+    employeeSignatureName: "Max Monteur",
+    employeeSignatureData: "data:image/png;base64,ZmFsc2No",
+    customerSignatureName: "Klara Kundin",
+    customerSignatureData: signature
+  }), /Mitarbeiterunterschrift/);
 });
 
 test("Ersteinrichtung verlangt lange Schlüssel und starke Passwörter", () => {

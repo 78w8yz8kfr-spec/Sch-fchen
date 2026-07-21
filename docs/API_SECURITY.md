@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 21.07.2026
-Technischer Stand: V0.19.1
+Technischer Stand: V0.20.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -74,6 +74,7 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/admin/site-materials` | Materialeintrag für eine aktive Baustelle anlegen |
 | `PATCH` | `/api/v1/admin/site-materials/:id` | Materialstatus versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/site-reports` | Montage- oder Bautagesbericht anlegen und optional mit Originalfoto verknüpfen |
+| `POST` | `/api/v1/admin/site-reports/:id/finalize` | beide Touch-Unterschriften prüfen, Bericht freigeben und unveränderliche PDF zentral speichern |
 | `POST` | `/api/v1/admin/documents` | Datei einmalig hochladen und hierarchisch verknüpfen |
 | `GET` | `/api/v1/admin/documents/:id/content` | Dokument nach Sitzungs- und Rollenprüfung herunterladen |
 | `PATCH` | `/api/v1/admin/documents/:id` | Dokument versionsgeschützt archivieren oder reaktivieren |

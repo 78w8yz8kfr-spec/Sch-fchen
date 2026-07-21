@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { resolve, sep } from "node:path";
 import {
   companyLogoUrl,
   sessionView,
@@ -24,6 +26,7 @@ import {
   validateAssignmentImportPayload
 } from "./assignment-import.mjs";
 import { buildSiteImportPreview, parseSiteWorkbook } from "./site-import.mjs";
+import { buildFinalReportPdf } from "./report-pdf.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -48,6 +51,7 @@ import {
   validateSiteMaterial,
   validateSiteMaterialUpdate,
   validateSiteReport,
+  validateSiteReportFinalization,
   validateSiteTask,
   validateSiteTaskUpdate,
   validateSiteBundle,
@@ -490,6 +494,12 @@ function siteReportDto(row) {
     sourceDocumentFileName: row.source_document_file_name,
     status: row.status,
     authorName: row.author_name,
+    approvedByName: row.approved_by_name,
+    approvedAt: row.approved_at ? new Date(row.approved_at).toISOString() : null,
+    employeeSignatureName: row.employee_signature_name,
+    customerSignatureName: row.customer_signature_name,
+    finalDocumentId: row.final_document_id,
+    finalDocumentFileName: row.final_document_file_name,
     rowVersion: Number(row.row_version),
     createdAt: new Date(row.created_at).toISOString()
   };
@@ -691,14 +701,22 @@ async function adminOverview(client, context, date) {
       `SELECT report.id, report.construction_site_id, report.report_number,
               report.report_type, report.work_date, report.source_mode,
               report.summary, report.details, report.source_document_id,
-              report.status, report.row_version, report.created_at,
+              report.status, report.approved_at, report.employee_signature_name,
+              report.customer_signature_name, report.final_document_id,
+              report.row_version, report.created_at,
               author.first_name || ' ' || author.last_name AS author_name,
-              document.original_file_name AS source_document_file_name
+              approver.first_name || ' ' || approver.last_name AS approved_by_name,
+              document.original_file_name AS source_document_file_name,
+              final_document.original_file_name AS final_document_file_name
        FROM site_reports AS report
        JOIN users AS author
          ON author.company_id = report.company_id AND author.id = report.author_user_id
        LEFT JOIN documents AS document
          ON document.company_id = report.company_id AND document.id = report.source_document_id
+       LEFT JOIN users AS approver
+         ON approver.company_id = report.company_id AND approver.id = report.approved_by_user_id
+       LEFT JOIN documents AS final_document
+         ON final_document.company_id = report.company_id AND final_document.id = report.final_document_id
        WHERE report.company_id = $1
        ORDER BY report.work_date DESC, report.created_at DESC`,
       [context.companyId]
@@ -1079,14 +1097,22 @@ async function getSiteReportRecord(client, context, reportId) {
     `SELECT report.id, report.construction_site_id, report.report_number,
             report.report_type, report.work_date, report.source_mode,
             report.summary, report.details, report.source_document_id,
-            report.status, report.row_version, report.created_at,
+            report.status, report.approved_at, report.employee_signature_name,
+            report.customer_signature_name, report.final_document_id,
+            report.row_version, report.created_at,
             author.first_name || ' ' || author.last_name AS author_name,
-            document.original_file_name AS source_document_file_name
+            approver.first_name || ' ' || approver.last_name AS approved_by_name,
+            document.original_file_name AS source_document_file_name,
+            final_document.original_file_name AS final_document_file_name
      FROM site_reports AS report
      JOIN users AS author
        ON author.company_id = report.company_id AND author.id = report.author_user_id
      LEFT JOIN documents AS document
        ON document.company_id = report.company_id AND document.id = report.source_document_id
+     LEFT JOIN users AS approver
+       ON approver.company_id = report.company_id AND approver.id = report.approved_by_user_id
+     LEFT JOIN documents AS final_document
+       ON final_document.company_id = report.company_id AND final_document.id = report.final_document_id
      WHERE report.company_id = $1 AND report.id = $2`,
     [context.companyId, reportId]
   );
@@ -1123,6 +1149,134 @@ async function createSiteReport(client, context, input) {
       input.sourceMode, input.summary, input.details, input.sourceDocumentId, context.userId]
   );
   return getSiteReportRecord(client, context, result.rows[0].id);
+}
+
+async function readCompanyLogo(staticDirectory, logoObjectKey) {
+  if (!staticDirectory || !logoObjectKey || !/^[A-Za-z0-9/_-]+\.(?:png|webp|jpe?g)$/i.test(logoObjectKey)) return null;
+  const assetsRoot = resolve(staticDirectory, "assets");
+  const pngObjectKey = logoObjectKey.replace(/\.(?:webp|jpe?g)$/i, ".png");
+  const candidate = resolve(assetsRoot, pngObjectKey);
+  if (candidate !== assetsRoot && !candidate.startsWith(`${assetsRoot}${sep}`)) return null;
+  try {
+    return await readFile(candidate);
+  } catch {
+    return null;
+  }
+}
+
+async function finalizeSiteReport(client, context, reportId, input, staticDirectory) {
+  await requirePlanner(client, context);
+  const result = await client.query(
+    `SELECT report.id, report.report_number, report.report_type, report.work_date,
+            report.summary, report.details, report.status, report.row_version,
+            author.first_name || ' ' || author.last_name AS author_name,
+            company.legal_name, company.display_name, company.street AS company_street,
+            company.house_number AS company_house_number, company.postal_code AS company_postal_code,
+            company.city AS company_city, company.phone AS company_phone,
+            company.email AS company_email, company.website AS company_website,
+            company.logo_object_key,
+            site.id AS construction_site_id, site.site_number, site.name AS site_name,
+            location.street AS site_street, location.house_number AS site_house_number,
+            location.postal_code AS site_postal_code, location.city AS site_city,
+            project.project_number, project.name AS project_name,
+            COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name
+     FROM site_reports AS report
+     JOIN users AS author
+       ON author.company_id = report.company_id AND author.id = report.author_user_id
+     JOIN companies AS company ON company.id = report.company_id
+     JOIN construction_sites AS site
+       ON site.company_id = report.company_id AND site.id = report.construction_site_id
+     JOIN projects AS project
+       ON project.company_id = site.company_id AND project.id = site.project_id
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id AND customer.id = project.customer_id
+     LEFT JOIN customer_locations AS location
+       ON location.company_id = site.company_id AND location.id = site.customer_location_id
+     WHERE report.company_id = $1 AND report.id = $2
+     FOR UPDATE OF report`,
+    [context.companyId, reportId]
+  );
+  if (result.rowCount !== 1) throw new InputError("Der Bericht wurde nicht gefunden.", 404, "site_report_not_found");
+  const row = result.rows[0];
+  if (row.status !== "submitted") {
+    throw new InputError("Nur ein eingereichter Bericht kann abgeschlossen werden.", 409, "site_report_state_conflict");
+  }
+  if (Number(row.row_version) !== input.rowVersion) {
+    throw new InputError("Der Bericht wurde bereits geändert. Bitte neu laden.", 409, "row_version_conflict");
+  }
+
+  const finalizedAt = new Date().toISOString();
+  const companySnapshot = {
+    legalName: row.legal_name,
+    displayName: row.display_name,
+    street: row.company_street,
+    houseNumber: row.company_house_number,
+    postalCode: row.company_postal_code,
+    city: row.company_city,
+    phone: row.company_phone,
+    email: row.company_email,
+    website: row.company_website,
+    logoObjectKey: row.logo_object_key
+  };
+  const siteAddress = [
+    [row.site_street, row.site_house_number].filter(Boolean).join(" "),
+    [row.site_postal_code, row.site_city].filter(Boolean).join(" ")
+  ].filter(Boolean).join(", ");
+  const reportSnapshot = {
+    customerName: row.customer_name,
+    projectNumber: row.project_number,
+    projectName: row.project_name,
+    siteNumber: row.site_number,
+    siteName: row.site_name,
+    siteAddress
+  };
+  const pdf = await buildFinalReportPdf({
+    report: {
+      id: row.id,
+      number: row.report_number,
+      reportType: row.report_type,
+      workDate: databaseDate(row.work_date),
+      summary: row.summary,
+      details: row.details,
+      authorName: row.author_name
+    },
+    company: companySnapshot,
+    context: reportSnapshot,
+    signatures: {
+      employee: { name: input.employeeSignatureName, data: input.employeeSignatureData },
+      customer: { name: input.customerSignatureName, data: input.customerSignatureData }
+    },
+    finalizedAt,
+    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key)
+  });
+  const reportLabel = row.report_type === "daily" ? "Bautagesbericht" : "Montagebericht";
+  const finalDocument = await createDocument(client, context, {
+    title: `${reportLabel} ${row.report_number}`,
+    category: "report",
+    fileName: `${row.report_number}-${databaseDate(row.work_date)}.pdf`,
+    mimeType: "application/pdf",
+    content: pdf,
+    customerId: null,
+    projectId: null,
+    constructionSiteId: row.construction_site_id
+  });
+  const update = await client.query(
+    `UPDATE site_reports SET
+       status = 'approved', approved_by_user_id = $3, approved_at = $4,
+       employee_signature_name = $5, employee_signature_data = $6, employee_signed_at = $4,
+       customer_signature_name = $7, customer_signature_data = $8, customer_signed_at = $4,
+       final_document_id = $9, company_snapshot = $10::jsonb, report_snapshot = $11::jsonb
+     WHERE company_id = $1 AND id = $2 AND status = 'submitted' AND row_version = $12
+     RETURNING id`,
+    [context.companyId, reportId, context.userId, finalizedAt,
+      input.employeeSignatureName, input.employeeSignatureData,
+      input.customerSignatureName, input.customerSignatureData,
+      finalDocument.document.id, JSON.stringify(companySnapshot), JSON.stringify(reportSnapshot), input.rowVersion]
+  );
+  if (update.rowCount !== 1) {
+    throw new InputError("Der Bericht wurde bereits geändert. Bitte neu laden.", 409, "row_version_conflict");
+  }
+  return getSiteReportRecord(client, context, reportId);
 }
 
 function publicAssignmentImportPreview(preview) {
@@ -2395,6 +2549,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const input = validateSiteReport(await readJson(request));
         const siteReport = await withReadySession(pool, tokenHash, (client, context) => createSiteReport(client, context, input));
         return json(response, 201, { siteReport });
+      }
+
+      const siteReportFinalizeMatch = /^\/api\/v1\/admin\/site-reports\/([^/]+)\/finalize$/.exec(url.pathname);
+      if (request.method === "POST" && siteReportFinalizeMatch) {
+        const reportId = validateId(siteReportFinalizeMatch[1], "Berichts-ID");
+        const input = validateSiteReportFinalization(await readJson(request, 1_400_000));
+        const siteReport = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => finalizeSiteReport(client, context, reportId, input, config.staticDirectory)
+        );
+        return json(response, 200, { siteReport });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/documents") {

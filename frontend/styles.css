@@ -2000,6 +2000,48 @@ select:focus-visible {
   margin: 0;
 }
 
+.site-module-form__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.site-module-form__heading strong {
+  font-size: 0.75rem;
+}
+
+.site-module-form__heading span {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.report-finalize-form {
+  border-color: #d8d8d8;
+  background: #ffffff;
+}
+
+.signature-pad {
+  display: grid;
+  gap: 5px;
+}
+
+.signature-pad canvas {
+  display: block;
+  width: 100%;
+  height: 116px;
+  border: 1px solid #cfd9d3;
+  border-radius: 12px;
+  background: #ffffff;
+  touch-action: none;
+}
+
+.signature-pad .text-button {
+  justify-self: end;
+  min-height: 30px;
+  font-size: 0.62rem;
+}
+
 .site-module-list {
   display: grid;
   margin: 0;
@@ -2072,9 +2114,20 @@ select:focus-visible {
 
 .module-chip--done,
 .module-chip--material-available,
-.module-chip--material-used {
+.module-chip--material-used,
+.module-chip--approved {
   color: #17613b;
   background: #e3f5eb;
+}
+
+.module-chip--submitted {
+  color: #174f78;
+  background: #e4f2fc;
+}
+
+.module-chip--returned {
+  color: var(--brand-dark);
+  background: var(--brand-soft);
 }
 
 .module-chip--priority-high {
@@ -2085,6 +2138,15 @@ select:focus-visible {
 .site-module-item__action,
 .site-module-item > .document-download {
   flex: 0 0 auto;
+}
+
+.site-module-item__actions {
+  flex: 0 0 auto;
+  justify-items: end;
+}
+
+.site-module-item__actions .document-download {
+  min-height: 30px;
 }
 
 .site-module-list__empty {
