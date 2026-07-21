@@ -124,6 +124,7 @@ assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__bod
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
 assert.match(html, /styles\.css\?v=0\.19\.1/);
 assert.match(html, /app\.js\?v=0\.19\.1/);
+assert.match(html, /version\.js\?v=0\.19\.1/);
 assert.match(html, /id="site-dashboard"/);
 assert.match(html, /aria-live="polite"/);
 assert.match(html, /Öffentliche Demo/);
@@ -246,6 +247,7 @@ for (const asset of [
 }
 assert.ok(worker.includes('"./styles.css?v=0.19.1"'));
 assert.ok(worker.includes('"./app.js?v=0.19.1"'));
+assert.ok(worker.includes('"./version.js?v=0.19.1"'));
 assert.match(
   styles,
   /\.login-form input,\s*\.admin-form input,\s*\.admin-form select\s*\{\s*height: 52px;/,

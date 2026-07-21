@@ -4,6 +4,7 @@ const APP_SHELL = [
   "./index.html",
   "./styles.css?v=0.19.1",
   "./app.js?v=0.19.1",
+  "./version.js?v=0.19.1",
   "./manifest.webmanifest",
   "./assets/mark.svg",
   "./assets/company-logos/schaaf-elektro.webp",
