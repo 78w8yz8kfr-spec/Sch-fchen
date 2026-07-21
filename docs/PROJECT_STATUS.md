@@ -1,9 +1,11 @@
 # Projektstatus
 
 Stand: 21.07.2026
-Technischer Stand: V0.19.0
+Technischer Stand: V0.19.1
 
 ## Abgeschlossen
+
+- Login-Darstellung mit ursprünglicher Feldhöhe und korrekt positionierter Passwortanzeige wiederhergestellt
 
 - Phase 0: Vision, Anforderungen, Rollenmodell und ER-Struktur mit 20 Kerntabellen
 - GitHub-Projektbasis und verbindliche Entwicklungsregeln

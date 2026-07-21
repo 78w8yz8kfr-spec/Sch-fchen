@@ -310,6 +310,7 @@ select:focus-visible {
   padding: 0 15px;
 }
 
+.login-form input,
 .admin-form input,
 .admin-form select {
   height: 52px;

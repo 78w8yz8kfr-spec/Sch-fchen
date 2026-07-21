@@ -169,3 +169,6 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - ausgeblendete Platzhalter für noch nicht aktivierte Baustellenmodule
 - SQL-Abnahmetests, API-Integrationstest und PWA-Smoke-Test für die neuen Arbeitsmodule
 - Versionsstand 0.19.0
+- ursprüngliche mobile Höhe der Loginfelder und Position der Passwortanzeige wiederhergestellt
+- neuer Frontend-Cache für die sofort sichtbare Korrektur auf installierten Geräten
+- Versionsstand 0.19.1
