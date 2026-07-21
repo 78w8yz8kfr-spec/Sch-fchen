@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 37491)
-Total output lines: 3437
-
 (() => {
   const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
   const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
@@ -489,7 +486,7 @@ Total output lines: 3437
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.19.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.19.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1279,7 +1276,712 @@ Total output lines: 3437
     reports.forEach((report) => {
       const item = document.createElement("li");
       const content = document.createElement("div");
-      co…7491 tokens truncated…s.filter((entry) => entry.type === "next_site").length,
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("small");
+      const meta = document.createElement("span");
+      title.textContent = report.summary;
+      badge.className = "module-chip";
+      badge.textContent = reportTypeLabel(report.reportType);
+      heading.append(title, badge);
+      meta.textContent = [
+        report.number,
+        new Intl.DateTimeFormat("de-DE").format(new Date(`${report.workDate}T12:00:00`)),
+        reportSourceLabel(report.sourceMode),
+        report.authorName,
+        report.details
+      ].filter(Boolean).join(" · ");
+      content.append(heading, meta);
+      item.className = "site-module-item";
+      item.append(content);
+      const sourceDocument = adminState.documents.find((documentItem) => documentItem.id === report.sourceDocumentId);
+      if (sourceDocument) item.append(documentDownloadLink(sourceDocument, true));
+      elements.siteDashboardReports.append(item);
+    });
+  }
+
+  function resetSiteTaskForm() {
+    elements.siteTaskForm.reset();
+    elements.siteTaskForm.hidden = true;
+    elements.siteTaskMessage.textContent = "";
+  }
+
+  function resetSiteMaterialForm() {
+    elements.siteMaterialForm.reset();
+    elements.siteMaterialForm.hidden = true;
+    elements.siteMaterialMessage.textContent = "";
+  }
+
+  function resetSiteReportForm() {
+    if (speechRecognition) {
+      speechRecognition.stop();
+      speechRecognition = null;
+    }
+    reportPhotoFile = null;
+    elements.siteReportPhotoInput.value = "";
+    elements.siteReportForm.reset();
+    elements.siteReportSourceMode.value = "digital";
+    elements.siteReportDate.value = localDateKey();
+    elements.siteReportSourceNote.textContent = "";
+    elements.siteReportMessage.textContent = "";
+    elements.siteReportForm.hidden = true;
+    elements.siteReportSubmit.disabled = false;
+  }
+
+  function openSiteReportForm(sourceMode, photoFile = null) {
+    resetSiteReportForm();
+    reportPhotoFile = photoFile;
+    elements.siteReportSourceMode.value = sourceMode;
+    elements.siteReportDate.value = localDateKey();
+    elements.siteReportSourceNote.textContent = {
+      digital: "Der Bericht wird direkt digital erfasst.",
+      photo: reportPhotoFile ? `${reportPhotoFile.name} · ${formatFileSize(reportPhotoFile.size)}` : "Originalfoto auswählen.",
+      speech: "Das Diktat wird als bearbeitbarer Text übernommen."
+    }[sourceMode];
+    elements.siteReportForm.hidden = false;
+    elements.siteReportSummary.focus({ preventScroll: true });
+  }
+
+  function projectStatusLabel(status) {
+    return {
+      planned: "Geplant",
+      active: "Aktiv",
+      on_hold: "Pausiert",
+      completed: "Abgeschlossen",
+      archived: "Archiviert",
+      cancelled: "Storniert"
+    }[status] || status;
+  }
+
+  function customerSearchText(customer) {
+    return [
+      customer.number,
+      customer.displayName,
+      customer.email,
+      customer.phone,
+      customer.address?.street,
+      customer.address?.houseNumber,
+      customer.address?.postalCode,
+      customer.address?.city
+    ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function projectSearchText(project) {
+    return [project.number, project.name, project.shortText, project.customerName]
+      .filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function renderCustomerList() {
+    if (!adminState) return;
+    const query = elements.customerSearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.customerStatusFilter.value;
+    const customers = adminState.customers.filter((customer) => (
+      (statusFilter === "all" || customerStatusGroup(customer.status) === statusFilter)
+      && (!query || customerSearchText(customer).includes(query))
+    ));
+
+    elements.customerList.replaceChildren();
+    elements.customerListSummary.textContent = `${customers.length} von ${adminState.customers.length} Kunde${adminState.customers.length === 1 ? "" : "n"}`;
+    if (customers.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query ? "Kein Kunde passt zur Suche." : "In diesem Status gibt es noch keinen Kunden.";
+      elements.customerList.append(empty);
+      return;
+    }
+
+    customers.forEach((customer) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const button = document.createElement("button");
+      const documentsButton = document.createElement("button");
+      const actions = document.createElement("div");
+      const documentCount = documentsForEntity("customer", customer.id).length;
+      const location = [customer.address?.postalCode, customer.address?.city].filter(Boolean).join(" ");
+      title.textContent = customer.displayName;
+      badge.className = `site-status site-status--${customerStatusGroup(customer.status)}`;
+      badge.textContent = customer.status === "archived" ? "Archiviert" : "Aktiv";
+      meta.textContent = [
+        customer.number,
+        `${customer.projectCount} Projekt${customer.projectCount === 1 ? "" : "e"}`,
+        `${documentCount} Dokument${documentCount === 1 ? "" : "e"}`,
+        location,
+        customer.email || customer.phone
+      ].filter(Boolean).join(" · ");
+      heading.append(title, badge);
+      content.append(heading, meta);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Bearbeiten";
+      button.addEventListener("click", () => openCustomerEditor(customer));
+      documentsButton.type = "button";
+      documentsButton.className = "text-button";
+      documentsButton.textContent = "Dokumente";
+      documentsButton.addEventListener("click", () => focusDocumentsForEntity("customer", customer));
+      actions.className = "list-actions";
+      actions.append(documentsButton, button);
+      item.append(content, actions);
+      elements.customerList.append(item);
+    });
+  }
+
+  function renderProjectList() {
+    if (!adminState) return;
+    const query = elements.projectSearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.projectStatusFilter.value;
+    const projects = adminState.projects.filter((project) => (
+      (statusFilter === "all" || projectStatusGroup(project.status) === statusFilter)
+      && (!query || projectSearchText(project).includes(query))
+    ));
+
+    elements.projectList.replaceChildren();
+    elements.projectListSummary.textContent = `${projects.length} von ${adminState.projects.length} Projekt${adminState.projects.length === 1 ? "" : "en"}`;
+    if (projects.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query ? "Kein Projekt passt zur Suche." : "In diesem Status gibt es noch kein Projekt.";
+      elements.projectList.append(empty);
+      return;
+    }
+
+    projects.forEach((project) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const button = document.createElement("button");
+      const documentsButton = document.createElement("button");
+      const actions = document.createElement("div");
+      const documentCount = documentsForEntity("project", project.id).length;
+      title.textContent = project.name;
+      badge.className = `site-status site-status--${projectStatusGroup(project.status)}`;
+      badge.textContent = projectStatusLabel(project.status);
+      meta.textContent = `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"} · ${documentCount} Dokument${documentCount === 1 ? "" : "e"}`;
+      heading.append(title, badge);
+      content.append(heading, meta);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Bearbeiten";
+      button.addEventListener("click", () => openProjectEditor(project));
+      documentsButton.type = "button";
+      documentsButton.className = "text-button";
+      documentsButton.textContent = "Dokumente";
+      documentsButton.addEventListener("click", () => focusDocumentsForEntity("project", project));
+      actions.className = "list-actions";
+      actions.append(documentsButton, button);
+      item.append(content, actions);
+      elements.projectList.append(item);
+    });
+  }
+
+  function openCustomerEditor(customer) {
+    openedCustomerId = customer.id;
+    elements.customerEditNumber.textContent = customer.number;
+    elements.customerEditType.value = customer.type;
+    elements.customerEditCompanyName.value = customer.companyName || "";
+    elements.customerEditFirstName.value = customer.firstName || "";
+    elements.customerEditLastName.value = customer.lastName || "";
+    elements.customerEditEmail.value = customer.email || "";
+    elements.customerEditPhone.value = customer.phone || "";
+    elements.customerEditStreet.value = customer.address?.street || "";
+    elements.customerEditHouseNumber.value = customer.address?.houseNumber || "";
+    elements.customerEditPostalCode.value = customer.address?.postalCode || "";
+    elements.customerEditCity.value = customer.address?.city || "";
+    elements.customerEditStatus.value = customer.status;
+    elements.customerEditMessage.textContent = "";
+    updateCustomerEditTypeFields();
+    elements.customerEditForm.hidden = false;
+    elements.customerEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openProjectEditor(project) {
+    openedProjectId = project.id;
+    elements.projectEditNumber.textContent = project.number;
+    elements.projectEditCustomer.textContent = project.customerName;
+    elements.projectEditName.value = project.name;
+    elements.projectEditShortText.value = project.shortText || "";
+    elements.projectEditStatus.value = project.status;
+    elements.projectEditMessage.textContent = "";
+    elements.projectEditForm.hidden = false;
+    elements.projectEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function siteStatusLabel(status) {
+    return {
+      active: "Aktiv",
+      planned: "Geplant",
+      on_hold: "Pausiert",
+      delayed: "Verzögert",
+      completed: "Abgeschlossen",
+      archived: "Archiviert",
+      cancelled: "Storniert"
+    }[status] || status;
+  }
+
+  function siteSearchText(site) {
+    return [
+      site.number,
+      site.name,
+      site.customerName,
+      site.projectName,
+      site.address?.street,
+      site.address?.houseNumber,
+      site.address?.postalCode,
+      site.address?.city
+    ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+  }
+
+  function renderSiteList() {
+    if (!adminState) return;
+    const query = elements.siteSearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.siteStatusFilter.value;
+    const sites = adminState.sites.filter((site) => {
+      const statusMatches = statusFilter === "all" || siteStatusGroup(site.status) === statusFilter;
+      return statusMatches && (!query || siteSearchText(site).includes(query));
+    });
+
+    elements.siteList.replaceChildren();
+    elements.siteListSummary.textContent = `${sites.length} von ${adminState.sites.length} Baustelle${adminState.sites.length === 1 ? "" : "n"}`;
+    if (sites.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = query
+        ? "Keine Baustelle passt zur Suche."
+        : "In diesem Status gibt es noch keine Baustelle.";
+      elements.siteList.append(empty);
+      return;
+    }
+
+    sites.forEach((site) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const meta = document.createElement("span");
+      const button = document.createElement("button");
+      title.textContent = site.name;
+      badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
+      badge.textContent = siteStatusLabel(site.status);
+      meta.textContent = [
+        site.customerName,
+        site.projectName,
+        `${documentsForEntity("construction_site", site.id).length} Dokumente`,
+        `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
+        `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
+      ].filter(Boolean).join(" · ");
+      heading.append(title, badge);
+      content.append(heading, meta);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Öffnen";
+      button.addEventListener("click", () => openSiteDashboard(site));
+      item.append(content, button);
+      elements.siteList.append(item);
+    });
+  }
+
+  function openSiteDashboard(site) {
+    const address = [
+      `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
+      `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
+    ].filter(Boolean).join(", ");
+    const assignedEmployees = new Map();
+    adminState.weekAssignments
+      .filter((assignment) => assignment.constructionSiteId === site.id)
+      .forEach((assignment) => {
+        assignedEmployees.set(assignment.employeeId, assignment.employeeName);
+      });
+
+    openedSiteId = site.id;
+    resetDeliveryNoteCapture();
+    resetSiteTaskForm();
+    resetSiteMaterialForm();
+    resetSiteReportForm();
+    elements.siteDashboardTitle.textContent = site.name;
+    elements.siteDashboardMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
+    elements.siteDashboardStatus.textContent = siteStatusLabel(site.status);
+    elements.siteDashboardStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
+    elements.siteDashboardCustomer.textContent = site.customerName;
+    elements.siteDashboardProject.textContent = site.projectName || site.name;
+    elements.siteDashboardOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
+    elements.siteDashboardNavigation.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    elements.siteDashboardEmployees.replaceChildren();
+    if (assignedEmployees.size === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = "In der gewählten Woche ist noch niemand zugewiesen.";
+      elements.siteDashboardEmployees.append(empty);
+    } else {
+      assignedEmployees.forEach((name) => {
+        appendAdminListItem(elements.siteDashboardEmployees, name, "In dieser Woche eingeplant");
+      });
+    }
+    renderSiteDocuments(site.id);
+    renderAdminSelect(
+      elements.siteTaskAssignee,
+      adminState.employees,
+      "Noch nicht zuweisen",
+      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
+    );
+    renderSiteTasks(site.id);
+    renderSiteMaterials(site.id);
+    renderSiteReports(site.id);
+    elements.siteEditForm.hidden = true;
+    elements.siteEditMessage.textContent = "";
+    elements.siteDashboardEdit.hidden = false;
+    elements.siteDashboard.hidden = false;
+    elements.siteDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openSiteEditor() {
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    elements.siteEditNumber.textContent = site.number;
+    elements.siteEditProject.textContent = `${site.customerName} · ${site.projectName}`;
+    elements.siteEditName.value = site.name;
+    elements.siteEditShortText.value = site.shortText || "";
+    elements.siteEditStreet.value = site.address.street || "";
+    elements.siteEditHouseNumber.value = site.address.houseNumber || "";
+    elements.siteEditPostalCode.value = site.address.postalCode || "";
+    elements.siteEditCity.value = site.address.city || "";
+    elements.siteEditStatus.value = siteStatusGroup(site.status);
+    elements.siteEditMessage.textContent = "";
+    elements.siteEditForm.hidden = false;
+    elements.siteDashboardEdit.hidden = true;
+    elements.siteEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderAdminSelect(select, items, placeholder, label) {
+    const selected = select.value;
+    select.replaceChildren();
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = placeholder;
+    select.append(empty);
+    items.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = label(item);
+      select.append(option);
+    });
+    if (items.some((item) => item.id === selected)) select.value = selected;
+  }
+
+  function hierarchySummary(title, meta) {
+    const summary = document.createElement("summary");
+    const content = document.createElement("span");
+    const strong = document.createElement("strong");
+    const small = document.createElement("small");
+    strong.textContent = title;
+    small.textContent = meta;
+    content.append(strong, small);
+    summary.append(content);
+    return summary;
+  }
+
+  function renderBusinessHierarchy() {
+    elements.businessHierarchy.replaceChildren();
+    const activeCustomers = adminState.customers.filter(
+      (customer) => customerStatusGroup(customer.status) === "active"
+    );
+    if (activeCustomers.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "hierarchy-empty";
+      empty.textContent = adminState.customers.length === 0
+        ? "Noch kein Kunde angelegt. Beginne mit dem ersten Kunden."
+        : "Aktuell gibt es keinen aktiven Kunden.";
+      elements.businessHierarchy.append(empty);
+      return;
+    }
+
+    activeCustomers.forEach((customer) => {
+      const customerNode = document.createElement("details");
+      customerNode.className = "hierarchy-customer";
+      customerNode.append(hierarchySummary(customer.displayName, customer.number));
+      const projects = adminState.projects.filter((project) => (
+        project.customerId === customer.id && projectStatusGroup(project.status) === "active"
+      ));
+      if (projects.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "hierarchy-empty";
+        empty.textContent = "Noch kein Projekt für diesen Kunden.";
+        customerNode.append(empty);
+      } else {
+        projects.forEach((project) => {
+          const projectNode = document.createElement("details");
+          projectNode.className = "hierarchy-project";
+          projectNode.append(hierarchySummary(project.name, `${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`));
+          const sites = adminState.sites.filter((site) => (
+            site.projectId === project.id && siteStatusGroup(site.status) === "active"
+          ));
+          if (sites.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "hierarchy-empty";
+            empty.textContent = "Noch keine Baustelle in diesem Projekt.";
+            projectNode.append(empty);
+          } else {
+            const list = document.createElement("ul");
+            list.className = "hierarchy-sites";
+            sites.forEach((site) => {
+              const item = document.createElement("li");
+              const button = document.createElement("button");
+              const title = document.createElement("strong");
+              const meta = document.createElement("span");
+              button.type = "button";
+              title.textContent = site.name;
+              meta.textContent = `${site.number} · ${site.address.city}`;
+              button.append(title, meta);
+              button.addEventListener("click", () => openSiteDashboard(site));
+              item.append(button);
+              list.append(item);
+            });
+            projectNode.append(list);
+          }
+          customerNode.append(projectNode);
+        });
+      }
+      elements.businessHierarchy.append(customerNode);
+    });
+  }
+
+  function closeAssignmentEditor() {
+    editingAssignmentId = null;
+    elements.assignmentEditForm.hidden = true;
+    elements.assignmentEditMessage.textContent = "";
+    elements.assignmentEditReason.value = "";
+  }
+
+  function openAssignmentEditor(assignment) {
+    editingAssignmentId = assignment.id;
+    elements.assignmentEditTitle.textContent = `${assignment.employeeName} · ${assignment.siteName}`;
+    elements.assignmentEditDate.value = assignment.workDate;
+    elements.assignmentEditTime.value = assignment.plannedStartTime?.slice(0, 5) || "";
+    elements.assignmentEditReason.value = "";
+    elements.assignmentEditMessage.textContent = "";
+    elements.assignmentEditForm.hidden = false;
+    elements.assignmentEditForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function renderAdminWeek() {
+    const weekStart = adminState.weekStart;
+    const weekEnd = addIsoDays(weekStart, 4);
+    const start = dateFromIso(weekStart);
+    const end = dateFromIso(weekEnd);
+    const startLabel = start.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+    const endLabel = end.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
+    elements.adminWeekTitle.textContent = `${startLabel} – ${endLabel}`;
+    elements.adminWeekBoard.replaceChildren();
+
+    for (let offset = 0; offset < 5; offset += 1) {
+      const workDate = addIsoDays(weekStart, offset);
+      const date = dateFromIso(workDate);
+      const day = document.createElement("section");
+      const dateBlock = document.createElement("div");
+      const dayName = document.createElement("span");
+      const dayNumber = document.createElement("strong");
+      const items = document.createElement("div");
+      day.className = "admin-week-day";
+      dateBlock.className = "admin-week-day__date";
+      items.className = "admin-week-day__items";
+      dayName.textContent = shortDayFormatter.format(date).replace(".", "");
+      dayNumber.textContent = String(date.getDate());
+      dateBlock.append(dayName, dayNumber);
+
+      const dayAssignments = adminState.weekAssignments.filter(
+        (assignment) => assignment.workDate === workDate
+      );
+      if (dayAssignments.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "admin-week-empty";
+        empty.textContent = "Noch kein Einsatz";
+        items.append(empty);
+      } else {
+        dayAssignments.forEach((assignment) => {
+          const card = document.createElement("article");
+          const content = document.createElement("div");
+          const title = document.createElement("strong");
+          const meta = document.createElement("span");
+          const edit = document.createElement("button");
+          const startTime = assignment.plannedStartTime
+            ? `${assignment.plannedStartTime.slice(0, 5)} Uhr`
+            : "ohne Startzeit";
+          card.className = "week-assignment";
+          title.textContent = assignment.employeeName;
+          meta.textContent = `${startTime} · ${assignment.siteName}`;
+          edit.type = "button";
+          edit.textContent = "Ändern";
+          edit.addEventListener("click", () => openAssignmentEditor(assignment));
+          content.append(title, meta);
+          card.append(content, edit);
+          items.append(card);
+        });
+      }
+      day.append(dateBlock, items);
+      elements.adminWeekBoard.append(day);
+    }
+  }
+
+  function renderAdmin() {
+    if (!adminState) return;
+    elements.adminEmployeeCount.textContent = String(adminState.employees.length);
+    elements.adminCustomerCount.textContent = String(
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active").length
+    );
+    elements.adminProjectCount.textContent = String(
+      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active").length
+    );
+    elements.adminSiteCount.textContent = String(
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active").length
+    );
+    elements.employeeManagementRoles.forEach((option) => {
+      option.hidden = !adminState.canCreateManagementRoles;
+      option.disabled = !adminState.canCreateManagementRoles;
+    });
+    if (
+      !adminState.canCreateManagementRoles
+      && elements.employeeManagementRoles.some((option) => option.value === elements.employeeRole.value)
+    ) {
+      elements.employeeRole.value = "installer";
+    }
+
+    renderAdminSelect(
+      elements.projectCustomer,
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
+      "Kunde auswählen",
+      (customer) => `${customer.displayName} · ${customer.number}`
+    );
+    renderAdminSelect(
+      elements.siteProject,
+      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active"),
+      "Projekt auswählen",
+      (project) => `${project.customerName} · ${project.name}`
+    );
+    renderAdminSelect(
+      elements.assignmentEmployee,
+      adminState.employees,
+      "Mitarbeiter auswählen",
+      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
+    );
+    renderAdminSelect(
+      elements.assignmentSite,
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
+      "Baustelle auswählen",
+      (site) => `${site.name} · ${site.address.city}`
+    );
+    renderAdminSelect(
+      elements.documentCustomer,
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
+      "Kunde auswählen",
+      (customer) => `${customer.displayName} · ${customer.number}`
+    );
+    renderAdminSelect(
+      elements.documentProject,
+      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active"),
+      "Projekt auswählen (optional)",
+      (project) => `${project.customerName} · ${project.name}`
+    );
+    renderAdminSelect(
+      elements.documentSite,
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
+      "Baustelle auswählen (optional)",
+      (site) => `${site.name} · ${site.address.city}`
+    );
+
+    elements.employeeList.replaceChildren();
+    adminState.employees.forEach((employee) => {
+      const roleLabels = {
+        admin: "Administrator",
+        managing_director: "Geschäftsführer",
+        dispatch_office: "Büro / Disposition",
+        office: "Planung (Bestand)",
+        planner: "Planer (Bestand)",
+        project_manager: "Projektleiter",
+        executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
+        foreman: "Vorarbeiter",
+        installer: "Monteur"
+      };
+      appendAdminListItem(
+        elements.employeeList,
+        `${employee.firstName} ${employee.lastName}`,
+        `${employee.personnelNumber} · ${employee.roles.map((role) => roleLabels[role] || role).join(", ")}`
+      );
+    });
+
+    renderCustomerList();
+    renderProjectList();
+    renderSiteList();
+    renderDocumentList();
+    if (openedSiteId && !elements.siteDashboard.hidden) {
+      renderSiteDocuments(openedSiteId);
+      renderSiteTasks(openedSiteId);
+      renderSiteMaterials(openedSiteId);
+      renderSiteReports(openedSiteId);
+    }
+
+    elements.adminAssignmentList.replaceChildren();
+    if (adminState.assignments.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = `Für ${adminState.date} ist noch kein Einsatz freigegeben.`;
+      elements.adminAssignmentList.append(empty);
+    } else {
+      adminState.assignments.forEach((assignment) => {
+        const start = assignment.plannedStartTime ? `${assignment.plannedStartTime.slice(0, 5)} Uhr` : "ohne Startzeit";
+        appendAdminListItem(
+          elements.adminAssignmentList,
+          `${assignment.sequenceNumber}. ${assignment.employeeName}`,
+          `${start} · ${assignment.siteName}`
+        );
+      });
+    }
+    renderBusinessHierarchy();
+    renderAdminWeek();
+  }
+
+  async function refreshAdmin(date = elements.assignmentDate.value || localDateKey()) {
+    if (!canPlan()) return;
+    elements.adminRefresh.disabled = true;
+    try {
+      const body = await requestJson(`./api/v1/admin/overview?date=${encodeURIComponent(date)}`);
+      adminState = body.overview;
+      elements.assignmentDate.value = adminState.date;
+      renderAdmin();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) showToast(error.message);
+    } finally {
+      elements.adminRefresh.disabled = false;
+    }
+  }
+
+  async function submitAdminForm(form, messageElement, requestPath, payload, successMessage) {
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    messageElement.textContent = "Wird sicher gespeichert …";
+    try {
+      await requestJson(requestPath, { method: "POST", body: JSON.stringify(payload) });
+      messageElement.textContent = "";
+      showToast(successMessage);
+      return true;
+    } catch (error) {
+      messageElement.textContent = error.message;
+      return false;
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  function currentSiteIndex() {
+    if (assignments.length === 0) return 0;
+    return Math.min(
+      state.events.filter((entry) => entry.type === "next_site").length,
       assignments.length - 1
     );
   }
