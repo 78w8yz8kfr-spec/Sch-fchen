@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Material und Berichte
 
-Stand: 21.07.2026
-Technischer Stand: V0.20.0
+Stand: 22.07.2026
+Technischer Stand: V0.21.0
 
 ## Bedienkonzept
 
@@ -55,7 +55,10 @@ keine Dokumentkopie.
 ## Sicherheitsgrenzen
 
 - Die Firma wird ausschließlich aus der Sitzung übernommen.
-- Nur Planungsrollen dürfen die aktuellen Verwaltungsendpunkte verwenden.
+- Planungsrollen dürfen Berichte im Baustellen-Dashboard verwalten und abschließen.
+- Der mobile Berichts-Endpunkt ist ausschließlich für den am betreffenden Tag und
+  an der betreffenden Baustelle als berichtspflichtig eingeteilten Vorarbeiter
+  freigeschaltet. Eine allgemeine Vorarbeiterrolle allein genügt nicht.
 - Baustellen und zugewiesene Mitarbeiter müssen aktiv und im selben Mandanten
   vorhanden sein.
 - Fremde Dokumente oder Dokumente einer anderen Baustelle werden abgewiesen.
@@ -74,6 +77,22 @@ und Baustelle verknüpft.
 
 ## Nächster Ausbau
 
-Als nächstes werden klar begrenzte mobile Rechte für Vorarbeiter und Monteure
-ergänzt. Dabei prüft das Backend Rolle, Baustellenzuweisung, Arbeitstag und den
-zugewiesenen Vorarbeiter.
+Als nächstes werden die mobilen Berichtsinhalte um strukturierte Angaben wie
+eingesetzte Mitarbeiter, Stunden, ausgeführte Leistungen, Behinderungen und
+offene Punkte ergänzt. Die vorhandene Vorarbeiterprüfung bleibt dafür die
+verbindliche Berechtigungsgrenze.
+
+## Mobiler Tagesabschluss
+
+`site_assignments.report_responsible` bestimmt genau einen Vorarbeiter je
+Baustelle und Arbeitstag. Beim Antippen von „Baustelle verlassen“ öffnet sich
+nur für diesen Mitarbeiter die Auswahl zwischen Montage- und Bautagesbericht.
+Der Bericht wird über `site_assignment_id` unverwechselbar mit dem Einsatz
+verbunden. `client_report_id` verhindert auch nach einem Verbindungsabbruch
+Doppelanlage.
+
+Ohne Bericht lehnt das Backend die Abfahrtsbuchung mit
+`site_report_required` ab. Offline legt die PWA Bericht und Zeitereignis lokal
+ab; nach Wiederherstellung der Verbindung synchronisiert sie zuerst den Bericht
+und anschließend die Abfahrt. Monteure ohne Berichtsverantwortung behalten den
+einfachen bisherigen Zeitablauf.

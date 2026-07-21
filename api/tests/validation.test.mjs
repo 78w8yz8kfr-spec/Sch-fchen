@@ -16,6 +16,7 @@ import {
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
+  validateMobileSiteReport,
   validateProject,
   validateProjectUpdate,
   validateSiteMaterial,
@@ -162,6 +163,21 @@ test("Baustellenmodule validieren Aufgaben, Material und Berichte", () => {
     sourceDocumentId: documentId
   }), /nur einem fotografierten Papierbericht/);
 
+  const mobileReport = validateMobileSiteReport({
+    clientReportId: "33333333-3333-4333-8333-333333333333",
+    constructionSiteId: siteId,
+    reportType: "daily",
+    workDate: "2026-07-21",
+    sourceMode: "digital",
+    summary: "Tagesfortschritt",
+    details: "Leitungen verlegt"
+  });
+  assert.equal(mobileReport.clientReportId, "33333333-3333-4333-8333-333333333333");
+  assert.throws(() => validateMobileSiteReport({
+    ...mobileReport,
+    sourceMode: "speech"
+  }), /direkt digital/);
+
   const signature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   const finalization = validateSiteReportFinalization({
     rowVersion: 1,
@@ -255,6 +271,12 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
     plannedStartTime: "07:30"
   });
   assert.equal(assignment.plannedStartTime, "07:30");
+  assert.equal(assignment.reportResponsible, false);
+  assert.equal(validateAssignment({ ...assignment, reportResponsible: true }).reportResponsible, true);
+  assert.throws(
+    () => validateAssignment({ ...assignment, reportResponsible: "ja" }),
+    /Vorarbeiterzuweisung/
+  );
   assert.throws(
     () => validateAssignment({ ...assignment, plannedStartTime: "25:30" }),
     /Startzeit/
@@ -266,6 +288,8 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
     changeReason: "Kunde öffnet später"
   });
   assert.equal(update.workDate, "2026-07-21");
+  assert.equal(update.reportResponsible, null);
+  assert.equal(validateAssignmentUpdate({ ...update, reportResponsible: true }).reportResponsible, true);
   assert.equal(
     validateAssignmentCancellation({ changeReason: "Termin abgesagt" }).changeReason,
     "Termin abgesagt"

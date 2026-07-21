@@ -103,6 +103,12 @@ function optionalUuid(value, label) {
   return uuid(value, label);
 }
 
+function boolean(value, label, fallback = false) {
+  if (value === undefined) return fallback;
+  if (typeof value !== "boolean") throw new InputError(`${label} ist ungültig.`);
+  return value;
+}
+
 function password(value) {
   const normalized = text(value, "Passwort", 12, 256);
   if (!/[a-zäöü]/i.test(normalized) || !/\d/.test(normalized)) {
@@ -294,7 +300,8 @@ export function validateAssignment(body) {
     constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
     workDate: validateWorkDate(body.workDate),
     plannedStartTime,
-    comment: optionalText(body.comment, "Hinweis", 500)
+    comment: optionalText(body.comment, "Hinweis", 500),
+    reportResponsible: boolean(body.reportResponsible, "Vorarbeiterzuweisung")
   };
 }
 
@@ -309,7 +316,10 @@ export function validateAssignmentUpdate(body) {
   return {
     workDate: validateWorkDate(body.workDate),
     plannedStartTime,
-    changeReason: text(body.changeReason, "Änderungsgrund", 3, 500)
+    changeReason: text(body.changeReason, "Änderungsgrund", 3, 500),
+    reportResponsible: Object.hasOwn(body, "reportResponsible")
+      ? boolean(body.reportResponsible, "Vorarbeiterzuweisung")
+      : null
   };
 }
 
@@ -480,6 +490,17 @@ export function validateSiteReport(body) {
     summary: text(body.summary, "Berichtstitel", 2, 200),
     details: optionalText(body.details, "Berichtsinhalt", 5000),
     sourceDocumentId
+  };
+}
+
+export function validateMobileSiteReport(body) {
+  const report = validateSiteReport(body);
+  if (report.sourceMode !== "digital" || report.sourceDocumentId) {
+    throw new InputError("Mobile Berichte werden direkt digital erfasst.");
+  }
+  return {
+    ...report,
+    clientReportId: uuid(body.clientReportId, "Offline-Berichts-ID")
   };
 }
 

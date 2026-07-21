@@ -677,6 +677,95 @@ select:focus-visible {
   text-align: center;
 }
 
+.mobile-report-card {
+  display: grid;
+  gap: 13px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #ef9da2;
+  border-radius: 21px;
+  background: #fff7f7;
+  box-shadow: 0 14px 32px rgba(227, 6, 19, 0.1);
+}
+
+.mobile-report-card[hidden] {
+  display: none;
+}
+
+.mobile-report-card__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-report-card__heading h2,
+.mobile-report-card__heading p,
+.mobile-report-site,
+.mobile-report-hint {
+  margin: 0;
+}
+
+.mobile-report-card__heading h2 {
+  font-size: 1.02rem;
+}
+
+.mobile-report-site {
+  color: var(--brand-dark);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.mobile-report-form {
+  display: grid;
+  gap: 9px;
+}
+
+.mobile-report-form label {
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.mobile-report-form label span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.mobile-report-form input,
+.mobile-report-form select,
+.mobile-report-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfd9d3;
+  border-radius: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  padding: 0 13px;
+}
+
+.mobile-report-form input,
+.mobile-report-form select {
+  min-height: 48px;
+}
+
+.mobile-report-form textarea {
+  min-height: 96px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.mobile-report-form .button {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.mobile-report-hint {
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .section {
   margin-top: 27px;
 }
@@ -1088,6 +1177,19 @@ select:focus-visible {
 .admin-week-empty {
   color: var(--muted);
   font-size: 0.64rem;
+}
+
+.week-assignment .foreman-duty {
+  width: max-content;
+  margin-top: 3px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  font-size: 0.55rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .week-assignment button {
@@ -1597,6 +1699,46 @@ select:focus-visible {
 .admin-form .setup-grid > div {
   display: grid;
   gap: 9px;
+}
+
+.toggle-field {
+  display: flex !important;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fffafa;
+}
+
+.toggle-field input {
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  margin: 0;
+  accent-color: var(--brand);
+}
+
+.toggle-field > span {
+  display: grid;
+  gap: 3px;
+}
+
+.toggle-field strong {
+  color: var(--ink);
+  font-size: 0.7rem;
+}
+
+.toggle-field small {
+  color: var(--muted);
+  font-size: 0.61rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.toggle-field:has(input:disabled) {
+  opacity: 0.55;
 }
 
 .admin-list {

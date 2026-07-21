@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.20.0">
-    <script src="./app.js?v=0.20.0" defer></script>
-    <script src="./version.js?v=0.20.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.21.0">
+    <script src="./app.js?v=0.21.0" defer></script>
+    <script src="./version.js?v=0.21.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.20.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.21.0</p>
         </div>
       </section>
 
@@ -209,6 +209,31 @@
               Feierabend
             </button>
             <p id="action-hint" class="action-hint">Dein nächster logischer Schritt</p>
+          </section>
+
+          <section id="mobile-report-card" class="mobile-report-card" aria-labelledby="mobile-report-title" hidden>
+            <div class="mobile-report-card__heading">
+              <div>
+                <p class="eyebrow">Vorarbeiter · Tagesabschluss</p>
+                <h2 id="mobile-report-title">Baustellenbericht erfassen</h2>
+              </div>
+              <span class="role-badge">Pflicht</span>
+            </div>
+            <p id="mobile-report-site" class="mobile-report-site">Aktuelle Baustelle</p>
+            <form id="mobile-report-form" class="mobile-report-form" novalidate>
+              <label for="mobile-report-type">Berichtsart</label>
+              <select id="mobile-report-type" required>
+                <option value="daily">Bautagesbericht</option>
+                <option value="montage">Montagebericht</option>
+              </select>
+              <label for="mobile-report-summary">Kurzbeschreibung</label>
+              <input id="mobile-report-summary" maxlength="200" required placeholder="Was wurde heute ausgeführt?">
+              <label for="mobile-report-details">Details <span>(optional)</span></label>
+              <textarea id="mobile-report-details" maxlength="5000" rows="4" placeholder="Fortschritt, Besonderheiten, offene Punkte"></textarea>
+              <button id="mobile-report-submit" class="button button--primary" type="submit">Bericht speichern &amp; Baustelle verlassen</button>
+              <p class="mobile-report-hint">Funktioniert auch offline. Der Bericht wird vor der Zeitbuchung sicher synchronisiert.</p>
+              <p id="mobile-report-message" class="form-message" aria-live="polite"></p>
+            </form>
           </section>
 
           <section class="section" data-dashboard-pane="start" aria-labelledby="today-assignment-title">
@@ -558,6 +583,10 @@
               </div>
               <label for="assignment-edit-reason">Begründung</label>
               <input id="assignment-edit-reason" maxlength="500" placeholder="z. B. Kunde verschiebt Termin" required>
+              <label class="toggle-field" for="assignment-edit-report-responsible">
+                <input id="assignment-edit-report-responsible" type="checkbox">
+                <span><strong>Vorarbeiter für diesen Einsatz</strong><small>Erstellt beim Verlassen den Baustellenbericht.</small></span>
+              </label>
               <div class="assignment-edit-actions">
                 <button id="assignment-edit-save" class="button button--primary" type="submit">Änderung speichern</button>
                 <button id="assignment-edit-cancel" class="button button--danger" type="button">Einsatz stornieren</button>
@@ -1049,6 +1078,10 @@
                 </div>
                 <label for="assignment-comment">Hinweis <span>(optional)</span></label>
                 <input id="assignment-comment" maxlength="500">
+                <label class="toggle-field" for="assignment-report-responsible">
+                  <input id="assignment-report-responsible" type="checkbox">
+                  <span><strong>Als Vorarbeiter einsetzen</strong><small>Nur möglich bei Mitarbeitern mit der Rolle Vorarbeiter.</small></span>
+                </label>
                 <button class="button button--primary" type="submit">Einsatz freigeben</button>
                 <p id="assignment-message" class="form-message" aria-live="polite"></p>
               </form>

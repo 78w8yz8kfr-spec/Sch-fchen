@@ -1,7 +1,7 @@
 # Projektstatus
 
-Stand: 21.07.2026
-Technischer Stand: V0.20.0
+Stand: 22.07.2026
+Technischer Stand: V0.21.0
 
 ## Abgeschlossen
 
@@ -114,6 +114,12 @@ Technischer Stand: V0.20.0
 - serverseitig erzeugte PDF-Ausgabe mit Firmenlogo, Kunde, Projekt, Baustelle, Berichtsdaten und beiden Unterschriften
 - freigegebene PDFs werden einmal zentral gespeichert und automatisch mit Kunde, Projekt und Baustelle verknüpft
 - freigegebene Berichte und ihre Abschluss-PDF bleiben technisch unveränderlich
+- Migration 024 verbindet die tägliche Einsatzplanung eindeutig mit der mobilen Berichtsverantwortung
+- pro Baustelle und Tag kann genau ein eingeteilter Vorarbeiter den Montage- oder Bautagesbericht übernehmen
+- normale Monteure können keine mobilen Baustellenberichte erzeugen; Firma, Rolle, Einsatz, Baustelle und Datum werden serverseitig geprüft
+- beim Verlassen einer berichtspflichtigen Baustelle fordert Schäfchen zuerst den Bericht an und blockiert auch serverseitig eine verfrühte Abfahrtsbuchung
+- mobile Berichte und Zeitbuchungen bleiben offline-fähig; der Bericht wird mit eigener Idempotenz-ID vor der Abfahrtsbuchung synchronisiert
+- Einsatzplanung und Wochenübersicht zeigen die Vorarbeiter-/Berichtspflicht sichtbar und erlauben begründete Änderungen
 
 ## Noch zu prüfen
 

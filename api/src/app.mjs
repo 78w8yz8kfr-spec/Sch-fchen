@@ -50,6 +50,7 @@ import {
   validateProjectUpdate,
   validateSiteMaterial,
   validateSiteMaterialUpdate,
+  validateMobileSiteReport,
   validateSiteReport,
   validateSiteReportFinalization,
   validateSiteTask,
@@ -279,6 +280,10 @@ async function getAssignments(client, context, date) {
        assignment.planned_duration_minutes,
        assignment.status,
        assignment.comment,
+       assignment.report_responsible,
+       report.id AS mobile_report_id,
+       report.report_number AS mobile_report_number,
+       report.status AS mobile_report_status,
        site.id AS construction_site_id,
        site.site_number,
        site.name,
@@ -286,8 +291,18 @@ async function getAssignments(client, context, date) {
        site.installer_short_text
      FROM site_assignments AS assignment
      JOIN construction_sites AS site
-       ON site.company_id = assignment.company_id
+      ON site.company_id = assignment.company_id
       AND site.id = assignment.construction_site_id
+     LEFT JOIN LATERAL (
+       SELECT candidate.id, candidate.report_number, candidate.status
+       FROM site_reports AS candidate
+       WHERE candidate.company_id = assignment.company_id
+         AND candidate.construction_site_id = assignment.construction_site_id
+         AND candidate.work_date = assignment.work_date
+         AND candidate.status IN ('submitted', 'approved')
+       ORDER BY (candidate.site_assignment_id = assignment.id) DESC NULLS LAST, candidate.created_at DESC
+       LIMIT 1
+     ) AS report ON TRUE
      WHERE assignment.company_id = $1
        AND assignment.user_id = $2
        AND assignment.work_date = $3
@@ -302,6 +317,12 @@ async function getAssignments(client, context, date) {
     plannedDurationMinutes: row.planned_duration_minutes,
     status: row.status,
     comment: row.comment,
+    reportResponsible: row.report_responsible,
+    mobileReport: row.mobile_report_id ? {
+      id: row.mobile_report_id,
+      number: row.mobile_report_number,
+      status: row.mobile_report_status
+    } : null,
     constructionSite: {
       id: row.construction_site_id,
       number: row.site_number,
@@ -491,6 +512,8 @@ function siteReportDto(row) {
     summary: row.summary,
     details: row.details,
     sourceDocumentId: row.source_document_id,
+    siteAssignmentId: row.site_assignment_id || null,
+    clientReportId: row.client_report_id || null,
     sourceDocumentFileName: row.source_document_file_name,
     status: row.status,
     authorName: row.author_name,
@@ -624,6 +647,7 @@ async function adminOverview(client, context, date) {
       `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
               assignment.work_date,
               assignment.sequence_number, assignment.planned_start_time::TEXT,
+              assignment.report_responsible,
               account.first_name, account.last_name, site.name AS site_name
        FROM site_assignments AS assignment
        JOIN users AS account
@@ -701,6 +725,7 @@ async function adminOverview(client, context, date) {
       `SELECT report.id, report.construction_site_id, report.report_number,
               report.report_type, report.work_date, report.source_mode,
               report.summary, report.details, report.source_document_id,
+              report.site_assignment_id, report.client_report_id,
               report.status, report.approved_at, report.employee_signature_name,
               report.customer_signature_name, report.final_document_id,
               report.row_version, report.created_at,
@@ -730,6 +755,7 @@ async function adminOverview(client, context, date) {
     workDate: databaseDate(row.work_date),
     sequenceNumber: row.sequence_number,
     plannedStartTime: row.planned_start_time,
+    reportResponsible: row.report_responsible,
     employeeName: `${row.first_name} ${row.last_name}`,
     siteName: row.site_name
   }));
@@ -1097,6 +1123,7 @@ async function getSiteReportRecord(client, context, reportId) {
     `SELECT report.id, report.construction_site_id, report.report_number,
             report.report_type, report.work_date, report.source_mode,
             report.summary, report.details, report.source_document_id,
+            report.site_assignment_id, report.client_report_id,
             report.status, report.approved_at, report.employee_signature_name,
             report.customer_signature_name, report.final_document_id,
             report.row_version, report.created_at,
@@ -1149,6 +1176,86 @@ async function createSiteReport(client, context, input) {
       input.sourceMode, input.summary, input.details, input.sourceDocumentId, context.userId]
   );
   return getSiteReportRecord(client, context, result.rows[0].id);
+}
+
+async function createMobileSiteReport(client, context, input) {
+  const duplicate = await client.query(
+    `SELECT id, author_user_id, construction_site_id, work_date, report_type,
+            source_mode, summary, details
+     FROM site_reports
+     WHERE company_id = $1 AND client_report_id = $2`,
+    [context.companyId, input.clientReportId]
+  );
+  if (duplicate.rowCount === 1) {
+    const row = duplicate.rows[0];
+    const same = row.author_user_id === context.userId
+      && row.construction_site_id === input.constructionSiteId
+      && databaseDate(row.work_date) === input.workDate
+      && row.report_type === input.reportType
+      && row.source_mode === input.sourceMode
+      && row.summary === input.summary
+      && (row.details || null) === input.details;
+    if (!same) {
+      throw new InputError(
+        "Die Offline-Berichts-ID wurde bereits für einen anderen Bericht verwendet.",
+        409,
+        "idempotency_conflict"
+      );
+    }
+    return { siteReport: await getSiteReportRecord(client, context, row.id), idempotent: true };
+  }
+
+  const roles = await activeRoleKeys(client, context);
+  if (!roles.has("foreman")) {
+    throw new InputError(
+      "Nur der für diesen Einsatz bestimmte Vorarbeiter darf den Baustellenbericht erfassen.",
+      403,
+      "report_forbidden"
+    );
+  }
+  const assignment = await client.query(
+    `SELECT id
+     FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+       AND work_date = $4 AND status IN ('released', 'completed')
+       AND report_responsible
+     FOR UPDATE`,
+    [context.companyId, context.userId, input.constructionSiteId, input.workDate]
+  );
+  if (assignment.rowCount !== 1) {
+    throw new InputError(
+      "Du bist für diesen Baustellentag nicht als berichtspflichtiger Vorarbeiter eingeteilt.",
+      403,
+      "report_assignment_required"
+    );
+  }
+
+  const existingReport = await client.query(
+    `SELECT id FROM site_reports
+     WHERE company_id = $1 AND construction_site_id = $3 AND work_date = $4
+       AND status IN ('submitted', 'approved')
+     ORDER BY (site_assignment_id = $2) DESC NULLS LAST, created_at DESC
+     LIMIT 1`,
+    [context.companyId, assignment.rows[0].id, input.constructionSiteId, input.workDate]
+  );
+  if (existingReport.rowCount === 1) {
+    return {
+      siteReport: await getSiteReportRecord(client, context, existingReport.rows[0].id),
+      idempotent: true
+    };
+  }
+
+  const result = await client.query(
+    `INSERT INTO site_reports (
+       company_id, construction_site_id, report_number, report_type, work_date,
+       source_mode, summary, details, source_document_id, status, author_user_id,
+       site_assignment_id, client_report_id
+     ) VALUES ($1, $2, NULL, $3, $4, 'digital', $5, $6, NULL, 'submitted', $7, $8, $9)
+     RETURNING id`,
+    [context.companyId, input.constructionSiteId, input.reportType, input.workDate,
+      input.summary, input.details, context.userId, assignment.rows[0].id, input.clientReportId]
+  );
+  return { siteReport: await getSiteReportRecord(client, context, result.rows[0].id), idempotent: false };
 }
 
 async function readCompanyLogo(staticDirectory, logoObjectKey) {
@@ -2141,7 +2248,7 @@ async function createAssignment(client, context, input) {
   await requirePlanner(client, context);
   const [employee, site] = await Promise.all([
     client.query(
-      "SELECT 1 FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+      "SELECT is_foreman FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
       [context.companyId, input.employeeId]
     ),
     client.query(
@@ -2153,6 +2260,30 @@ async function createAssignment(client, context, input) {
   ]);
   if (employee.rowCount !== 1) throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
   if (site.rowCount !== 1) throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
+  if (input.reportResponsible && !employee.rows[0].is_foreman) {
+    throw new InputError("Nur ein Mitarbeiter mit der Rolle Vorarbeiter kann den Baustellenbericht übernehmen.");
+  }
+
+  if (input.reportResponsible) {
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`assignment-report:${context.companyId}:${input.constructionSiteId}:${input.workDate}`]
+    );
+    const existingResponsible = await client.query(
+      `SELECT 1 FROM site_assignments
+       WHERE company_id = $1 AND construction_site_id = $2 AND work_date = $3
+         AND status <> 'cancelled' AND report_responsible
+       LIMIT 1`,
+      [context.companyId, input.constructionSiteId, input.workDate]
+    );
+    if (existingResponsible.rowCount) {
+      throw new InputError(
+        "Für diese Baustelle ist an diesem Tag bereits ein Vorarbeiter für den Bericht eingeteilt.",
+        409,
+        "report_responsibility_conflict"
+      );
+    }
+  }
 
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
@@ -2167,9 +2298,10 @@ async function createAssignment(client, context, input) {
   const inserted = await client.query(
     `INSERT INTO site_assignments (
        company_id, user_id, construction_site_id, work_date, sequence_number,
-       planned_start_time, status, comment, created_by_user_id, changed_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, 'released', $7, $8, $8)
-     RETURNING id, sequence_number, planned_start_time::TEXT`,
+       planned_start_time, status, comment, report_responsible,
+       created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, 'released', $7, $8, $9, $9)
+     RETURNING id, sequence_number, planned_start_time::TEXT, report_responsible`,
     [
       context.companyId,
       input.employeeId,
@@ -2178,6 +2310,7 @@ async function createAssignment(client, context, input) {
       sequence.rows[0].next_sequence,
       input.plannedStartTime,
       input.comment,
+      input.reportResponsible,
       context.userId
     ]
   );
@@ -2187,16 +2320,24 @@ async function createAssignment(client, context, input) {
     constructionSiteId: input.constructionSiteId,
     workDate: input.workDate,
     sequenceNumber: inserted.rows[0].sequence_number,
-    plannedStartTime: inserted.rows[0].planned_start_time
+    plannedStartTime: inserted.rows[0].planned_start_time,
+    reportResponsible: inserted.rows[0].report_responsible
   };
 }
 
 async function updateAssignment(client, context, assignmentId, input) {
   await requirePlanner(client, context);
   const current = await client.query(
-    `SELECT id, user_id, work_date, sequence_number, status
-     FROM site_assignments
-     WHERE company_id = $1 AND id = $2
+    `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
+            assignment.work_date, assignment.sequence_number, assignment.status,
+            assignment.report_responsible,
+            EXISTS (
+              SELECT 1 FROM site_reports AS report
+              WHERE report.company_id = assignment.company_id
+                AND report.site_assignment_id = assignment.id
+            ) AS has_mobile_report
+     FROM site_assignments AS assignment
+     WHERE assignment.company_id = $1 AND assignment.id = $2
      FOR UPDATE`,
     [context.companyId, assignmentId]
   );
@@ -2206,6 +2347,47 @@ async function updateAssignment(client, context, assignmentId, input) {
   const assignment = current.rows[0];
   if (!["draft", "released"].includes(assignment.status)) {
     throw new InputError("Dieser Einsatz kann nicht mehr geändert werden.", 409, "assignment_locked");
+  }
+
+  const reportResponsible = input.reportResponsible === null
+    ? assignment.report_responsible
+    : input.reportResponsible;
+  if (assignment.has_mobile_report && (
+    databaseDate(assignment.work_date) !== input.workDate
+    || reportResponsible !== assignment.report_responsible
+  )) {
+    throw new InputError(
+      "Der Einsatz besitzt bereits einen Baustellenbericht und kann nicht mehr verschoben oder neu zugeordnet werden.",
+      409,
+      "assignment_has_report"
+    );
+  }
+  if (reportResponsible) {
+    const employee = await client.query(
+      "SELECT is_foreman FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+      [context.companyId, assignment.user_id]
+    );
+    if (employee.rowCount !== 1 || !employee.rows[0].is_foreman) {
+      throw new InputError("Nur ein Mitarbeiter mit der Rolle Vorarbeiter kann den Baustellenbericht übernehmen.");
+    }
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`assignment-report:${context.companyId}:${assignment.construction_site_id}:${input.workDate}`]
+    );
+    const existingResponsible = await client.query(
+      `SELECT 1 FROM site_assignments
+       WHERE company_id = $1 AND construction_site_id = $2 AND work_date = $3
+         AND status <> 'cancelled' AND report_responsible AND id <> $4
+       LIMIT 1`,
+      [context.companyId, assignment.construction_site_id, input.workDate, assignmentId]
+    );
+    if (existingResponsible.rowCount) {
+      throw new InputError(
+        "Für diese Baustelle ist an diesem Tag bereits ein Vorarbeiter für den Bericht eingeteilt.",
+        409,
+        "report_responsibility_conflict"
+      );
+    }
   }
 
   let sequenceNumber = assignment.sequence_number;
@@ -2229,17 +2411,19 @@ async function updateAssignment(client, context, assignmentId, input) {
      SET work_date = $3,
          sequence_number = $4,
          planned_start_time = $5,
-         changed_by_user_id = $6,
-         last_change_reason = $7
+         report_responsible = $6,
+         changed_by_user_id = $7,
+         last_change_reason = $8
      WHERE company_id = $1 AND id = $2
      RETURNING id, user_id, construction_site_id, work_date,
-               sequence_number, planned_start_time::TEXT, status`,
+               sequence_number, planned_start_time::TEXT, status, report_responsible`,
     [
       context.companyId,
       assignmentId,
       input.workDate,
       sequenceNumber,
       input.plannedStartTime,
+      reportResponsible,
       context.userId,
       input.changeReason
     ]
@@ -2252,7 +2436,8 @@ async function updateAssignment(client, context, assignmentId, input) {
     workDate: databaseDate(row.work_date),
     sequenceNumber: row.sequence_number,
     plannedStartTime: row.planned_start_time,
-    status: row.status
+    status: row.status,
+    reportResponsible: row.report_responsible
   };
 }
 
@@ -2264,6 +2449,11 @@ async function cancelAssignment(client, context, assignmentId, changeReason) {
          changed_by_user_id = $3,
          last_change_reason = $4
      WHERE company_id = $1 AND id = $2 AND status IN ('draft', 'released')
+       AND NOT EXISTS (
+         SELECT 1 FROM site_reports AS report
+         WHERE report.company_id = site_assignments.company_id
+           AND report.site_assignment_id = site_assignments.id
+       )
      RETURNING id`,
     [context.companyId, assignmentId, context.userId, changeReason]
   );
@@ -2332,15 +2522,38 @@ async function insertTimeEntry(client, context, input, timeZone) {
     throw new InputError("recordedAt darf nicht in der Zukunft liegen.");
   }
 
+  let matchedAssignment = null;
   if (input.constructionSiteId) {
     const assignment = await client.query(
-      `SELECT 1 FROM site_assignments
+      `SELECT id, report_responsible FROM site_assignments
        WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released', 'completed')`,
+         AND work_date = $4 AND status IN ('released', 'completed')
+       ORDER BY report_responsible DESC, sequence_number`,
       [context.companyId, context.userId, input.constructionSiteId, workDate]
     );
     if (assignment.rowCount === 0) {
       throw new InputError("Die Baustelle ist für diesen Arbeitstag nicht freigegeben.", 403, "site_not_assigned");
+    }
+    matchedAssignment = assignment.rows[0];
+  }
+
+  if (input.entryType === "site_departure" && matchedAssignment?.report_responsible) {
+    const report = await client.query(
+      `SELECT 1 FROM site_reports
+       WHERE company_id = $1
+         AND construction_site_id = $3
+         AND work_date = $4
+         AND status IN ('submitted', 'approved')
+         AND (site_assignment_id = $2 OR site_assignment_id IS NULL)
+       LIMIT 1`,
+      [context.companyId, matchedAssignment.id, input.constructionSiteId, workDate]
+    );
+    if (report.rowCount === 0) {
+      throw new InputError(
+        "Bitte zuerst den Baustellenbericht speichern. Danach kannst du die Baustelle verlassen.",
+        409,
+        "site_report_required"
+      );
     }
   }
 
@@ -2780,6 +2993,16 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => getAssignments(client, context, date)
         );
         return json(response, 200, { assignments });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/site-reports") {
+        const input = validateMobileSiteReport(await readJson(request));
+        const created = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createMobileSiteReport(client, context, input)
+        );
+        return json(response, created.idempotent ? 200 : 201, created);
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/time-entries") {

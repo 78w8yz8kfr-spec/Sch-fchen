@@ -71,6 +71,14 @@
     statusSince: document.querySelector("#status-since"),
     statusWorkTime: document.querySelector("#status-work-time"),
     actionHint: document.querySelector("#action-hint"),
+    mobileReportCard: document.querySelector("#mobile-report-card"),
+    mobileReportForm: document.querySelector("#mobile-report-form"),
+    mobileReportSite: document.querySelector("#mobile-report-site"),
+    mobileReportType: document.querySelector("#mobile-report-type"),
+    mobileReportSummary: document.querySelector("#mobile-report-summary"),
+    mobileReportDetails: document.querySelector("#mobile-report-details"),
+    mobileReportSubmit: document.querySelector("#mobile-report-submit"),
+    mobileReportMessage: document.querySelector("#mobile-report-message"),
     connectionState: document.querySelector("#connection-state"),
     todayLabel: document.querySelector("#today-label"),
     weekStrip: document.querySelector("#week-strip"),
@@ -204,6 +212,7 @@
     assignmentEditTitle: document.querySelector("#assignment-edit-title"),
     assignmentEditDate: document.querySelector("#assignment-edit-date"),
     assignmentEditTime: document.querySelector("#assignment-edit-time"),
+    assignmentEditReportResponsible: document.querySelector("#assignment-edit-report-responsible"),
     assignmentEditReason: document.querySelector("#assignment-edit-reason"),
     assignmentEditSave: document.querySelector("#assignment-edit-save"),
     assignmentEditCancel: document.querySelector("#assignment-edit-cancel"),
@@ -342,6 +351,7 @@
     assignmentDate: document.querySelector("#assignment-date"),
     assignmentTime: document.querySelector("#assignment-time"),
     assignmentComment: document.querySelector("#assignment-comment"),
+    assignmentReportResponsible: document.querySelector("#assignment-report-responsible"),
     assignmentMessage: document.querySelector("#assignment-message"),
     adminAssignmentList: document.querySelector("#admin-assignment-list"),
     toast: document.querySelector("#toast")
@@ -475,7 +485,7 @@
   }
 
   function initialState() {
-    return { version: 1, workDate: localDateKey(), events: [] };
+    return { version: 1, workDate: localDateKey(), events: [], reports: [] };
   }
 
   function loadState() {
@@ -487,7 +497,12 @@
           if (Array.isArray(saved.assignments)) assignments = saved.assignments;
           cachedUserId = typeof saved.userId === "string" ? saved.userId : null;
         }
-        return { version: 1, workDate: saved.workDate, events: saved.events };
+        return {
+          version: 1,
+          workDate: saved.workDate,
+          events: saved.events,
+          reports: Array.isArray(saved.reports) ? saved.reports : []
+        };
       }
     } catch {
       // Ein blockierter Speicher darf die App nicht unbenutzbar machen.
@@ -565,7 +580,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.20.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.21.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1899,6 +1914,9 @@
     elements.assignmentEditTitle.textContent = `${assignment.employeeName} · ${assignment.siteName}`;
     elements.assignmentEditDate.value = assignment.workDate;
     elements.assignmentEditTime.value = assignment.plannedStartTime?.slice(0, 5) || "";
+    const employee = adminState?.employees.find((item) => item.id === assignment.employeeId);
+    elements.assignmentEditReportResponsible.disabled = !employee?.roles?.includes("foreman");
+    elements.assignmentEditReportResponsible.checked = Boolean(assignment.reportResponsible);
     elements.assignmentEditReason.value = "";
     elements.assignmentEditMessage.textContent = "";
     elements.assignmentEditForm.hidden = false;
@@ -1945,16 +1963,20 @@
           const title = document.createElement("strong");
           const meta = document.createElement("span");
           const edit = document.createElement("button");
+          const duty = document.createElement("span");
           const startTime = assignment.plannedStartTime
             ? `${assignment.plannedStartTime.slice(0, 5)} Uhr`
             : "ohne Startzeit";
           card.className = "week-assignment";
           title.textContent = assignment.employeeName;
           meta.textContent = `${startTime} · ${assignment.siteName}`;
+          duty.className = "foreman-duty";
+          duty.textContent = "Vorarbeiter · Bericht";
+          duty.hidden = !assignment.reportResponsible;
           edit.type = "button";
           edit.textContent = "Ändern";
           edit.addEventListener("click", () => openAssignmentEditor(assignment));
-          content.append(title, meta);
+          content.append(title, meta, duty);
           card.append(content, edit);
           items.append(card);
         });
@@ -2005,6 +2027,7 @@
       "Mitarbeiter auswählen",
       (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
     );
+    updateAssignmentResponsibilityControl();
     renderAdminSelect(
       elements.assignmentSite,
       adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
@@ -2073,12 +2096,19 @@
         appendAdminListItem(
           elements.adminAssignmentList,
           `${assignment.sequenceNumber}. ${assignment.employeeName}`,
-          `${start} · ${assignment.siteName}`
+          `${start} · ${assignment.siteName}${assignment.reportResponsible ? " · Vorarbeiter / Bericht" : ""}`
         );
       });
     }
     renderBusinessHierarchy();
     renderAdminWeek();
+  }
+
+  function updateAssignmentResponsibilityControl() {
+    const employee = adminState?.employees.find((item) => item.id === elements.assignmentEmployee.value);
+    const isForeman = Boolean(employee?.roles?.includes("foreman"));
+    elements.assignmentReportResponsible.disabled = !isForeman;
+    if (!isForeman) elements.assignmentReportResponsible.checked = false;
   }
 
   async function refreshAdmin(date = elements.assignmentDate.value || localDateKey()) {
@@ -2131,6 +2161,33 @@
     return index >= 0 ? index : null;
   }
 
+  function reportForAssignment(assignment) {
+    if (!assignment) return null;
+    if (assignment.mobileReport) return assignment.mobileReport;
+    return (state.reports || []).find((report) => (
+      report.assignmentId === assignment.id
+      || (
+        report.constructionSiteId === assignment.constructionSite.id
+        && report.workDate === state.workDate
+      )
+    )) || null;
+  }
+
+  function closeMobileReportForm() {
+    elements.mobileReportCard.hidden = true;
+    elements.mobileReportMessage.textContent = "";
+  }
+
+  function openMobileReportForm(assignment) {
+    elements.mobileReportSite.textContent = assignment.constructionSite.name;
+    elements.mobileReportSummary.value = "";
+    elements.mobileReportDetails.value = "";
+    elements.mobileReportMessage.textContent = "";
+    elements.mobileReportCard.hidden = false;
+    elements.mobileReportCard.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => elements.mobileReportSummary.focus(), 250);
+  }
+
   function addEntry(type, siteIndex = null) {
     const siteEvent = ["site_arrival", "site_departure", "next_site"].includes(type);
     const assignment = siteIndex === null ? null : assignments[siteIndex];
@@ -2167,12 +2224,49 @@
 
   async function syncPendingEntries() {
     if (demoMode || syncing || !navigator.onLine) return;
+    const pendingReports = (state.reports || []).filter((report) => report.pendingSync && !report.syncError);
     const pending = state.events.filter((entry) => entry.pendingSync && !entry.syncError);
-    if (pending.length === 0) return;
+    if (pendingReports.length === 0 && pending.length === 0) return;
     syncing = true;
     updateConnectionState();
 
-    for (const entry of pending) {
+    let reportSyncFailed = false;
+    for (const report of pendingReports) {
+      try {
+        const body = await requestJson("./api/v1/site-reports", {
+          method: "POST",
+          body: JSON.stringify({
+            clientReportId: report.clientReportId,
+            constructionSiteId: report.constructionSiteId,
+            reportType: report.reportType,
+            workDate: report.workDate,
+            sourceMode: "digital",
+            summary: report.summary,
+            details: report.details
+          })
+        });
+        report.id = body.siteReport.id;
+        report.number = body.siteReport.number;
+        report.status = body.siteReport.status;
+        report.pendingSync = false;
+        const assignment = assignments.find((item) => item.id === report.assignmentId);
+        if (assignment) assignment.mobileReport = {
+          id: report.id,
+          number: report.number,
+          status: report.status
+        };
+      } catch (error) {
+        if (!error.network) report.syncError = error.message;
+        if (error.status === 401) showLogin();
+        showToast(error.network ? "Bericht wartet auf Verbindung." : error.message);
+        reportSyncFailed = true;
+        break;
+      }
+      saveState();
+      render();
+    }
+
+    for (const entry of reportSyncFailed ? [] : pending) {
       try {
         const body = await requestJson("./api/v1/time-entries", {
           method: "POST",
@@ -2212,7 +2306,14 @@
     if (!latest) addEntry("clock_in");
     else if (latest.type === "clock_in" && assignments.length === 0) addEntry("clock_out");
     else if (latest.type === "clock_in" || latest.type === "next_site") addEntry("site_arrival", siteIndex);
-    else if (latest.type === "site_arrival") addEntry("site_departure", siteIndex);
+    else if (latest.type === "site_arrival") {
+      const assignment = assignments[siteIndex];
+      if (assignment?.reportResponsible && !reportForAssignment(assignment)) {
+        openMobileReportForm(assignment);
+      } else {
+        addEntry("site_departure", siteIndex);
+      }
+    }
     else if (latest.type === "site_departure" && siteIndex < assignments.length - 1) addEntry("next_site", siteIndex + 1);
     else if (latest.type === "site_departure") addEntry("clock_out");
   }
@@ -2423,7 +2524,8 @@
 
   function updateConnectionState() {
     const online = navigator.onLine;
-    const pendingCount = state.events.filter((entry) => entry.pendingSync).length;
+    const pendingCount = state.events.filter((entry) => entry.pendingSync).length
+      + (state.reports || []).filter((report) => report.pendingSync).length;
     elements.connectionState.classList.toggle("connection-state--offline", !online || pendingCount > 0);
     const label = !online ? "Offline" : syncing ? "Sync …" : pendingCount > 0 ? `${pendingCount} offen` : "Online";
     elements.connectionState.querySelector("span").textContent = label;
@@ -2439,6 +2541,7 @@
   }
 
   function showDashboardPane(pane, smooth = true) {
+    if (pane !== "start") closeMobileReportForm();
     const adminPanes = new Set(["assignments", "sites", "more"]);
     elements.dashboardPanes.forEach((element) => {
       if (element === elements.adminSection) {
@@ -2498,6 +2601,7 @@
     if (demoMode || !navigator.onLine) return;
     const date = localDateKey();
     const pending = state.events.filter((entry) => entry.pendingSync);
+    const localReports = (state.reports || []).filter((report) => report.workDate === date);
     try {
       const [assignmentBody, workDayBody] = await Promise.all([
         requestJson(`./api/v1/site-assignments/${date}`),
@@ -2510,7 +2614,8 @@
         version: 1,
         workDate: date,
         events: [...persisted, ...pending.filter((entry) => !knownIds.has(entry.clientEntryId))]
-          .sort((left, right) => new Date(left.recordedAt) - new Date(right.recordedAt))
+          .sort((left, right) => new Date(left.recordedAt) - new Date(right.recordedAt)),
+        reports: localReports
       };
       saveState();
       render();
@@ -3263,6 +3368,47 @@
     }
   });
 
+  elements.mobileReportForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const latest = lastEvent();
+    const siteIndex = currentSiteIndex();
+    const assignment = assignments[siteIndex];
+    if (latest?.type !== "site_arrival" || !assignment?.reportResponsible) {
+      elements.mobileReportMessage.textContent = "Der aktuelle Einsatz benötigt keinen Baustellenbericht.";
+      return;
+    }
+    if (reportForAssignment(assignment)) {
+      closeMobileReportForm();
+      addEntry("site_departure", siteIndex);
+      return;
+    }
+    const summary = elements.mobileReportSummary.value.trim();
+    if (summary.length < 2) {
+      elements.mobileReportMessage.textContent = "Bitte kurz beschreiben, was heute ausgeführt wurde.";
+      elements.mobileReportSummary.focus();
+      return;
+    }
+    const report = {
+      clientReportId: createClientEntryId(),
+      assignmentId: assignment.id,
+      constructionSiteId: assignment.constructionSite.id,
+      workDate: state.workDate,
+      reportType: elements.mobileReportType.value,
+      summary,
+      details: elements.mobileReportDetails.value.trim() || null,
+      pendingSync: !demoMode,
+      syncError: null
+    };
+    if (!Array.isArray(state.reports)) state.reports = [];
+    state.reports.push(report);
+    saveState();
+    closeMobileReportForm();
+    addEntry("site_departure", siteIndex);
+    showToast(navigator.onLine
+      ? "Bericht gespeichert · Baustelle wird abgeschlossen."
+      : "Bericht offline gespeichert · Synchronisation folgt automatisch.");
+  });
+
   elements.assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const saved = await submitAdminForm(
@@ -3274,13 +3420,15 @@
         constructionSiteId: elements.assignmentSite.value,
         workDate: elements.assignmentDate.value,
         plannedStartTime: elements.assignmentTime.value,
-        comment: elements.assignmentComment.value
+        comment: elements.assignmentComment.value,
+        reportResponsible: elements.assignmentReportResponsible.checked
       },
       "Einsatz freigegeben · auf dem Mitarbeiter-Handy sichtbar."
     );
     if (!saved) return;
     elements.assignmentTime.value = "";
     elements.assignmentComment.value = "";
+    elements.assignmentReportResponsible.checked = false;
     await Promise.all([refreshAdmin(), refreshLiveData()]);
   });
 
@@ -3459,6 +3607,7 @@
         body: JSON.stringify({
           workDate: destinationDate,
           plannedStartTime: elements.assignmentEditTime.value,
+          reportResponsible: elements.assignmentEditReportResponsible.checked,
           changeReason
         })
       });
@@ -3502,6 +3651,7 @@
   });
 
   elements.assignmentEditClose.addEventListener("click", closeAssignmentEditor);
+  elements.assignmentEmployee.addEventListener("change", updateAssignmentResponsibilityControl);
   elements.adminWeekPrevious.addEventListener("click", () => {
     void refreshAdmin(addIsoDays(adminState?.weekStart || localDateKey(), -7));
   });

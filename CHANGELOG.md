@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.21.0 – Mobile Vorarbeiterberichte
+
+- tägliche Vorarbeiter- und Berichtsverantwortung direkt in der Einsatzplanung
+- mobile Montage- oder Bautagesberichte beim Verlassen der Baustelle
+- serverseitige Rollen-, Einsatz-, Baustellen- und Datumsprüfung sowie Abfahrtssperre ohne Pflichtbericht
+- offline-fähige, idempotente Berichtsübertragung vor der zugehörigen Zeitbuchung
+- Migration und automatisierte Tests für eindeutige Zuständigkeit und unverwechselbare Bericht-zu-Einsatz-Verknüpfung
+
 ### Hinzugefügt
 
 - initiale Repository- und Ordnerstruktur
