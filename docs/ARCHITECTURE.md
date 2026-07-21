@@ -58,6 +58,13 @@ klare Austauschgrenze für den späteren Umzug in MinIO oder einen anderen
 S3-kompatiblen Objektspeicher. Details stehen in
 [`DOCUMENT_MODEL.md`](DOCUMENT_MODEL.md).
 
+Migrationen 020 bis 022 ergänzen denselben Kern um `site_tasks`,
+`site_material_entries` und `site_reports`. Ein fotografierter Papierbericht
+verweist über `source_document_id` auf das einmal gespeicherte Original in
+`documents`; es entsteht keine zweite Dateiablage. Bedienung, Statusfolgen und
+Sicherheitsgrenzen sind in [`SITE_WORK_MODULES.md`](SITE_WORK_MODULES.md)
+dokumentiert.
+
 ## Mandantentrennung
 
 `companies` ist die Wurzel eines Mandanten. Nachfolgende Tabellen erhalten eine verpflichtende `company_id`. Die API setzt die aktuelle Firma serverseitig aus der authentifizierten Sitzung. Daten aus dem Frontend dürfen die Mandantenzuordnung nicht überschreiben.
@@ -83,8 +90,8 @@ Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht. 
 1. Datenbankgrundlage und Mandantenschutz
 2. Login, Benutzer, Rollen, Zeiterfassung und Wochenplanung
 3. Kunden, Standorte, Projekte, Baustellen und Dokumente
-4. Montage- und Bautagesberichte mit PDF-Versionierung
-5. Dokumenten-, Berichts-, Aufgaben- und Materialmodule
+4. Aufgaben, Material sowie Montage- und Bautagesberichte
+5. Freigabe, Unterschrift und unveränderliche PDF-Versionierung
 6. Optionale Spezialmodule wie VDE, LWL, DGUV und KNX
 7. KI, OCR und Sprache erst nach stabiler Kernfunktion
 

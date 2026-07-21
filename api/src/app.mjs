@@ -45,6 +45,11 @@ import {
   validateLogin,
   validateProject,
   validateProjectUpdate,
+  validateSiteMaterial,
+  validateSiteMaterialUpdate,
+  validateSiteReport,
+  validateSiteTask,
+  validateSiteTaskUpdate,
   validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
@@ -440,6 +445,56 @@ function documentDto(row) {
   };
 }
 
+function siteTaskDto(row) {
+  return {
+    id: row.id,
+    constructionSiteId: row.construction_site_id,
+    title: row.title,
+    details: row.details,
+    priority: row.priority,
+    status: row.status,
+    assignedUserId: row.assigned_user_id,
+    assignedUserName: row.assigned_user_name,
+    dueDate: row.due_date ? databaseDate(row.due_date) : null,
+    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString()
+  };
+}
+
+function siteMaterialDto(row) {
+  return {
+    id: row.id,
+    constructionSiteId: row.construction_site_id,
+    itemName: row.item_name,
+    quantity: Number(row.quantity),
+    unit: row.unit,
+    status: row.status,
+    note: row.note,
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString()
+  };
+}
+
+function siteReportDto(row) {
+  return {
+    id: row.id,
+    constructionSiteId: row.construction_site_id,
+    number: row.report_number,
+    reportType: row.report_type,
+    workDate: databaseDate(row.work_date),
+    sourceMode: row.source_mode,
+    summary: row.summary,
+    details: row.details,
+    sourceDocumentId: row.source_document_id,
+    sourceDocumentFileName: row.source_document_file_name,
+    status: row.status,
+    authorName: row.author_name,
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString()
+  };
+}
+
 function mondayFor(date) {
   const value = new Date(`${date}T00:00:00Z`);
   const weekday = value.getUTCDay() || 7;
@@ -461,7 +516,17 @@ async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
   const weekStart = mondayFor(date);
   const weekEnd = addUtcDays(weekStart, 4);
-  const [employeeResult, customerResult, projectResult, siteResult, assignmentResult, documentResult] = await Promise.all([
+  const [
+    employeeResult,
+    customerResult,
+    projectResult,
+    siteResult,
+    assignmentResult,
+    documentResult,
+    taskResult,
+    materialResult,
+    reportResult
+  ] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
               account.must_change_password,
@@ -599,6 +664,44 @@ async function adminOverview(client, context, date) {
        ORDER BY CASE document.status WHEN 'active' THEN 1 ELSE 2 END,
                 document.created_at DESC, document.document_number DESC`,
       [context.companyId]
+    ),
+    client.query(
+      `SELECT task.id, task.construction_site_id, task.title, task.details,
+              task.priority, task.status, task.assigned_user_id, task.due_date,
+              task.completed_at, task.row_version, task.created_at,
+              CASE WHEN assignee.id IS NULL THEN NULL ELSE assignee.first_name || ' ' || assignee.last_name END AS assigned_user_name
+       FROM site_tasks AS task
+       LEFT JOIN users AS assignee
+         ON assignee.company_id = task.company_id AND assignee.id = task.assigned_user_id
+       WHERE task.company_id = $1
+       ORDER BY CASE task.status WHEN 'open' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+                task.due_date NULLS LAST, task.created_at DESC`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT id, construction_site_id, item_name, quantity, unit, status,
+              note, row_version, created_at
+       FROM site_material_entries
+       WHERE company_id = $1
+       ORDER BY CASE status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
+                created_at DESC`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT report.id, report.construction_site_id, report.report_number,
+              report.report_type, report.work_date, report.source_mode,
+              report.summary, report.details, report.source_document_id,
+              report.status, report.row_version, report.created_at,
+              author.first_name || ' ' || author.last_name AS author_name,
+              document.original_file_name AS source_document_file_name
+       FROM site_reports AS report
+       JOIN users AS author
+         ON author.company_id = report.company_id AND author.id = report.author_user_id
+       LEFT JOIN documents AS document
+         ON document.company_id = report.company_id AND document.id = report.source_document_id
+       WHERE report.company_id = $1
+       ORDER BY report.work_date DESC, report.created_at DESC`,
+      [context.companyId]
     )
   ]);
 
@@ -622,6 +725,9 @@ async function adminOverview(client, context, date) {
     projects: projectResult.rows.map(projectDto),
     sites: siteResult.rows.map(siteDto),
     documents: documentResult.rows.map(documentDto),
+    siteTasks: taskResult.rows.map(siteTaskDto),
+    siteMaterials: materialResult.rows.map(siteMaterialDto),
+    siteReports: reportResult.rows.map(siteReportDto),
     assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
     weekAssignments
   };
@@ -865,6 +971,158 @@ async function updateDocumentStatus(client, context, documentId, input) {
     );
   }
   return getDocumentRecord(client, context, documentId);
+}
+
+async function requireActiveSite(client, context, constructionSiteId) {
+  const result = await client.query(
+    `SELECT id FROM construction_sites
+     WHERE company_id = $1 AND id = $2
+       AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId, constructionSiteId]
+  );
+  if (result.rowCount !== 1) throw new InputError("Die aktive Baustelle wurde nicht gefunden.", 404, "site_not_found");
+}
+
+async function getSiteTaskRecord(client, context, taskId) {
+  const result = await client.query(
+    `SELECT task.id, task.construction_site_id, task.title, task.details,
+            task.priority, task.status, task.assigned_user_id, task.due_date,
+            task.completed_at, task.row_version, task.created_at,
+            CASE WHEN assignee.id IS NULL THEN NULL ELSE assignee.first_name || ' ' || assignee.last_name END AS assigned_user_name
+     FROM site_tasks AS task
+     LEFT JOIN users AS assignee
+       ON assignee.company_id = task.company_id AND assignee.id = task.assigned_user_id
+     WHERE task.company_id = $1 AND task.id = $2`,
+    [context.companyId, taskId]
+  );
+  if (result.rowCount !== 1) throw new InputError("Die Aufgabe wurde nicht gefunden.", 404, "site_task_not_found");
+  return siteTaskDto(result.rows[0]);
+}
+
+async function createSiteTask(client, context, input) {
+  await requirePlanner(client, context);
+  await requireActiveSite(client, context, input.constructionSiteId);
+  if (input.assignedUserId) {
+    const assignee = await client.query(
+      "SELECT id FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+      [context.companyId, input.assignedUserId]
+    );
+    if (assignee.rowCount !== 1) throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  const result = await client.query(
+    `INSERT INTO site_tasks (
+       company_id, construction_site_id, title, details, priority,
+       assigned_user_id, due_date, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+     RETURNING id`,
+    [context.companyId, input.constructionSiteId, input.title, input.details, input.priority,
+      input.assignedUserId, input.dueDate, context.userId]
+  );
+  return getSiteTaskRecord(client, context, result.rows[0].id);
+}
+
+async function updateSiteTask(client, context, taskId, input) {
+  await requirePlanner(client, context);
+  const result = await client.query(
+    `UPDATE site_tasks
+     SET status = $3, changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2 AND row_version = $5
+     RETURNING id`,
+    [context.companyId, taskId, input.status, context.userId, input.rowVersion]
+  );
+  if (result.rowCount !== 1) throw new InputError("Die Aufgabe wurde geändert. Bitte neu laden.", 409, "row_version_conflict");
+  return getSiteTaskRecord(client, context, taskId);
+}
+
+async function getSiteMaterialRecord(client, context, materialId) {
+  const result = await client.query(
+    `SELECT id, construction_site_id, item_name, quantity, unit, status,
+            note, row_version, created_at
+     FROM site_material_entries
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, materialId]
+  );
+  if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde nicht gefunden.", 404, "site_material_not_found");
+  return siteMaterialDto(result.rows[0]);
+}
+
+async function createSiteMaterial(client, context, input) {
+  await requirePlanner(client, context);
+  await requireActiveSite(client, context, input.constructionSiteId);
+  const result = await client.query(
+    `INSERT INTO site_material_entries (
+       company_id, construction_site_id, item_name, quantity, unit, status,
+       note, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+     RETURNING id`,
+    [context.companyId, input.constructionSiteId, input.itemName, input.quantity,
+      input.unit, input.status, input.note, context.userId]
+  );
+  return getSiteMaterialRecord(client, context, result.rows[0].id);
+}
+
+async function updateSiteMaterial(client, context, materialId, input) {
+  await requirePlanner(client, context);
+  const result = await client.query(
+    `UPDATE site_material_entries
+     SET status = $3, changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2 AND row_version = $5
+     RETURNING id`,
+    [context.companyId, materialId, input.status, context.userId, input.rowVersion]
+  );
+  if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde geändert. Bitte neu laden.", 409, "row_version_conflict");
+  return getSiteMaterialRecord(client, context, materialId);
+}
+
+async function getSiteReportRecord(client, context, reportId) {
+  const result = await client.query(
+    `SELECT report.id, report.construction_site_id, report.report_number,
+            report.report_type, report.work_date, report.source_mode,
+            report.summary, report.details, report.source_document_id,
+            report.status, report.row_version, report.created_at,
+            author.first_name || ' ' || author.last_name AS author_name,
+            document.original_file_name AS source_document_file_name
+     FROM site_reports AS report
+     JOIN users AS author
+       ON author.company_id = report.company_id AND author.id = report.author_user_id
+     LEFT JOIN documents AS document
+       ON document.company_id = report.company_id AND document.id = report.source_document_id
+     WHERE report.company_id = $1 AND report.id = $2`,
+    [context.companyId, reportId]
+  );
+  if (result.rowCount !== 1) throw new InputError("Der Bericht wurde nicht gefunden.", 404, "site_report_not_found");
+  return siteReportDto(result.rows[0]);
+}
+
+async function createSiteReport(client, context, input) {
+  await requirePlanner(client, context);
+  await requireActiveSite(client, context, input.constructionSiteId);
+  if (input.sourceDocumentId) {
+    const document = await client.query(
+      `SELECT document.id
+       FROM documents AS document
+       JOIN document_links AS link
+         ON link.company_id = document.company_id AND link.document_id = document.id
+       WHERE document.company_id = $1 AND document.id = $2
+         AND document.mime_type IN ('image/jpeg', 'image/png', 'image/webp')
+         AND document.status = 'active'
+         AND link.entity_type = 'construction_site' AND link.construction_site_id = $3`,
+      [context.companyId, input.sourceDocumentId, input.constructionSiteId]
+    );
+    if (document.rowCount !== 1) {
+      throw new InputError("Das Originalfoto gehört nicht zu dieser Baustelle.", 409, "report_document_conflict");
+    }
+  }
+  const result = await client.query(
+    `INSERT INTO site_reports (
+       company_id, construction_site_id, report_number, report_type, work_date,
+       source_mode, summary, details, source_document_id, status, author_user_id
+     ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, 'submitted', $9)
+     RETURNING id`,
+    [context.companyId, input.constructionSiteId, input.reportType, input.workDate,
+      input.sourceMode, input.summary, input.details, input.sourceDocumentId, context.userId]
+  );
+  return getSiteReportRecord(client, context, result.rows[0].id);
 }
 
 function publicAssignmentImportPreview(preview) {
@@ -2103,6 +2361,40 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/site-tasks") {
+        const input = validateSiteTask(await readJson(request));
+        const siteTask = await withReadySession(pool, tokenHash, (client, context) => createSiteTask(client, context, input));
+        return json(response, 201, { siteTask });
+      }
+
+      const siteTaskMatch = /^\/api\/v1\/admin\/site-tasks\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && siteTaskMatch) {
+        const taskId = validateId(siteTaskMatch[1], "Aufgaben-ID");
+        const input = validateSiteTaskUpdate(await readJson(request));
+        const siteTask = await withReadySession(pool, tokenHash, (client, context) => updateSiteTask(client, context, taskId, input));
+        return json(response, 200, { siteTask });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/site-materials") {
+        const input = validateSiteMaterial(await readJson(request));
+        const siteMaterial = await withReadySession(pool, tokenHash, (client, context) => createSiteMaterial(client, context, input));
+        return json(response, 201, { siteMaterial });
+      }
+
+      const siteMaterialMatch = /^\/api\/v1\/admin\/site-materials\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && siteMaterialMatch) {
+        const materialId = validateId(siteMaterialMatch[1], "Material-ID");
+        const input = validateSiteMaterialUpdate(await readJson(request));
+        const siteMaterial = await withReadySession(pool, tokenHash, (client, context) => updateSiteMaterial(client, context, materialId, input));
+        return json(response, 200, { siteMaterial });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/site-reports") {
+        const input = validateSiteReport(await readJson(request));
+        const siteReport = await withReadySession(pool, tokenHash, (client, context) => createSiteReport(client, context, input));
+        return json(response, 201, { siteReport });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/documents") {

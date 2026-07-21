@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 19.07.2026  
-Technischer Stand: V0.18.0
+Stand: 21.07.2026
+Technischer Stand: V0.19.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -68,7 +68,12 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/api/v1/setup` | Status der einmaligen Ersteinrichtung lesen |
 | `POST` | `/api/v1/setup` | Genau den ersten Admin geschützt anlegen |
 | `POST` | `/api/v1/account/initial-password` | Persönliches Startpasswort einmalig ersetzen |
-| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Kunden, Projekte, Baustellen, Dokumente und Wochenplanung Montag bis Freitag |
+| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Kunden, Projekte, Baustellen, Dokumente, Arbeitsmodule und Wochenplanung Montag bis Freitag |
+| `POST` | `/api/v1/admin/site-tasks` | Aufgabe für eine aktive Baustelle anlegen |
+| `PATCH` | `/api/v1/admin/site-tasks/:id` | Aufgabenstatus versionsgeschützt ändern |
+| `POST` | `/api/v1/admin/site-materials` | Materialeintrag für eine aktive Baustelle anlegen |
+| `PATCH` | `/api/v1/admin/site-materials/:id` | Materialstatus versionsgeschützt ändern |
+| `POST` | `/api/v1/admin/site-reports` | Montage- oder Bautagesbericht anlegen und optional mit Originalfoto verknüpfen |
 | `POST` | `/api/v1/admin/documents` | Datei einmalig hochladen und hierarchisch verknüpfen |
 | `GET` | `/api/v1/admin/documents/:id/content` | Dokument nach Sitzungs- und Rollenprüfung herunterladen |
 | `PATCH` | `/api/v1/admin/documents/:id` | Dokument versionsgeschützt archivieren oder reaktivieren |
@@ -155,6 +160,12 @@ den SHA-256-Hash selbst. Bei einer Baustellenzuordnung leitet sie Projekt und
 Kunde aus dem Mandantenbestand ab; widersprüchliche IDs werden abgewiesen. Der
 Download wird nur als Anlage, ohne Cache und mit `X-Content-Type-Options:
 nosniff` ausgeliefert. Metadaten, Inhalt und Links besitzen eigene RLS-Regeln.
+
+Fotografierte Papierberichte dürfen nur auf ein aktives Bilddokument verweisen,
+das derselben Baustelle zugeordnet ist. Die API prüft diesen Bezug innerhalb der
+Mandantentransaktion. Aufgaben- und Materialstatus verlangen die aktuelle
+`rowVersion`; parallele Änderungen werden als Konflikt abgewiesen. Alle drei
+Modultabellen verhindern fachliches Hartlöschen.
 
 ## Lokale Inbetriebnahme
 

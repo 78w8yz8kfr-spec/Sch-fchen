@@ -59,6 +59,7 @@ Vorarbeiterstatus. Wochenansicht und Verwaltung sind getrennte Ansichten.
 Das Baustellen-Dashboard verwendet aufklappbare Themenbereiche für Mitarbeiter,
 Berichte, Dokumente, Fotos, Aufgaben, Material, Notizen und weitere Module. Es
 gibt bewusst keine unübersichtliche Gesamtchronik.
+Noch nicht aktivierte Module erscheinen nicht als funktionslose Platzhalter.
 
 ## Dokumente und Firmenauftritt
 

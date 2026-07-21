@@ -160,3 +160,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Lieferscheine serverseitig auf JPG, PNG und WebP bis 5 MB begrenzt
 - geordneter Umsetzungsplan aus dem Projekt-GPT „Render für Web-App Hosting“ dokumentiert
 - Versionsstand 0.18.0
+- Migration 020 für priorisierte und optional zugewiesene Baustellenaufgaben mit Fälligkeit und Abschlussstatus
+- Migration 021 für Materialbedarf und die Statusfolge benötigt, bestellt, vor Ort und verbraucht
+- Migration 022 für nummerierte Montage- und Bautagesberichte mit digitaler, fotografierter oder diktierter Erfassung
+- echte Aufgaben-, Material- und Berichtsaktionen direkt im Baustellen-Dashboard ohne zusätzliche Hauptnavigation
+- fotografierte Papierberichte werden einmal im zentralen Dokumentenbestand gespeichert und mit dem Bericht verknüpft
+- ruhige Karten-, Formular- und Statusgestaltung nach den vereinbarten mobilen Designspezifikationen
+- ausgeblendete Platzhalter für noch nicht aktivierte Baustellenmodule
+- SQL-Abnahmetests, API-Integrationstest und PWA-Smoke-Test für die neuen Arbeitsmodule
+- Versionsstand 0.19.0

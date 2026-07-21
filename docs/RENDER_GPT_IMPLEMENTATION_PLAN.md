@@ -61,10 +61,13 @@ dürfen keine parallelen Stammdatenbestände erzeugen.
 
 ### Aktueller Ausbauschritt
 
-- Lieferschein direkt in der geöffneten Baustelle fotografieren;
-- Bild einmal zentral speichern und automatisch mit Baustelle, Projekt und
-  Kunde verknüpfen;
-- JPG, PNG und WebP bis 5 MB; kein paralleler Lieferschein-Datensatz.
+- Aufgaben mit Priorität, Zuweisung, Fälligkeit und Arbeitsstatus direkt an der
+  Baustelle;
+- Materialbedarf mit den Stufen benötigt, bestellt, vor Ort und verbraucht;
+- Montage- und Bautagesberichte digital, als unverändertes Originalfoto oder
+  per Diktat erfassen;
+- ruhige Themenbereiche ohne Aktivitätschronik und ohne zusätzliche
+  Hauptnavigation.
 
 ## Geordnete nächste Schritte
 
@@ -72,9 +75,9 @@ dürfen keine parallelen Stammdatenbestände erzeugen.
    Dauerhafte Render-Datenbank, Backups, Wiederherstellung, Überwachung und
    Aufbewahrung festlegen. Für wachsende Dateimengen wird S3-/MinIO-kompatibler
    Objektspeicher angebunden.
-2. **Baustellenarbeit**
-   Aufgaben, Material, Notizen sowie Montage- und Bautagesberichte direkt in
-   der Baustelle ergänzen. Keine globale Aktivitätschronik.
+2. **Baustellenarbeit – Grundfunktion umgesetzt**
+   Aufgaben, Material sowie Montage- und Bautagesberichte liegen direkt in der
+   Baustelle. Notizen folgen erst als aktiviertes Modul mit echtem Datenmodell.
 3. **Berichte und PDFs**
    Entwurf, Freigabe, Unterschriften, unveränderliche PDF-Version und zentrale
    Dokumentverknüpfung. Firmenlogo und zum Erstellzeitpunkt gültige Firmendaten

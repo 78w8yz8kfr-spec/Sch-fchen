@@ -8,8 +8,8 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.18.0">
-    <script src="./app.js?v=0.18.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.19.0">
+    <script src="./app.js?v=0.19.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -123,7 +123,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.18.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.19.0</p>
         </div>
       </section>
 
@@ -363,7 +363,50 @@
                 <summary>Mitarbeiter</summary>
                 <ul id="site-dashboard-employees" class="admin-list"></ul>
               </details>
-              <details><summary>Berichte</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
+              <details id="site-dashboard-reports-panel">
+                <summary>Berichte <span id="site-dashboard-report-count" class="module-count">0</span></summary>
+                <div class="site-work-module">
+                  <div class="report-entry-actions" aria-label="Bericht erfassen">
+                    <button id="site-report-digital" class="module-action module-action--primary" type="button">
+                      <strong>Digital erstellen</strong><span>Montage- oder Bautagesbericht</span>
+                    </button>
+                    <button id="site-report-photo" class="module-action" type="button">
+                      <strong>Papierbericht fotografieren</strong><span>Original direkt ablegen</span>
+                    </button>
+                    <button id="site-report-speech" class="module-action" type="button">
+                      <strong>Bericht diktieren</strong><span>Sprache wird als Text übernommen</span>
+                    </button>
+                  </div>
+                  <input id="site-report-photo-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+                  <form id="site-report-form" class="site-module-form" novalidate hidden>
+                    <input id="site-report-source-mode" type="hidden" value="digital">
+                    <div class="setup-grid">
+                      <div>
+                        <label for="site-report-type">Berichtsart</label>
+                        <select id="site-report-type" required>
+                          <option value="montage">Montagebericht</option>
+                          <option value="daily">Bautagesbericht</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="site-report-date">Arbeitstag</label>
+                        <input id="site-report-date" type="date" required>
+                      </div>
+                    </div>
+                    <label for="site-report-summary">Titel</label>
+                    <input id="site-report-summary" maxlength="200" required placeholder="z. B. Unterverteilung montiert">
+                    <label for="site-report-details">Ausgeführte Arbeiten</label>
+                    <textarea id="site-report-details" maxlength="5000" rows="5" placeholder="Arbeiten, Besonderheiten und Hinweise"></textarea>
+                    <p id="site-report-source-note" class="site-module-form__note"></p>
+                    <div class="site-module-form__actions">
+                      <button id="site-report-submit" class="button button--primary" type="submit">Bericht speichern</button>
+                      <button id="site-report-cancel" class="text-button" type="button">Abbrechen</button>
+                    </div>
+                    <p id="site-report-message" class="form-message" aria-live="polite"></p>
+                  </form>
+                  <ul id="site-dashboard-reports" class="site-module-list" aria-label="Berichte dieser Baustelle"></ul>
+                </div>
+              </details>
               <details id="site-dashboard-documents-panel">
                 <summary>Dokumente <span id="site-dashboard-document-count" class="module-count">0</span></summary>
                 <div class="site-document-module">
@@ -391,11 +434,74 @@
                   <ul id="site-dashboard-documents" class="document-compact-list" aria-label="Dokumente dieser Baustelle"></ul>
                 </div>
               </details>
-              <details><summary>Fotos</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
-              <details><summary>Aufgaben</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
-              <details><summary>Material</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
-              <details><summary>Notizen</summary><p>Dieses Modul ist noch nicht aktiviert.</p></details>
-              <details><summary>Weitere Module</summary><p>VDE, LWL, DGUV und KNX werden hier modular ergänzt.</p></details>
+              <details id="site-dashboard-tasks-panel">
+                <summary>Aufgaben <span id="site-dashboard-task-count" class="module-count">0</span></summary>
+                <div class="site-work-module">
+                  <button id="site-task-add" class="button button--primary" type="button">Aufgabe hinzufügen</button>
+                  <form id="site-task-form" class="site-module-form" novalidate hidden>
+                    <label for="site-task-title">Aufgabe</label>
+                    <input id="site-task-title" maxlength="180" required placeholder="Was ist zu erledigen?">
+                    <label for="site-task-details">Beschreibung <span>(optional)</span></label>
+                    <textarea id="site-task-details" maxlength="2000" rows="3"></textarea>
+                    <div class="setup-grid">
+                      <div>
+                        <label for="site-task-assignee">Mitarbeiter</label>
+                        <select id="site-task-assignee"><option value="">Noch nicht zuweisen</option></select>
+                      </div>
+                      <div>
+                        <label for="site-task-priority">Priorität</label>
+                        <select id="site-task-priority">
+                          <option value="normal">Normal</option>
+                          <option value="high">Dringend</option>
+                          <option value="low">Niedrig</option>
+                        </select>
+                      </div>
+                    </div>
+                    <label for="site-task-due-date">Fällig am <span>(optional)</span></label>
+                    <input id="site-task-due-date" type="date">
+                    <div class="site-module-form__actions">
+                      <button class="button button--primary" type="submit">Aufgabe speichern</button>
+                      <button id="site-task-cancel" class="text-button" type="button">Abbrechen</button>
+                    </div>
+                    <p id="site-task-message" class="form-message" aria-live="polite"></p>
+                  </form>
+                  <ul id="site-dashboard-tasks" class="site-module-list" aria-label="Aufgaben dieser Baustelle"></ul>
+                </div>
+              </details>
+              <details id="site-dashboard-materials-panel">
+                <summary>Material <span id="site-dashboard-material-count" class="module-count">0</span></summary>
+                <div class="site-work-module">
+                  <button id="site-material-add" class="button button--primary" type="button">Material hinzufügen</button>
+                  <form id="site-material-form" class="site-module-form" novalidate hidden>
+                    <label for="site-material-name">Material</label>
+                    <input id="site-material-name" maxlength="180" required placeholder="z. B. NYM-J 3x1,5">
+                    <div class="setup-grid">
+                      <div>
+                        <label for="site-material-quantity">Menge</label>
+                        <input id="site-material-quantity" type="number" min="0.001" max="999999999" step="0.001" inputmode="decimal" required>
+                      </div>
+                      <div>
+                        <label for="site-material-unit">Einheit</label>
+                        <select id="site-material-unit">
+                          <option value="Stk.">Stk.</option><option value="m">m</option><option value="Rolle">Rolle</option><option value="Paket">Paket</option><option value="kg">kg</option>
+                        </select>
+                      </div>
+                    </div>
+                    <label for="site-material-status">Stand</label>
+                    <select id="site-material-status">
+                      <option value="planned">Benötigt</option><option value="ordered">Bestellt</option><option value="available">Vor Ort</option><option value="used">Verbraucht</option>
+                    </select>
+                    <label for="site-material-note">Hinweis <span>(optional)</span></label>
+                    <input id="site-material-note" maxlength="1000">
+                    <div class="site-module-form__actions">
+                      <button class="button button--primary" type="submit">Material speichern</button>
+                      <button id="site-material-cancel" class="text-button" type="button">Abbrechen</button>
+                    </div>
+                    <p id="site-material-message" class="form-message" aria-live="polite"></p>
+                  </form>
+                  <ul id="site-dashboard-materials" class="site-module-list" aria-label="Material dieser Baustelle"></ul>
+                </div>
+              </details>
             </section>
 
             <section id="admin-week" class="admin-week" aria-labelledby="admin-week-title">

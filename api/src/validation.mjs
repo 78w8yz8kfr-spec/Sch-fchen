@@ -38,6 +38,11 @@ const DOCUMENT_MIME_TYPES = new Map([
 ]);
 const MAXIMUM_DOCUMENT_BYTES = 5_000_000;
 const DELIVERY_NOTE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const SITE_TASK_PRIORITIES = new Set(["low", "normal", "high"]);
+const SITE_TASK_STATUSES = new Set(["open", "in_progress", "done", "archived"]);
+const SITE_MATERIAL_STATUSES = new Set(["planned", "ordered", "available", "used", "archived"]);
+const SITE_REPORT_TYPES = new Set(["montage", "daily"]);
+const SITE_REPORT_SOURCES = new Set(["digital", "photo", "speech"]);
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -401,6 +406,80 @@ export function validateDocumentStatusUpdate(body) {
     throw new InputError("Die Dokumentversion ist ungültig.");
   }
   return { status, rowVersion };
+}
+
+export function validateSiteTask(body) {
+  rejectTenantFields(body);
+  const priority = text(body.priority, "Priorität", 3, 20).toLowerCase();
+  if (!SITE_TASK_PRIORITIES.has(priority)) throw new InputError("Die Aufgabenpriorität ist ungültig.");
+  return {
+    constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
+    title: text(body.title, "Aufgabentitel", 2, 180),
+    details: optionalText(body.details, "Aufgabenbeschreibung", 2000),
+    priority,
+    assignedUserId: optionalUuid(body.assignedUserId, "Mitarbeiter"),
+    dueDate: body.dueDate ? validateWorkDate(body.dueDate) : null
+  };
+}
+
+export function validateSiteTaskUpdate(body) {
+  rejectTenantFields(body);
+  const status = text(body.status, "Aufgabenstatus", 2, 20).toLowerCase();
+  if (!SITE_TASK_STATUSES.has(status)) throw new InputError("Der Aufgabenstatus ist ungültig.");
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) throw new InputError("Die Aufgabenversion ist ungültig.");
+  return { status, rowVersion };
+}
+
+export function validateSiteMaterial(body) {
+  rejectTenantFields(body);
+  const quantity = Number(body.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 999999999) {
+    throw new InputError("Die Materialmenge ist ungültig.");
+  }
+  const status = text(body.status || "planned", "Materialstatus", 2, 20).toLowerCase();
+  if (!SITE_MATERIAL_STATUSES.has(status)) throw new InputError("Der Materialstatus ist ungültig.");
+  return {
+    constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
+    itemName: text(body.itemName, "Materialbezeichnung", 2, 180),
+    quantity,
+    unit: text(body.unit, "Einheit", 1, 20),
+    status,
+    note: optionalText(body.note, "Materialhinweis", 1000)
+  };
+}
+
+export function validateSiteMaterialUpdate(body) {
+  rejectTenantFields(body);
+  const status = text(body.status, "Materialstatus", 2, 20).toLowerCase();
+  if (!SITE_MATERIAL_STATUSES.has(status)) throw new InputError("Der Materialstatus ist ungültig.");
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) throw new InputError("Die Materialversion ist ungültig.");
+  return { status, rowVersion };
+}
+
+export function validateSiteReport(body) {
+  rejectTenantFields(body);
+  const reportType = text(body.reportType, "Berichtsart", 2, 20).toLowerCase();
+  const sourceMode = text(body.sourceMode, "Erfassungsart", 2, 20).toLowerCase();
+  if (!SITE_REPORT_TYPES.has(reportType)) throw new InputError("Die Berichtsart ist ungültig.");
+  if (!SITE_REPORT_SOURCES.has(sourceMode)) throw new InputError("Die Erfassungsart ist ungültig.");
+  const sourceDocumentId = optionalUuid(body.sourceDocumentId, "Originaldokument");
+  if (sourceMode === "photo" && !sourceDocumentId) {
+    throw new InputError("Ein fotografierter Papierbericht benötigt das Originalfoto.");
+  }
+  if (sourceMode !== "photo" && sourceDocumentId) {
+    throw new InputError("Ein Originalfoto darf nur einem fotografierten Papierbericht zugeordnet werden.");
+  }
+  return {
+    constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
+    reportType,
+    workDate: validateWorkDate(body.workDate),
+    sourceMode,
+    summary: text(body.summary, "Berichtstitel", 2, 200),
+    details: optionalText(body.details, "Berichtsinhalt", 5000),
+    sourceDocumentId
+  };
 }
 
 export function validateWorkDate(value) {

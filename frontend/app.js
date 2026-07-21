@@ -120,6 +120,22 @@
     siteDashboardOrder: document.querySelector("#site-dashboard-order"),
     siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
     siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
+    siteDashboardReportCount: document.querySelector("#site-dashboard-report-count"),
+    siteDashboardReports: document.querySelector("#site-dashboard-reports"),
+    siteReportDigital: document.querySelector("#site-report-digital"),
+    siteReportPhoto: document.querySelector("#site-report-photo"),
+    siteReportSpeech: document.querySelector("#site-report-speech"),
+    siteReportPhotoInput: document.querySelector("#site-report-photo-input"),
+    siteReportForm: document.querySelector("#site-report-form"),
+    siteReportSourceMode: document.querySelector("#site-report-source-mode"),
+    siteReportType: document.querySelector("#site-report-type"),
+    siteReportDate: document.querySelector("#site-report-date"),
+    siteReportSummary: document.querySelector("#site-report-summary"),
+    siteReportDetails: document.querySelector("#site-report-details"),
+    siteReportSourceNote: document.querySelector("#site-report-source-note"),
+    siteReportSubmit: document.querySelector("#site-report-submit"),
+    siteReportCancel: document.querySelector("#site-report-cancel"),
+    siteReportMessage: document.querySelector("#site-report-message"),
     siteDashboardDocumentsPanel: document.querySelector("#site-dashboard-documents-panel"),
     siteDashboardDocumentCount: document.querySelector("#site-dashboard-document-count"),
     siteDashboardDocuments: document.querySelector("#site-dashboard-documents"),
@@ -132,6 +148,28 @@
     siteDashboardDeliveryNoteCancel: document.querySelector("#site-dashboard-delivery-note-cancel"),
     siteDashboardDeliveryNoteMessage: document.querySelector("#site-dashboard-delivery-note-message"),
     siteDashboardAddDocument: document.querySelector("#site-dashboard-add-document"),
+    siteDashboardTaskCount: document.querySelector("#site-dashboard-task-count"),
+    siteDashboardTasks: document.querySelector("#site-dashboard-tasks"),
+    siteTaskAdd: document.querySelector("#site-task-add"),
+    siteTaskForm: document.querySelector("#site-task-form"),
+    siteTaskTitle: document.querySelector("#site-task-title"),
+    siteTaskDetails: document.querySelector("#site-task-details"),
+    siteTaskAssignee: document.querySelector("#site-task-assignee"),
+    siteTaskPriority: document.querySelector("#site-task-priority"),
+    siteTaskDueDate: document.querySelector("#site-task-due-date"),
+    siteTaskCancel: document.querySelector("#site-task-cancel"),
+    siteTaskMessage: document.querySelector("#site-task-message"),
+    siteDashboardMaterialCount: document.querySelector("#site-dashboard-material-count"),
+    siteDashboardMaterials: document.querySelector("#site-dashboard-materials"),
+    siteMaterialAdd: document.querySelector("#site-material-add"),
+    siteMaterialForm: document.querySelector("#site-material-form"),
+    siteMaterialName: document.querySelector("#site-material-name"),
+    siteMaterialQuantity: document.querySelector("#site-material-quantity"),
+    siteMaterialUnit: document.querySelector("#site-material-unit"),
+    siteMaterialStatus: document.querySelector("#site-material-status"),
+    siteMaterialNote: document.querySelector("#site-material-note"),
+    siteMaterialCancel: document.querySelector("#site-material-cancel"),
+    siteMaterialMessage: document.querySelector("#site-material-message"),
     siteDashboardEdit: document.querySelector("#site-dashboard-edit"),
     adminWeek: document.querySelector("#admin-week"),
     siteDashboardClose: document.querySelector("#site-dashboard-close"),
@@ -344,6 +382,8 @@
   let siteImportState = null;
   let documentFile = null;
   let deliveryNoteFile = null;
+  let reportPhotoFile = null;
+  let speechRecognition = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -446,7 +486,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.18.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.19.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1075,6 +1115,233 @@
     });
   }
 
+  function taskPriorityLabel(priority) {
+    return { low: "Niedrig", normal: "Normal", high: "Dringend" }[priority] || priority;
+  }
+
+  function taskStatusLabel(status) {
+    return { open: "Offen", in_progress: "In Arbeit", done: "Erledigt", archived: "Archiviert" }[status] || status;
+  }
+
+  function materialStatusLabel(status) {
+    return {
+      planned: "Benötigt",
+      ordered: "Bestellt",
+      available: "Vor Ort",
+      used: "Verbraucht",
+      archived: "Archiviert"
+    }[status] || status;
+  }
+
+  function reportTypeLabel(type) {
+    return { montage: "Montagebericht", daily: "Bautagesbericht" }[type] || type;
+  }
+
+  function reportSourceLabel(source) {
+    return { digital: "Digital", photo: "Originalfoto", speech: "Diktiert" }[source] || source;
+  }
+
+  function appendSiteModuleEmpty(list, message) {
+    const empty = document.createElement("li");
+    empty.className = "site-module-list__empty";
+    empty.textContent = message;
+    list.append(empty);
+  }
+
+  function renderSiteTasks(siteId) {
+    const tasks = (adminState?.siteTasks || []).filter((task) => (
+      task.constructionSiteId === siteId && task.status !== "archived"
+    ));
+    const activeCount = tasks.filter((task) => task.status !== "done").length;
+    elements.siteDashboardTaskCount.textContent = String(activeCount);
+    elements.siteDashboardTasks.replaceChildren();
+    if (tasks.length === 0) {
+      appendSiteModuleEmpty(elements.siteDashboardTasks, "Noch keine Aufgabe für diese Baustelle.");
+      return;
+    }
+    tasks.forEach((task) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badges = document.createElement("span");
+      const meta = document.createElement("span");
+      const action = document.createElement("button");
+      const next = task.status === "open" ? "in_progress" : task.status === "in_progress" ? "done" : "open";
+      title.textContent = task.title;
+      badges.className = "site-module-item__badges";
+      badges.append(
+        Object.assign(document.createElement("small"), {
+          className: `module-chip module-chip--${task.status}`,
+          textContent: taskStatusLabel(task.status)
+        }),
+        Object.assign(document.createElement("small"), {
+          className: `module-chip module-chip--priority-${task.priority}`,
+          textContent: taskPriorityLabel(task.priority)
+        })
+      );
+      heading.append(title, badges);
+      meta.textContent = [
+        task.assignedUserName || "Noch nicht zugewiesen",
+        task.dueDate ? `fällig ${new Intl.DateTimeFormat("de-DE").format(new Date(`${task.dueDate}T12:00:00`))}` : null,
+        task.details
+      ].filter(Boolean).join(" · ");
+      content.append(heading, meta);
+      action.type = "button";
+      action.className = "text-button site-module-item__action";
+      action.textContent = task.status === "open" ? "Beginnen" : task.status === "in_progress" ? "Erledigt" : "Wieder öffnen";
+      action.addEventListener("click", async () => {
+        action.disabled = true;
+        try {
+          await requestJson(`./api/v1/admin/site-tasks/${encodeURIComponent(task.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: next, rowVersion: task.rowVersion })
+          });
+          await refreshAdmin();
+          showToast(next === "done" ? "Aufgabe erledigt." : "Aufgabenstatus aktualisiert.");
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          action.disabled = false;
+        }
+      });
+      item.className = "site-module-item";
+      item.append(content, action);
+      elements.siteDashboardTasks.append(item);
+    });
+  }
+
+  function renderSiteMaterials(siteId) {
+    const materials = (adminState?.siteMaterials || []).filter((material) => (
+      material.constructionSiteId === siteId && material.status !== "archived"
+    ));
+    const pendingCount = materials.filter((material) => material.status !== "used").length;
+    elements.siteDashboardMaterialCount.textContent = String(pendingCount);
+    elements.siteDashboardMaterials.replaceChildren();
+    if (materials.length === 0) {
+      appendSiteModuleEmpty(elements.siteDashboardMaterials, "Noch kein Material für diese Baustelle erfasst.");
+      return;
+    }
+    const nextStatus = { planned: "ordered", ordered: "available", available: "used" };
+    const nextLabel = { planned: "Als bestellt", ordered: "Ist vor Ort", available: "Als verbraucht" };
+    materials.forEach((material) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("small");
+      const meta = document.createElement("span");
+      title.textContent = material.itemName;
+      badge.className = `module-chip module-chip--material-${material.status}`;
+      badge.textContent = materialStatusLabel(material.status);
+      heading.append(title, badge);
+      meta.textContent = [`${material.quantity} ${material.unit}`, material.note].filter(Boolean).join(" · ");
+      content.append(heading, meta);
+      item.className = "site-module-item";
+      item.append(content);
+      if (nextStatus[material.status]) {
+        const action = document.createElement("button");
+        action.type = "button";
+        action.className = "text-button site-module-item__action";
+        action.textContent = nextLabel[material.status];
+        action.addEventListener("click", async () => {
+          action.disabled = true;
+          try {
+            await requestJson(`./api/v1/admin/site-materials/${encodeURIComponent(material.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ status: nextStatus[material.status], rowVersion: material.rowVersion })
+            });
+            await refreshAdmin();
+            showToast("Materialstatus aktualisiert.");
+          } catch (error) {
+            showToast(error.message);
+          } finally {
+            action.disabled = false;
+          }
+        });
+        item.append(action);
+      }
+      elements.siteDashboardMaterials.append(item);
+    });
+  }
+
+  function renderSiteReports(siteId) {
+    const reports = (adminState?.siteReports || []).filter((report) => report.constructionSiteId === siteId);
+    elements.siteDashboardReportCount.textContent = String(reports.length);
+    elements.siteDashboardReports.replaceChildren();
+    if (reports.length === 0) {
+      appendSiteModuleEmpty(elements.siteDashboardReports, "Noch kein Bericht für diese Baustelle.");
+      return;
+    }
+    reports.forEach((report) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("small");
+      const meta = document.createElement("span");
+      title.textContent = report.summary;
+      badge.className = "module-chip";
+      badge.textContent = reportTypeLabel(report.reportType);
+      heading.append(title, badge);
+      meta.textContent = [
+        report.number,
+        new Intl.DateTimeFormat("de-DE").format(new Date(`${report.workDate}T12:00:00`)),
+        reportSourceLabel(report.sourceMode),
+        report.authorName,
+        report.details
+      ].filter(Boolean).join(" · ");
+      content.append(heading, meta);
+      item.className = "site-module-item";
+      item.append(content);
+      const sourceDocument = adminState.documents.find((documentItem) => documentItem.id === report.sourceDocumentId);
+      if (sourceDocument) item.append(documentDownloadLink(sourceDocument, true));
+      elements.siteDashboardReports.append(item);
+    });
+  }
+
+  function resetSiteTaskForm() {
+    elements.siteTaskForm.reset();
+    elements.siteTaskForm.hidden = true;
+    elements.siteTaskMessage.textContent = "";
+  }
+
+  function resetSiteMaterialForm() {
+    elements.siteMaterialForm.reset();
+    elements.siteMaterialForm.hidden = true;
+    elements.siteMaterialMessage.textContent = "";
+  }
+
+  function resetSiteReportForm() {
+    if (speechRecognition) {
+      speechRecognition.stop();
+      speechRecognition = null;
+    }
+    reportPhotoFile = null;
+    elements.siteReportPhotoInput.value = "";
+    elements.siteReportForm.reset();
+    elements.siteReportSourceMode.value = "digital";
+    elements.siteReportDate.value = localDateKey();
+    elements.siteReportSourceNote.textContent = "";
+    elements.siteReportMessage.textContent = "";
+    elements.siteReportForm.hidden = true;
+    elements.siteReportSubmit.disabled = false;
+  }
+
+  function openSiteReportForm(sourceMode, photoFile = null) {
+    resetSiteReportForm();
+    reportPhotoFile = photoFile;
+    elements.siteReportSourceMode.value = sourceMode;
+    elements.siteReportDate.value = localDateKey();
+    elements.siteReportSourceNote.textContent = {
+      digital: "Der Bericht wird direkt digital erfasst.",
+      photo: reportPhotoFile ? `${reportPhotoFile.name} · ${formatFileSize(reportPhotoFile.size)}` : "Originalfoto auswählen.",
+      speech: "Das Diktat wird als bearbeitbarer Text übernommen."
+    }[sourceMode];
+    elements.siteReportForm.hidden = false;
+    elements.siteReportSummary.focus({ preventScroll: true });
+  }
+
   function projectStatusLabel(status) {
     return {
       planned: "Geplant",
@@ -1334,6 +1601,9 @@
 
     openedSiteId = site.id;
     resetDeliveryNoteCapture();
+    resetSiteTaskForm();
+    resetSiteMaterialForm();
+    resetSiteReportForm();
     elements.siteDashboardTitle.textContent = site.name;
     elements.siteDashboardMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
     elements.siteDashboardStatus.textContent = siteStatusLabel(site.status);
@@ -1354,6 +1624,15 @@
       });
     }
     renderSiteDocuments(site.id);
+    renderAdminSelect(
+      elements.siteTaskAssignee,
+      adminState.employees,
+      "Noch nicht zuweisen",
+      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
+    );
+    renderSiteTasks(site.id);
+    renderSiteMaterials(site.id);
+    renderSiteReports(site.id);
     elements.siteEditForm.hidden = true;
     elements.siteEditMessage.textContent = "";
     elements.siteDashboardEdit.hidden = false;
@@ -1639,7 +1918,12 @@
     renderProjectList();
     renderSiteList();
     renderDocumentList();
-    if (openedSiteId && !elements.siteDashboard.hidden) renderSiteDocuments(openedSiteId);
+    if (openedSiteId && !elements.siteDashboard.hidden) {
+      renderSiteDocuments(openedSiteId);
+      renderSiteTasks(openedSiteId);
+      renderSiteMaterials(openedSiteId);
+      renderSiteReports(openedSiteId);
+    }
 
     elements.adminAssignmentList.replaceChildren();
     if (adminState.assignments.length === 0) {
@@ -2625,6 +2909,187 @@
     }
   });
 
+  elements.siteTaskAdd.addEventListener("click", () => {
+    resetSiteTaskForm();
+    elements.siteTaskForm.hidden = false;
+    elements.siteTaskTitle.focus({ preventScroll: true });
+  });
+  elements.siteTaskCancel.addEventListener("click", resetSiteTaskForm);
+  elements.siteTaskForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    const submit = elements.siteTaskForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    elements.siteTaskMessage.textContent = "Aufgabe wird gespeichert …";
+    try {
+      await requestJson("./api/v1/admin/site-tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          constructionSiteId: site.id,
+          title: elements.siteTaskTitle.value,
+          details: elements.siteTaskDetails.value,
+          assignedUserId: elements.siteTaskAssignee.value,
+          priority: elements.siteTaskPriority.value,
+          dueDate: elements.siteTaskDueDate.value
+        })
+      });
+      resetSiteTaskForm();
+      await refreshAdmin();
+      showToast("Aufgabe für die Baustelle gespeichert.");
+    } catch (error) {
+      elements.siteTaskMessage.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  elements.siteMaterialAdd.addEventListener("click", () => {
+    resetSiteMaterialForm();
+    elements.siteMaterialForm.hidden = false;
+    elements.siteMaterialName.focus({ preventScroll: true });
+  });
+  elements.siteMaterialCancel.addEventListener("click", resetSiteMaterialForm);
+  elements.siteMaterialForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    const submit = elements.siteMaterialForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    elements.siteMaterialMessage.textContent = "Material wird gespeichert …";
+    try {
+      await requestJson("./api/v1/admin/site-materials", {
+        method: "POST",
+        body: JSON.stringify({
+          constructionSiteId: site.id,
+          itemName: elements.siteMaterialName.value,
+          quantity: Number(elements.siteMaterialQuantity.value),
+          unit: elements.siteMaterialUnit.value,
+          status: elements.siteMaterialStatus.value,
+          note: elements.siteMaterialNote.value
+        })
+      });
+      resetSiteMaterialForm();
+      await refreshAdmin();
+      showToast("Material für die Baustelle gespeichert.");
+    } catch (error) {
+      elements.siteMaterialMessage.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  elements.siteReportDigital.addEventListener("click", () => openSiteReportForm("digital"));
+  elements.siteReportPhoto.addEventListener("click", () => elements.siteReportPhotoInput.click());
+  elements.siteReportPhotoInput.addEventListener("change", () => {
+    const file = elements.siteReportPhotoInput.files?.[0] || null;
+    if (!file) return;
+    if (!isDeliveryNotePhoto(file)) {
+      openSiteReportForm("photo");
+      elements.siteReportMessage.textContent = "Bitte ein JPG-, PNG- oder WebP-Foto mit höchstens 5 MB auswählen.";
+      elements.siteReportSubmit.disabled = true;
+      return;
+    }
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    openSiteReportForm("photo", file);
+    elements.siteReportSummary.value = `Papierbericht · ${site?.name || "Baustelle"} · ${new Intl.DateTimeFormat("de-DE").format(new Date())}`;
+    elements.siteReportSourceNote.textContent = `${file.name} · ${formatFileSize(file.size)} · Das Originalfoto bleibt unverändert erhalten.`;
+  });
+  elements.siteReportSpeech.addEventListener("click", () => {
+    openSiteReportForm("speech");
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      elements.siteReportMessage.textContent = "Dieser Browser unterstützt kein Diktat. Der Bericht kann hier trotzdem direkt eingetippt werden.";
+      elements.siteReportDetails.focus({ preventScroll: true });
+      return;
+    }
+    const recognition = new Recognition();
+    speechRecognition = recognition;
+    recognition.lang = "de-DE";
+    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.onresult = (event) => {
+      const transcript = [...event.results]
+        .slice(event.resultIndex)
+        .map((result) => result[0]?.transcript || "")
+        .join(" ")
+        .trim();
+      if (transcript) {
+        elements.siteReportDetails.value = `${elements.siteReportDetails.value.trim()} ${transcript}`.trim();
+      }
+    };
+    recognition.onerror = () => {
+      elements.siteReportMessage.textContent = "Das Diktat wurde unterbrochen. Der bisherige Text kann geprüft und ergänzt werden.";
+    };
+    recognition.onend = () => {
+      if (speechRecognition === recognition) {
+        speechRecognition = null;
+        if (!elements.siteReportMessage.textContent) elements.siteReportMessage.textContent = "Diktat beendet. Bitte den Text vor dem Speichern prüfen.";
+      }
+    };
+    elements.siteReportMessage.textContent = "Ich höre zu … zum Beenden erneut „Bericht diktieren“ antippen oder den Bericht speichern.";
+    try {
+      recognition.start();
+    } catch {
+      speechRecognition = null;
+      elements.siteReportMessage.textContent = "Das Diktat konnte nicht gestartet werden. Der Bericht kann direkt eingetippt werden.";
+    }
+  });
+  elements.siteReportCancel.addEventListener("click", resetSiteReportForm);
+  elements.siteReportForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    const sourceMode = elements.siteReportSourceMode.value;
+    if (!site) return;
+    if (sourceMode === "photo" && !isDeliveryNotePhoto(reportPhotoFile)) {
+      elements.siteReportMessage.textContent = "Bitte zuerst ein gültiges Originalfoto auswählen.";
+      return;
+    }
+    if (speechRecognition) {
+      speechRecognition.stop();
+      speechRecognition = null;
+    }
+    elements.siteReportSubmit.disabled = true;
+    elements.siteReportMessage.textContent = sourceMode === "photo"
+      ? "Originalfoto und Bericht werden gespeichert …"
+      : "Bericht wird gespeichert …";
+    try {
+      let sourceDocumentId = null;
+      if (sourceMode === "photo") {
+        const uploaded = await requestJson("./api/v1/admin/documents", {
+          method: "POST",
+          body: JSON.stringify({
+            title: elements.siteReportSummary.value,
+            category: "report",
+            fileName: reportPhotoFile.name,
+            mimeType: documentMimeType(reportPhotoFile),
+            contentBase64: arrayBufferToBase64(await reportPhotoFile.arrayBuffer()),
+            constructionSiteId: site.id
+          })
+        });
+        sourceDocumentId = uploaded.document.id;
+      }
+      await requestJson("./api/v1/admin/site-reports", {
+        method: "POST",
+        body: JSON.stringify({
+          constructionSiteId: site.id,
+          reportType: elements.siteReportType.value,
+          workDate: elements.siteReportDate.value,
+          sourceMode,
+          summary: elements.siteReportSummary.value,
+          details: elements.siteReportDetails.value,
+          sourceDocumentId
+        })
+      });
+      resetSiteReportForm();
+      await refreshAdmin();
+      showToast("Bericht gespeichert und der Baustelle zugeordnet.");
+    } catch (error) {
+      elements.siteReportMessage.textContent = error.message;
+      elements.siteReportSubmit.disabled = false;
+    }
+  });
+
   elements.assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const saved = await submitAdminForm(
@@ -2930,6 +3395,9 @@
     showDashboardPane("more");
   });
   elements.siteDashboardClose.addEventListener("click", () => {
+    resetSiteReportForm();
+    resetSiteTaskForm();
+    resetSiteMaterialForm();
     openedSiteId = null;
     elements.siteEditForm.hidden = true;
     elements.siteDashboard.hidden = true;

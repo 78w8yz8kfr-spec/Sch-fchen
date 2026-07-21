@@ -38,7 +38,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -47,7 +48,8 @@ button {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid rgba(227, 6, 19, 0.28);
   outline-offset: 2px;
 }
@@ -298,14 +300,26 @@ select:focus-visible {
 
 .login-form input,
 .admin-form input,
-.admin-form select {
+.admin-form select,
+.admin-form textarea {
   width: 100%;
-  height: 52px;
   border: 1px solid #cfd9d3;
   border-radius: 14px;
   color: var(--ink);
   background: var(--surface);
   padding: 0 15px;
+}
+
+.admin-form input,
+.admin-form select {
+  height: 52px;
+}
+
+.admin-form textarea {
+  min-height: 104px;
+  padding-top: 13px;
+  padding-bottom: 13px;
+  resize: vertical;
 }
 
 .login-form input::placeholder {
@@ -1871,6 +1885,213 @@ select:focus-visible {
 .site-document-module > .button {
   min-height: 44px;
   margin: 0;
+}
+
+.site-work-module {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.site-work-module > .button {
+  min-height: 44px;
+  margin: 0;
+}
+
+.report-entry-actions {
+  display: grid;
+  gap: 9px;
+}
+
+.module-action {
+  display: grid;
+  width: 100%;
+  min-height: 62px;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  text-align: left;
+}
+
+.module-action strong {
+  font-size: 0.74rem;
+}
+
+.module-action span {
+  color: var(--muted);
+  font-size: 0.63rem;
+  line-height: 1.35;
+}
+
+.module-action--primary {
+  border-color: var(--brand);
+  color: #ffffff;
+  background: var(--brand);
+  box-shadow: 0 8px 22px rgba(227, 6, 19, 0.16);
+}
+
+.module-action--primary span {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.site-module-form {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid #f0c3c7;
+  border-radius: 14px;
+  background: #fffafa;
+}
+
+.site-module-form label {
+  font-size: 0.69rem;
+  font-weight: 800;
+}
+
+.site-module-form label span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.site-module-form input,
+.site-module-form select,
+.site-module-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfd9d3;
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  padding: 0 12px;
+}
+
+.site-module-form input,
+.site-module-form select {
+  height: 46px;
+}
+
+.site-module-form textarea {
+  min-height: 92px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  resize: vertical;
+}
+
+.site-module-form__note,
+.site-module-form .form-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.site-module-form__actions {
+  display: grid;
+  gap: 7px;
+}
+
+.site-module-form__actions .button {
+  min-height: 44px;
+  margin: 0;
+}
+
+.site-module-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-module-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.site-module-item > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.site-module-item > div > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.site-module-item strong {
+  font-size: 0.74rem;
+}
+
+.site-module-item span {
+  color: var(--muted);
+  font-size: 0.63rem;
+  line-height: 1.45;
+}
+
+.site-module-item__badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.module-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #555555;
+  background: #eeeeee;
+  font-size: 0.56rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.module-chip--open,
+.module-chip--material-planned {
+  color: #744d00;
+  background: #fff3cc;
+}
+
+.module-chip--in_progress,
+.module-chip--material-ordered {
+  color: #174f78;
+  background: #e4f2fc;
+}
+
+.module-chip--done,
+.module-chip--material-available,
+.module-chip--material-used {
+  color: #17613b;
+  background: #e3f5eb;
+}
+
+.module-chip--priority-high {
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+}
+
+.site-module-item__action,
+.site-module-item > .document-download {
+  flex: 0 0 auto;
+}
+
+.site-module-list__empty {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: center;
 }
 
 .delivery-note-capture {

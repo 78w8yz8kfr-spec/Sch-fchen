@@ -342,6 +342,64 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(structuredSite.status, "active");
   assert.equal(structuredSite.rowVersion, 1);
 
+  const siteTaskResponse = await fetch(`${baseUrl}/api/v1/admin/site-tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      constructionSiteId: structuredSite.id,
+      title: "Unterverteilung beschriften",
+      details: "Stromkreise eindeutig kennzeichnen",
+      assignedUserId: employee.id,
+      priority: "high",
+      dueDate: assignmentDate
+    })
+  });
+  assert.equal(siteTaskResponse.status, 201, await siteTaskResponse.clone().text());
+  const siteTask = (await siteTaskResponse.json()).siteTask;
+  assert.equal(siteTask.status, "open");
+  assert.equal(siteTask.assignedUserId, employee.id);
+
+  const completedSiteTaskResponse = await fetch(
+    `${baseUrl}/api/v1/admin/site-tasks/${siteTask.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ status: "done", rowVersion: siteTask.rowVersion })
+    }
+  );
+  assert.equal(completedSiteTaskResponse.status, 200, await completedSiteTaskResponse.clone().text());
+  const completedSiteTask = (await completedSiteTaskResponse.json()).siteTask;
+  assert.equal(completedSiteTask.status, "done");
+  assert.ok(completedSiteTask.completedAt);
+
+  const siteMaterialResponse = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      constructionSiteId: structuredSite.id,
+      itemName: "NYM-J 3x1,5",
+      quantity: 100,
+      unit: "m",
+      status: "planned",
+      note: "Eine Rolle"
+    })
+  });
+  assert.equal(siteMaterialResponse.status, 201, await siteMaterialResponse.clone().text());
+  const siteMaterial = (await siteMaterialResponse.json()).siteMaterial;
+  assert.equal(siteMaterial.status, "planned");
+  assert.equal(siteMaterial.quantity, 100);
+
+  const availableMaterialResponse = await fetch(
+    `${baseUrl}/api/v1/admin/site-materials/${siteMaterial.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ status: "available", rowVersion: siteMaterial.rowVersion })
+    }
+  );
+  assert.equal(availableMaterialResponse.status, 200, await availableMaterialResponse.clone().text());
+  assert.equal((await availableMaterialResponse.json()).siteMaterial.status, "available");
+
   const documentContent = Buffer.from(`%PDF-1.4\nSchäfchen Dokument ${suffix}`, "utf8");
   const documentUploadResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
     method: "POST",
@@ -364,6 +422,40 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.ok(uploadedDocument.links.some((link) => link.customerId === customer.id));
   assert.ok(uploadedDocument.links.some((link) => link.projectId === project.id));
   assert.ok(uploadedDocument.links.some((link) => link.constructionSiteId === structuredSite.id));
+
+  const reportPhotoResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      title: `Papierbericht ${suffix}`,
+      category: "report",
+      fileName: `Papierbericht-${suffix}.jpg`,
+      mimeType: "image/jpeg",
+      contentBase64: Buffer.from(`JPEG-Test-${suffix}`).toString("base64"),
+      constructionSiteId: structuredSite.id
+    })
+  });
+  assert.equal(reportPhotoResponse.status, 201, await reportPhotoResponse.clone().text());
+  const reportPhoto = (await reportPhotoResponse.json()).document;
+
+  const siteReportResponse = await fetch(`${baseUrl}/api/v1/admin/site-reports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      constructionSiteId: structuredSite.id,
+      reportType: "montage",
+      workDate: assignmentDate,
+      sourceMode: "photo",
+      summary: "Montagefortschritt",
+      details: "Unterverteilung gesetzt und beschriftet",
+      sourceDocumentId: reportPhoto.id
+    })
+  });
+  assert.equal(siteReportResponse.status, 201, await siteReportResponse.clone().text());
+  const siteReport = (await siteReportResponse.json()).siteReport;
+  assert.match(siteReport.number, /^SE-R-\d{4}-\d{5}$/);
+  assert.equal(siteReport.sourceDocumentId, reportPhoto.id);
+  assert.equal(siteReport.status, "submitted");
 
   const mismatchedDocumentResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
     method: "POST",
@@ -505,6 +597,9 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     structureOverview.documents.filter((item) => item.id === uploadedDocument.id).length,
     1
   );
+  assert.ok(structureOverview.siteTasks.some((item) => item.id === completedSiteTask.id && item.status === "done"));
+  assert.ok(structureOverview.siteMaterials.some((item) => item.id === siteMaterial.id && item.status === "available"));
+  assert.ok(structureOverview.siteReports.some((item) => item.id === siteReport.id && item.sourceMode === "photo"));
 
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",

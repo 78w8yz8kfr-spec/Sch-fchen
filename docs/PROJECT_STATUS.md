@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 21.07.2026
-Technischer Stand: V0.18.0
+Technischer Stand: V0.19.0
 
 ## Abgeschlossen
 
@@ -68,7 +68,7 @@ Technischer Stand: V0.18.0
 - normaler Login nur mit Personalnummer und Passwort; die eingerichtete Firmennummer bleibt im Hintergrund
 - getrennte Ansichten für Live-Arbeitstag, Woche und Verwaltung
 - Live-Übersicht mit Status, aktueller Baustelle, Statusbeginn, Arbeitszeit und Vorarbeiterstatus
-- gegliedertes Baustellen-Dashboard für Mitarbeiter, Berichte, Dokumente, Fotos, Aufgaben, Material, Notizen und weitere Module
+- gegliedertes Baustellen-Dashboard für Mitarbeiter, Berichte, Dokumente, Aufgaben und Material; weitere Module erscheinen erst nach Aktivierung
 - Migration 016 mit neuem Betriebsrollenmodell und differenzierten Berechtigungsgrundlagen
 - vereinfachte Arbeitskarte ohne doppelten Live-Block sowie versionierte PWA-Assets gegen gemischte iPhone-Cache-Stände
 - getrennte mobile Anlage von Kunden, Projekten und Baustellen entlang der verbindlichen Hierarchie
@@ -100,6 +100,13 @@ Technischer Stand: V0.18.0
 - einmalige zentrale Speicherung des Lieferschein-Fotos mit automatischer Verknüpfung zu Baustelle, Projekt und Kunde
 - serverseitige Beschränkung von Lieferscheinen auf JPG, PNG oder WebP bis 5 MB
 - abgeglichener, phasenweiser Umsetzungsplan aus dem Projekt-GPT „Render für Web-App Hosting“
+- Migration 020 für Baustellenaufgaben mit Priorität, Mitarbeiterzuweisung, Fälligkeit, Status und Abschlusszeitpunkt
+- Migration 021 für Baustellenmaterial mit Menge, Einheit und nachvollziehbaren Statusstufen
+- Migration 022 für nummerierte Montage- und Bautagesberichte aus digitaler Eingabe, Originalfoto oder Diktat
+- Aufgaben-, Material- und Berichtsbereiche direkt im thematisch gegliederten Baustellen-Dashboard
+- fotografierte Papierberichte verwenden das zentrale Ein-Dokument-Prinzip und bleiben mit der Baustelle verknüpft
+- ruhige mobile Gestaltung nach den festgelegten Spezifikationen; nicht aktivierte Platzhalterbereiche wurden ausgeblendet
+- RLS, Mandanten-Fremdschlüssel, Versionsschutz, Löschschutz sowie SQL-, API- und Oberflächentests für alle drei Module
 
 ## Noch zu prüfen
 
@@ -115,9 +122,9 @@ Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
 - Objektspeicher-Anbindung für größere Dokumentmengen und betriebliche Aufbewahrungsregeln
-- Dokumentverknüpfung zu Montage-/Bautagesberichten und versionierten PDF-Ausgaben
+- Freigabe, Unterschrift und unveränderliche PDF-Ausgaben für Montage- und Bautagesberichte
 - allgemeine Logo-Verwaltung als geschütztes Mandantendokument; bis dahin bleibt bei Firmen ohne Logo der Initial-Platzhalter
-- danach Aufgaben, Material sowie Montage- und Bautagesberichte mit PDF-Versionierung
+- danach begrenzte mobile Berichtsrechte für Vorarbeiter und zugewiesene Monteure
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo
 gekennzeichnet; die echte Anmeldung läuft ausschließlich auf der gemeinsamen

@@ -18,6 +18,11 @@ import {
   validateLogin,
   validateProject,
   validateProjectUpdate,
+  validateSiteMaterial,
+  validateSiteMaterialUpdate,
+  validateSiteReport,
+  validateSiteTask,
+  validateSiteTaskUpdate,
   validateSiteBundle,
   validateTimeEntry,
   validateWorkDate
@@ -100,6 +105,61 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
     () => validateDocumentStatusUpdate({ status: "deleted", rowVersion: 2 }),
     /Dokumentstatus/
   );
+});
+
+test("Baustellenmodule validieren Aufgaben, Material und Berichte", () => {
+  const siteId = "22222222-2222-4222-8222-222222222222";
+  const userId = "33333333-3333-4333-8333-333333333333";
+  const documentId = "44444444-4444-4444-8444-444444444444";
+  assert.deepEqual(validateSiteTask({
+    constructionSiteId: siteId,
+    title: "Verteiler beschriften",
+    details: "Alle Stromkreise prüfen",
+    priority: "high",
+    assignedUserId: userId,
+    dueDate: "2026-07-24"
+  }), {
+    constructionSiteId: siteId,
+    title: "Verteiler beschriften",
+    details: "Alle Stromkreise prüfen",
+    priority: "high",
+    assignedUserId: userId,
+    dueDate: "2026-07-24"
+  });
+  assert.deepEqual(validateSiteTaskUpdate({ status: "done", rowVersion: 2 }), { status: "done", rowVersion: 2 });
+
+  assert.equal(validateSiteMaterial({
+    constructionSiteId: siteId,
+    itemName: "NYM-J 3x1,5",
+    quantity: "50",
+    unit: "m",
+    status: "planned"
+  }).quantity, 50);
+  assert.deepEqual(validateSiteMaterialUpdate({ status: "used", rowVersion: 1 }), { status: "used", rowVersion: 1 });
+
+  assert.equal(validateSiteReport({
+    constructionSiteId: siteId,
+    reportType: "montage",
+    workDate: "2026-07-21",
+    sourceMode: "photo",
+    summary: "Papierbericht",
+    sourceDocumentId: documentId
+  }).sourceDocumentId, documentId);
+  assert.throws(() => validateSiteReport({
+    constructionSiteId: siteId,
+    reportType: "daily",
+    workDate: "2026-07-21",
+    sourceMode: "photo",
+    summary: "Original fehlt"
+  }), /Originalfoto/);
+  assert.throws(() => validateSiteReport({
+    constructionSiteId: siteId,
+    reportType: "daily",
+    workDate: "2026-07-21",
+    sourceMode: "digital",
+    summary: "Digitaler Bericht",
+    sourceDocumentId: documentId
+  }), /nur einem fotografierten Papierbericht/);
 });
 
 test("Ersteinrichtung verlangt lange Schlüssel und starke Passwörter", () => {
