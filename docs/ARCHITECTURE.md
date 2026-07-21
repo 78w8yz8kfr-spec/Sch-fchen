@@ -1,12 +1,13 @@
 # Architektur
 
-Stand: 19.07.2026
+Stand: 21.07.2026
 
 ## Zielbild
 
 Schäfchen wird als modulare, mandantenfähige All-in-One-Unternehmenssoftware
-für Handwerksbetriebe entwickelt. Eine gemeinsame PWA-Codebasis bedient Handy
-und PC. Das Frontend kommuniziert ausschließlich mit einer API; direkte
+zunächst für Elektrobetriebe entwickelt. Der gemeinsame Kern bleibt später für
+weitere Gewerke erweiterbar. Eine gemeinsame PWA-Codebasis bedient Handy und PC.
+Das Frontend kommuniziert ausschließlich mit einer API; direkte
 Datenbankzugriffe aus dem Frontend sind ausgeschlossen. Die fachliche Grundlage
 steht in [`PRODUCT_VISION.md`](PRODUCT_VISION.md).
 

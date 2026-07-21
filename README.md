@@ -1,10 +1,10 @@
 # Schäfchen
 
-Schäfchen ist eine modulare All-in-One-Unternehmenssoftware für
-Handwerksbetriebe. Die Progressive Web App verbindet eine besonders einfache
+Schäfchen ist eine modulare All-in-One-Unternehmenssoftware, die zunächst für
+Elektrobetriebe entwickelt wird. Die Progressive Web App verbindet eine besonders einfache
 Live-Oberfläche für Monteure mit der Verwaltung für Geschäftsführung,
-Administrator, Büro/Disposition, Projektleitung und Vorarbeiter. VDE ist nur
-eines von mehreren optionalen Spezialmodulen.
+Administrator, Büro/Disposition, Projektleitung und Vorarbeiter. VDE, DGUV,
+LWL und KNX sind optionale Spezialmodule auf demselben gemeinsamen Kern.
 
 ## Projektstand
 

@@ -1,7 +1,7 @@
 # Projektstatus
 
-Stand: 19.07.2026
-Technischer Stand: V0.17.1
+Stand: 21.07.2026
+Technischer Stand: V0.18.0
 
 ## Abgeschlossen
 
@@ -95,6 +95,11 @@ Technischer Stand: V0.17.1
 - Migration 019 stabilisiert die getrennten V1-/V2-Vertraege der Ersteinrichtung
 - sicherer Produktions-Vorabcheck repariert den kurzzeitig veroeffentlichten V1-Logovertrag vor den normalen Migrationen
 - CI prueft den echten Upgradepfad vom betroffenen Produktionsstand bis zum erfolgreichen Neustart
+- verbindlicher Produktfokus auf Elektrobetriebe bei später erweiterbarem gemeinsamen Kern
+- direkte Kameraaktion für Lieferscheine im Dokumentbereich der geöffneten Baustelle
+- einmalige zentrale Speicherung des Lieferschein-Fotos mit automatischer Verknüpfung zu Baustelle, Projekt und Kunde
+- serverseitige Beschränkung von Lieferscheinen auf JPG, PNG oder WebP bis 5 MB
+- abgeglichener, phasenweiser Umsetzungsplan aus dem Projekt-GPT „Render für Web-App Hosting“
 
 ## Noch zu prüfen
 
@@ -110,7 +115,7 @@ Nach der technischen Online-Anbindung folgt die kontrollierte Betriebsaufnahme:
 
 - dauerhafte Datenbank, Backup-Plan und Überwachung festlegen
 - Objektspeicher-Anbindung für größere Dokumentmengen und betriebliche Aufbewahrungsregeln
-- Dokumentverknüpfung zu Berichten und versionierten PDF-Ausgaben
+- Dokumentverknüpfung zu Montage-/Bautagesberichten und versionierten PDF-Ausgaben
 - allgemeine Logo-Verwaltung als geschütztes Mandantendokument; bis dahin bleibt bei Firmen ohne Logo der Initial-Platzhalter
 - danach Aufgaben, Material sowie Montage- und Bautagesberichte mit PDF-Versionierung
 

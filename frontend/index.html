@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#e30613">
-    <meta name="description" content="Schäfchen – die einfache Arbeitsapp für Handwerksbetriebe.">
+    <meta name="description" content="Schäfchen – die einfache Arbeitsapp für Elektrobetriebe.">
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.17.1">
-    <script src="./app.js?v=0.17.1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.18.0">
+    <script src="./app.js?v=0.18.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -123,7 +123,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.17.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.18.0</p>
         </div>
       </section>
 
@@ -367,7 +367,27 @@
               <details id="site-dashboard-documents-panel">
                 <summary>Dokumente <span id="site-dashboard-document-count" class="module-count">0</span></summary>
                 <div class="site-document-module">
-                  <button id="site-dashboard-add-document" class="button button--secondary" type="button">Dokument hinzufügen</button>
+                  <button id="site-dashboard-capture-delivery-note" class="button button--primary" type="button">Lieferschein fotografieren</button>
+                  <input
+                    id="site-dashboard-delivery-note-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    hidden
+                  >
+                  <form id="site-dashboard-delivery-note-form" class="delivery-note-capture" novalidate hidden>
+                    <div>
+                      <label for="site-dashboard-delivery-note-title">Titel</label>
+                      <input id="site-dashboard-delivery-note-title" maxlength="200" required>
+                    </div>
+                    <p id="site-dashboard-delivery-note-file-name" class="delivery-note-capture__file"></p>
+                    <div class="delivery-note-capture__actions">
+                      <button id="site-dashboard-delivery-note-submit" class="button button--primary" type="submit">Lieferschein speichern</button>
+                      <button id="site-dashboard-delivery-note-cancel" class="text-button" type="button">Abbrechen</button>
+                    </div>
+                    <p id="site-dashboard-delivery-note-message" class="form-message" aria-live="polite"></p>
+                  </form>
+                  <button id="site-dashboard-add-document" class="button button--secondary" type="button">Anderes Dokument hinzufügen</button>
                   <ul id="site-dashboard-documents" class="document-compact-list" aria-label="Dokumente dieser Baustelle"></ul>
                 </div>
               </details>

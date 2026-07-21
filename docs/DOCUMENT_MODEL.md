@@ -1,7 +1,7 @@
 # Zentrales Dokumentenmodell
 
-Stand: 19.07.2026  
-Technischer Stand: V0.17.1
+Stand: 21.07.2026
+Technischer Stand: V0.18.0
 
 ## Grundsatz
 
@@ -19,6 +19,7 @@ die fehlende Verknüpfung ergänzt.
 ## Erster Online-Stand
 
 - unterstützte Formate: PDF, JPEG, PNG, WebP, Text, XLSX und DOCX
+- Lieferscheine sind bewusst auf JPEG-, PNG- oder WebP-Fotos begrenzt
 - maximale Dateigröße: 5 MB
 - Download ausschließlich nach gültiger Sitzung und Verwaltungsrollenprüfung
 - Download immer als Anlage mit `nosniff` und ohne Browser-Cache
@@ -39,4 +40,6 @@ Der Dokumentenbereich ist Teil der Baustellenverwaltung und kein zusätzlicher
 Hauptmenüpunkt. Kunden- und Projektlisten zeigen ihre Dokumentanzahl und führen
 direkt zur passenden gefilterten Dokumentliste. Im Baustellen-Dashboard werden
 die verknüpften Dokumente im vorhandenen Themenbereich angezeigt und können von
-dort geöffnet oder ergänzt werden.
+dort geöffnet oder ergänzt werden. „Lieferschein fotografieren“ öffnet auf
+Mobilgeräten direkt die Kamera und verknüpft das gespeicherte Original
+automatisch mit der geöffneten Baustelle sowie deren Projekt und Kunde.

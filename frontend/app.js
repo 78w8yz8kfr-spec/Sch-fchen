@@ -123,6 +123,14 @@
     siteDashboardDocumentsPanel: document.querySelector("#site-dashboard-documents-panel"),
     siteDashboardDocumentCount: document.querySelector("#site-dashboard-document-count"),
     siteDashboardDocuments: document.querySelector("#site-dashboard-documents"),
+    siteDashboardCaptureDeliveryNote: document.querySelector("#site-dashboard-capture-delivery-note"),
+    siteDashboardDeliveryNoteInput: document.querySelector("#site-dashboard-delivery-note-input"),
+    siteDashboardDeliveryNoteForm: document.querySelector("#site-dashboard-delivery-note-form"),
+    siteDashboardDeliveryNoteTitle: document.querySelector("#site-dashboard-delivery-note-title"),
+    siteDashboardDeliveryNoteFileName: document.querySelector("#site-dashboard-delivery-note-file-name"),
+    siteDashboardDeliveryNoteSubmit: document.querySelector("#site-dashboard-delivery-note-submit"),
+    siteDashboardDeliveryNoteCancel: document.querySelector("#site-dashboard-delivery-note-cancel"),
+    siteDashboardDeliveryNoteMessage: document.querySelector("#site-dashboard-delivery-note-message"),
     siteDashboardAddDocument: document.querySelector("#site-dashboard-add-document"),
     siteDashboardEdit: document.querySelector("#site-dashboard-edit"),
     adminWeek: document.querySelector("#admin-week"),
@@ -335,6 +343,7 @@
   let siteImportPayload = null;
   let siteImportState = null;
   let documentFile = null;
+  let deliveryNoteFile = null;
   let cachedUserId = null;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -437,7 +446,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.17.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.18.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -873,6 +882,66 @@
     return `${(sizeBytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
   }
 
+  function documentMimeType(file) {
+    const extension = file?.name.split(".").at(-1)?.toLowerCase();
+    return {
+      pdf: "application/pdf",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      webp: "image/webp",
+      txt: "text/plain",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    }[extension] || "";
+  }
+
+  function isDeliveryNotePhoto(file) {
+    return Boolean(
+      file
+      && ["image/jpeg", "image/png", "image/webp"].includes(documentMimeType(file))
+      && file.size > 0
+      && file.size <= 5_000_000
+    );
+  }
+
+  function updateDocumentFileSelection() {
+    elements.documentMessage.textContent = "";
+    const supported = Boolean(
+      documentFile
+      && documentMimeType(documentFile)
+      && documentFile.size > 0
+      && documentFile.size <= 5_000_000
+    );
+    const categoryMatches = elements.documentCategory.value !== "delivery_note"
+      || isDeliveryNotePhoto(documentFile);
+    elements.documentSubmit.disabled = !supported || !categoryMatches;
+    if (!documentFile) {
+      elements.documentFileName.textContent = "Noch keine Datei gewählt";
+      return;
+    }
+    elements.documentFileName.textContent = `${documentFile.name} · ${formatFileSize(documentFile.size)}`;
+    if (!elements.documentTitle.value.trim()) {
+      elements.documentTitle.value = documentFile.name.replace(/\.[^.]+$/, "");
+    }
+    if (!supported) {
+      elements.documentMessage.textContent = "Bitte eine unterstützte Datei mit höchstens 5 MB auswählen.";
+    } else if (!categoryMatches) {
+      elements.documentMessage.textContent = "Lieferscheine werden ausschließlich als JPG-, PNG- oder WebP-Foto gespeichert.";
+    }
+  }
+
+  function resetDeliveryNoteCapture() {
+    deliveryNoteFile = null;
+    elements.siteDashboardDeliveryNoteInput.value = "";
+    elements.siteDashboardDeliveryNoteForm.reset();
+    elements.siteDashboardDeliveryNoteForm.hidden = true;
+    elements.siteDashboardDeliveryNoteFileName.textContent = "";
+    elements.siteDashboardDeliveryNoteMessage.textContent = "";
+    elements.siteDashboardDeliveryNoteSubmit.disabled = false;
+    elements.siteDashboardCaptureDeliveryNote.disabled = false;
+  }
+
   function documentSearchText(document) {
     return [
       document.number,
@@ -1264,6 +1333,7 @@
       });
 
     openedSiteId = site.id;
+    resetDeliveryNoteCapture();
     elements.siteDashboardTitle.textContent = site.name;
     elements.siteDashboardMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
     elements.siteDashboardStatus.textContent = siteStatusLabel(site.status);
@@ -2411,26 +2481,9 @@
   elements.documentFileChoose.addEventListener("click", () => elements.documentFile.click());
   elements.documentFile.addEventListener("change", () => {
     documentFile = elements.documentFile.files?.[0] || null;
-    elements.documentMessage.textContent = "";
-    const allowedExtension = Boolean(
-      documentFile
-      && /\.(pdf|jpe?g|png|webp|txt|xlsx|docx)$/i.test(documentFile.name)
-      && documentFile.size > 0
-      && documentFile.size <= 5_000_000
-    );
-    elements.documentSubmit.disabled = !allowedExtension;
-    if (!documentFile) {
-      elements.documentFileName.textContent = "Noch keine Datei gewählt";
-      return;
-    }
-    elements.documentFileName.textContent = `${documentFile.name} · ${formatFileSize(documentFile.size)}`;
-    if (!elements.documentTitle.value.trim()) {
-      elements.documentTitle.value = documentFile.name.replace(/\.[^.]+$/, "");
-    }
-    if (!allowedExtension) {
-      elements.documentMessage.textContent = "Bitte eine unterstützte Datei mit höchstens 5 MB auswählen.";
-    }
+    updateDocumentFileSelection();
   });
+  elements.documentCategory.addEventListener("change", updateDocumentFileSelection);
 
   elements.documentProject.addEventListener("change", () => {
     const project = adminState?.projects.find((candidate) => candidate.id === elements.documentProject.value);
@@ -2467,17 +2520,7 @@
     elements.documentFileChoose.disabled = true;
     elements.documentMessage.textContent = "Dokument wird einmalig und sicher gespeichert …";
     try {
-      const extension = documentFile.name.split(".").at(-1).toLowerCase();
-      const mimeType = {
-        pdf: "application/pdf",
-        jpg: "image/jpeg",
-        jpeg: "image/jpeg",
-        png: "image/png",
-        webp: "image/webp",
-        txt: "text/plain",
-        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      }[extension];
+      const mimeType = documentMimeType(documentFile);
       const body = await requestJson("./api/v1/admin/documents", {
         method: "POST",
         body: JSON.stringify({
@@ -2519,6 +2562,67 @@
     renderDocumentList();
     elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     elements.documentTitle.focus({ preventScroll: true });
+  });
+
+  elements.siteDashboardCaptureDeliveryNote.addEventListener("click", () => {
+    elements.siteDashboardDeliveryNoteInput.click();
+  });
+
+  elements.siteDashboardDeliveryNoteInput.addEventListener("change", () => {
+    deliveryNoteFile = elements.siteDashboardDeliveryNoteInput.files?.[0] || null;
+    if (!deliveryNoteFile) {
+      resetDeliveryNoteCapture();
+      return;
+    }
+
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    elements.siteDashboardDeliveryNoteForm.hidden = false;
+    elements.siteDashboardDeliveryNoteFileName.textContent = `${deliveryNoteFile.name} · ${formatFileSize(deliveryNoteFile.size)}`;
+    elements.siteDashboardDeliveryNoteTitle.value = `Lieferschein · ${site?.name || "Baustelle"} · ${new Intl.DateTimeFormat("de-DE").format(new Date())}`;
+    const valid = isDeliveryNotePhoto(deliveryNoteFile);
+    elements.siteDashboardDeliveryNoteSubmit.disabled = !valid;
+    elements.siteDashboardDeliveryNoteMessage.textContent = valid
+      ? "Das Foto wird einmal gespeichert und direkt mit dieser Baustelle verknüpft."
+      : "Bitte ein JPG-, PNG- oder WebP-Foto mit höchstens 5 MB auswählen.";
+    elements.siteDashboardDeliveryNoteTitle.focus({ preventScroll: true });
+  });
+
+  elements.siteDashboardDeliveryNoteCancel.addEventListener("click", resetDeliveryNoteCapture);
+
+  elements.siteDashboardDeliveryNoteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site || !isDeliveryNotePhoto(deliveryNoteFile)) {
+      elements.siteDashboardDeliveryNoteMessage.textContent = "Bitte ein gültiges Lieferschein-Foto auswählen.";
+      return;
+    }
+
+    elements.siteDashboardDeliveryNoteSubmit.disabled = true;
+    elements.siteDashboardCaptureDeliveryNote.disabled = true;
+    elements.siteDashboardDeliveryNoteMessage.textContent = "Lieferschein wird sicher gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/admin/documents", {
+        method: "POST",
+        body: JSON.stringify({
+          title: elements.siteDashboardDeliveryNoteTitle.value,
+          category: "delivery_note",
+          fileName: deliveryNoteFile.name,
+          mimeType: documentMimeType(deliveryNoteFile),
+          contentBase64: arrayBufferToBase64(await deliveryNoteFile.arrayBuffer()),
+          constructionSiteId: site.id
+        })
+      });
+      resetDeliveryNoteCapture();
+      await refreshAdmin();
+      renderSiteDocuments(site.id);
+      showToast(body.reused
+        ? "Lieferschein war bereits gespeichert und wurde ohne Kopie verknüpft."
+        : "Lieferschein gespeichert und mit der Baustelle verknüpft.");
+    } catch (error) {
+      elements.siteDashboardDeliveryNoteMessage.textContent = error.message;
+      elements.siteDashboardDeliveryNoteSubmit.disabled = false;
+      elements.siteDashboardCaptureDeliveryNote.disabled = false;
+    }
   });
 
   elements.assignmentForm.addEventListener("submit", async (event) => {

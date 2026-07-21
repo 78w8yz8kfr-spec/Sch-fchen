@@ -3,6 +3,7 @@
 ## Produktregeln
 
 - Das verbindliche Entwicklungsprinzip lautet: Einfach vor komplex.
+- Schäfchen startet als Unternehmenssoftware für Elektrobetriebe. Eine spätere Übertragung des gemeinsamen Kerns auf weitere Gewerke bleibt möglich, erweitert aber nicht den aktuellen Entwicklungsumfang.
 - Monteure sollen immer nur den nächsten logischen Schritt und möglichst wenige große Schaltflächen sehen.
 - Historie wird erhalten; fachliche Datensätze werden nicht hart gelöscht.
 - Jede fachliche Entität ist einem Mandanten zugeordnet. `company_id` wird später serverseitig aus der Sitzung gesetzt und niemals aus ungeprüften Frontend-Daten übernommen.

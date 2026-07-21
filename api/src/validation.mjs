@@ -37,6 +37,7 @@ const DOCUMENT_MIME_TYPES = new Map([
   ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", new Set(["docx"])]
 ]);
 const MAXIMUM_DOCUMENT_BYTES = 5_000_000;
+const DELIVERY_NOTE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export class InputError extends Error {
   constructor(message, status = 400, code = "invalid_request") {
@@ -338,6 +339,13 @@ export function validateDocumentUpload(body) {
   const allowedExtensions = DOCUMENT_MIME_TYPES.get(mimeType);
   if (!allowedExtensions || !allowedExtensions.has(extension)) {
     throw new InputError("Dieser Dateityp wird nicht unterstützt.", 415, "unsupported_document_type");
+  }
+  if (category === "delivery_note" && !DELIVERY_NOTE_MIME_TYPES.has(mimeType)) {
+    throw new InputError(
+      "Lieferscheine werden ausschließlich als Foto gespeichert.",
+      415,
+      "delivery_note_photo_required"
+    );
   }
 
   if (typeof body.contentBase64 !== "string") {

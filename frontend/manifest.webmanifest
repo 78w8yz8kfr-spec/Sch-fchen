@@ -1,7 +1,7 @@
 {
   "name": "Schäfchen",
   "short_name": "Schäfchen",
-  "description": "Die einfache, offline-fähige Arbeitsapp für Handwerksbetriebe.",
+  "description": "Die einfache, offline-fähige Arbeitsapp für Elektrobetriebe.",
   "lang": "de-DE",
   "start_url": "./",
   "scope": "./",

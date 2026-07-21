@@ -36,6 +36,29 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
   assert.equal(document.content.toString("utf8"), "%PDF-1.4\nTest");
   assert.equal(document.customerId, null);
 
+  const deliveryNote = validateDocumentUpload({
+    title: "Lieferschein 4711",
+    category: "delivery_note",
+    fileName: "Lieferschein.jpg",
+    mimeType: "image/jpeg",
+    contentBase64: Buffer.from("Bildinhalt").toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  });
+  assert.equal(deliveryNote.category, "delivery_note");
+  assert.equal(deliveryNote.mimeType, "image/jpeg");
+
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Lieferschein als PDF",
+      category: "delivery_note",
+      fileName: "Lieferschein.pdf",
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from("%PDF-1.4").toString("base64"),
+      constructionSiteId: "22222222-2222-4222-8222-222222222222"
+    }),
+    /ausschließlich als Foto/
+  );
+
   assert.throws(
     () => validateDocumentUpload({
       title: "Ohne Zuordnung",

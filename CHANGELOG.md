@@ -154,3 +154,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Migration 019 prüft die stabilen getrennten V1-/V2-Verträge der Ersteinrichtung
 - CI bildet den betroffenen Produktionsstand nach und prüft Vorabreparatur, Migrationen und Neustart
 - Versionsstand 0.17.1
+- Produktfokus auf Elektrobetriebe präzisiert; eine spätere Gewerkeerweiterung bleibt auf Basis des gemeinsamen Kerns möglich
+- direkter Kamerazugriff „Lieferschein fotografieren“ im Dokumentbereich einer geöffneten Baustelle
+- Lieferschein-Foto wird nur einmal zentral gespeichert und automatisch zu Baustelle, Projekt und Kunde verknüpft
+- Lieferscheine serverseitig auf JPG, PNG und WebP bis 5 MB begrenzt
+- geordneter Umsetzungsplan aus dem Projekt-GPT „Render für Web-App Hosting“ dokumentiert
+- Versionsstand 0.18.0

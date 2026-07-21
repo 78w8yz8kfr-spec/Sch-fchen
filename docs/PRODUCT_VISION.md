@@ -1,13 +1,18 @@
 # Produktvision Schäfchen
 
-Stand: 18.07.2026
+Stand: 21.07.2026
 
 ## Zweck
 
-Schäfchen ist eine modulare All-in-One-Unternehmenssoftware für
-Handwerksbetriebe. Die Software bildet den Arbeitsablauf vom Büro bis zur
-Baustelle in einem gemeinsamen Datenbestand ab. VDE ist ein optionales
-Spezialmodul und nicht der Mittelpunkt des Produkts.
+Schäfchen ist eine modulare All-in-One-Unternehmenssoftware, die zunächst für
+Elektrobetriebe entwickelt wird. Sie ersetzt die heute verteilte Arbeit mit
+Bürosoftware, Excel, Messenger-Nachrichten, Papierformularen und einzelnen
+Prüfprogrammen durch einen gemeinsamen Datenbestand vom Büro bis zur Baustelle.
+
+Der gemeinsame Kern darf später für weitere Gewerke erweitert werden. Diese
+Möglichkeit macht Schäfchen in der aktuellen Entwicklungsphase jedoch nicht zu
+einer allgemeinen Handwerker-App. VDE, DGUV, LWL und KNX bleiben optionale
+Elektro-Spezialmodule und sind nicht der fachliche Kern.
 
 ## Verbindliche Grundsätze
 

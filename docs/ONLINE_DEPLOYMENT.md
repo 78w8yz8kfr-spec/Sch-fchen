@@ -1,6 +1,6 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.17.1
+Technischer Stand: V0.18.0
 
 Das Firmenlogo von Schaaf Elektro stammt unverändert aus dem bestehenden
 VDE-Prüfprotokoll. Es wird im Login und App-Kopfbereich getrennt vom
