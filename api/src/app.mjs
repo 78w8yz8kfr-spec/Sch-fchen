@@ -1083,6 +1083,8 @@ function employeeDto(row) {
     personnelNumber: row.personnel_number,
     firstName: row.first_name,
     lastName: row.last_name,
+    email: row.email || null,
+    phone: row.phone || null,
     roles: row.roles,
     mustChangePassword: row.must_change_password,
     rowVersion: Number(row.row_version || 1)
@@ -1638,6 +1640,7 @@ async function adminOverview(client, context, date) {
   ] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
+              account.email, account.phone,
               account.must_change_password, account.row_version,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
@@ -1730,7 +1733,7 @@ async function adminOverview(client, context, date) {
       `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
               assignment.work_date,
               assignment.sequence_number, assignment.planned_start_time::TEXT,
-              assignment.planned_duration_minutes,
+              assignment.planned_duration_minutes, assignment.comment,
               assignment.report_responsible, assignment.report_responsibility_source,
               account.first_name, account.last_name, site.name AS site_name
        FROM site_assignments AS assignment
@@ -1932,6 +1935,7 @@ async function adminOverview(client, context, date) {
     plannedDurationMinutes: row.planned_duration_minutes === null
       ? null
       : Number(row.planned_duration_minutes),
+    comment: row.comment,
     reportResponsible: row.report_responsible,
     reportResponsibilitySource: row.report_responsibility_source,
     employeeName: `${row.first_name} ${row.last_name}`,
@@ -1962,7 +1966,8 @@ async function requireSiteWorkspaceAccess(client, context, constructionSiteId, d
   const roles = await activeRoleKeys(client, context);
   const canManage = [...roles].some((role) => PLANNER_ROLES.has(role));
   const assignment = await client.query(
-    `SELECT id, report_responsible
+    `SELECT id, sequence_number, planned_start_time::TEXT,
+            planned_duration_minutes, comment, report_responsible
      FROM site_assignments
      WHERE company_id = $1
        AND user_id = $2
@@ -1990,7 +1995,16 @@ async function requireSiteWorkspaceAccess(client, context, constructionSiteId, d
     canManage,
     canLead,
     assignmentId: assignment.rows[0]?.id || null,
-    reportResponsible: Boolean(assignment.rows[0]?.report_responsible)
+    reportResponsible: Boolean(assignment.rows[0]?.report_responsible),
+    assignment: assignment.rowCount === 1 ? {
+      id: assignment.rows[0].id,
+      sequenceNumber: assignment.rows[0].sequence_number,
+      plannedStartTime: assignment.rows[0].planned_start_time,
+      plannedDurationMinutes: assignment.rows[0].planned_duration_minutes === null
+        ? null
+        : Number(assignment.rows[0].planned_duration_minutes),
+      comment: assignment.rows[0].comment
+    } : null
   };
 }
 
@@ -2021,6 +2035,7 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
   const [teamResult, documentResult, taskResult, materialResult, noteResult, reportResult] = await Promise.all([
     client.query(
       `SELECT account.id, account.first_name, account.last_name,
+              account.email, account.phone,
               BOOL_OR(assignment.report_responsible) AS report_responsible,
               MAX(assignment.planned_duration_minutes) AS planned_duration_minutes,
               COALESCE(
@@ -2146,9 +2161,12 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
       canLead: access.canLead,
       reportResponsible: access.reportResponsible
     },
+    assignment: access.assignment,
     team: teamResult.rows.map((row) => ({
       id: row.id,
       name: `${row.first_name} ${row.last_name}`,
+      email: row.email || null,
+      phone: row.phone || null,
       roles: row.roles,
       reportResponsible: row.report_responsible,
       plannedDurationMinutes: row.planned_duration_minutes === null
@@ -3316,6 +3334,7 @@ async function importSitesFromWorkbook(client, context, plan) {
 async function getEmployeeRecord(client, context, employeeId) {
   const result = await client.query(
     `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
+            account.email, account.phone,
             account.must_change_password, account.row_version,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
@@ -3356,11 +3375,20 @@ async function createEmployee(client, context, input) {
     );
   }
   const duplicate = await client.query(
-    "SELECT 1 FROM users WHERE company_id = $1 AND personnel_number = $2",
-    [context.companyId, input.personnelNumber]
+    `SELECT personnel_number, email
+     FROM users
+     WHERE company_id = $1
+       AND (
+         personnel_number = $2
+         OR ($3::TEXT IS NOT NULL AND LOWER(email) = LOWER($3))
+       )`,
+    [context.companyId, input.personnelNumber, input.email]
   );
-  if (duplicate.rowCount) {
+  if (duplicate.rows.some((row) => row.personnel_number === input.personnelNumber)) {
     throw new InputError("Diese Personalnummer ist bereits vergeben.", 409, "personnel_number_exists");
+  }
+  if (input.email && duplicate.rows.some((row) => row.email?.toLowerCase() === input.email.toLowerCase())) {
+    throw new InputError("Diese E-Mail-Adresse ist bereits vergeben.", 409, "employee_email_exists");
   }
   const roleResult = await client.query(
     "SELECT id FROM roles WHERE company_id = $1 AND role_key = $2 AND status = 'active'",
@@ -3371,10 +3399,19 @@ async function createEmployee(client, context, input) {
   const passwordHash = await hashPassword(input.temporaryPassword);
   const inserted = await client.query(
     `INSERT INTO users (
-       company_id, personnel_number, first_name, last_name, password_hash, must_change_password
-     ) VALUES ($1, $2, $3, $4, $5, TRUE)
-     RETURNING id, personnel_number, first_name, last_name, must_change_password`,
-    [context.companyId, input.personnelNumber, input.firstName, input.lastName, passwordHash]
+       company_id, personnel_number, first_name, last_name, email, phone,
+       password_hash, must_change_password
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+     RETURNING id, personnel_number, first_name, last_name, email, phone, must_change_password`,
+    [
+      context.companyId,
+      input.personnelNumber,
+      input.firstName,
+      input.lastName,
+      input.email,
+      input.phone,
+      passwordHash
+    ]
   );
   await client.query(
     `INSERT INTO user_roles (company_id, user_id, role_id, assigned_by_user_id, reason)
@@ -3438,13 +3475,21 @@ async function updateEmployee(client, context, employeeId, input) {
   }
 
   const duplicate = await client.query(
-    `SELECT 1
+    `SELECT personnel_number, email
      FROM users
-     WHERE company_id = $1 AND personnel_number = $2 AND id <> $3`,
-    [context.companyId, input.personnelNumber, employeeId]
+     WHERE company_id = $1
+       AND id <> $3
+       AND (
+         personnel_number = $2
+         OR ($4::TEXT IS NOT NULL AND LOWER(email) = LOWER($4))
+       )`,
+    [context.companyId, input.personnelNumber, employeeId, input.email]
   );
-  if (duplicate.rowCount) {
+  if (duplicate.rows.some((row) => row.personnel_number === input.personnelNumber)) {
     throw new InputError("Diese Personalnummer ist bereits vergeben.", 409, "personnel_number_exists");
+  }
+  if (input.email && duplicate.rows.some((row) => row.email?.toLowerCase() === input.email.toLowerCase())) {
+    throw new InputError("Diese E-Mail-Adresse ist bereits vergeben.", 409, "employee_email_exists");
   }
 
   if (currentRoles.has("foreman") && input.role !== "foreman") {
@@ -3476,8 +3521,9 @@ async function updateEmployee(client, context, employeeId, input) {
 
   const updated = await client.query(
     `UPDATE users
-     SET personnel_number = $3, first_name = $4, last_name = $5
-     WHERE company_id = $1 AND id = $2 AND row_version = $6
+     SET personnel_number = $3, first_name = $4, last_name = $5,
+         email = $6, phone = $7
+     WHERE company_id = $1 AND id = $2 AND row_version = $8
      RETURNING id`,
     [
       context.companyId,
@@ -3485,6 +3531,8 @@ async function updateEmployee(client, context, employeeId, input) {
       input.personnelNumber,
       input.firstName,
       input.lastName,
+      input.email,
+      input.phone,
       input.rowVersion
     ]
   );
@@ -4221,10 +4269,10 @@ async function createAssignment(client, context, input) {
   const inserted = await client.query(
     `INSERT INTO site_assignments (
        company_id, user_id, construction_site_id, work_date, sequence_number,
-       planned_start_time, status, comment, report_responsible,
+       planned_start_time, planned_duration_minutes, status, comment, report_responsible,
        report_responsibility_source,
        created_by_user_id, changed_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, 'released', $7, $8, $9, $10, $10)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'released', $8, $9, $10, $11, $11)
      RETURNING id`,
     [
       context.companyId,
@@ -4233,6 +4281,7 @@ async function createAssignment(client, context, input) {
       input.workDate,
       sequence.rows[0].next_sequence,
       input.plannedStartTime,
+      input.plannedDurationMinutes,
       input.comment,
       input.reportResponsible,
       input.reportResponsible ? "manual" : null,
@@ -4246,7 +4295,8 @@ async function createAssignment(client, context, input) {
     input.workDate
   );
   const assignment = await client.query(
-    `SELECT id, sequence_number, planned_start_time::TEXT, report_responsible,
+    `SELECT id, sequence_number, planned_start_time::TEXT,
+            planned_duration_minutes, comment, report_responsible,
             report_responsibility_source
      FROM site_assignments
      WHERE company_id = $1 AND id = $2`,
@@ -4259,6 +4309,10 @@ async function createAssignment(client, context, input) {
     workDate: input.workDate,
     sequenceNumber: assignment.rows[0].sequence_number,
     plannedStartTime: assignment.rows[0].planned_start_time,
+    plannedDurationMinutes: assignment.rows[0].planned_duration_minutes === null
+      ? null
+      : Number(assignment.rows[0].planned_duration_minutes),
+    comment: assignment.rows[0].comment,
     reportResponsible: assignment.rows[0].report_responsible,
     reportResponsibilitySource: assignment.rows[0].report_responsibility_source
   };
@@ -4269,6 +4323,7 @@ async function updateAssignment(client, context, assignmentId, input) {
   const current = await client.query(
     `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
             assignment.work_date, assignment.sequence_number, assignment.status,
+            assignment.planned_duration_minutes, assignment.comment,
             assignment.report_responsible, assignment.report_responsibility_source,
             EXISTS (
               SELECT 1 FROM site_reports AS report
@@ -4288,6 +4343,10 @@ async function updateAssignment(client, context, assignmentId, input) {
     throw new InputError("Dieser Einsatz kann nicht mehr geändert werden.", 409, "assignment_locked");
   }
 
+  const plannedDurationMinutes = input.plannedDurationMinutes === undefined
+    ? assignment.planned_duration_minutes
+    : input.plannedDurationMinutes;
+  const comment = input.comment === undefined ? assignment.comment : input.comment;
   let reportResponsible = input.reportResponsible === null
     ? assignment.report_responsible
     : input.reportResponsible;
@@ -4388,10 +4447,12 @@ async function updateAssignment(client, context, assignmentId, input) {
      SET work_date = $3,
          sequence_number = $4,
          planned_start_time = $5,
-         report_responsible = $6,
-         report_responsibility_source = $7,
-         changed_by_user_id = $8,
-         last_change_reason = $9
+         planned_duration_minutes = $6,
+         comment = $7,
+         report_responsible = $8,
+         report_responsibility_source = $9,
+         changed_by_user_id = $10,
+         last_change_reason = $11
      WHERE company_id = $1 AND id = $2
      RETURNING id`,
     [
@@ -4400,6 +4461,8 @@ async function updateAssignment(client, context, assignmentId, input) {
       input.workDate,
       sequenceNumber,
       input.plannedStartTime,
+      plannedDurationMinutes,
+      comment,
       reportResponsible,
       reportResponsibilitySource,
       context.userId,
@@ -4423,7 +4486,8 @@ async function updateAssignment(client, context, assignmentId, input) {
   }
   const refreshed = await client.query(
     `SELECT id, user_id, construction_site_id, work_date, sequence_number,
-            planned_start_time::TEXT, status, report_responsible,
+            planned_start_time::TEXT, planned_duration_minutes, comment,
+            status, report_responsible,
             report_responsibility_source
      FROM site_assignments
      WHERE company_id = $1 AND id = $2`,
@@ -4437,6 +4501,10 @@ async function updateAssignment(client, context, assignmentId, input) {
     workDate: databaseDate(row.work_date),
     sequenceNumber: row.sequence_number,
     plannedStartTime: row.planned_start_time,
+    plannedDurationMinutes: row.planned_duration_minutes === null
+      ? null
+      : Number(row.planned_duration_minutes),
+    comment: row.comment,
     status: row.status,
     reportResponsible: row.report_responsible,
     reportResponsibilitySource: row.report_responsibility_source

@@ -317,17 +317,25 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
     personnelNumber: "M-17",
     firstName: "Mara",
     lastName: "Montage",
+    email: "mara@example.test",
+    phone: "+49 170 1234567",
     role: "installer",
     temporaryPassword: "Startpasswort-2026"
   });
   assert.equal(employee.role, "installer");
-  assert.equal(validateEmployeeUpdate({
+  assert.equal(employee.email, "mara@example.test");
+  assert.equal(employee.phone, "+49 170 1234567");
+  const employeeUpdate = validateEmployeeUpdate({
     personnelNumber: "M-17",
     firstName: "Mara",
     lastName: "Vorarbeiterin",
+    email: "mara.v@example.test",
+    phone: "+49 170 7654321",
     role: "foreman",
     rowVersion: 2
-  }).rowVersion, 2);
+  });
+  assert.equal(employeeUpdate.phone, "+49 170 7654321");
+  assert.equal(employeeUpdate.rowVersion, 2);
   for (const role of ["managing_director", "dispatch_office", "project_manager"]) {
     assert.equal(
       validateEmployee({ ...employee, role, temporaryPassword: "Startpasswort-2026" }).role,
@@ -358,9 +366,13 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
     employeeId: "11111111-1111-4111-8111-111111111111",
     constructionSiteId: "22222222-2222-4222-8222-222222222222",
     workDate: "2026-07-20",
-    plannedStartTime: "07:30"
+    plannedStartTime: "07:30",
+    plannedDurationMinutes: 420,
+    comment: "Unterverteilung fertigstellen"
   });
   assert.equal(assignment.plannedStartTime, "07:30");
+  assert.equal(assignment.plannedDurationMinutes, 420);
+  assert.equal(assignment.comment, "Unterverteilung fertigstellen");
   assert.equal(assignment.reportResponsible, false);
   assert.equal(validateAssignment({ ...assignment, reportResponsible: true }).reportResponsible, true);
   assert.throws(
@@ -375,9 +387,13 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   const update = validateAssignmentUpdate({
     workDate: "2026-07-21",
     plannedStartTime: "08:15",
+    plannedDurationMinutes: 360,
+    comment: "Beschriftung prüfen",
     changeReason: "Kunde öffnet später"
   });
   assert.equal(update.workDate, "2026-07-21");
+  assert.equal(update.plannedDurationMinutes, 360);
+  assert.equal(update.comment, "Beschriftung prüfen");
   assert.equal(update.reportResponsible, null);
   assert.equal(validateAssignmentUpdate({ ...update, reportResponsible: true }).reportResponsible, true);
   assert.equal(
@@ -387,6 +403,10 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   assert.throws(
     () => validateAssignmentUpdate({ ...update, changeReason: "x" }),
     /Änderungsgrund/
+  );
+  assert.throws(
+    () => validateAssignmentUpdate({ ...update, plannedDurationMinutes: 14 }),
+    /Einsatzdauer/
   );
 });
 

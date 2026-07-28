@@ -40,7 +40,10 @@ Aktuell enthalten:
 - mobile Baustellenakte für zugewiesene Monteure und Vorarbeiter mit Auftrag, Navigation, Team, Aufgaben, Berichten, Dokumenten, Fotos und Material
 - direkter, berechtigungsgeprüfter Kamera-Upload in den zentralen Dokumentenbestand
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
-- geschützte Bearbeitung von Mitarbeiterstammdaten und Betriebsrollen
+- geschützte Bearbeitung von Mitarbeiterstammdaten, Kontaktdaten und Betriebsrollen
+- Tageslage für die Disposition mit Planung, freien Feldmitarbeitern, laufenden Arbeitstagen und Zeitprüfungen
+- geplante Einsatzdauer und Arbeitsanweisung in Wochenplanung, Tageseinsatz und mobiler Baustellenakte
+- direkt erreichbare Telefon- und E-Mail-Kontakte des tagesbezogenen Baustellenteams
 - automatische Vorarbeiter- und Berichtsfunktion für den einzigen Mitarbeiter einer Baustelle
 - sicherer Excel-Wochenplanimport mit Vorschau, eindeutiger Zuordnung und Schutz bestehender Einsätze
 - Excel-Baustellenlistenimport mit Vorlage, Zeilenprüfung und Wiederverwendung vorhandener Kunden

@@ -11,6 +11,8 @@
     {
       sequenceNumber: 1,
       plannedStartTime: "07:30:00",
+      plannedDurationMinutes: 420,
+      comment: "Unterverteilung fertigstellen und Beschriftung fotografieren.",
       constructionSite: {
         id: "11111111-1111-4111-8111-111111111111",
         name: "Demo · Musterstraße 12",
@@ -20,6 +22,8 @@
     {
       sequenceNumber: 2,
       plannedStartTime: null,
+      plannedDurationMinutes: 120,
+      comment: "Leuchten prüfen und offene Punkte als Notiz erfassen.",
       constructionSite: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Demo · Hafenweg 4",
@@ -167,6 +171,7 @@
     assignmentOrder: document.querySelector("#assignment-order"),
     assignmentTitle: document.querySelector("#assignment-title"),
     assignmentMeta: document.querySelector("#assignment-meta"),
+    assignmentInstruction: document.querySelector("#assignment-instruction"),
     assignmentQuickActions: document.querySelector("#assignment-quick-actions"),
     assignmentNavigation: document.querySelector("#assignment-navigation"),
     assignmentDetails: document.querySelector("#assignment-details"),
@@ -235,6 +240,13 @@
     adminTitle: document.querySelector("#admin-title"),
     adminIntro: document.querySelector("#admin-intro"),
     adminSummary: document.querySelector("#admin-summary"),
+    dispatchSummary: document.querySelector("#dispatch-summary"),
+    dispatchSummaryDate: document.querySelector("#dispatch-summary-date"),
+    dispatchPlannedCount: document.querySelector("#dispatch-planned-count"),
+    dispatchUnassignedCount: document.querySelector("#dispatch-unassigned-count"),
+    dispatchActiveCount: document.querySelector("#dispatch-active-count"),
+    dispatchReviewCount: document.querySelector("#dispatch-review-count"),
+    dispatchSummaryNote: document.querySelector("#dispatch-summary-note"),
     adminRefresh: document.querySelector("#admin-refresh"),
     assignmentPlanningShell: document.querySelector("#assignment-planning-shell"),
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
@@ -367,6 +379,8 @@
     assignmentEditTitle: document.querySelector("#assignment-edit-title"),
     assignmentEditDate: document.querySelector("#assignment-edit-date"),
     assignmentEditTime: document.querySelector("#assignment-edit-time"),
+    assignmentEditDuration: document.querySelector("#assignment-edit-duration"),
+    assignmentEditComment: document.querySelector("#assignment-edit-comment"),
     assignmentEditReportResponsible: document.querySelector("#assignment-edit-report-responsible"),
     assignmentEditReason: document.querySelector("#assignment-edit-reason"),
     assignmentEditSave: document.querySelector("#assignment-edit-save"),
@@ -406,6 +420,8 @@
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
     employeePersonnelNumber: document.querySelector("#employee-personnel-number"),
+    employeePhone: document.querySelector("#employee-phone"),
+    employeeEmail: document.querySelector("#employee-email"),
     employeeRole: document.querySelector("#employee-role"),
     employeeManagementRoles: [...document.querySelectorAll("[data-management-role]")],
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
@@ -417,6 +433,8 @@
     employeeEditFirstName: document.querySelector("#employee-edit-first-name"),
     employeeEditLastName: document.querySelector("#employee-edit-last-name"),
     employeeEditPersonnelNumber: document.querySelector("#employee-edit-personnel-number"),
+    employeeEditPhone: document.querySelector("#employee-edit-phone"),
+    employeeEditEmail: document.querySelector("#employee-edit-email"),
     employeeEditRole: document.querySelector("#employee-edit-role"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
@@ -517,6 +535,7 @@
     assignmentSite: document.querySelector("#assignment-site"),
     assignmentDate: document.querySelector("#assignment-date"),
     assignmentTime: document.querySelector("#assignment-time"),
+    assignmentDuration: document.querySelector("#assignment-duration"),
     assignmentComment: document.querySelector("#assignment-comment"),
     assignmentReportResponsible: document.querySelector("#assignment-report-responsible"),
     assignmentMessage: document.querySelector("#assignment-message"),
@@ -809,7 +828,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.34.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.35.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -953,6 +972,22 @@
       day: "2-digit",
       month: "2-digit"
     });
+  }
+
+  function assignmentDurationLabel(minutes) {
+    if (!Number.isFinite(Number(minutes)) || Number(minutes) <= 0) return "";
+    const totalMinutes = Math.round(Number(minutes));
+    const hours = Math.floor(totalMinutes / 60);
+    const remainder = totalMinutes % 60;
+    if (hours && remainder) return `${hours} Std. ${remainder} Min.`;
+    if (hours) return `${hours} Std.`;
+    return `${remainder} Min.`;
+  }
+
+  function durationHoursToMinutes(value) {
+    if (value === "" || value === null || value === undefined) return null;
+    const hours = Number(value);
+    return Number.isFinite(hours) ? Math.round(hours * 60) : null;
   }
 
   function arrayBufferToBase64(buffer) {
@@ -2384,6 +2419,10 @@
     elements.assignmentEditTitle.textContent = `${assignment.employeeName} · ${assignment.siteName}`;
     elements.assignmentEditDate.value = assignment.workDate;
     elements.assignmentEditTime.value = assignment.plannedStartTime?.slice(0, 5) || "";
+    elements.assignmentEditDuration.value = assignment.plannedDurationMinutes
+      ? String(assignment.plannedDurationMinutes / 60)
+      : "";
+    elements.assignmentEditComment.value = assignment.comment || "";
     const employee = adminState?.employees.find((item) => item.id === assignment.employeeId);
     elements.assignmentEditReportResponsible.disabled =
       assignment.reportResponsibilitySource === "automatic"
@@ -2434,6 +2473,7 @@
           const content = document.createElement("div");
           const title = document.createElement("strong");
           const meta = document.createElement("span");
+          const instruction = document.createElement("span");
           const edit = document.createElement("button");
           const duty = document.createElement("span");
           const startTime = assignment.plannedStartTime
@@ -2441,7 +2481,14 @@
             : "ohne Startzeit";
           card.className = "week-assignment";
           title.textContent = assignment.employeeName;
-          meta.textContent = `${startTime} · ${assignment.siteName}`;
+          meta.textContent = [
+            startTime,
+            assignmentDurationLabel(assignment.plannedDurationMinutes),
+            assignment.siteName
+          ].filter(Boolean).join(" · ");
+          instruction.className = "week-assignment__instruction";
+          instruction.textContent = assignment.comment || "";
+          instruction.hidden = !assignment.comment;
           duty.className = "foreman-duty";
           duty.textContent = assignment.reportResponsibilitySource === "automatic"
             ? "Automatisch Vorarbeiter · allein vor Ort"
@@ -2450,7 +2497,7 @@
           edit.type = "button";
           edit.textContent = "Ändern";
           edit.addEventListener("click", () => openAssignmentEditor(assignment));
-          content.append(title, meta, duty);
+          content.append(title, meta, instruction, duty);
           card.append(content, edit);
           items.append(card);
         });
@@ -2706,12 +2753,60 @@
     elements.employeeEditFirstName.value = employee.firstName;
     elements.employeeEditLastName.value = employee.lastName;
     elements.employeeEditPersonnelNumber.value = employee.personnelNumber;
+    elements.employeeEditPhone.value = employee.phone || "";
+    elements.employeeEditEmail.value = employee.email || "";
     elements.employeeEditRole.value = employee.roles.find((role) => (
       ["installer", "foreman", "managing_director", "dispatch_office", "project_manager"].includes(role)
     )) || "installer";
     elements.employeeEditMessage.textContent = "";
     elements.employeeEditForm.hidden = false;
     elements.employeeEditForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function renderDispatchSummary() {
+    const date = adminState.date;
+    const fieldEmployees = adminState.employees.filter((employee) => (
+      employee.roles.some((role) => ["installer", "foreman"].includes(role))
+    ));
+    const dayAssignments = adminState.assignments.filter((assignment) => assignment.workDate === date);
+    const plannedEmployeeIds = new Set(dayAssignments.map((assignment) => assignment.employeeId));
+    const unassigned = fieldEmployees.filter((employee) => !plannedEmployeeIds.has(employee.id));
+    const dayWorkDays = adminState.workDays.filter((day) => day.workDate === date);
+    const active = dayWorkDays.filter((day) => day.workflowStatus === "in_progress");
+    const reviews = dayWorkDays.filter((day) => (
+      day.reviewable || (
+        day.workflowStatus !== "in_progress"
+        && Array.isArray(day.warnings)
+        && day.warnings.length > 0
+      )
+    ));
+    const plannedFieldCount = fieldEmployees.filter((employee) => plannedEmployeeIds.has(employee.id)).length;
+    const dateLabel = shortDate(date);
+
+    elements.dispatchSummaryDate.textContent = date === localDateKey()
+      ? `Heute · ${dateLabel}`
+      : dateLabel;
+    elements.dispatchPlannedCount.textContent = String(plannedFieldCount);
+    elements.dispatchUnassignedCount.textContent = String(unassigned.length);
+    elements.dispatchActiveCount.textContent = String(active.length);
+    elements.dispatchReviewCount.textContent = String(reviews.length);
+
+    const notes = [];
+    if (unassigned.length) {
+      notes.push(`Ohne Einsatz: ${unassigned.map(
+        (employee) => `${employee.firstName} ${employee.lastName}`
+      ).join(", ")}`);
+    } else if (fieldEmployees.length) {
+      notes.push("Alle Monteure und Vorarbeiter sind eingeplant");
+    } else {
+      notes.push("Noch keine Monteure oder Vorarbeiter angelegt");
+    }
+    if (reviews.length) {
+      notes.push(`Zeit prüfen: ${reviews.map((day) => day.employeeName).join(", ")}`);
+    } else {
+      notes.push("keine offene Zeitprüfung");
+    }
+    elements.dispatchSummaryNote.textContent = `${notes.join(" · ")}.`;
   }
 
   function renderAdmin() {
@@ -2726,6 +2821,7 @@
     elements.adminSiteCount.textContent = String(
       adminState.sites.filter((site) => siteStatusGroup(site.status) === "active").length
     );
+    renderDispatchSummary();
     elements.employeeManagementRoles.forEach((option) => {
       option.hidden = !adminState.canCreateManagementRoles;
       option.disabled = !adminState.canCreateManagementRoles;
@@ -2812,7 +2908,12 @@
       appendAdminListItem(
         elements.employeeList,
         `${employee.firstName} ${employee.lastName}`,
-        `${employee.personnelNumber} · ${employee.roles.map((role) => roleLabels[role] || role).join(", ")}`,
+        [
+          employee.personnelNumber,
+          employee.roles.map((role) => roleLabels[role] || role).join(", "),
+          employee.phone,
+          employee.email
+        ].filter(Boolean).join(" · "),
         employee.roles.includes("admin")
           ? null
           : { label: "Bearbeiten", handler: () => openEmployeeEditor(employee) }
@@ -2846,13 +2947,17 @@
         appendAdminListItem(
           elements.adminAssignmentList,
           `${assignment.sequenceNumber}. ${assignment.employeeName}`,
-          `${start} · ${assignment.siteName}${
+          [
+            start,
+            assignmentDurationLabel(assignment.plannedDurationMinutes),
+            assignment.siteName,
+            assignment.comment ? `Auftrag: ${assignment.comment}` : "",
             assignment.reportResponsible
               ? (assignment.reportResponsibilitySource === "automatic"
-                ? " · automatisch Vorarbeiter"
-                : " · Vorarbeiter / Bericht")
+                ? "automatisch Vorarbeiter"
+                : "Vorarbeiter / Bericht")
               : ""
-          }`
+          ].filter(Boolean).join(" · ")
         );
       });
     }
@@ -2915,7 +3020,7 @@
     list.append(item);
   }
 
-  function appendEmployeeSiteItem(list, titleText, metaText, badgeText = "") {
+  function appendEmployeeSiteItem(list, titleText, metaText, badgeText = "", action = null) {
     const item = document.createElement("li");
     const content = document.createElement("div");
     const title = document.createElement("strong");
@@ -2924,7 +3029,21 @@
     meta.textContent = metaText;
     content.append(title, meta);
     item.append(content);
-    if (badgeText) {
+    if (action) {
+      const actions = document.createElement("div");
+      const link = document.createElement("a");
+      actions.className = "employee-site-item-actions";
+      if (badgeText) {
+        const badge = document.createElement("small");
+        badge.textContent = badgeText;
+        actions.append(badge);
+      }
+      link.className = "text-button";
+      link.href = action.href;
+      link.textContent = action.label;
+      actions.append(link);
+      item.append(actions);
+    } else if (badgeText) {
       const badge = document.createElement("small");
       badge.textContent = badgeText;
       item.append(badge);
@@ -3028,8 +3147,16 @@
     elements.employeeSiteMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
     elements.employeeSiteStatus.textContent = siteStatusLabel(site.status);
     elements.employeeSiteStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
-    elements.employeeSiteOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
-    elements.employeeSiteContext.textContent = site.customerName || address;
+    elements.employeeSiteOrder.textContent = dashboard.assignment?.comment
+      || site.shortText
+      || "Noch kein Arbeitsauftrag hinterlegt";
+    elements.employeeSiteContext.textContent = [
+      dashboard.assignment?.plannedStartTime
+        ? `Start ${dashboard.assignment.plannedStartTime.slice(0, 5)} Uhr`
+        : "",
+      assignmentDurationLabel(dashboard.assignment?.plannedDurationMinutes),
+      site.customerName || address
+    ].filter(Boolean).join(" · ");
     elements.employeeSiteNavigation.href = siteNavigationUrl(site);
 
     elements.employeeSiteTeamCount.textContent = String(dashboard.team.length);
@@ -3038,11 +3165,28 @@
       appendEmployeeSiteEmpty(elements.employeeSiteTeam, "Für heute ist noch kein Team eingetragen.");
     } else {
       dashboard.team.forEach((member) => {
+        const contact = [member.phone, member.email].filter(Boolean).join(" · ");
+        const action = member.phone
+          ? {
+              href: `tel:${member.phone.replace(/[^\d+*#]/g, "")}`,
+              label: "Anrufen"
+            }
+          : member.email
+            ? {
+                href: `mailto:${member.email}`,
+                label: "E-Mail"
+              }
+            : null;
         appendEmployeeSiteItem(
           elements.employeeSiteTeam,
           member.name,
-          member.reportResponsible ? "Erstellt heute den Baustellenbericht" : "Heute eingeplant",
-          member.reportResponsible ? "Vorarbeiter" : employeeRoleLabel(member.roles)
+          [
+            member.reportResponsible ? "Erstellt heute den Baustellenbericht" : "Heute eingeplant",
+            assignmentDurationLabel(member.plannedDurationMinutes),
+            contact
+          ].filter(Boolean).join(" · "),
+          member.reportResponsible ? "Vorarbeiter" : employeeRoleLabel(member.roles),
+          action
         );
       });
     }
@@ -3898,7 +4042,11 @@
     const start = assignment.plannedStartTime
       ? `${assignment.plannedStartTime.slice(0, 5)} Uhr`
       : "Danach";
-    return [start, assignment.constructionSite.shortText].filter(Boolean).join(" · ");
+    return [
+      start,
+      assignmentDurationLabel(assignment.plannedDurationMinutes),
+      assignment.constructionSite.shortText
+    ].filter(Boolean).join(" · ");
   }
 
   function renderAssignment() {
@@ -3911,6 +4059,7 @@
       elements.assignmentOrder.textContent = "Heute";
       elements.assignmentTitle.textContent = "Kein Einsatz freigegeben";
       elements.assignmentMeta.textContent = "Die Zeiterfassung kann trotzdem gestartet werden.";
+      elements.assignmentInstruction.hidden = true;
       elements.assignmentCard.classList.remove("assignment-card--active");
       elements.assignmentQuickActions.hidden = true;
       elements.assignmentReport.hidden = true;
@@ -3933,6 +4082,10 @@
     elements.assignmentOrder.textContent = `${siteIndex + 1} von ${assignments.length}`;
     elements.assignmentTitle.textContent = assignment.constructionSite.name;
     elements.assignmentMeta.textContent = status;
+    elements.assignmentInstruction.textContent = assignment.comment
+      ? `Arbeitsauftrag: ${assignment.comment}`
+      : "";
+    elements.assignmentInstruction.hidden = !assignment.comment;
     elements.assignmentNavigation.href = siteNavigationUrl(assignment.constructionSite);
     const showReportAction = latest?.type === "site_arrival"
       && assignment.reportResponsible
@@ -4449,6 +4602,7 @@
       elements.sitePlanningShell.hidden = pane !== "sites";
       elements.employeePanel.hidden = pane !== "more";
       elements.adminSummary.hidden = pane === "more";
+      elements.dispatchSummary.hidden = pane !== "assignments";
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
         sites: ["Baustellen", "Baustellenplanung", "Baustellen anlegen, durchsuchen und direkt bearbeiten."],
@@ -4698,6 +4852,8 @@
         firstName: elements.employeeFirstName.value,
         lastName: elements.employeeLastName.value,
         personnelNumber: elements.employeePersonnelNumber.value,
+        phone: elements.employeePhone.value,
+        email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
         temporaryPassword: elements.employeeTemporaryPassword.value
       },
@@ -4725,6 +4881,8 @@
           firstName: elements.employeeEditFirstName.value,
           lastName: elements.employeeEditLastName.value,
           personnelNumber: elements.employeeEditPersonnelNumber.value,
+          phone: elements.employeeEditPhone.value,
+          email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,
           rowVersion: employee.rowVersion
         })
@@ -5475,6 +5633,7 @@
         constructionSiteId: elements.assignmentSite.value,
         workDate: elements.assignmentDate.value,
         plannedStartTime: elements.assignmentTime.value,
+        plannedDurationMinutes: durationHoursToMinutes(elements.assignmentDuration.value),
         comment: elements.assignmentComment.value,
         reportResponsible: elements.assignmentReportResponsible.checked
       },
@@ -5482,6 +5641,7 @@
     );
     if (!saved) return;
     elements.assignmentTime.value = "";
+    elements.assignmentDuration.value = "";
     elements.assignmentComment.value = "";
     elements.assignmentReportResponsible.checked = false;
     await Promise.all([refreshAdmin(), refreshLiveData()]);
@@ -5662,6 +5822,8 @@
         body: JSON.stringify({
           workDate: destinationDate,
           plannedStartTime: elements.assignmentEditTime.value,
+          plannedDurationMinutes: durationHoursToMinutes(elements.assignmentEditDuration.value),
+          comment: elements.assignmentEditComment.value,
           ...(elements.assignmentEditReportResponsible.disabled
             ? {}
             : { reportResponsible: elements.assignmentEditReportResponsible.checked }),
@@ -5669,7 +5831,7 @@
         })
       });
       closeAssignmentEditor();
-      showToast("Einsatz verschoben · Änderung ist historisch gespeichert.");
+      showToast("Einsatz aktualisiert · Änderung ist historisch gespeichert.");
       await Promise.all([refreshAdmin(destinationDate), refreshLiveData()]);
     } catch (error) {
       elements.assignmentEditMessage.textContent = error.message;

@@ -1,7 +1,7 @@
 # Plancraft-Featureprüfung für Schäfchen
 
 Stand: 29.07.2026  
-Technischer Stand: V0.34.0
+Technischer Stand: V0.35.0
 
 ## Ziel und Leitplanken
 
@@ -31,6 +31,9 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 | Häufige Büroaktionen an der Baustelle | In V0.34.0 übernehmen | Einsatz planen, Bericht, Dokument und Aufgabe sind direkt am Baustellenkopf erreichbar. |
 | Nur zugewiesene mobile Baustellen | Bereits vorhanden | Schäfchen erzwingt die tagesbezogene Zuweisung bereits serverseitig. |
 | Vorausgefüllte mobile Berichte und Entwurf | Bereits vorhanden, in V0.34.0 ergänzen | Team und Stunden werden vorausgefüllt; Entwürfe funktionieren offline. Neu ist das Speichern ohne gleichzeitiges Verlassen der Baustelle. |
+| Plantafel mit Start, Dauer und Arbeitsauftrag | In V0.35.0 übernehmen | Schäfchen ergänzt die vorhandene Wochenplanung um geplante Dauer und einsatzbezogene Arbeitsanweisung, ohne eine komplexe Ressourcenplanung einzuführen. |
+| Tagesübersicht für die Disposition | In V0.35.0 übernehmen | Eingeplante und freie Feldmitarbeiter, laufende Zeiten und Prüfbedarf werden in einer ruhigen Tageskarte zusammengeführt. |
+| Team und Kontaktdaten am mobilen Einsatz | In V0.35.0 übernehmen | Telefonnummer und E-Mail gehören zu den Mitarbeiterstammdaten und sind aus der tagesbezogenen Baustellenakte erreichbar. |
 | Frei konfigurierbare Projektstatus | Später prüfen | Die vorhandenen Status reichen für den aktuellen Betriebsablauf. Zusätzliche Status lohnen sich erst mit klaren realen Fällen. |
 | Freigabe einzelner Dokumente für Mobilrollen | Später prüfen | Fachlich sinnvoll, benötigt aber ein eigenes Freigabemodell und eine Datenmigration. |
 | Plan-/Ist-Nachkalkulation | Später prüfen | Erst sinnvoll, wenn Zeit-, Material- und Kostenstammdaten über mehrere reale Aufträge stabil gepflegt werden. |
@@ -53,8 +56,25 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 2. Am Kopf stehen die vier häufigsten Folgeaktionen: **Einsatz planen**, **Bericht**, **Dokument** und **Aufgabe**.
 3. Schäfchen öffnet jeweils den vorhandenen Fachbereich und übernimmt die gewählte Baustelle automatisch.
 
+## In V0.35.0 ergänzter Ablauf
+
+### Planung und Disposition
+
+1. Beim Einsatz werden neben Datum und Startzeit eine optionale Dauer und eine konkrete Arbeitsanweisung hinterlegt.
+2. Die Wochenplanung zeigt diese Angaben direkt an der Zuweisung; Änderungen bleiben über den vorhandenen Änderungsgrund historisiert.
+3. Die Tageslage macht sichtbar, welche Monteure und Vorarbeiter eingeplant oder noch frei sind, welche Arbeitstage laufen und wo eine Zeitprüfung offen ist.
+
+### Baustellenteam
+
+1. Der Tageseinsatz zeigt Dauer und Arbeitsanweisung vor dem Start.
+2. Die Baustellenakte übernimmt dieselben Angaben und zeigt das heute eingeplante Team.
+3. Hinterlegte Telefonnummern oder E-Mail-Adressen sind direkt als Kontaktaktion erreichbar. Der Zugriff bleibt auf die zugewiesene Baustelle und den gewählten Tag begrenzt.
+
 ## Öffentliche Referenzen
 
+- [Zeiterfassung im Handwerk](https://plancraft.com/de-de/funktionen/zeiterfassung-handwerk)
+- [Handwerker-App](https://plancraft.com/de-de/funktionen/handwerker-app)
+- [Teams gemeinsam planen](https://plancraft.com/de-de/produktupdates/teams-planen-2024-07)
 - [Projekt anlegen und verwalten](https://help.plancraft.com/de/articles/382654-projekt-in-plancraft-anlegen-und-verwalten)
 - [Projektübersicht und Arbeitsstunden](https://help.plancraft.com/de/articles/382729-projektubersicht-arbeitsstunden-kontaktdaten-und-beschreibung-bearbeiten)
 - [Mitarbeitende einem Projekt zuweisen](https://help.plancraft.com/de/articles/382733-mitarbeitende-einem-projekt-zuweisen)

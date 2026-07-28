@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.35.0 – Einsatzdetails und Tagesdisposition
+
+- Einsätze erhalten eine optionale geplante Dauer und eine konkrete Arbeitsanweisung; beides kann beim Anlegen und bei einer historisierten Änderung gepflegt werden
+- Startzeit, Dauer und Arbeitsauftrag erscheinen in der Büro-Wochenplanung, in der Tagesliste, am mobilen Tageseinsatz und in der Baustellenakte
+- die Baustellenakte zeigt das heutige Team mit Rolle, geplanter Dauer und vorhandenen Telefon- oder E-Mail-Kontaktdaten; Telefon und Mail sind mobil direkt erreichbar
+- Mitarbeiterstammdaten umfassen jetzt optionale Telefonnummer und E-Mail-Adresse und bleiben versionsgeschützt bearbeitbar
+- eine neue Tageslage fasst für Büro und Disposition eingeplante sowie nicht eingeplante Feldmitarbeiter, laufende Arbeitstage und offene Zeitprüfungen zusammen
+- bestehende Einsatz- und Mitarbeiterfelder werden wiederverwendet; es ist keine neue Datenbankmigration erforderlich
+- zusätzliche Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Dauer, Arbeitsanweisung, Kontaktdaten und Tagesdisposition
+
 ### V0.34.0 – Direkte Baustellenabläufe
 
 - der heutige Einsatz bietet Navigation und Baustellenakte als eindeutige Schnellaktionen, ohne den großen Zeitbuchungs-Schritt zu verdrängen

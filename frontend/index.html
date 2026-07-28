@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.34.0">
-    <script src="./app.js?v=0.34.0" defer></script>
-    <script src="./version.js?v=0.34.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.35.0">
+    <script src="./app.js?v=0.35.0" defer></script>
+    <script src="./version.js?v=0.35.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.34.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.35.0</p>
         </div>
       </section>
 
@@ -411,6 +411,7 @@
                 <span id="assignment-order" class="assignment-order">1 von 2</span>
                 <h3 id="assignment-title">Demo · Musterstraße 12</h3>
                 <p id="assignment-meta">07:30 Uhr · Verteilung erneuern</p>
+                <p id="assignment-instruction" class="assignment-instruction">Heute: Unterverteilung fertigstellen</p>
               </div>
             </article>
             <div id="assignment-quick-actions" class="assignment-quick-actions" aria-label="Schnellaktionen für den Einsatz">
@@ -705,6 +706,23 @@
               <div hidden><strong id="admin-project-count">0</strong><span>Interne Aufträge</span></div>
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
             </div>
+
+            <section id="dispatch-summary" class="dispatch-summary" aria-labelledby="dispatch-summary-title">
+              <div class="dispatch-summary__heading">
+                <div>
+                  <p class="eyebrow">Disposition</p>
+                  <h3 id="dispatch-summary-title">Tageslage im Betrieb</h3>
+                </div>
+                <span id="dispatch-summary-date">Heute</span>
+              </div>
+              <div class="dispatch-summary__grid">
+                <div><strong id="dispatch-planned-count">0</strong><span>Eingeplant</span></div>
+                <div><strong id="dispatch-unassigned-count">0</strong><span>Ohne Einsatz</span></div>
+                <div><strong id="dispatch-active-count">0</strong><span>Laufend</span></div>
+                <div><strong id="dispatch-review-count">0</strong><span>Zeitprüfung</span></div>
+              </div>
+              <p id="dispatch-summary-note">Noch keine Planung für heute.</p>
+            </section>
 
             <section id="assignment-planning-shell" class="planning-shell-direct">
               <div id="assignment-planning-content" class="planning-group">
@@ -1065,6 +1083,10 @@
                   <input id="assignment-edit-time" type="time">
                 </div>
               </div>
+              <label for="assignment-edit-duration">Geplante Dauer in Stunden <span>(optional)</span></label>
+              <input id="assignment-edit-duration" type="number" min="0.25" max="24" step="0.25" inputmode="decimal">
+              <label for="assignment-edit-comment">Arbeitsanweisung <span>(optional)</span></label>
+              <textarea id="assignment-edit-comment" maxlength="500" rows="3" placeholder="Was soll vor Ort erledigt oder beachtet werden?"></textarea>
               <label for="assignment-edit-reason">Begründung</label>
               <input id="assignment-edit-reason" maxlength="500" placeholder="z. B. Kunde verschiebt Termin" required>
               <label class="toggle-field" for="assignment-edit-report-responsible">
@@ -1177,6 +1199,16 @@
                 </div>
                 <label for="employee-personnel-number">Personalnummer</label>
                 <input id="employee-personnel-number" maxlength="30" autocomplete="off" required>
+                <div class="setup-grid">
+                  <div>
+                    <label for="employee-phone">Telefon <span>(optional)</span></label>
+                    <input id="employee-phone" type="tel" maxlength="50" autocomplete="tel">
+                  </div>
+                  <div>
+                    <label for="employee-email">E-Mail <span>(optional)</span></label>
+                    <input id="employee-email" type="email" maxlength="254" autocomplete="email">
+                  </div>
+                </div>
                 <label for="employee-role">Rolle</label>
                 <select id="employee-role" required>
                   <option value="installer">Monteur</option>
@@ -1211,6 +1243,16 @@
                 </div>
                 <label for="employee-edit-personnel-number">Personalnummer</label>
                 <input id="employee-edit-personnel-number" maxlength="30" autocomplete="off" required>
+                <div class="setup-grid">
+                  <div>
+                    <label for="employee-edit-phone">Telefon <span>(optional)</span></label>
+                    <input id="employee-edit-phone" type="tel" maxlength="50" autocomplete="tel">
+                  </div>
+                  <div>
+                    <label for="employee-edit-email">E-Mail <span>(optional)</span></label>
+                    <input id="employee-edit-email" type="email" maxlength="254" autocomplete="email">
+                  </div>
+                </div>
                 <label for="employee-edit-role">Rolle</label>
                 <select id="employee-edit-role" required>
                   <option value="installer">Monteur</option>
@@ -1605,8 +1647,10 @@
                     <input id="assignment-time" type="time">
                   </div>
                 </div>
-                <label for="assignment-comment">Hinweis <span>(optional)</span></label>
-                <input id="assignment-comment" maxlength="500">
+                <label for="assignment-duration">Geplante Dauer in Stunden <span>(optional)</span></label>
+                <input id="assignment-duration" type="number" min="0.25" max="24" step="0.25" inputmode="decimal">
+                <label for="assignment-comment">Arbeitsanweisung <span>(optional)</span></label>
+                <textarea id="assignment-comment" maxlength="500" rows="3" placeholder="Was soll vor Ort erledigt oder beachtet werden?"></textarea>
                 <label class="toggle-field" for="assignment-report-responsible">
                   <input id="assignment-report-responsible" type="checkbox">
                   <span><strong>Als Vorarbeiter einsetzen</strong><small>Nur möglich bei Mitarbeitern mit der Rolle Vorarbeiter.</small></span>

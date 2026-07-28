@@ -1,7 +1,7 @@
 # Sprint 2: Planung und Zeiterfassung
 
 Stand: 29.07.2026
-Technischer Stand: V0.34.0
+Technischer Stand: V0.35.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
 012 sowie 027, 031 und 032. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,
@@ -29,9 +29,11 @@ werden.
 ## 009 `site_assignments`
 
 Ein Mitarbeiter kann an einem Arbeitstag mehrere Baustellen in einer
-verbindlichen Reihenfolge erhalten. `sequence_number` ist Pflicht; eine
-Startzeit bleibt optional. Dieselbe Baustelle darf in der Tagesfolge mehrfach
-vorkommen.
+verbindlichen Reihenfolge erhalten. `sequence_number` ist Pflicht; Startzeit,
+geplante Dauer und eine einsatzbezogene Arbeitsanweisung bleiben optional.
+Dieselbe Baustelle darf in der Tagesfolge mehrfach vorkommen. Dauer und
+Arbeitsanweisung werden in Büroplanung und mobiler Baustellenakte aus demselben
+historisierten Einsatz gelesen.
 
 Die freigegebene Planung ist eine Empfehlung und keine Sperre. Der Mitarbeiter
 darf für den aktuellen Tag eine andere vorhandene Baustelle auswählen. Fehlt

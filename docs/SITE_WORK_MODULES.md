@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Notizen, Material und Berichte
 
 Stand: 29.07.2026
-Technischer Stand: V0.34.0
+Technischer Stand: V0.35.0
 
 ## Bedienkonzept
 
@@ -24,10 +24,15 @@ Die Oberfläche folgt den festgelegten Gestaltungsregeln:
 
 Navigation und Baustellenakte sind direkt am aktuellen Tageseinsatz erreichbar.
 Die Baustellenakte öffnet die Baustelle als eigenen Arbeitsbereich.
-Arbeitsauftrag und Navigation stehen zuerst; darunter folgen
+Die einsatzbezogene Arbeitsanweisung, geplante Startzeit und Dauer sowie die
+Navigation stehen zuerst; darunter folgen
 sichtbare, getrennte Karten für Mitarbeiter, Aufgaben, Notizen, Berichte, Dokumente,
 Fotos und Material. Die Ansicht ist keine chronologische Pinnwand und erzeugt
 keinen zusätzlichen Hauptmenüpunkt.
+
+Das tagesbezogene Team zeigt Rolle, geplante Einsatzdauer und vorhandene
+Telefon- oder E-Mail-Kontaktdaten. Die mobile Kontaktaktion verwendet nur die
+bereits für diesen Tag und diese Baustelle freigegebenen Teamdaten.
 
 Monteur und Vorarbeiter benötigen für genau diesen Tag einen freigegebenen oder
 abgeschlossenen Einsatz an der Baustelle. Monteure sehen nur eigene und

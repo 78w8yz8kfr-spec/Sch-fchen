@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 29.07.2026
-Technischer Stand: V0.34.0
+Technischer Stand: V0.35.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -82,7 +82,7 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/construction-sites/:id/notes?date=JJJJ-MM-TT` | Notiz idempotent für eine an diesem Tag zugewiesene Baustelle speichern |
 | `POST` | `/api/v1/construction-sites/:id/photos?date=JJJJ-MM-TT` | Foto für eine an diesem Tag zugewiesene Baustelle zentral speichern |
 | `GET` | `/api/v1/construction-sites/:id/documents/:documentId/content?date=JJJJ-MM-TT` | mit Baustellenzuweisung verknüpften Dateiinhalt geschützt lesen |
-| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Kunden, Projekte, Baustellen, Dokumente, Arbeitsmodule und Wochenplanung Montag bis Freitag |
+| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter samt optionalen Kontaktdaten, Kunden, Projekte, Baustellen, Arbeitsmodule, Tageslage und Wochenplanung Montag bis Freitag |
 | `POST` | `/api/v1/admin/site-notes` | Notiz für eine aktive Baustelle anlegen |
 | `POST` | `/api/v1/admin/site-tasks` | Aufgabe für eine aktive Baustelle anlegen |
 | `PATCH` | `/api/v1/admin/site-tasks/:id` | Aufgabenstatus versionsgeschützt ändern |
@@ -93,8 +93,8 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/admin/documents` | Datei einmalig hochladen und hierarchisch verknüpfen |
 | `GET` | `/api/v1/admin/documents/:id/content` | Dokument nach Sitzungs- und Rollenprüfung herunterladen |
 | `PATCH` | `/api/v1/admin/documents/:id` | Dokument versionsgeschützt archivieren oder reaktivieren |
-| `POST` | `/api/v1/admin/employees` | Mitarbeiter mit Startpasswort und begrenzter Rolle anlegen |
-| `PATCH` | `/api/v1/admin/employees/:id` | Mitarbeiterstammdaten und Rolle mit Versionskonfliktschutz bearbeiten |
+| `POST` | `/api/v1/admin/employees` | Mitarbeiter mit optionalen Kontaktdaten, Startpasswort und begrenzter Rolle anlegen |
+| `PATCH` | `/api/v1/admin/employees/:id` | Mitarbeiterstammdaten, Kontaktdaten und Rolle mit Versionskonfliktschutz bearbeiten |
 | `POST` | `/api/v1/admin/customers` | Firmen- oder Privatkunden getrennt anlegen |
 | `PATCH` | `/api/v1/admin/customers/:id` | Kundenstammdaten und Archivstatus versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden zuordnen |
@@ -103,8 +103,8 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/construction-sites/:id` | Baustellendaten und Status versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/construction-sites/:id/confirm` | Eine im Feld angelegte Baustelle fachlich bestätigen |
 | `POST` | `/api/v1/admin/sites` | Kompatibler Paket-Endpunkt für bestehende Integrationen |
-| `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz freigeben |
-| `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung verschieben oder Startzeit ändern |
+| `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz mit optionaler Dauer und Arbeitsanweisung freigeben |
+| `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung einschließlich Datum, Startzeit, Dauer und Arbeitsanweisung ändern |
 | `POST` | `/api/v1/admin/assignments/:id/cancel` | Einsatz mit Begründung stornieren; Historie bleibt erhalten |
 | `POST` | `/api/v1/admin/assignment-imports/preview` | XLSX-Wochenplan prüfen und sichere X-Zuweisungen vorschlagen |
 | `POST` | `/api/v1/admin/assignment-imports` | zuvor prüfbare X-Zuweisungen geschützt importieren |
