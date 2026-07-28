@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.32.0 – Persönlicher Stundenzettelexport und Wochenvergleich
+
+- Mitarbeiter können ausschließlich ihre eigenen vom Büro freigegebenen oder bereits abgerechneten Stundenzettel als Excel-Datei exportieren
+- der persönliche Endpunkt erzwingt Mitarbeiter- und Mandantentrennung serverseitig; unfertige oder nur abgeschlossene Tage gelangen nicht in die Datei
+- die Wochenansicht wechselt zwischen vergangenen Wochen und der aktuellen Woche, ohne zukünftige leere Wochen anzubieten
+- Status zeigen eindeutig „Freigegeben“ beziehungsweise „Abgerechnet“ und kennzeichnen exportierbare Tage
+- Wochensumme und Tageskarten zeigen zusätzlich Soll- und Mehrzeit; der Export meldet Server- und Zeitraumfehler direkt in der Oberfläche
+
+### V0.31.0 – Zeiterfassung, Berichte und Baustellenablage aufgeräumt
+
+- die Büro-Wochenprüfung gruppiert Stundenzettel nach Monteur und zeigt Tage, Wochenstunden, Warnungen sowie kompakte Freigabe- und Abrechnungsaktionen ohne überdeckende Schaltflächen
+- beim spontanen Einsatz können Monteure einen vorhandenen Kunden und ein vorhandenes Projekt verwenden oder Kunde, Projekt und Baustelle vollständig in einem geführten Ablauf anlegen
+- der Excel-Export enthält eine Mitarbeiterübersicht, ein eigenes nach Datum sortiertes Tabellenblatt je Monteur, sichtbare Arbeitsstundensummen und weiterhin die unveränderliche Buchungshistorie
+- Bautagesbericht und Montageschein erhalten Teamstundensumme, Vollständigkeitsprüfung, lokalen Entwurf sowie optionale Angaben zu Witterung, Material, Geräten, Absprachen, Behinderungen, offenen Punkten und Vorfällen
+- die freigegebene Berichts-PDF übernimmt alle strukturierten Zusatzangaben und verwendet die eindeutige Bezeichnung Montageschein
+- der Bereich Baustellen zeigt Kunde → Projekt → Baustelle als durchsuchbare Hauptablage; doppelte Verwaltungslisten entfallen und Formulare erscheinen nur noch zum gezielten Anlegen oder Bearbeiten
+- zentrale Dokumentablage ist standardmäßig eingeklappt; häufige Aktionen zum Anlegen und Bearbeiten liegen direkt am passenden Kunden oder Projekt
+
 ### V0.30.0 – Zeiterfassung vollständig
 
 - beendete Arbeitstage erscheinen ohne zusätzlichen Einreich-Schritt automatisch im Büro; die Oberfläche bündelt den Ablauf in „In Arbeit“, „Abgeschlossen“ und „Abgerechnet“

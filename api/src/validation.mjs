@@ -567,6 +567,10 @@ export function validateSiteReport(body) {
     workPerformed: optionalText(body.workPerformed, "Ausgeführte Leistungen", 5000) || details || summary,
     obstructions: optionalText(body.obstructions, "Behinderungen", 3000),
     openItems: optionalText(body.openItems, "Offene Punkte", 3000),
+    weather: optionalText(body.weather, "Witterung", 200),
+    materialsAndEquipment: optionalText(body.materialsAndEquipment, "Material und Geräte", 3000),
+    agreements: optionalText(body.agreements, "Absprachen und Anweisungen", 3000),
+    incidents: optionalText(body.incidents, "Mängel, Schäden oder Sicherheit", 3000),
     personnel: personnel.entries,
     personnelProvided: personnel.provided
   };
@@ -735,9 +739,28 @@ export function validateSpontaneousSiteSelection(body) {
 
 export function validateFieldConstructionSite(body) {
   rejectTenantFields(body);
+  const projectId = optionalUuid(body.projectId, "Projekt");
+  const customerId = optionalUuid(body.customerId, "Kunde");
+  const customerName = optionalText(body.customerName, "Neuer Kunde", 200);
+  const projectName = optionalText(body.projectName, "Neues Projekt", 200);
+  if (projectId && (customerId || customerName || projectName)) {
+    throw new InputError("Ein vorhandenes Projekt darf nicht mit neuen Stammdaten kombiniert werden.");
+  }
+  if (!projectId && !customerId && !customerName) {
+    throw new InputError("Bitte einen vorhandenen oder neuen Kunden auswählen.");
+  }
+  if (!projectId && !projectName) {
+    throw new InputError("Bitte ein vorhandenes Projekt auswählen oder ein neues Projekt benennen.");
+  }
+  if (customerId && customerName) {
+    throw new InputError("Bitte entweder einen vorhandenen oder einen neuen Kunden verwenden.");
+  }
   return {
     workDate: validateWorkDate(body.workDate),
-    projectId: uuid(body.projectId, "Projekt"),
+    projectId,
+    customerId,
+    customerName,
+    projectName,
     name: text(body.name, "Baustellenname", 2, 200),
     installerShortText: optionalText(body.installerShortText, "Aufgabe für den Monteur", 300),
     street: text(body.street, "Straße", 2, 150),

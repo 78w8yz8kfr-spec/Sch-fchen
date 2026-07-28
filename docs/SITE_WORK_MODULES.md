@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Notizen, Material und Berichte
 
-Stand: 26.07.2026
-Technischer Stand: V0.26.1
+Stand: 28.07.2026
+Technischer Stand: V0.32.0
 
 ## Bedienkonzept
 
@@ -73,12 +73,14 @@ Baustelle, Projekt und Kunde verknüpft. Der eigene Fotobereich ist lediglich
 eine thematische Sicht auf denselben zentralen Dokumentbestand und erzeugt
 keine zweite Dateikopie.
 
-## Montage- und Bautagesberichte
+## Montagescheine und Bautagesberichte
 
-`site_reports` speichert Montage- oder Bautagesbericht, Arbeitstag, Titel,
+`site_reports` speichert Montageschein oder Bautagesbericht, Arbeitstag, Titel,
 Autor, Status und Erfassungsart. `structured_data` enthält ausgeführte
-Leistungen, Behinderungen, offene Punkte und die serverseitig geprüften
-Mitarbeiterstunden. Drei gleichwertige Einstiege sind vorgesehen:
+Leistungen, Behinderungen, offene Punkte, Witterung, Material und Geräte,
+Absprachen, Vorfälle sowie die serverseitig geprüften Mitarbeiterstunden. Die
+PWA summiert die Teamstunden, prüft Pflichtangaben und bewahrt einen noch nicht
+abgeschlossenen lokalen Entwurf. Drei gleichwertige Einstiege sind vorgesehen:
 
 1. **Digital erstellen** – Text direkt eingeben.
 2. **Papierbericht fotografieren** – das unveränderte Originalfoto einmal im
@@ -109,7 +111,7 @@ keine Dokumentkopie.
 
 ## Freigabe und Abschluss-PDF
 
-Eingereichte Montage- und Bautagesberichte werden erst abgeschlossen, wenn
+Eingereichte Montagescheine und Bautagesberichte werden erst abgeschlossen, wenn
 Mitarbeiter beziehungsweise Vorarbeiter und Auftraggeber direkt auf dem Gerät
 unterschrieben haben. Die API erzeugt daraus eine PDF-Datei mit dem zu diesem
 Zeitpunkt gültigen Firmenlogo sowie historischen Firmen-, Kunden-, Projekt- und
@@ -123,7 +125,7 @@ und Baustelle verknüpft.
 Baustelle und Arbeitstag. `report_responsibility_source` unterscheidet die
 manuelle Einteilung eines Vorarbeiters von der automatischen Verantwortung bei
 einem Alleineinsatz. Beim Antippen von „Baustelle verlassen“ öffnet sich nur
-für diesen Mitarbeiter die Auswahl zwischen Montage- und Bautagesbericht.
+für diesen Mitarbeiter die Auswahl zwischen Montageschein und Bautagesbericht.
 Der Bericht wird über `site_assignment_id` unverwechselbar mit dem Einsatz
 verbunden. `client_report_id` verhindert auch nach einem Verbindungsabbruch
 Doppelanlage.

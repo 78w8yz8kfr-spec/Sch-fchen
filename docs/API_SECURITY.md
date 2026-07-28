@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 26.07.2026
-Technischer Stand: V0.30.0
+Stand: 28.07.2026
+Technischer Stand: V0.32.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -114,6 +114,7 @@ API setzt beide Werte ausschließlich selbst.
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
 | `GET` | `/api/v1/work-days/:date` | Eigenen berechneten Arbeitstag und Ereignisse lesen |
 | `GET` | `/api/v1/work-weeks/:monday` | Eigene sieben Kalendertage mit wirksamen Buchungen und Summen lesen |
+| `GET` | `/api/v1/timesheets.xlsx` | Ausschließlich eigene freigegebene oder abgerechnete Stundenzettel exportieren; Mitarbeiter-ID stammt aus der Sitzung |
 | `GET` | `/api/v1/site-assignments/:date` | Eigene freigegebene Tageseinsätze lesen |
 | `GET` | `/api/v1/time-tracking/site-options/:date` | Geplante und weitere Baustellen sowie Projekte für die aktuelle Auswahl lesen |
 | `POST` | `/api/v1/time-tracking/site-selection` | Andere vorhandene Baustelle als spontanen Tageseinsatz wählen |

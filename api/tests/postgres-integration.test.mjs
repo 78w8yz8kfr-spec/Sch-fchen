@@ -1357,6 +1357,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const siteOptions = (await siteOptionsResponse.json()).options;
   assert.ok(siteOptions.sites.some((option) => option.id === structuredSite.id));
   assert.ok(siteOptions.projects.some((option) => option.id === project.id));
+  assert.ok(siteOptions.customers.some((option) => option.id === customer.id));
 
   const spontaneousSelectionResponse = await fetch(
     `${baseUrl}/api/v1/time-tracking/site-selection`,
@@ -1424,6 +1425,27 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   );
   assert.equal(confirmFieldSiteResponse.status, 200, await confirmFieldSiteResponse.clone().text());
   assert.equal((await confirmFieldSiteResponse.json()).site.fieldReviewStatus, "confirmed");
+
+  const fieldBundleResponse = await fetch(`${baseUrl}/api/v1/time-tracking/sites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      workDate: assignmentDate,
+      customerName: `Feldkunde ${suffix}`,
+      projectName: `Feldprojekt ${suffix}`,
+      name: `Feldneubau ${suffix}`,
+      installerShortText: "Kunde, Projekt und Baustelle spontan anlegen",
+      street: "Neuweg",
+      houseNumber: "7",
+      postalCode: "09599",
+      city: "Freiberg"
+    })
+  });
+  assert.equal(fieldBundleResponse.status, 201, await fieldBundleResponse.clone().text());
+  const fieldBundle = (await fieldBundleResponse.json()).selection.site;
+  assert.equal(fieldBundle.customerName, `Feldkunde ${suffix}`);
+  assert.equal(fieldBundle.projectName, `Feldprojekt ${suffix}`);
+  assert.equal(fieldBundle.fieldReviewStatus, "pending");
 
   const clockInAt = new Date(Date.now() - 5000).toISOString();
   const clockOutAt = new Date(Date.now() - 4000).toISOString();
@@ -1600,6 +1622,13 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(reviewableWorkDay.workflowStatus, "completed");
   assert.equal(reviewableWorkDay.reviewable, true);
 
+  const prematureOwnExport = await fetch(
+    `${baseUrl}/api/v1/timesheets.xlsx?from=${workDate}&to=${workDate}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(prematureOwnExport.status, 404);
+  assert.equal((await prematureOwnExport.json()).error.code, "approved_timesheet_not_found");
+
   const approvedWorkDayResponse = await fetch(
     `${baseUrl}/api/v1/admin/work-days/${reviewableWorkDay.id}`,
     {
@@ -1610,6 +1639,35 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   );
   assert.equal(approvedWorkDayResponse.status, 200, await approvedWorkDayResponse.clone().text());
   assert.equal((await approvedWorkDayResponse.json()).workDay.status, "approved");
+
+  const unrelatedEmployeeExport = await fetch(
+    `${baseUrl}/api/v1/timesheets.xlsx?from=${workDate}&to=${workDate}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(unrelatedEmployeeExport.status, 404);
+
+  const manipulatedOwnExport = await fetch(
+    `${baseUrl}/api/v1/timesheets.xlsx?from=${workDate}&to=${workDate}&employeeId=${employee.id}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(manipulatedOwnExport.status, 400);
+
+  const ownTimesheetExportResponse = await fetch(
+    `${baseUrl}/api/v1/timesheets.xlsx?from=${workDate}&to=${workDate}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(
+    ownTimesheetExportResponse.status,
+    200,
+    await ownTimesheetExportResponse.clone().text()
+  );
+  assert.match(ownTimesheetExportResponse.headers.get("content-type"), /spreadsheetml/);
+  assert.match(
+    ownTimesheetExportResponse.headers.get("content-disposition"),
+    /Mein_Stundenzettel_/
+  );
+  const ownTimesheetExport = Buffer.from(await ownTimesheetExportResponse.arrayBuffer());
+  assert.equal(ownTimesheetExport.subarray(0, 2).toString("ascii"), "PK");
 
   const lockedWorkDayResponse = await fetch(
     `${baseUrl}/api/v1/admin/work-days/${reviewableWorkDay.id}`,

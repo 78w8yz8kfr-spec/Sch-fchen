@@ -1394,6 +1394,18 @@ select:focus-visible {
   grid-column: 1 / -1;
 }
 
+.employee-timesheet-export-panel {
+  border-color: rgba(227, 6, 19, 0.22);
+  background: linear-gradient(180deg, #fff 0%, #fff8f8 100%);
+}
+
+.employee-timesheet-export-summary {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .week-day-warnings {
   display: grid;
   gap: 5px;
@@ -1454,6 +1466,25 @@ select:focus-visible {
   margin-top: 12px;
 }
 
+.site-choice-new-form__intro {
+  margin: 0 0 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--muted);
+  background: #f7f7f7;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.site-choice-dependent-field {
+  display: grid;
+  gap: 6px;
+}
+
+.site-choice-dependent-field[hidden] {
+  display: none;
+}
+
 .form-grid--two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1463,6 +1494,83 @@ select:focus-visible {
 .form-grid--two label {
   display: grid;
   gap: 6px;
+}
+
+.mobile-report-personnel__total {
+  display: block;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.mobile-report-more {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fafafa;
+}
+
+.mobile-report-more > summary {
+  padding: 12px 13px;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mobile-report-more__fields {
+  display: grid;
+  gap: 9px;
+  padding: 0 12px 12px;
+}
+
+.mobile-report-check {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid #cfe5d8;
+  border-radius: 13px;
+  color: #176b45;
+  background: #effaf4;
+}
+
+.mobile-report-check strong {
+  font-size: 0.7rem;
+}
+
+.mobile-report-check span {
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.mobile-report-check--warning {
+  border-color: #f0d58b;
+  color: #795400;
+  background: #fff5d6;
+}
+
+@media (max-width: 520px) {
+  .work-day-review-day {
+    align-items: start;
+  }
+
+  .week-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .week-heading__controls {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .form-grid--two {
+    grid-template-columns: 1fr;
+  }
 }
 
 .time-addition-site-field {
@@ -1512,10 +1620,42 @@ select:focus-visible {
   align-items: end;
 }
 
+.week-heading__controls {
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+
 .week-period {
   color: var(--muted);
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
+}
+
+.week-navigation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.week-navigation .text-button {
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  color: var(--muted);
+  background: #f4f4f4;
+  font-size: 0.61rem;
+}
+
+.week-navigation .text-button:first-child,
+.week-navigation .text-button:last-child {
+  min-width: 30px;
+  padding: 2px 8px;
+  font-size: 1rem;
+}
+
+.week-navigation .text-button:disabled {
+  opacity: 0.38;
 }
 
 .week-strip {
@@ -1574,7 +1714,7 @@ select:focus-visible {
 
 .week-totals {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   overflow: hidden;
   margin-top: 12px;
   border: 1px solid var(--line);
@@ -1664,6 +1804,7 @@ select:focus-visible {
 
 .week-day-metrics {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 0 16px 13px;
 }
@@ -1754,8 +1895,63 @@ select:focus-visible {
   background: #f1f1f1;
 }
 
-.work-day-review-list li {
-  align-items: flex-start;
+.work-day-review-list {
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.work-day-review-list > .work-day-review-employee {
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.work-day-review-employee__heading {
+  display: flex !important;
+  padding: 13px 14px;
+  border: 0 !important;
+  background: #f7f7f7;
+}
+
+.work-day-review-employee__heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.work-day-review-employee__heading strong {
+  font-size: 0.82rem;
+}
+
+.work-day-review-days {
+  display: grid !important;
+}
+
+.work-day-review-day {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.work-day-review-day + .work-day-review-day {
+  border-top: 1px solid var(--line);
+}
+
+.work-day-review-day > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.work-day-review-day > div > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
 }
 
 .work-day-review-status {
@@ -1780,10 +1976,15 @@ select:focus-visible {
 }
 
 .work-day-review-action {
-  min-height: 44px;
+  width: auto !important;
+  min-height: 36px;
   flex: 0 0 auto;
-  padding: 9px 12px;
-  font-size: 0.66rem;
+  padding: 7px 9px;
+  border: 1px solid #f3b4b7;
+  border-radius: 10px;
+  background: #fff7f7;
+  font-size: 0.64rem;
+  white-space: nowrap;
 }
 
 .info-card {
@@ -2349,6 +2550,57 @@ select:focus-visible {
   font-style: normal;
 }
 
+.hierarchy-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(118px, 1fr);
+  gap: 9px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fafafa;
+}
+
+.hierarchy-toolbar label {
+  display: grid;
+  gap: 5px;
+}
+
+.hierarchy-toolbar label > span {
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hierarchy-toolbar input,
+.hierarchy-toolbar select {
+  width: 100%;
+  height: 42px;
+  min-width: 0;
+  border: 1px solid #cfd9d3;
+  border-radius: 11px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.68rem;
+}
+
+.hierarchy-create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 12px 0;
+}
+
+.hierarchy-create-actions .text-button {
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid #f1c6c8;
+  border-radius: 10px;
+  background: #fff7f7;
+  font-size: 0.64rem;
+}
+
 .business-hierarchy {
   display: grid;
   gap: 9px;
@@ -2365,16 +2617,37 @@ select:focus-visible {
 
 .hierarchy-customer > summary,
 .hierarchy-project > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
   padding: 12px 13px;
   cursor: pointer;
 }
 
-.hierarchy-customer > summary > span,
-.hierarchy-project > summary > span {
-  display: inline-grid;
+.hierarchy-customer > summary > span:not(.hierarchy-icon),
+.hierarchy-project > summary > span:not(.hierarchy-icon) {
+  display: grid;
+  min-width: 0;
   gap: 2px;
-  margin-left: 4px;
-  vertical-align: middle;
+}
+
+.hierarchy-icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: #ffffff;
+  background: var(--ink);
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.hierarchy-icon--project {
+  color: var(--brand);
+  background: var(--brand-soft);
 }
 
 .hierarchy-customer > summary strong,
@@ -2383,8 +2656,8 @@ select:focus-visible {
   font-size: 0.75rem;
 }
 
-.hierarchy-customer > summary small,
-.hierarchy-project > summary small {
+.hierarchy-customer > summary > span:not(.hierarchy-icon) small,
+.hierarchy-project > summary > span:not(.hierarchy-icon) small {
   color: var(--muted);
   font-size: 0.6rem;
 }
@@ -2392,6 +2665,21 @@ select:focus-visible {
 .hierarchy-customer[open] > summary,
 .hierarchy-project[open] > summary {
   border-bottom: 1px solid var(--line);
+}
+
+.hierarchy-node-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  background: #fffafa;
+}
+
+.hierarchy-node-actions .text-button {
+  min-height: 30px;
+  padding: 5px 7px;
+  font-size: 0.59rem;
 }
 
 .hierarchy-project {
@@ -2412,14 +2700,22 @@ select:focus-visible {
 
 .hierarchy-sites button {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  gap: 3px;
   padding: 11px 13px;
   border: 0;
   color: var(--ink);
   background: transparent;
   font: inherit;
   text-align: left;
+}
+
+.hierarchy-sites button > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
 }
 
 .hierarchy-sites button strong {
@@ -2436,6 +2732,38 @@ select:focus-visible {
   margin: 0;
   padding: 13px;
   line-height: 1.45;
+}
+
+.site-master-data-tools {
+  background: #fafafa;
+}
+
+.site-master-data-tools > .planning-intro {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.site-master-data-tools > .admin-panel,
+.site-master-data-tools > .site-management-panel {
+  margin: 10px;
+  background: var(--surface);
+}
+
+@media (max-width: 520px) {
+  .hierarchy-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .hierarchy-customer > summary,
+  .hierarchy-project > summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .hierarchy-customer > summary > .site-status,
+  .hierarchy-project > summary > .site-status {
+    grid-column: 2;
+  }
 }
 
 .admin-form {
