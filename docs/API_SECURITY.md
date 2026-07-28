@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 28.07.2026
-Technischer Stand: V0.33.0
+Stand: 29.07.2026
+Technischer Stand: V0.34.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -78,6 +78,7 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/setup` | Genau den ersten Admin geschützt anlegen |
 | `POST` | `/api/v1/account/initial-password` | Persönliches Startpasswort einmalig ersetzen |
 | `GET` | `/api/v1/construction-sites/:id/dashboard?date=JJJJ-MM-TT` | Rollen- und einsatzbezogene mobile Baustellenakte lesen |
+| `PATCH` | `/api/v1/construction-sites/:id/tasks/:taskId?date=JJJJ-MM-TT` | sichtbare Baustellenaufgabe mit Einsatz-, Rollen-, Status- und Versionsprüfung fortschreiben |
 | `POST` | `/api/v1/construction-sites/:id/notes?date=JJJJ-MM-TT` | Notiz idempotent für eine an diesem Tag zugewiesene Baustelle speichern |
 | `POST` | `/api/v1/construction-sites/:id/photos?date=JJJJ-MM-TT` | Foto für eine an diesem Tag zugewiesene Baustelle zentral speichern |
 | `GET` | `/api/v1/construction-sites/:id/documents/:documentId/content?date=JJJJ-MM-TT` | mit Baustellenzuweisung verknüpften Dateiinhalt geschützt lesen |

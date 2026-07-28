@@ -930,6 +930,52 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+.assignment-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.assignment-quick-actions--report {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.assignment-quick-action {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 5px;
+  place-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+
+.assignment-quick-action span {
+  color: var(--brand);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.assignment-quick-action strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignment-quick-action:disabled {
+  opacity: 0.52;
+}
+
 .employee-site-workspace {
   display: grid;
   gap: 14px;
@@ -1123,6 +1169,23 @@ select:focus-visible {
 .employee-site-list .text-button {
   flex: 0 0 auto;
   min-height: 40px;
+}
+
+.employee-site-task-actions {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 3px;
+}
+
+.employee-site-task-actions small {
+  max-width: none;
+}
+
+.employee-site-task-actions .text-button {
+  min-height: 36px;
+  padding: 0 7px;
+  font-size: 0.65rem;
 }
 
 .employee-site-list__empty {
@@ -3103,6 +3166,45 @@ select:focus-visible {
   display: grid;
   justify-items: end;
   gap: 2px;
+}
+
+.site-dashboard-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fffafa;
+}
+
+.site-dashboard-shortcut {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 4px;
+  place-items: center;
+  gap: 4px;
+  border: 1px solid #f0c9cc;
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  text-align: center;
+}
+
+.site-dashboard-shortcut span {
+  color: var(--brand);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.site-dashboard-shortcut strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 0.61rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .site-edit-form {

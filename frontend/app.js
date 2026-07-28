@@ -81,6 +81,8 @@
     actionHint: document.querySelector("#action-hint"),
     mobileReportCard: document.querySelector("#mobile-report-card"),
     mobileReportForm: document.querySelector("#mobile-report-form"),
+    mobileReportEyebrow: document.querySelector("#mobile-report-eyebrow"),
+    mobileReportBadge: document.querySelector("#mobile-report-badge"),
     mobileReportSite: document.querySelector("#mobile-report-site"),
     mobileReportType: document.querySelector("#mobile-report-type"),
     mobileReportPersonnelList: document.querySelector("#mobile-report-personnel-list"),
@@ -165,7 +167,11 @@
     assignmentOrder: document.querySelector("#assignment-order"),
     assignmentTitle: document.querySelector("#assignment-title"),
     assignmentMeta: document.querySelector("#assignment-meta"),
+    assignmentQuickActions: document.querySelector("#assignment-quick-actions"),
+    assignmentNavigation: document.querySelector("#assignment-navigation"),
     assignmentDetails: document.querySelector("#assignment-details"),
+    assignmentDetailsLabel: document.querySelector("#assignment-details-label"),
+    assignmentReport: document.querySelector("#assignment-report"),
     siteChoiceOpen: document.querySelector("#site-choice-open"),
     liveDuration: document.querySelector("#live-duration"),
     grossTime: document.querySelector("#gross-time"),
@@ -255,6 +261,11 @@
     siteDashboardOrder: document.querySelector("#site-dashboard-order"),
     siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
     siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
+    siteDashboardPlanAssignment: document.querySelector("#site-dashboard-plan-assignment"),
+    siteDashboardCreateReport: document.querySelector("#site-dashboard-create-report"),
+    siteDashboardAddDocumentShortcut: document.querySelector("#site-dashboard-add-document-shortcut"),
+    siteDashboardCreateTask: document.querySelector("#site-dashboard-create-task"),
+    siteDashboardReportsPanel: document.querySelector("#site-dashboard-reports-panel"),
     siteDashboardReportCount: document.querySelector("#site-dashboard-report-count"),
     siteDashboardReports: document.querySelector("#site-dashboard-reports"),
     siteReportDigital: document.querySelector("#site-report-digital"),
@@ -302,6 +313,7 @@
     siteDashboardDeliveryNoteCancel: document.querySelector("#site-dashboard-delivery-note-cancel"),
     siteDashboardDeliveryNoteMessage: document.querySelector("#site-dashboard-delivery-note-message"),
     siteDashboardAddDocument: document.querySelector("#site-dashboard-add-document"),
+    siteDashboardTasksPanel: document.querySelector("#site-dashboard-tasks-panel"),
     siteDashboardTaskCount: document.querySelector("#site-dashboard-task-count"),
     siteDashboardTasks: document.querySelector("#site-dashboard-tasks"),
     siteTaskAdd: document.querySelector("#site-task-add"),
@@ -542,6 +554,7 @@
 
   let toastTimer;
   let syncing = false;
+  let syncRequested = false;
   let session = null;
   let adminState = null;
   let weekState = null;
@@ -567,6 +580,7 @@
   let speechRecognition = null;
   let cachedUserId = null;
   let employeeSiteState = null;
+  let mobileReportLeavesSite = true;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
   employeeSiteState = state.siteWorkspace || null;
@@ -795,7 +809,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.33.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.34.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2016,6 +2030,18 @@
     }[status] || status;
   }
 
+  function siteAddressText(site) {
+    return [
+      `${site.address?.street || ""} ${site.address?.houseNumber || ""}`.trim(),
+      `${site.address?.postalCode || ""} ${site.address?.city || ""}`.trim()
+    ].filter(Boolean).join(", ");
+  }
+
+  function siteNavigationUrl(site) {
+    const destination = siteAddressText(site) || site.name || "";
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+  }
+
   function siteSearchText(site) {
     return [
       site.number,
@@ -2106,10 +2132,7 @@
   }
 
   function openSiteDashboard(site) {
-    const address = [
-      `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
-      `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
-    ].filter(Boolean).join(", ");
+    const address = siteAddressText(site);
     const assignedEmployees = new Map();
     adminState.weekAssignments
       .filter((assignment) => assignment.constructionSiteId === site.id)
@@ -2130,7 +2153,7 @@
     elements.siteDashboardCustomer.textContent = site.customerName;
     elements.siteDashboardProject.textContent = site.customerName;
     elements.siteDashboardOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
-    elements.siteDashboardNavigation.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    elements.siteDashboardNavigation.href = siteNavigationUrl(site);
     elements.siteDashboardEmployees.replaceChildren();
     if (assignedEmployees.size === 0) {
       const empty = document.createElement("li");
@@ -2158,6 +2181,46 @@
     elements.siteDashboardEdit.hidden = false;
     elements.siteDashboard.hidden = false;
     elements.siteDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openAssignmentPlanningForSite() {
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    showDashboardPane("assignments");
+    elements.assignmentPanel.open = true;
+    elements.assignmentSite.value = site.id;
+    elements.assignmentDate.value = adminState.date;
+    window.setTimeout(() => {
+      elements.assignmentForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      elements.assignmentEmployee.focus({ preventScroll: true });
+    }, 100);
+  }
+
+  function openDocumentUploadForSite() {
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    elements.documentSearch.value = "";
+    setDocumentTargets({ customerId: site.customerId, projectId: site.projectId, constructionSiteId: site.id });
+    renderDocumentList();
+    elements.documentManagementPanel.open = true;
+    elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    elements.documentTitle.focus({ preventScroll: true });
+  }
+
+  function openReportForSite() {
+    if (!openedSiteId) return;
+    elements.siteDashboardReportsPanel.open = true;
+    openSiteReportForm("digital");
+    elements.siteReportForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function openTaskForSite() {
+    if (!openedSiteId) return;
+    elements.siteDashboardTasksPanel.open = true;
+    resetSiteTaskForm();
+    elements.siteTaskForm.hidden = false;
+    elements.siteTaskForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    elements.siteTaskTitle.focus({ preventScroll: true });
   }
 
   function openSiteEditor() {
@@ -2887,24 +2950,87 @@
     return link;
   }
 
+  function employeeSiteTaskAction(task) {
+    return {
+      open: { label: "Beginnen", status: "in_progress" },
+      in_progress: { label: "Erledigt", status: "done" },
+      done: { label: "Wieder öffnen", status: "in_progress" }
+    }[task.status] || null;
+  }
+
+  async function updateEmployeeSiteTask(task, nextStatus, button) {
+    if (!employeeSiteState || !navigator.onLine) {
+      showToast("Der Aufgabenstatus kann wieder mit Verbindung geändert werden.");
+      return;
+    }
+    button.disabled = true;
+    try {
+      const body = await requestJson(
+        `./api/v1/construction-sites/${encodeURIComponent(employeeSiteState.site.id)}/tasks/${encodeURIComponent(task.id)}?date=${encodeURIComponent(employeeSiteState.date)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status: nextStatus, rowVersion: task.rowVersion })
+        }
+      );
+      employeeSiteState.tasks = employeeSiteState.tasks.map((item) => (
+        item.id === body.siteTask.id ? body.siteTask : item
+      ));
+      renderEmployeeSiteWorkspace(employeeSiteState);
+      showToast(nextStatus === "done" ? "Aufgabe erledigt." : "Aufgabenstatus aktualisiert.");
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else showToast(error.message);
+      button.disabled = false;
+    }
+  }
+
+  function appendEmployeeSiteTask(task) {
+    const item = document.createElement("li");
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const actions = document.createElement("div");
+    const badge = document.createElement("small");
+    const due = task.dueDate
+      ? `Fällig ${new Intl.DateTimeFormat("de-DE").format(new Date(`${task.dueDate}T00:00:00`))}`
+      : "Ohne Fälligkeit";
+    const action = employeeSiteTaskAction(task);
+
+    title.textContent = task.title;
+    meta.textContent = [task.details, task.assignedUserName, due].filter(Boolean).join(" · ");
+    content.append(title, meta);
+    actions.className = "employee-site-task-actions";
+    badge.textContent = `${taskPriorityLabel(task.priority)} · ${taskStatusLabel(task.status)}`;
+    actions.append(badge);
+    if (action) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = action.label;
+      button.disabled = !navigator.onLine;
+      button.addEventListener("click", () => {
+        void updateEmployeeSiteTask(task, action.status, button);
+      });
+      actions.append(button);
+    }
+    item.append(content, actions);
+    elements.employeeSiteTasks.append(item);
+  }
+
   function renderEmployeeSiteWorkspace(dashboard) {
     employeeSiteState = dashboard;
     state.siteWorkspace = dashboard;
     saveState();
 
     const { site } = dashboard;
-    const address = [
-      `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
-      `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
-    ].filter(Boolean).join(", ");
+    const address = siteAddressText(site);
     elements.employeeSiteTitle.textContent = site.name;
     elements.employeeSiteMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
     elements.employeeSiteStatus.textContent = siteStatusLabel(site.status);
     elements.employeeSiteStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
     elements.employeeSiteOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
     elements.employeeSiteContext.textContent = site.customerName || address;
-    elements.employeeSiteNavigation.href =
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    elements.employeeSiteNavigation.href = siteNavigationUrl(site);
 
     elements.employeeSiteTeamCount.textContent = String(dashboard.team.length);
     elements.employeeSiteTeam.replaceChildren();
@@ -2926,17 +3052,7 @@
     if (dashboard.tasks.length === 0) {
       appendEmployeeSiteEmpty(elements.employeeSiteTasks, "Keine offene Aufgabe für dich.");
     } else {
-      dashboard.tasks.forEach((task) => {
-        const due = task.dueDate
-          ? `Fällig ${new Intl.DateTimeFormat("de-DE").format(new Date(`${task.dueDate}T00:00:00`))}`
-          : "Ohne Fälligkeit";
-        appendEmployeeSiteItem(
-          elements.employeeSiteTasks,
-          task.title,
-          [task.details, task.assignedUserName, due].filter(Boolean).join(" · "),
-          `${taskPriorityLabel(task.priority)} · ${taskStatusLabel(task.status)}`
-        );
-      });
+      dashboard.tasks.forEach(appendEmployeeSiteTask);
     }
 
     const notes = dashboard.notes || [];
@@ -3069,7 +3185,7 @@
     }
 
     elements.assignmentDetails.disabled = true;
-    elements.assignmentDetails.textContent = "Lädt …";
+    elements.assignmentDetailsLabel.textContent = "Lädt …";
     try {
       const body = await requestJson(
         `./api/v1/construction-sites/${encodeURIComponent(assignment.constructionSite.id)}/dashboard?date=${encodeURIComponent(state.workDate)}`
@@ -3081,7 +3197,7 @@
       else showToast(error.message);
     } finally {
       elements.assignmentDetails.disabled = false;
-      elements.assignmentDetails.textContent = "Details";
+      elements.assignmentDetailsLabel.textContent = "Baustellenakte";
     }
   }
 
@@ -3383,6 +3499,7 @@
   function closeMobileReportForm() {
     elements.mobileReportCard.hidden = true;
     elements.mobileReportMessage.textContent = "";
+    mobileReportLeavesSite = true;
   }
 
   function mobileReportDraftFor(assignment) {
@@ -3507,7 +3624,15 @@
       .filter((entry) => Number.isSafeInteger(entry.minutes) && entry.minutes > 0);
   }
 
-  async function openMobileReportForm(assignment) {
+  async function openMobileReportForm(assignment, { leaveAfterSave = true } = {}) {
+    mobileReportLeavesSite = leaveAfterSave;
+    elements.mobileReportEyebrow.textContent = leaveAfterSave
+      ? "Vorarbeiter · Tagesabschluss"
+      : "Vorarbeiter · Baustellenbericht";
+    elements.mobileReportBadge.textContent = leaveAfterSave ? "Pflicht" : "Zwischenspeichern";
+    elements.mobileReportSubmit.textContent = leaveAfterSave
+      ? "Bericht speichern & Baustelle verlassen"
+      : "Bericht speichern";
     const draft = mobileReportDraftFor(assignment);
     elements.mobileReportSite.textContent = assignment.constructionSite.name;
     elements.mobileReportType.value = draft?.reportType || "daily";
@@ -3591,7 +3716,11 @@
   }
 
   async function syncPendingEntries() {
-    if (demoMode || syncing || !navigator.onLine) return;
+    if (demoMode || !navigator.onLine) return;
+    if (syncing) {
+      syncRequested = true;
+      return;
+    }
     const pendingReports = (state.reports || []).filter((report) => report.pendingSync && !report.syncError);
     const pending = state.events.filter((entry) => entry.pendingSync && !entry.syncError);
     if (pendingReports.length === 0 && pending.length === 0) return;
@@ -3642,7 +3771,8 @@
       render();
     }
 
-    for (const entry of reportSyncFailed ? [] : pending) {
+    const reportStillPending = (state.reports || []).some((report) => report.pendingSync);
+    for (const entry of reportSyncFailed || reportStillPending ? [] : pending) {
       try {
         const body = await requestJson("./api/v1/time-entries", {
           method: "POST",
@@ -3671,9 +3801,12 @@
       render();
     }
 
+    const runAgain = syncRequested;
+    syncRequested = false;
     syncing = false;
     updateConnectionState();
     await refreshWeekData();
+    if (runAgain && navigator.onLine) void syncPendingEntries();
   }
 
   function handlePrimaryAction() {
@@ -3779,10 +3912,13 @@
       elements.assignmentTitle.textContent = "Kein Einsatz freigegeben";
       elements.assignmentMeta.textContent = "Die Zeiterfassung kann trotzdem gestartet werden.";
       elements.assignmentCard.classList.remove("assignment-card--active");
+      elements.assignmentQuickActions.hidden = true;
+      elements.assignmentReport.hidden = true;
       elements.assignmentDetails.disabled = true;
       return;
     }
 
+    elements.assignmentQuickActions.hidden = false;
     elements.assignmentDetails.disabled = false;
     const siteIndex = currentSiteIndex();
     const assignment = assignments[siteIndex];
@@ -3797,6 +3933,15 @@
     elements.assignmentOrder.textContent = `${siteIndex + 1} von ${assignments.length}`;
     elements.assignmentTitle.textContent = assignment.constructionSite.name;
     elements.assignmentMeta.textContent = status;
+    elements.assignmentNavigation.href = siteNavigationUrl(assignment.constructionSite);
+    const showReportAction = latest?.type === "site_arrival"
+      && assignment.reportResponsible
+      && !reportForAssignment(assignment);
+    elements.assignmentReport.hidden = !showReportAction;
+    elements.assignmentQuickActions.classList.toggle(
+      "assignment-quick-actions--report",
+      showReportAction
+    );
     elements.assignmentCard.classList.toggle("assignment-card--active", Boolean(latest) && latest.type !== "clock_out");
   }
 
@@ -4266,6 +4411,9 @@
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
+      elements.employeeSiteTasks
+        .querySelectorAll(".employee-site-task-actions button")
+        .forEach((button) => { button.disabled = !online; });
       if (!online) {
         elements.employeeSitePhotoMessage.textContent =
           "Fotos können wieder hinzugefügt werden, sobald eine Verbindung besteht.";
@@ -4911,16 +5059,7 @@
     }
   });
 
-  elements.siteDashboardAddDocument.addEventListener("click", () => {
-    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
-    if (!site) return;
-    elements.documentSearch.value = "";
-    setDocumentTargets({ customerId: site.customerId, projectId: site.projectId, constructionSiteId: site.id });
-    renderDocumentList();
-    elements.documentManagementPanel.open = true;
-    elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-    elements.documentTitle.focus({ preventScroll: true });
-  });
+  elements.siteDashboardAddDocument.addEventListener("click", openDocumentUploadForSite);
 
   elements.siteDashboardCaptureDeliveryNote.addEventListener("click", () => {
     elements.siteDashboardDeliveryNoteInput.click();
@@ -4983,11 +5122,7 @@
     }
   });
 
-  elements.siteTaskAdd.addEventListener("click", () => {
-    resetSiteTaskForm();
-    elements.siteTaskForm.hidden = false;
-    elements.siteTaskTitle.focus({ preventScroll: true });
-  });
+  elements.siteTaskAdd.addEventListener("click", openTaskForSite);
   elements.siteTaskCancel.addEventListener("click", resetSiteTaskForm);
   elements.siteTaskForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -5264,9 +5399,11 @@
       elements.mobileReportMessage.textContent = "Der aktuelle Einsatz benötigt keinen Baustellenbericht.";
       return;
     }
+    const leaveAfterSave = mobileReportLeavesSite;
     if (reportForAssignment(assignment)) {
       closeMobileReportForm();
-      addEntry("site_departure", siteIndex);
+      if (leaveAfterSave) addEntry("site_departure", siteIndex);
+      else showToast("Der Bericht für diese Baustelle ist bereits gespeichert.");
       return;
     }
     const summary = elements.mobileReportSummary.value.trim();
@@ -5313,10 +5450,18 @@
     state.reportDraft = null;
     saveState();
     closeMobileReportForm();
-    addEntry("site_departure", siteIndex);
-    showToast(navigator.onLine
-      ? "Bericht gespeichert · Baustelle wird abgeschlossen."
-      : "Bericht offline gespeichert · Synchronisation folgt automatisch.");
+    if (leaveAfterSave) {
+      addEntry("site_departure", siteIndex);
+      showToast(navigator.onLine
+        ? "Bericht gespeichert · Baustelle wird abgeschlossen."
+        : "Bericht offline gespeichert · Synchronisation folgt automatisch.");
+    } else {
+      render();
+      showToast(navigator.onLine
+        ? "Bericht gespeichert · du bleibst auf der Baustelle."
+        : "Bericht offline gespeichert · du bleibst auf der Baustelle.");
+      if (!demoMode && navigator.onLine) void syncPendingEntries();
+    }
   });
 
   elements.assignmentForm.addEventListener("submit", async (event) => {
@@ -5684,6 +5829,10 @@
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
   elements.secondaryAction.addEventListener("click", () => addEntry("clock_out"));
   elements.assignmentDetails.addEventListener("click", openEmployeeSiteWorkspace);
+  elements.assignmentReport.addEventListener("click", () => {
+    const assignment = assignments[currentSiteIndex()];
+    if (assignment) void openMobileReportForm(assignment, { leaveAfterSave: false });
+  });
   elements.siteChoiceOpen.addEventListener("click", () => void openSiteChoice());
   elements.siteChoiceCancel.addEventListener("click", closeSiteChoice);
   elements.siteChoiceDialog.addEventListener("cancel", (event) => {
@@ -5962,6 +6111,10 @@
     elements.siteEditForm.hidden = true;
     elements.siteDashboard.hidden = true;
   });
+  elements.siteDashboardPlanAssignment.addEventListener("click", openAssignmentPlanningForSite);
+  elements.siteDashboardCreateReport.addEventListener("click", openReportForSite);
+  elements.siteDashboardAddDocumentShortcut.addEventListener("click", openDocumentUploadForSite);
+  elements.siteDashboardCreateTask.addEventListener("click", openTaskForSite);
   elements.siteDashboardEdit.addEventListener("click", openSiteEditor);
   elements.siteEditCancel.addEventListener("click", () => {
     elements.siteEditForm.hidden = true;

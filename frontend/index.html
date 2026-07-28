@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.33.0">
-    <script src="./app.js?v=0.33.0" defer></script>
-    <script src="./version.js?v=0.33.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.34.0">
+    <script src="./app.js?v=0.34.0" defer></script>
+    <script src="./version.js?v=0.34.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.33.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.34.0</p>
         </div>
       </section>
 
@@ -214,10 +214,10 @@
           <section id="mobile-report-card" class="mobile-report-card" aria-labelledby="mobile-report-title" hidden>
             <div class="mobile-report-card__heading">
               <div>
-                <p class="eyebrow">Vorarbeiter · Tagesabschluss</p>
+                <p id="mobile-report-eyebrow" class="eyebrow">Vorarbeiter · Tagesabschluss</p>
                 <h2 id="mobile-report-title">Baustellenbericht erfassen</h2>
               </div>
-              <span class="role-badge">Pflicht</span>
+              <span id="mobile-report-badge" class="role-badge">Pflicht</span>
             </div>
             <p id="mobile-report-site" class="mobile-report-site">Aktuelle Baustelle</p>
             <form id="mobile-report-form" class="mobile-report-form" novalidate>
@@ -401,7 +401,6 @@
               <h2 id="today-assignment-title">Heutiger Einsatz</h2>
               <div class="section-heading__actions">
                 <button id="site-choice-open" class="text-button" type="button">Baustelle wählen</button>
-                <button id="assignment-details" class="text-button" type="button">Details</button>
               </div>
             </div>
             <article id="assignment-card" class="assignment-card">
@@ -414,6 +413,20 @@
                 <p id="assignment-meta">07:30 Uhr · Verteilung erneuern</p>
               </div>
             </article>
+            <div id="assignment-quick-actions" class="assignment-quick-actions" aria-label="Schnellaktionen für den Einsatz">
+              <a id="assignment-navigation" class="assignment-quick-action" target="_blank" rel="noopener">
+                <span aria-hidden="true">⌖</span>
+                <strong>Navigation</strong>
+              </a>
+              <button id="assignment-details" class="assignment-quick-action" type="button">
+                <span aria-hidden="true">▤</span>
+                <strong id="assignment-details-label">Baustellenakte</strong>
+              </button>
+              <button id="assignment-report" class="assignment-quick-action" type="button" hidden>
+                <span aria-hidden="true">✎</span>
+                <strong>Bericht</strong>
+              </button>
+            </div>
           </section>
 
           <section id="timesheet-section" class="section" data-dashboard-pane="start" aria-labelledby="timesheet-title">
@@ -741,6 +754,24 @@
                   <button id="site-dashboard-close" class="text-button" type="button">Schließen</button>
                 </div>
               </div>
+              <nav class="site-dashboard-shortcuts" aria-label="Schnellaktionen für diese Baustelle">
+                <button id="site-dashboard-plan-assignment" class="site-dashboard-shortcut" type="button">
+                  <span aria-hidden="true">＋</span>
+                  <strong>Einsatz planen</strong>
+                </button>
+                <button id="site-dashboard-create-report" class="site-dashboard-shortcut" type="button">
+                  <span aria-hidden="true">✎</span>
+                  <strong>Bericht</strong>
+                </button>
+                <button id="site-dashboard-add-document-shortcut" class="site-dashboard-shortcut" type="button">
+                  <span aria-hidden="true">⇧</span>
+                  <strong>Dokument</strong>
+                </button>
+                <button id="site-dashboard-create-task" class="site-dashboard-shortcut" type="button">
+                  <span aria-hidden="true">✓</span>
+                  <strong>Aufgabe</strong>
+                </button>
+              </nav>
               <form id="site-edit-form" class="admin-form site-edit-form" novalidate hidden>
                 <div class="site-edit-form__heading">
                   <div>

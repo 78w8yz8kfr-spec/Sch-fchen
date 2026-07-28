@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Notizen, Material und Berichte
 
-Stand: 28.07.2026
-Technischer Stand: V0.33.0
+Stand: 29.07.2026
+Technischer Stand: V0.34.0
 
 ## Bedienkonzept
 
@@ -22,8 +22,9 @@ Die Oberfläche folgt den festgelegten Gestaltungsregeln:
 
 ## Mobile Baustellenakte
 
-Der Details-Knopf des aktuellen Tageseinsatzes öffnet die Baustelle als eigenen
-Arbeitsbereich. Arbeitsauftrag und Navigation stehen zuerst; darunter folgen
+Navigation und Baustellenakte sind direkt am aktuellen Tageseinsatz erreichbar.
+Die Baustellenakte öffnet die Baustelle als eigenen Arbeitsbereich.
+Arbeitsauftrag und Navigation stehen zuerst; darunter folgen
 sichtbare, getrennte Karten für Mitarbeiter, Aufgaben, Notizen, Berichte, Dokumente,
 Fotos und Material. Die Ansicht ist keine chronologische Pinnwand und erzeugt
 keinen zusätzlichen Hauptmenüpunkt.
@@ -45,6 +46,14 @@ Serververbindung.
 Fälligkeit und Status. Die Statusfolge lautet `open`, `in_progress`, `done` und
 optional `archived`. Beim Abschluss setzt PostgreSQL den Abschlusszeitpunkt.
 Änderungen verwenden `row_version`; hartes Löschen ist gesperrt.
+
+Ein für den Tag berechtigter Mitarbeiter kann eine für ihn sichtbare Aufgabe
+mobil von `open` nach `in_progress`, von `in_progress` nach `done` und von
+`done` zurück nach `in_progress` setzen. Normale Monteure dürfen nur allgemeine
+oder ihnen selbst zugewiesene Aufgaben ändern; Vorarbeiter dürfen die sichtbaren
+Aufgaben ihres Baustellenteams bearbeiten. Archivieren bleibt eine Büroaktion.
+Die API prüft Baustelle, Arbeitstag, Einsatz, Mitarbeiterzuordnung,
+Statusübergang und `row_version`.
 
 ## Material
 
@@ -126,6 +135,10 @@ Baustelle und Arbeitstag. `report_responsibility_source` unterscheidet die
 manuelle Einteilung eines Vorarbeiters von der automatischen Verantwortung bei
 einem Alleineinsatz. Beim Antippen von „Baustelle verlassen“ öffnet sich nur
 für diesen Mitarbeiter die Auswahl zwischen Montageschein und Bautagesbericht.
+Zusätzlich kann derselbe Mitarbeiter den Bericht über die Schnellaktion des
+laufenden Einsatzes vorab speichern, ohne dabei die Baustelle zu verlassen.
+Beim späteren Verlassen erkennt Schäfchen den vorhandenen Bericht und legt
+keine zweite Ausführung an.
 Der Bericht wird über `site_assignment_id` unverwechselbar mit dem Einsatz
 verbunden. `client_report_id` verhindert auch nach einem Verbindungsabbruch
 Doppelanlage.

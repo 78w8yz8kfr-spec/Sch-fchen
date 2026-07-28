@@ -1,0 +1,65 @@
+# Plancraft-Featureprüfung für Schäfchen
+
+Stand: 29.07.2026  
+Technischer Stand: V0.34.0
+
+## Ziel und Leitplanken
+
+Plancraft dient ausschließlich als öffentlich zugängliche Produktreferenz. Schäfchen übernimmt keine Gestaltung, Texte oder vollständigen Module, sondern nur Arbeitsmuster, die den bestehenden Ablauf für Elektrobetriebe nachweislich vereinfachen.
+
+Für jede Übernahme gelten die Schäfchen-Grundsätze:
+
+- eine sichtbare Baustelle statt doppelter Projekt- und Baustellenordner
+- wenige große, eindeutige Aktionen
+- Monteure sehen nur ihren nächsten sinnvollen Schritt
+- Büro und Baustelle arbeiten mit demselben Datenbestand
+- keine neue Funktion ohne Rollen-, Mandanten- und Verlaufsprüfung
+
+## Beobachtete Plancraft-Muster
+
+Die öffentlich dokumentierten Plancraft-Abläufe bündeln Auftragsdaten, Mitarbeiter, Dokumente, Berichte und Zeiterfassung in einer zentralen Projektakte. Aus der Einsatzplanung gelangen mobile Mitarbeiter direkt zu Navigation, Zeiterfassung, Bericht und Projektordner. Zugewiesene Mitarbeiter sehen nur ihre relevanten Projekte. Berichte werden aus Projekt- und Kundendaten vorausgefüllt und können mobil bearbeitet werden.
+
+Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt hier jedoch konsequent **Baustelle**. Die intern notwendige Projektebene bleibt verborgen.
+
+## Entscheidung
+
+| Muster | Entscheidung für Schäfchen | Begründung |
+|---|---|---|
+| Zentrale Projekt-/Baustellenakte | Bereits vorhanden, weiter vereinfachen | Arbeitsauftrag, Team, Aufgaben, Berichte, Dokumente, Fotos, Notizen und Material liegen schon an einer Baustelle. |
+| Direkte Aktionen aus dem Tageseinsatz | In V0.34.0 übernehmen | Navigation und Baustellenakte sind ohne Umweg erreichbar; der verantwortliche Mitarbeiter kann den Bericht bereits vor der Abfahrt speichern. |
+| Mobile Aufgabenbearbeitung | In V0.34.0 übernehmen | Monteure können sichtbare Aufgaben beginnen, erledigen und wieder öffnen. Rollen-, Tages- und Baustellenzugriff werden serverseitig geprüft. |
+| Häufige Büroaktionen an der Baustelle | In V0.34.0 übernehmen | Einsatz planen, Bericht, Dokument und Aufgabe sind direkt am Baustellenkopf erreichbar. |
+| Nur zugewiesene mobile Baustellen | Bereits vorhanden | Schäfchen erzwingt die tagesbezogene Zuweisung bereits serverseitig. |
+| Vorausgefüllte mobile Berichte und Entwurf | Bereits vorhanden, in V0.34.0 ergänzen | Team und Stunden werden vorausgefüllt; Entwürfe funktionieren offline. Neu ist das Speichern ohne gleichzeitiges Verlassen der Baustelle. |
+| Frei konfigurierbare Projektstatus | Später prüfen | Die vorhandenen Status reichen für den aktuellen Betriebsablauf. Zusätzliche Status lohnen sich erst mit klaren realen Fällen. |
+| Freigabe einzelner Dokumente für Mobilrollen | Später prüfen | Fachlich sinnvoll, benötigt aber ein eigenes Freigabemodell und eine Datenmigration. |
+| Plan-/Ist-Nachkalkulation | Später prüfen | Erst sinnvoll, wenn Zeit-, Material- und Kostenstammdaten über mehrere reale Aufträge stabil gepflegt werden. |
+| Vollständige Angebots-, Rechnungs- und Buchhaltungswelt | Nicht jetzt übernehmen | Würde den Kern Zeiterfassung, Einsatz und Baustellenarbeit unnötig verbreitern. |
+| Sichtbare zusätzliche Projektebene | Nicht übernehmen | Widerspricht der bewusst flachen Baustellenansicht und erzeugt doppelte Wege. |
+| Allgemeiner Projektchat | Nicht übernehmen | Gemeinsame Baustellennotizen decken den konkreten Bedarf mit weniger Ablenkung ab. |
+
+## In V0.34.0 umgesetzter Ablauf
+
+### Monteur
+
+1. Der heutige Einsatz zeigt direkt **Navigation** und **Baustellenakte**.
+2. Auf der Baustelle kann der zuständige Mitarbeiter den **Bericht** vorab speichern und arbeitet danach normal weiter.
+3. Sichtbare Aufgaben wechseln mit einer Aktion von **Offen** zu **In Arbeit** und anschließend zu **Erledigt**.
+4. Archivieren bleibt eine Büroaktion. Fremde oder nicht zugewiesene Baustellen bleiben gesperrt.
+
+### Büro und Disposition
+
+1. Eine Baustelle wird in der flachen Baustellenliste geöffnet.
+2. Am Kopf stehen die vier häufigsten Folgeaktionen: **Einsatz planen**, **Bericht**, **Dokument** und **Aufgabe**.
+3. Schäfchen öffnet jeweils den vorhandenen Fachbereich und übernimmt die gewählte Baustelle automatisch.
+
+## Öffentliche Referenzen
+
+- [Projekt anlegen und verwalten](https://help.plancraft.com/de/articles/382654-projekt-in-plancraft-anlegen-und-verwalten)
+- [Projektübersicht und Arbeitsstunden](https://help.plancraft.com/de/articles/382729-projektubersicht-arbeitsstunden-kontaktdaten-und-beschreibung-bearbeiten)
+- [Mitarbeitende einem Projekt zuweisen](https://help.plancraft.com/de/articles/382733-mitarbeitende-einem-projekt-zuweisen)
+- [Ablage in Projekten](https://help.plancraft.com/de/articles/382740-ablage-in-projekten-dateien-zentral-speichern-und-verwalten)
+- [Berichte erstellen und unterschreiben](https://help.plancraft.com/de/articles/382751-berichte-in-plancraft-erstellen-ausfullen-und-unterschreiben)
+- [Plantafel für Einsatzplanung](https://help.plancraft.com/de/articles/382799-plantafel-fur-projekt-einsatz-und-abwesenheitsplanung)
+- [Plancraft-App und mobiler Aufbau](https://help.plancraft.com/de/articles/382683-plancraft-app-zielgruppe-download-registrierung-und-aufbau)
+- [Nachkalkulation](https://help.plancraft.com/de/articles/382735-nachkalkulation-plan-und-ist-kosten-im-projekt-vergleichen)
