@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.33.0 – Persönlicher PDF-Stundenzettel und einfache Baustellen
+
+- Mitarbeiter laden ihre eigenen freigegebenen oder abgerechneten Stundenzettel jetzt direkt als übersichtliches A4-PDF oder weiterhin als Excel-Datei herunter
+- das persönliche PDF enthält Tageszeiten, Baustellen, Status, Soll-, Arbeits-, Pausen-, Fahrt- und Mehrzeit sowie eine klare Gesamtsumme und Unterschriftsfelder
+- der Büro-PDF-Export beginnt für jeden Monteur auf einer eigenen Seite und behält die Sortierung nach Mitarbeiter und Datum bei
+- die Baustellenansicht ist eine einzige flache, durchsuchbare Liste ohne sichtbare Projektebene und ohne doppelte Verwaltungsordner
+- neue Baustellen benötigen in der Oberfläche nur Kunde, Baustellenname, Aufgabe und Adresse; die notwendige interne Datenbankzuordnung übernimmt Schäfchen automatisch
+- die Baustellen-Importvorlage wurde auf Kunde und Baustelle reduziert, neu gegliedert und mit einer kurzen Anleitung versehen
+- Bautagesberichte und Montagescheine zeigen in der finalen PDF nur noch Kunde und Baustelle statt einer zusätzlichen Projektzeile
+
 ### V0.32.0 – Persönlicher Stundenzettelexport und Wochenvergleich
 
 - Mitarbeiter können ausschließlich ihre eigenen vom Büro freigegebenen oder bereits abgerechneten Stundenzettel als Excel-Datei exportieren

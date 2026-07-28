@@ -1390,7 +1390,19 @@ select:focus-visible {
   width: 100%;
 }
 
-.timesheet-export-form .button {
+.timesheet-export-actions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.timesheet-export-actions .button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.timesheet-export-form > .button {
   grid-column: 1 / -1;
 }
 
@@ -2010,7 +2022,7 @@ select:focus-visible {
 
 .admin-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   overflow: hidden;
   margin-bottom: 14px;
   border: 1px solid var(--line);
@@ -2588,8 +2600,15 @@ select:focus-visible {
 .hierarchy-create-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 7px;
   padding: 10px 12px 0;
+}
+
+.hierarchy-create-actions .button {
+  width: auto;
+  min-height: 42px;
+  padding-inline: 16px;
 }
 
 .hierarchy-create-actions .text-button {
@@ -2694,6 +2713,22 @@ select:focus-visible {
   list-style: none;
 }
 
+.hierarchy-sites--flat {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.hierarchy-sites--flat button:active {
+  background: var(--brand-soft);
+}
+
+.site-list-summary--standalone {
+  justify-self: end;
+  margin: 0;
+}
+
 .hierarchy-sites li + li {
   border-top: 1px solid var(--line);
 }
@@ -2726,6 +2761,21 @@ select:focus-visible {
 .hierarchy-empty {
   color: var(--muted);
   font-size: 0.61rem;
+}
+
+.hierarchy-sites.hierarchy-sites--flat button {
+  min-height: 72px;
+  padding: 14px;
+}
+
+.hierarchy-sites.hierarchy-sites--flat button strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.hierarchy-sites.hierarchy-sites--flat button span {
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .hierarchy-empty {

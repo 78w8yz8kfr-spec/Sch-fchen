@@ -171,10 +171,9 @@ export async function buildFinalReportPdf({
 
   section("Auftrag");
   keyValue("Kunde", context.customerName, margin, 230);
-  keyValue("Projekt", `${context.projectNumber} - ${context.projectName}`, 310, 240);
+  keyValue("Baustelle", `${context.siteNumber} - ${context.siteName}`, 310, 240);
   y -= 45;
-  keyValue("Baustelle", `${context.siteNumber} - ${context.siteName}`, margin, 230);
-  keyValue("Anschrift", context.siteAddress, 310, 240);
+  keyValue("Anschrift", context.siteAddress, margin, contentWidth);
   y -= 48;
 
   const structured = report.structuredData || {};

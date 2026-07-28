@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.32.0">
-    <script src="./app.js?v=0.32.0" defer></script>
-    <script src="./version.js?v=0.32.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.33.0">
+    <script src="./app.js?v=0.33.0" defer></script>
+    <script src="./version.js?v=0.33.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.32.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.33.0</p>
         </div>
       </section>
 
@@ -286,7 +286,7 @@
               <div>
                 <span>Arbeitsauftrag</span>
                 <strong id="employee-site-order">Noch kein Arbeitsauftrag hinterlegt</strong>
-                <small id="employee-site-context">Kunde · Projekt</small>
+                <small id="employee-site-context">Kunde</small>
               </div>
               <a id="employee-site-navigation" class="button button--primary" target="_blank" rel="noopener">
                 Navigation
@@ -474,9 +474,14 @@
                 <input id="employee-timesheet-export-from" type="date" required>
                 <label for="employee-timesheet-export-to">Bis</label>
                 <input id="employee-timesheet-export-to" type="date" required>
-                <button id="employee-timesheet-export-submit" class="button button--primary" type="submit">
-                  Meine Excel-Datei herunterladen
-                </button>
+                <div class="timesheet-export-actions">
+                  <button id="employee-timesheet-export-pdf-submit" class="button button--primary" type="button">
+                    PDF herunterladen
+                  </button>
+                  <button id="employee-timesheet-export-submit" class="button button--secondary" type="submit">
+                    Excel herunterladen
+                  </button>
+                </div>
               </form>
               <p id="employee-timesheet-export-message" class="form-message" aria-live="polite"></p>
             </section>
@@ -487,7 +492,7 @@
               <div class="site-management-panel__heading">
                 <div>
                   <p class="eyebrow">Jederzeit für das Büro</p>
-                  <h3 id="timesheet-export-title">Stundenzettel als Excel</h3>
+                  <h3 id="timesheet-export-title">Stundenzettel exportieren</h3>
                 </div>
               </div>
               <form id="timesheet-export-form" class="timesheet-export-form">
@@ -506,9 +511,14 @@
                   <option value="completed">Abgeschlossen</option>
                   <option value="billed">Abgerechnet</option>
                 </select>
-                <button id="timesheet-export-submit" class="button button--primary" type="submit">
-                  Excel herunterladen
-                </button>
+                <div class="timesheet-export-actions">
+                  <button id="timesheet-export-pdf-submit" class="button button--primary" type="button">
+                    PDF herunterladen
+                  </button>
+                  <button id="timesheet-export-submit" class="button button--secondary" type="submit">
+                    Excel herunterladen
+                  </button>
+                </div>
               </form>
               <p id="timesheet-export-message" class="form-message" aria-live="polite"></p>
             </section>
@@ -619,10 +629,10 @@
                 </button>
               </form>
               <details class="site-choice-new">
-                <summary>Kunde, Projekt oder Baustelle nicht vorhanden? Neu anlegen</summary>
+                <summary>Kunde oder Baustelle nicht vorhanden? Neu anlegen</summary>
                 <form id="field-site-form" class="site-choice-new-form">
                   <p class="site-choice-new-form__intro">
-                    Lege die fehlende Struktur in einem Schritt an. Vorhandene Kunden und Projekte werden weiterverwendet.
+                    Lege die Baustelle direkt an. Vorhandene Kunden werden weiterverwendet.
                   </p>
                   <label for="field-site-customer">Kunde</label>
                   <select id="field-site-customer" required></select>
@@ -630,11 +640,12 @@
                     <label for="field-site-customer-name">Neuer Kunde</label>
                     <input id="field-site-customer-name" maxlength="200" placeholder="Firmen- oder Kundenname">
                   </div>
-                  <label for="field-site-project">Projekt</label>
-                  <select id="field-site-project" required></select>
-                  <div id="field-site-new-project" class="site-choice-dependent-field" hidden>
-                    <label for="field-site-project-name">Neues Projekt</label>
-                    <input id="field-site-project-name" maxlength="200" placeholder="Projektname oder Auftrag">
+                  <div hidden aria-hidden="true">
+                    <label for="field-site-project">Interne Zuordnung</label>
+                    <select id="field-site-project"><option value=""></option></select>
+                    <div id="field-site-new-project" hidden>
+                      <input id="field-site-project-name" maxlength="200">
+                    </div>
                   </div>
                   <label for="field-site-name">Baustellenname</label>
                   <input id="field-site-name" maxlength="200" required>
@@ -673,12 +684,12 @@
                 <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
               </div>
             </div>
-            <p id="admin-intro" class="admin-intro">Kunden, Projekte, Baustellen und Einsätze – eindeutig verknüpft und direkt vom Handy verwaltet.</p>
+            <p id="admin-intro" class="admin-intro">Baustellen, Einsätze und Mitarbeiter – übersichtlich an einem Ort.</p>
 
             <div id="admin-summary" class="admin-summary" aria-label="Verwaltungsübersicht">
               <div><strong id="admin-employee-count">0</strong><span>Mitarbeiter</span></div>
               <div><strong id="admin-customer-count">0</strong><span>Kunden</span></div>
-              <div><strong id="admin-project-count">0</strong><span>Projekte</span></div>
+              <div hidden><strong id="admin-project-count">0</strong><span>Interne Aufträge</span></div>
               <div><strong id="admin-site-count">0</strong><span>Baustellen</span></div>
             </div>
 
@@ -690,19 +701,16 @@
 
             <section id="site-planning-shell" class="planning-shell-direct" hidden>
               <div id="site-planning-content" class="planning-group">
-                <p class="planning-intro">Kunden, Projekte und Baustellen einzeln oder gesammelt aus Excel anlegen.</p>
+                <p class="planning-intro">Baustellen direkt anlegen oder gesammelt aus Excel übernehmen.</p>
               </div>
             </section>
 
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
-              <summary>Kunden &amp; Baustellen</summary>
-              <div class="structure-legend" aria-hidden="true">
-                <span>Kunde</span><i>›</i><span>Projekt</span><i>›</i><span>Baustelle</span>
-              </div>
+              <summary>Baustellen</summary>
               <div class="hierarchy-toolbar">
                 <label for="hierarchy-search">
                   <span>Suchen</span>
-                  <input id="hierarchy-search" type="search" maxlength="120" placeholder="Kunde, Projekt, Baustelle oder Ort">
+                  <input id="hierarchy-search" type="search" maxlength="120" placeholder="Baustelle, Kunde, Adresse oder Aufgabe">
                 </label>
                 <label for="hierarchy-status-filter">
                   <span>Status</span>
@@ -714,9 +722,9 @@
                 </label>
               </div>
               <div class="hierarchy-create-actions" aria-label="Stammdaten anlegen">
-                <button id="hierarchy-new-customer" class="text-button" type="button">＋ Kunde</button>
-                <button id="hierarchy-new-project" class="text-button" type="button">＋ Projekt</button>
-                <button id="hierarchy-new-site" class="text-button" type="button">＋ Baustelle</button>
+                <button id="hierarchy-new-customer" class="text-button" type="button" hidden>＋ Kunde</button>
+                <button id="hierarchy-new-project" class="text-button" type="button" hidden>＋ Projekt</button>
+                <button id="hierarchy-new-site" class="button button--primary" type="button">＋ Baustelle anlegen</button>
               </div>
               <div id="business-hierarchy" class="business-hierarchy"></div>
             </details>
@@ -739,7 +747,7 @@
                     <p class="eyebrow">Baustelle bearbeiten</p>
                     <strong id="site-edit-number">Baustellennummer</strong>
                   </div>
-                  <span id="site-edit-project">Kunde · Projekt</span>
+                  <span id="site-edit-project">Kunde</span>
                 </div>
                 <label for="site-edit-name">Baustellenname</label>
                 <input id="site-edit-name" maxlength="200" required>
@@ -782,7 +790,7 @@
                 <dl class="site-facts">
                   <div><dt>Status</dt><dd id="site-dashboard-status">Aktiv</dd></div>
                   <div><dt>Kunde</dt><dd id="site-dashboard-customer">–</dd></div>
-                  <div><dt>Projekt</dt><dd id="site-dashboard-project">–</dd></div>
+                  <div hidden><dt>Interne Zuordnung</dt><dd id="site-dashboard-project">–</dd></div>
                   <div><dt>Arbeitsauftrag</dt><dd id="site-dashboard-order">–</dd></div>
                 </dl>
                 <a id="site-dashboard-navigation" class="download-link" target="_blank" rel="noopener">Navigation öffnen</a>
@@ -1189,11 +1197,11 @@
               </form>
             </details>
 
-            <details id="site-master-data-tools" class="admin-panel site-master-data-tools">
-              <summary>Stammdaten anlegen &amp; bearbeiten</summary>
-              <p class="planning-intro">Hier erscheinen nur die gerade benötigten Formulare. Übersicht, Suche und Statusfilter bleiben oben in der Ordneransicht.</p>
+            <details id="site-master-data-tools" class="admin-panel site-master-data-tools" hidden>
+              <summary>Baustelle anlegen</summary>
+              <p class="planning-intro">Kunde wählen, Baustelle eintragen und speichern.</p>
 
-            <details id="customer-panel" class="admin-panel">
+            <details id="customer-panel" class="admin-panel" hidden>
               <summary>Kunde anlegen</summary>
               <form id="customer-form" class="admin-form" novalidate>
                 <label for="customer-type">Kundenart</label>
@@ -1344,7 +1352,7 @@
               <ul id="customer-list" class="admin-list site-management-list" aria-label="Kunden" hidden></ul>
             </section>
 
-            <details id="project-panel" class="admin-panel">
+            <details id="project-panel" class="admin-panel" hidden>
               <summary>Projekt anlegen</summary>
               <form id="project-form" class="admin-form" novalidate>
                 <label for="project-customer">Kunde</label>
@@ -1411,10 +1419,15 @@
             </section>
 
             <details id="site-form-panel" class="admin-panel">
-              <summary>Baustellen anlegen</summary>
+              <summary hidden>Baustellendaten</summary>
               <form id="site-form" class="admin-form" novalidate>
-                <label for="site-project">Projekt</label>
-                <select id="site-project" required></select>
+                <label for="site-customer">Kunde</label>
+                <select id="site-customer" required></select>
+                <div id="site-new-customer" class="site-choice-dependent-field" hidden>
+                  <label for="site-customer-name">Neuer Kunde</label>
+                  <input id="site-customer-name" maxlength="200" placeholder="Firmen- oder Kundenname">
+                </div>
+                <select id="site-project" hidden aria-hidden="true"><option value=""></option></select>
                 <label for="site-name">Baustellenname</label>
                 <input id="site-name" maxlength="200" required>
                 <label for="site-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
@@ -1455,7 +1468,7 @@
               <div class="site-list-toolbar">
                 <label class="site-search" for="site-search">
                   <span>Baustellen durchsuchen</span>
-                  <input id="site-search" type="search" maxlength="120" placeholder="Name, Kunde, Projekt oder Ort">
+                  <input id="site-search" type="search" maxlength="120" placeholder="Name, Kunde, Adresse oder Aufgabe">
                 </label>
                 <label class="site-status-filter" for="site-status-filter">
                   <span>Status</span>
@@ -1507,13 +1520,13 @@
                 <select id="document-customer">
                   <option value="">Kunde auswählen</option>
                 </select>
-                <select id="document-project" aria-label="Projekt für Dokument">
-                  <option value="">Projekt auswählen (optional)</option>
+                <select id="document-project" aria-label="Interne Dokumentzuordnung" hidden>
+                  <option value="">Keine interne Zuordnung</option>
                 </select>
                 <select id="document-site" aria-label="Baustelle für Dokument">
                   <option value="">Baustelle auswählen (optional)</option>
                 </select>
-                <p class="field-help">Bei Auswahl einer Baustelle wird das Dokument automatisch auch dem Projekt und Kunden zugeordnet.</p>
+                <p class="field-help">Bei Auswahl einer Baustelle wird der zugehörige Kunde automatisch übernommen.</p>
                 <input
                   id="document-file"
                   type="file"

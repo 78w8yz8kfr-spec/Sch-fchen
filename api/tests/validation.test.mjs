@@ -345,7 +345,6 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
 
   const site = validateSiteBundle({
     customerName: "Musterkunde GmbH",
-    projectName: "Verteilung",
     siteName: "Musterstraße 12",
     installerShortText: "Verteilung erneuern",
     street: "Musterstraße",
@@ -438,8 +437,17 @@ test("Kunde, Projekt und Baustelle werden als getrennte Hierarchie validiert", (
   assert.equal(site.projectId, "22222222-2222-4222-8222-222222222222");
   assert.throws(
     () => validateConstructionSite({ ...site, projectId: "falsch" }),
-    /Projekt/
+    /Auftrag/
   );
+  const directSite = validateConstructionSite({
+    customerId: "11111111-1111-4111-8111-111111111111",
+    name: "Musterweg 6",
+    street: "Musterweg",
+    houseNumber: "6",
+    postalCode: "12345",
+    city: "Musterstadt"
+  });
+  assert.equal(directSite.customerId, "11111111-1111-4111-8111-111111111111");
 });
 
 test("Baustellenänderungen erlauben nur sichere Status und Versionsstände", () => {
@@ -633,22 +641,12 @@ test("spontane Baustellenwahl und Feldanlage verlangen gültige Stammdaten", () 
   assert.equal(validateFieldConstructionSite({
     workDate: "2026-07-17",
     customerName: "Neukunde GmbH",
-    projectName: "Neuer Auftrag",
     name: "Baustelle Neubau",
     street: "Musterweg",
     houseNumber: "14",
     postalCode: "12345",
     city: "Musterstadt"
-  }).projectName, "Neuer Auftrag");
-  assert.throws(() => validateFieldConstructionSite({
-    workDate: "2026-07-17",
-    customerName: "Neukunde GmbH",
-    name: "Baustelle Neubau",
-    street: "Musterweg",
-    houseNumber: "14",
-    postalCode: "12345",
-    city: "Musterstadt"
-  }), /Projekt/);
+  }).customerName, "Neukunde GmbH");
   assert.throws(() => validateFieldConstructionSite({
     workDate: "2026-07-17",
     projectId,

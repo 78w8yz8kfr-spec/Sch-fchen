@@ -146,6 +146,7 @@
     employeeTimesheetExportForm: document.querySelector("#employee-timesheet-export-form"),
     employeeTimesheetExportFrom: document.querySelector("#employee-timesheet-export-from"),
     employeeTimesheetExportTo: document.querySelector("#employee-timesheet-export-to"),
+    employeeTimesheetExportPdfSubmit: document.querySelector("#employee-timesheet-export-pdf-submit"),
     employeeTimesheetExportSubmit: document.querySelector("#employee-timesheet-export-submit"),
     employeeTimesheetExportMessage: document.querySelector("#employee-timesheet-export-message"),
     workDayReviewPanel: document.querySelector("#work-day-review-panel"),
@@ -157,6 +158,7 @@
     timesheetExportTo: document.querySelector("#timesheet-export-to"),
     timesheetExportEmployee: document.querySelector("#timesheet-export-employee"),
     timesheetExportStatus: document.querySelector("#timesheet-export-status"),
+    timesheetExportPdfSubmit: document.querySelector("#timesheet-export-pdf-submit"),
     timesheetExportSubmit: document.querySelector("#timesheet-export-submit"),
     timesheetExportMessage: document.querySelector("#timesheet-export-message"),
     assignmentCard: document.querySelector("#assignment-card"),
@@ -466,6 +468,9 @@
     siteFormPanel: document.querySelector("#site-form-panel"),
     siteManagementPanel: document.querySelector("#site-management-panel"),
     siteForm: document.querySelector("#site-form"),
+    siteCustomer: document.querySelector("#site-customer"),
+    siteNewCustomer: document.querySelector("#site-new-customer"),
+    siteCustomerName: document.querySelector("#site-customer-name"),
     siteProject: document.querySelector("#site-project"),
     siteName: document.querySelector("#site-name"),
     siteShortText: document.querySelector("#site-short-text"),
@@ -790,7 +795,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.32.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.33.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2016,7 +2021,7 @@
       site.number,
       site.name,
       site.customerName,
-      site.projectName,
+      site.shortText,
       site.address?.street,
       site.address?.houseNumber,
       site.address?.postalCode,
@@ -2059,7 +2064,6 @@
       badge.textContent = siteStatusLabel(site.status);
       meta.textContent = [
         site.customerName,
-        site.projectName,
         site.fieldReviewStatus === "pending"
           ? `Vom Monteur ${site.fieldCreatedByName ? `(${site.fieldCreatedByName}) ` : ""}angelegt · Büroprüfung offen`
           : null,
@@ -2124,7 +2128,7 @@
     elements.siteDashboardStatus.textContent = siteStatusLabel(site.status);
     elements.siteDashboardStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
     elements.siteDashboardCustomer.textContent = site.customerName;
-    elements.siteDashboardProject.textContent = site.projectName || site.name;
+    elements.siteDashboardProject.textContent = site.customerName;
     elements.siteDashboardOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
     elements.siteDashboardNavigation.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     elements.siteDashboardEmployees.replaceChildren();
@@ -2160,7 +2164,7 @@
     const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
     if (!site) return;
     elements.siteEditNumber.textContent = site.number;
-    elements.siteEditProject.textContent = `${site.customerName} · ${site.projectName}`;
+    elements.siteEditProject.textContent = site.customerName;
     elements.siteEditName.value = site.name;
     elements.siteEditShortText.value = site.shortText || "";
     elements.siteEditStreet.value = site.address.street || "";
@@ -2226,6 +2230,7 @@
   }
 
   function openMasterDataForm(panel, focusElement = null) {
+    elements.siteMasterDataTools.hidden = false;
     elements.siteMasterDataTools.open = true;
     elements.customerEditForm.hidden = true;
     elements.projectEditForm.hidden = true;
@@ -2243,132 +2248,65 @@
     elements.businessHierarchy.replaceChildren();
     const query = elements.hierarchySearch.value.trim().toLocaleLowerCase("de-DE");
     const statusFilter = elements.hierarchyStatusFilter.value;
-    const statusMatches = (status, groupFunction) => (
-      statusFilter === "all" || groupFunction(status) === statusFilter
-    );
-    const visibleCustomers = adminState.customers.map((customer) => {
-      const customerProjects = adminState.projects.filter((project) => project.customerId === customer.id);
-      const projects = customerProjects.map((project) => {
-        const projectSites = adminState.sites.filter((site) => site.projectId === project.id);
-        const queryMatchesProject = !query || projectSearchText(project).includes(query)
-          || customerSearchText(customer).includes(query);
-        const sites = projectSites.filter((site) => (
-          statusMatches(site.status, siteStatusGroup)
-          && (!query || queryMatchesProject || siteSearchText(site).includes(query))
-        ));
-        const projectMatches = statusMatches(project.status, projectStatusGroup)
-          && (queryMatchesProject || sites.length > 0);
-        return projectMatches || sites.length > 0 ? { project, sites } : null;
-      }).filter(Boolean);
-      const customerMatches = statusMatches(customer.status, customerStatusGroup)
-        && (!query || customerSearchText(customer).includes(query));
-      return customerMatches || projects.length > 0 ? { customer, projects } : null;
-    }).filter(Boolean);
+    const sites = adminState.sites
+      .filter((site) => (
+        (statusFilter === "all" || siteStatusGroup(site.status) === statusFilter)
+        && (!query || siteSearchText(site).includes(query))
+      ))
+      .sort((left, right) => (
+        Number(right.fieldReviewStatus === "pending") - Number(left.fieldReviewStatus === "pending")
+        || left.name.localeCompare(right.name, "de-DE")
+      ));
 
-    if (visibleCustomers.length === 0) {
+    const summary = document.createElement("p");
+    summary.className = "site-list-summary site-list-summary--standalone";
+    summary.textContent = `${sites.length} von ${adminState.sites.length} Baustelle${
+      adminState.sites.length === 1 ? "" : "n"
+    }`;
+    elements.businessHierarchy.append(summary);
+
+    if (sites.length === 0) {
       const empty = document.createElement("p");
       empty.className = "hierarchy-empty";
-      empty.textContent = adminState.customers.length === 0
-        ? "Noch kein Kunde angelegt. Beginne mit dem ersten Kunden."
-        : "Keine Kunden, Projekte oder Baustellen passen zu Suche und Status.";
+      empty.textContent = adminState.sites.length === 0
+        ? "Noch keine Baustelle angelegt."
+        : "Keine Baustelle passt zu Suche und Status.";
       elements.businessHierarchy.append(empty);
       return;
     }
 
-    visibleCustomers.forEach(({ customer, projects }) => {
-      const customerNode = document.createElement("details");
-      customerNode.className = "hierarchy-customer";
-      customerNode.open = Boolean(query);
-      customerNode.append(
-        hierarchySummary(
-          customer.displayName,
-          `${customer.number} · ${projects.length} Projekt${projects.length === 1 ? "" : "e"}`,
-          "customer",
-          { group: customerStatusGroup(customer.status), label: customer.status === "archived" ? "Archiviert" : "Aktiv" }
-        ),
-        hierarchyActions([
-          { label: "Kunde bearbeiten", handler: () => openCustomerEditor(customer) },
-          {
-            label: "Projekt hinzufügen",
-            handler: () => {
-              elements.projectCustomer.value = customer.id;
-              openMasterDataForm(elements.projectPanel, elements.projectName);
-            }
-          }
-        ])
-      );
-      if (projects.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "hierarchy-empty";
-        empty.textContent = "Kein Projekt passt zur aktuellen Auswahl.";
-        customerNode.append(empty);
-      } else {
-        projects.forEach(({ project, sites }) => {
-          const projectNode = document.createElement("details");
-          projectNode.className = "hierarchy-project";
-          projectNode.open = Boolean(query);
-          projectNode.append(
-            hierarchySummary(
-              project.name,
-              `${project.number} · ${sites.length} Baustelle${sites.length === 1 ? "" : "n"}`,
-              "project",
-              { group: projectStatusGroup(project.status), label: projectStatusLabel(project.status) }
-            ),
-            hierarchyActions([
-              { label: "Projekt bearbeiten", handler: () => openProjectEditor(project) },
-              {
-                label: "Baustelle hinzufügen",
-                handler: () => {
-                  elements.siteProject.value = project.id;
-                  openMasterDataForm(elements.siteFormPanel, elements.siteName);
-                }
-              }
-            ])
-          );
-          if (sites.length === 0) {
-            const empty = document.createElement("p");
-            empty.className = "hierarchy-empty";
-            empty.textContent = "Keine Baustelle passt zur aktuellen Auswahl.";
-            projectNode.append(empty);
-          } else {
-            const list = document.createElement("ul");
-            list.className = "hierarchy-sites";
-            sites.forEach((site) => {
-              const item = document.createElement("li");
-              const button = document.createElement("button");
-              const content = document.createElement("span");
-              const title = document.createElement("strong");
-              const meta = document.createElement("span");
-              const badge = document.createElement("small");
-              const address = [
-                `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
-                `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
-              ].filter(Boolean).join(", ");
-              button.type = "button";
-              title.textContent = site.name;
-              meta.textContent = [
-                site.number,
-                address,
-                site.shortText,
-                `${documentsForEntity("construction_site", site.id).length} Dokumente`
-              ].filter(Boolean).join(" · ");
-              badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
-              badge.textContent = site.fieldReviewStatus === "pending"
-                ? "Büroprüfung"
-                : siteStatusLabel(site.status);
-              content.append(title, meta);
-              button.append(content, badge);
-              button.addEventListener("click", () => openSiteDashboard(site));
-              item.append(button);
-              list.append(item);
-            });
-            projectNode.append(list);
-          }
-          customerNode.append(projectNode);
-        });
-      }
-      elements.businessHierarchy.append(customerNode);
+    const list = document.createElement("ul");
+    list.className = "hierarchy-sites hierarchy-sites--flat";
+    sites.forEach((site) => {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      const content = document.createElement("span");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const badge = document.createElement("small");
+      const address = [
+        `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
+        `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
+      ].filter(Boolean).join(", ");
+      button.type = "button";
+      title.textContent = site.name;
+      meta.textContent = [
+        site.customerName,
+        address,
+        site.shortText,
+        `${documentsForEntity("construction_site", site.id).length} Dokumente`
+      ].filter(Boolean).join(" · ");
+      badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
+      badge.textContent = site.fieldReviewStatus === "pending"
+        ? "Büroprüfung"
+        : siteStatusLabel(site.status);
+      content.append(title, meta);
+      button.append(content, badge);
+      button.addEventListener("click", () => openSiteDashboard(site));
+      item.append(button);
+      list.append(item);
     });
+    elements.businessHierarchy.append(list);
   }
 
   function closeAssignmentEditor() {
@@ -2685,6 +2623,13 @@
     });
   }
 
+  function updateSiteCustomerMode() {
+    const createsCustomer = elements.siteCustomer.value === "__new__";
+    elements.siteNewCustomer.hidden = !createsCustomer;
+    elements.siteCustomerName.required = createsCustomer;
+    if (!createsCustomer) elements.siteCustomerName.value = "";
+  }
+
   function closeEmployeeEditor() {
     editingEmployeeId = null;
     elements.employeeEditForm.hidden = true;
@@ -2742,11 +2687,20 @@
       (customer) => `${customer.displayName} · ${customer.number}`
     );
     renderAdminSelect(
-      elements.siteProject,
-      adminState.projects.filter((project) => projectStatusGroup(project.status) === "active"),
-      "Projekt auswählen",
-      (project) => `${project.customerName} · ${project.name}`
+      elements.siteCustomer,
+      adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
+      "Kunde auswählen",
+      (customer) => `${customer.displayName} · ${customer.number}`
     );
+    const createCustomer = document.createElement("option");
+    createCustomer.value = "__new__";
+    createCustomer.textContent = "＋ Neuen Kunden anlegen";
+    elements.siteCustomer.append(createCustomer);
+    if (!adminState.customers.some((customer) => customerStatusGroup(customer.status) === "active")) {
+      elements.siteCustomer.value = "__new__";
+    }
+    elements.siteProject.value = "";
+    updateSiteCustomerMode();
     renderAdminSelect(
       elements.assignmentEmployee,
       adminState.employees,
@@ -2948,7 +2902,7 @@
     elements.employeeSiteStatus.textContent = siteStatusLabel(site.status);
     elements.employeeSiteStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
     elements.employeeSiteOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
-    elements.employeeSiteContext.textContent = [site.customerName, site.projectName].filter(Boolean).join(" · ");
+    elements.employeeSiteContext.textContent = site.customerName || address;
     elements.employeeSiteNavigation.href =
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
@@ -3279,29 +3233,16 @@
     elements.fieldSiteNewCustomer.hidden = !createsCustomer;
     elements.fieldSiteCustomerName.required = createsCustomer;
     elements.fieldSiteProject.replaceChildren();
-    const projects = createsCustomer
-      ? []
-      : (siteOptionsState?.projects || []).filter((project) => project.customerId === customerId);
-    projects.forEach((project) => {
-      const option = document.createElement("option");
-      option.value = project.id;
-      option.textContent = project.name;
-      elements.fieldSiteProject.append(option);
-    });
-    const createProject = document.createElement("option");
-    createProject.value = "__new__";
-    createProject.textContent = projects.length
-      ? "＋ Neues Projekt für diesen Kunden"
-      : "＋ Erstes Projekt für diesen Kunden anlegen";
-    elements.fieldSiteProject.append(createProject);
-    if (createsCustomer || projects.length === 0) elements.fieldSiteProject.value = "__new__";
+    const automatic = document.createElement("option");
+    automatic.value = "";
+    automatic.textContent = "Automatisch";
+    elements.fieldSiteProject.append(automatic);
     updateFieldSiteProjectMode();
   }
 
   function updateFieldSiteProjectMode() {
-    const createsProject = elements.fieldSiteProject.value === "__new__";
-    elements.fieldSiteNewProject.hidden = !createsProject;
-    elements.fieldSiteProjectName.required = createsProject;
+    elements.fieldSiteNewProject.hidden = true;
+    elements.fieldSiteProjectName.required = false;
   }
 
   function renderSiteChoiceOptions(options) {
@@ -3323,7 +3264,7 @@
       option.value = site.id;
       option.textContent = `${
         suggestedIds.has(site.id) ? "Vorschlag · " : ""
-      }${site.name} · ${site.projectName || "Projekt"}`;
+      }${site.name}${site.customerName ? ` · ${site.customerName}` : ""}`;
       option.selected = site.id === suggested?.constructionSite.id;
       elements.siteChoiceSelect.append(option);
     });
@@ -4017,7 +3958,7 @@
       body.options.sites.forEach((site) => {
         const option = document.createElement("option");
         option.value = site.id;
-        option.textContent = `${site.name} · ${site.projectName || "Projekt"}`;
+        option.textContent = `${site.name}${site.customerName ? ` · ${site.customerName}` : ""}`;
         elements.timeAdditionSite.append(option);
       });
       elements.timeAdditionMessage.textContent = "";
@@ -4301,6 +4242,7 @@
       } · ${formatMinutes(approvedMinutes)} h. Exportiert werden nur freigegebene oder abgerechnete Tage.`
       : "Diese Woche ist noch kein Tag freigegeben. Du kannst auch einen älteren Zeitraum auswählen.";
     elements.employeeTimesheetExportSubmit.disabled = !navigator.onLine;
+    elements.employeeTimesheetExportPdfSubmit.disabled = !navigator.onLine;
   }
 
   function render() {
@@ -4320,6 +4262,7 @@
     const label = !online ? "Offline" : syncing ? "Sync …" : pendingCount > 0 ? `${pendingCount} offen` : "Online";
     elements.connectionState.querySelector("span").textContent = label;
     elements.employeeTimesheetExportSubmit.disabled = !online;
+    elements.employeeTimesheetExportPdfSubmit.disabled = !online;
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
@@ -4360,7 +4303,7 @@
       elements.adminSummary.hidden = pane === "more";
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
-        sites: ["Kunden, Projekte und Baustellen", "Baustellenplanung", "Stammdaten durchsuchen, bearbeiten und eindeutig zuordnen."],
+        sites: ["Baustellen", "Baustellenplanung", "Baustellen anlegen, durchsuchen und direkt bearbeiten."],
         more: ["Verwaltung", "Mehr", "Mitarbeiter und weitere Einstellungen verwalten."]
       }[pane];
       if (copy) {
@@ -4819,14 +4762,17 @@
     }
   });
 
+  elements.siteCustomer.addEventListener("change", updateSiteCustomerMode);
   elements.siteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const createsCustomer = elements.siteCustomer.value === "__new__";
     const saved = await submitAdminForm(
       elements.siteForm,
       elements.siteMessage,
       "./api/v1/admin/construction-sites",
       {
-        projectId: elements.siteProject.value,
+        customerId: createsCustomer ? null : elements.siteCustomer.value,
+        customerName: createsCustomer ? elements.siteCustomerName.value : null,
         name: elements.siteName.value,
         installerShortText: elements.siteShortText.value,
         street: elements.siteStreet.value,
@@ -4838,6 +4784,9 @@
     );
     if (!saved) return;
     elements.siteForm.reset();
+    updateSiteCustomerMode();
+    elements.siteMasterDataTools.open = false;
+    elements.siteMasterDataTools.hidden = true;
     await refreshAdmin();
   });
 
@@ -4921,7 +4870,7 @@
       return;
     }
     if (!elements.documentCustomer.value && !elements.documentProject.value && !elements.documentSite.value) {
-      elements.documentMessage.textContent = "Bitte mindestens einen Kunden, ein Projekt oder eine Baustelle auswählen.";
+      elements.documentMessage.textContent = "Bitte mindestens einen Kunden oder eine Baustelle auswählen.";
       return;
     }
     elements.documentSubmit.disabled = true;
@@ -5624,8 +5573,7 @@
 
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
   elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
-  elements.timesheetExportForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  async function downloadAdminTimesheet(format) {
     const from = elements.timesheetExportFrom.value;
     const to = elements.timesheetExportTo.value;
     if (!from || !to || to < from) {
@@ -5641,23 +5589,34 @@
       parameters.set("status", elements.timesheetExportStatus.value);
     }
     elements.timesheetExportSubmit.disabled = true;
-    elements.timesheetExportMessage.textContent = "Excel-Datei wird erstellt …";
+    elements.timesheetExportPdfSubmit.disabled = true;
+    elements.timesheetExportMessage.textContent =
+      `${format === "pdf" ? "PDF" : "Excel-Datei"} wird erstellt …`;
     try {
       await downloadFile(
-        `./api/v1/admin/timesheets.xlsx?${parameters}`,
-        `Stundenzettel_${from}_${to}.xlsx`
+        `./api/v1/admin/timesheets.${format}?${parameters}`,
+        `Stundenzettel_${from}_${to}.${format}`
       );
-      elements.timesheetExportMessage.textContent = "Excel-Datei wurde heruntergeladen.";
+      elements.timesheetExportMessage.textContent =
+        `${format === "pdf" ? "PDF" : "Excel-Datei"} wurde heruntergeladen.`;
     } catch (error) {
       if (error.status === 401) showLogin();
       else elements.timesheetExportMessage.textContent = error.message;
     } finally {
       elements.timesheetExportSubmit.disabled = false;
+      elements.timesheetExportPdfSubmit.disabled = false;
     }
+  }
+
+  elements.timesheetExportForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await downloadAdminTimesheet("xlsx");
+  });
+  elements.timesheetExportPdfSubmit.addEventListener("click", () => {
+    void downloadAdminTimesheet("pdf");
   });
 
-  elements.employeeTimesheetExportForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  async function downloadOwnTimesheet(format) {
     const from = elements.employeeTimesheetExportFrom.value;
     const to = elements.employeeTimesheetExportTo.value;
     if (!from || !to || to < from) {
@@ -5672,21 +5631,31 @@
     }
     const parameters = new URLSearchParams({ from, to });
     elements.employeeTimesheetExportSubmit.disabled = true;
+    elements.employeeTimesheetExportPdfSubmit.disabled = true;
     elements.employeeTimesheetExportMessage.textContent =
-      "Dein freigegebener Stundenzettel wird erstellt …";
+      `Dein freigegebener ${format === "pdf" ? "PDF-Stundenzettel" : "Excel-Stundenzettel"} wird erstellt …`;
     try {
       await downloadFile(
-        `./api/v1/timesheets.xlsx?${parameters}`,
-        `Mein_Stundenzettel_${from}_${to}.xlsx`
+        `./api/v1/timesheets.${format}?${parameters}`,
+        `Mein_Stundenzettel_${from}_${to}.${format}`
       );
       elements.employeeTimesheetExportMessage.textContent =
-        "Deine Excel-Datei wurde heruntergeladen.";
+        `Deine ${format === "pdf" ? "PDF-Datei" : "Excel-Datei"} wurde heruntergeladen.`;
     } catch (error) {
       if (error.status === 401) showLogin();
       else elements.employeeTimesheetExportMessage.textContent = error.message;
     } finally {
       elements.employeeTimesheetExportSubmit.disabled = !navigator.onLine;
+      elements.employeeTimesheetExportPdfSubmit.disabled = !navigator.onLine;
     }
+  }
+
+  elements.employeeTimesheetExportForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await downloadOwnTimesheet("xlsx");
+  });
+  elements.employeeTimesheetExportPdfSubmit.addEventListener("click", () => {
+    void downloadOwnTimesheet("pdf");
   });
 
   elements.togglePassword.addEventListener("click", () => {
@@ -5755,19 +5724,12 @@
     elements.siteChoiceMessage.textContent = "Neue Baustelle wird angelegt …";
     try {
       const createsCustomer = elements.fieldSiteCustomer.value === "__new__";
-      const createsProject = elements.fieldSiteProject.value === "__new__";
       const body = await requestJson("./api/v1/time-tracking/sites", {
         method: "POST",
         body: JSON.stringify({
           workDate: state.workDate,
-          projectId: createsProject ? null : elements.fieldSiteProject.value,
-          customerId: createsProject && !createsCustomer
-            ? elements.fieldSiteCustomer.value
-            : null,
-          customerName: createsProject && createsCustomer
-            ? elements.fieldSiteCustomerName.value
-            : null,
-          projectName: createsProject ? elements.fieldSiteProjectName.value : null,
+          customerId: createsCustomer ? null : elements.fieldSiteCustomer.value,
+          customerName: createsCustomer ? elements.fieldSiteCustomerName.value : null,
           name: elements.fieldSiteName.value,
           installerShortText: elements.fieldSiteShortText.value,
           street: elements.fieldSiteStreet.value,
@@ -5783,10 +5745,8 @@
       elements.fieldSiteForm.reset();
       showToast(
         createsCustomer
-          ? "Kunde, Projekt und Baustelle angelegt · das Büro sieht alles zur Prüfung."
-          : createsProject
-            ? "Projekt und Baustelle angelegt · das Büro sieht beides zur Prüfung."
-            : "Baustelle angelegt und gewählt · das Büro sieht sie zur Prüfung."
+          ? "Kunde und Baustelle angelegt · das Büro sieht sie zur Prüfung."
+          : "Baustelle angelegt und gewählt · das Büro sieht sie zur Prüfung."
       );
     } catch (error) {
       if (error.status === 401) showLogin();

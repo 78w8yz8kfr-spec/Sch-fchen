@@ -434,6 +434,25 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(structuredSite.status, "active");
   assert.equal(structuredSite.rowVersion, 1);
 
+  const directSiteResponse = await fetch(`${baseUrl}/api/v1/admin/construction-sites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      customerId: customer.id,
+      name: `Direkte Baustelle ${suffix}`,
+      installerShortText: "Ohne sichtbare Projektebene angelegt",
+      street: "Direktweg",
+      houseNumber: "9",
+      postalCode: "12345",
+      city: "Teststadt"
+    })
+  });
+  assert.equal(directSiteResponse.status, 201, await directSiteResponse.clone().text());
+  const directSite = (await directSiteResponse.json()).site;
+  assert.equal(directSite.customerId, customer.id);
+  assert.equal(directSite.projectName, "Baustellen");
+  assert.notEqual(directSite.projectId, project.id);
+
   const editedForemanAssignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },
@@ -1432,9 +1451,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     body: JSON.stringify({
       workDate: assignmentDate,
       customerName: `Feldkunde ${suffix}`,
-      projectName: `Feldprojekt ${suffix}`,
       name: `Feldneubau ${suffix}`,
-      installerShortText: "Kunde, Projekt und Baustelle spontan anlegen",
+      installerShortText: "Kunde und Baustelle spontan anlegen",
       street: "Neuweg",
       houseNumber: "7",
       postalCode: "09599",
@@ -1444,7 +1462,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(fieldBundleResponse.status, 201, await fieldBundleResponse.clone().text());
   const fieldBundle = (await fieldBundleResponse.json()).selection.site;
   assert.equal(fieldBundle.customerName, `Feldkunde ${suffix}`);
-  assert.equal(fieldBundle.projectName, `Feldprojekt ${suffix}`);
+  assert.equal(fieldBundle.projectName, "Baustellen");
   assert.equal(fieldBundle.fieldReviewStatus, "pending");
 
   const clockInAt = new Date(Date.now() - 5000).toISOString();
@@ -1669,6 +1687,23 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const ownTimesheetExport = Buffer.from(await ownTimesheetExportResponse.arrayBuffer());
   assert.equal(ownTimesheetExport.subarray(0, 2).toString("ascii"), "PK");
 
+  const ownTimesheetPdfResponse = await fetch(
+    `${baseUrl}/api/v1/timesheets.pdf?from=${workDate}&to=${workDate}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(
+    ownTimesheetPdfResponse.status,
+    200,
+    await ownTimesheetPdfResponse.clone().text()
+  );
+  assert.match(ownTimesheetPdfResponse.headers.get("content-type"), /application\/pdf/);
+  assert.match(
+    ownTimesheetPdfResponse.headers.get("content-disposition"),
+    /Mein_Stundenzettel_/
+  );
+  const ownTimesheetPdf = Buffer.from(await ownTimesheetPdfResponse.arrayBuffer());
+  assert.equal(ownTimesheetPdf.subarray(0, 5).toString("ascii"), "%PDF-");
+
   const lockedWorkDayResponse = await fetch(
     `${baseUrl}/api/v1/admin/work-days/${reviewableWorkDay.id}`,
     {
@@ -1689,6 +1724,15 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.match(timesheetExportResponse.headers.get("content-disposition"), /Stundenzettel_/);
   const timesheetExport = Buffer.from(await timesheetExportResponse.arrayBuffer());
   assert.equal(timesheetExport.subarray(0, 2).toString("ascii"), "PK");
+
+  const timesheetPdfResponse = await fetch(
+    `${baseUrl}/api/v1/admin/timesheets.pdf?from=${workDate}&to=${workDate}&status=billed`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(timesheetPdfResponse.status, 200, await timesheetPdfResponse.clone().text());
+  assert.match(timesheetPdfResponse.headers.get("content-type"), /application\/pdf/);
+  const timesheetPdf = Buffer.from(await timesheetPdfResponse.arrayBuffer());
+  assert.equal(timesheetPdf.subarray(0, 5).toString("ascii"), "%PDF-");
 
   const blockedNewBlock = await fetch(`${baseUrl}/api/v1/time-entries`, {
     method: "POST",

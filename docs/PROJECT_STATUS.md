@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 28.07.2026
-Technischer Stand: V0.32.0
+Technischer Stand: V0.33.0
 
 ## Abgeschlossen
 
@@ -20,10 +20,12 @@ Technischer Stand: V0.32.0
 - Büro-Wochenprüfung nach Monteur gruppiert, mit kompakten Tagesaktionen und sichtbarer Arbeitsstundensumme
 - spontaner Einsatz kann fehlenden Kunden, fehlendes Projekt und fehlende Baustelle in einem geführten Vorgang anlegen
 - Excel-Stundenzettel mit Mitarbeiterübersicht, eigenem Datumsblatt und Arbeitsstundensumme pro Monteur
-- persönlicher Excel-Export für Mitarbeiter enthält ausschließlich eigene freigegebene oder abgerechnete Tage
+- persönlicher PDF- und Excel-Export für Mitarbeiter enthält ausschließlich eigene freigegebene oder abgerechnete Tage
+- persönlicher A4-Stundenzettel mit Tageswerten, Baustellen, Mitarbeiter-Gesamtsumme und Unterschriftsfeldern
 - navigierbare Wochenhistorie mit eindeutigem Freigabestatus sowie sichtbarer Soll- und Mehrzeit
 - Bautagesbericht und Montageschein mit Teamstunden, lokaler Entwurfssicherung, Vollständigkeitsprüfung und strukturierten Zusatzangaben in der finalen PDF
-- durchsuchbare Baustellenablage Kunde → Projekt → Baustelle; doppelte Verwaltungslisten entfallen, Formulare erscheinen nur noch bei einer gezielten Aktion
+- flache durchsuchbare Baustellenablage ohne sichtbare Projektebene; neue Baustellen werden direkt einem vorhandenen oder neuen Kunden zugeordnet
+- auf Kunde und Baustelle reduzierte Excel-Importvorlage mit eindeutiger Anleitung und automatischer interner Zuordnung
 
 - Phase 0: Vision, Anforderungen, Rollenmodell und ER-Struktur mit 20 Kerntabellen
 - GitHub-Projektbasis und verbindliche Entwicklungsregeln

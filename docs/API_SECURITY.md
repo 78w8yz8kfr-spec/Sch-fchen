@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 28.07.2026
-Technischer Stand: V0.32.0
+Technischer Stand: V0.33.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -98,7 +98,7 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/customers/:id` | Kundenstammdaten und Archivstatus versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden zuordnen |
 | `PATCH` | `/api/v1/admin/projects/:id` | Projektdaten und Status versionsgeschützt ändern |
-| `POST` | `/api/v1/admin/construction-sites` | Baustelle mit Standort einem aktiven Projekt zuordnen |
+| `POST` | `/api/v1/admin/construction-sites` | Baustelle und Standort für einen aktiven oder neuen Kunden anlegen; interne Zuordnung erfolgt automatisch |
 | `PATCH` | `/api/v1/admin/construction-sites/:id` | Baustellendaten und Status versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/construction-sites/:id/confirm` | Eine im Feld angelegte Baustelle fachlich bestätigen |
 | `POST` | `/api/v1/admin/sites` | Kompatibler Paket-Endpunkt für bestehende Integrationen |
@@ -108,15 +108,16 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/admin/assignment-imports/preview` | XLSX-Wochenplan prüfen und sichere X-Zuweisungen vorschlagen |
 | `POST` | `/api/v1/admin/assignment-imports` | zuvor prüfbare X-Zuweisungen geschützt importieren |
 | `POST` | `/api/v1/admin/site-imports/preview` | XLSX-Baustellenliste prüfen und neue Pakete vorschlagen |
-| `POST` | `/api/v1/admin/site-imports` | geprüfte Kunden-, Projekt- und Baustellenpakete anlegen |
+| `POST` | `/api/v1/admin/site-imports` | geprüfte Kunden- und Baustellenpakete mit automatischer interner Zuordnung anlegen |
 | `POST` | `/api/v1/session` | Mit Firma, Personalnummer und Passwort anmelden |
 | `GET` | `/api/v1/session` | Eigene Firma, Person, Rollen und Ablaufzeit lesen |
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
 | `GET` | `/api/v1/work-days/:date` | Eigenen berechneten Arbeitstag und Ereignisse lesen |
 | `GET` | `/api/v1/work-weeks/:monday` | Eigene sieben Kalendertage mit wirksamen Buchungen und Summen lesen |
 | `GET` | `/api/v1/timesheets.xlsx` | Ausschließlich eigene freigegebene oder abgerechnete Stundenzettel exportieren; Mitarbeiter-ID stammt aus der Sitzung |
+| `GET` | `/api/v1/timesheets.pdf` | Eigenen freigegebenen oder abgerechneten A4-Stundenzettel mit Tages- und Gesamtsummen exportieren |
 | `GET` | `/api/v1/site-assignments/:date` | Eigene freigegebene Tageseinsätze lesen |
-| `GET` | `/api/v1/time-tracking/site-options/:date` | Geplante und weitere Baustellen sowie Projekte für die aktuelle Auswahl lesen |
+| `GET` | `/api/v1/time-tracking/site-options/:date` | Geplante und weitere Baustellen sowie vorhandene Kunden für die aktuelle Auswahl lesen |
 | `POST` | `/api/v1/time-tracking/site-selection` | Andere vorhandene Baustelle als spontanen Tageseinsatz wählen |
 | `POST` | `/api/v1/time-tracking/sites` | Fehlende Baustelle im Feld anlegen und als Tageseinsatz auswählen |
 | `POST` | `/api/v1/site-reports` | Mobilen Bericht idempotent erfassen; nur für den berichtspflichtig eingeteilten Vorarbeiter |
@@ -127,6 +128,7 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/time-entry-corrections/:id` | Offenen Korrekturantrag genehmigen oder ablehnen |
 | `PATCH` | `/api/v1/admin/work-days/:id` | Automatisch sichtbaren abgeschlossenen Stundenzettel freigeben oder als abgerechnet sperren |
 | `GET` | `/api/v1/admin/timesheets.xlsx` | Stundenzettel und Buchungshistorie nach Zeitraum, Mitarbeiter und Status exportieren |
+| `GET` | `/api/v1/admin/timesheets.pdf` | Nach Mitarbeiter und Datum sortierte Stundenzettel als getrennte A4-Seiten exportieren |
 
 Der Zeitendpunkt verlangt eine Client-UUID, Buchungsart und ISO-Zeitpunkte mit
 Zeitzone. Baustellenereignisse benötigen eine geplante oder vom Mitarbeiter
@@ -191,17 +193,19 @@ sind. Eine Reaktivierung ist nur mit einem aktiven übergeordneten Datensatz
 zulässig.
 
 Der Baustellenlistenimport verlangt die Spalten Kunde, Baustelle, Straße,
-Hausnummer, PLZ und Ort; Projekt und Aufgabe sind optional. Fehlerhafte Zeilen
+Hausnummer, PLZ und Ort; Aufgabe ist optional. Eine ältere Projektspalte bleibt
+für bestehende Dateien technisch lesbar, wird aber nicht mehr benötigt. Fehlerhafte Zeilen
 werden einzeln gemeldet. Vorhandene aktive Baustellennamen werden nicht erneut
 angelegt. Eindeutig vorhandene Firmenkunden werden wiederverwendet, neue Kunden
-werden gemeinsam mit Standort, Projekt und Baustelle in derselben Transaktion
-angelegt. Eine mandantenbezogene Sperre verhindert konkurrierende Doppelimporte.
+werden gemeinsam mit Standort und Baustelle in derselben Transaktion angelegt.
+Die interne Auftragszuordnung erzeugt Schäfchen automatisch. Eine mandantenbezogene
+Sperre verhindert konkurrierende Doppelimporte.
 
-Bei der normalen mobilen Anlage werden Kunde, Projekt und Baustelle bewusst
-nacheinander gespeichert. Kunden- und Projekt-IDs werden in jeder Transaktion
-erneut gegen den Sitzungsmandanten sowie ihren Aktivstatus geprüft. Dadurch kann
-das Frontend weder fremde Projekte verwenden noch Baustellen ohne eindeutigen
-Kunden- und Projektbezug erzeugen.
+Bei der normalen mobilen Anlage wählt der Mitarbeiter nur einen vorhandenen oder
+neuen Kunden und erfasst die Baustelle. Die API prüft den Kunden erneut gegen
+Sitzungsmandant und Aktivstatus und verwaltet die notwendige interne Zuordnung
+selbst. Dadurch kann das Frontend weder fremde Kunden verwenden noch Baustellen
+ohne eindeutigen Kundenbezug erzeugen.
 
 ## Dokumentenschutz
 
