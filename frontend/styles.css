@@ -385,6 +385,12 @@ select:focus-visible {
   background: var(--brand-soft);
 }
 
+.button--quiet {
+  width: 100%;
+  color: var(--muted);
+  background: #f1f1f1;
+}
+
 .button--primary,
 .button--action {
   width: 100%;
@@ -1360,8 +1366,114 @@ select:focus-visible {
 }
 
 .time-correction-form input,
+.time-correction-form select,
 .time-correction-form textarea {
   width: 100%;
+}
+
+.timesheet-export-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  margin-top: 14px;
+}
+
+.timesheet-export-form label {
+  align-self: end;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.timesheet-export-form input,
+.timesheet-export-form select {
+  width: 100%;
+}
+
+.timesheet-export-form .button {
+  grid-column: 1 / -1;
+}
+
+.week-day-warnings {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0 0;
+  padding: 10px 12px 10px 29px;
+  border-radius: 13px;
+  color: #795400;
+  background: #fff5d6;
+  font-size: 0.7rem;
+}
+
+.work-day-review-warning {
+  overflow: visible !important;
+  color: #8a6100 !important;
+  white-space: normal !important;
+}
+
+.week-day-addition {
+  min-height: 42px;
+  margin-top: 10px;
+  font-size: 0.72rem;
+}
+
+.site-choice-dialog {
+  width: min(calc(100% - 28px), 620px);
+}
+
+.site-choice-form,
+.site-choice-existing-form,
+.site-choice-new-form {
+  display: grid;
+  gap: 10px;
+}
+
+.site-choice-suggestion {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 13px;
+  color: #5d4200;
+  background: #fff5d6;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.site-choice-new {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.site-choice-new summary {
+  color: var(--brand);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.site-choice-new-form {
+  margin-top: 12px;
+}
+
+.form-grid--two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.form-grid--two label {
+  display: grid;
+  gap: 6px;
+}
+
+.time-addition-site-field {
+  display: grid;
+  gap: 6px;
+}
+
+.site-list-actions {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 6px;
 }
 
 .week-review-panel {
@@ -1620,11 +1732,6 @@ select:focus-visible {
 .week-time-entry__pending {
   color: var(--muted);
   background: #f3f3f3;
-}
-
-.week-day-submit {
-  width: calc(100% - 32px);
-  margin: 14px 16px 16px;
 }
 
 .week-day-state {

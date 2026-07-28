@@ -683,6 +683,70 @@ export function validateTimeEntryCorrection(body) {
   };
 }
 
+export function validateTimeEntryAddition(body) {
+  rejectTenantFields(body);
+  const workDate = validateWorkDate(body.workDate);
+  const entryType = text(body.entryType, "Buchungsart", 1, 30);
+  if (!ENTRY_TYPES.has(entryType)) throw new InputError("Die Buchungsart ist ungültig.");
+  const recordedAt = text(body.recordedAt, "Zeitpunkt", 20, 35);
+  const recordedDate = new Date(recordedAt);
+  if (Number.isNaN(recordedDate.valueOf()) || !/[zZ]|[+-]\d{2}:\d{2}$/.test(recordedAt)) {
+    throw new InputError("Der Zeitpunkt benötigt Datum, Uhrzeit und Zeitzone.");
+  }
+  const constructionSiteId = SITE_TYPES.has(entryType)
+    ? uuid(body.constructionSiteId, "Baustelle")
+    : null;
+  if (
+    !SITE_TYPES.has(entryType)
+    && body.constructionSiteId !== undefined
+    && body.constructionSiteId !== null
+    && body.constructionSiteId !== ""
+  ) {
+    throw new InputError("Diese Buchungsart darf keine Baustelle enthalten.");
+  }
+  return {
+    workDate,
+    entryType,
+    recordedAt,
+    constructionSiteId,
+    reason: text(body.reason, "Ergänzungsgrund", 5, 500)
+  };
+}
+
+export function validateTimeEntryInvalidation(body) {
+  rejectTenantFields(body);
+  return {
+    originalEntryId: uuid(body.originalEntryId, "Zeitbuchungs-ID"),
+    reason: text(body.reason, "Ungültigkeitsgrund", 5, 500)
+  };
+}
+
+export function validateSpontaneousSiteSelection(body) {
+  rejectTenantFields(body);
+  if (body.newOccurrence !== undefined && typeof body.newOccurrence !== "boolean") {
+    throw new InputError("Die Angabe zur erneuten Baustellenfahrt ist ungültig.");
+  }
+  return {
+    workDate: validateWorkDate(body.workDate),
+    constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
+    newOccurrence: body.newOccurrence === true
+  };
+}
+
+export function validateFieldConstructionSite(body) {
+  rejectTenantFields(body);
+  return {
+    workDate: validateWorkDate(body.workDate),
+    projectId: uuid(body.projectId, "Projekt"),
+    name: text(body.name, "Baustellenname", 2, 200),
+    installerShortText: optionalText(body.installerShortText, "Aufgabe für den Monteur", 300),
+    street: text(body.street, "Straße", 2, 150),
+    houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
+    postalCode: text(body.postalCode, "Postleitzahl", 3, 12),
+    city: text(body.city, "Ort", 2, 100)
+  };
+}
+
 export function validateTimeEntryCorrectionDecision(body) {
   rejectTenantFields(body);
   const decision = text(body.decision, "Entscheidung", 7, 8).toLowerCase();

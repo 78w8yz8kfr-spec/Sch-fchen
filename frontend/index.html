@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.29.0">
-    <script src="./app.js?v=0.29.0" defer></script>
-    <script src="./version.js?v=0.29.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.30.0">
+    <script src="./app.js?v=0.30.0" defer></script>
+    <script src="./version.js?v=0.30.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.29.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.30.0</p>
         </div>
       </section>
 
@@ -379,7 +379,10 @@
           <section class="section" data-dashboard-pane="start" aria-labelledby="today-assignment-title">
             <div class="section-heading">
               <h2 id="today-assignment-title">Heutiger Einsatz</h2>
-              <button id="assignment-details" class="text-button" type="button">Details</button>
+              <div class="section-heading__actions">
+                <button id="site-choice-open" class="text-button" type="button">Baustelle wählen</button>
+                <button id="assignment-details" class="text-button" type="button">Details</button>
+              </div>
             </div>
             <article id="assignment-card" class="assignment-card">
               <div class="assignment-card__icon" aria-hidden="true">
@@ -429,6 +432,36 @@
             <p id="week-message" class="form-message week-message" aria-live="polite"></p>
             <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
 
+            <section id="timesheet-export-panel" class="week-review-panel timesheet-export-panel" aria-labelledby="timesheet-export-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Jederzeit für das Büro</p>
+                  <h3 id="timesheet-export-title">Stundenzettel als Excel</h3>
+                </div>
+              </div>
+              <form id="timesheet-export-form" class="timesheet-export-form">
+                <label for="timesheet-export-from">Von</label>
+                <input id="timesheet-export-from" type="date" required>
+                <label for="timesheet-export-to">Bis</label>
+                <input id="timesheet-export-to" type="date" required>
+                <label for="timesheet-export-employee">Mitarbeiter</label>
+                <select id="timesheet-export-employee">
+                  <option value="">Alle Mitarbeiter</option>
+                </select>
+                <label for="timesheet-export-status">Status</label>
+                <select id="timesheet-export-status">
+                  <option value="">Alle Status</option>
+                  <option value="in_progress">In Arbeit</option>
+                  <option value="completed">Abgeschlossen</option>
+                  <option value="billed">Abgerechnet</option>
+                </select>
+                <button id="timesheet-export-submit" class="button button--primary" type="submit">
+                  Excel herunterladen
+                </button>
+              </form>
+              <p id="timesheet-export-message" class="form-message" aria-live="polite"></p>
+            </section>
+
             <section id="work-day-review-panel" class="week-review-panel" aria-labelledby="work-day-review-title" hidden>
               <div class="site-management-panel__heading">
                 <div>
@@ -475,9 +508,95 @@
               <button id="time-correction-submit" class="button button--primary" type="submit">
                 Änderung einreichen
               </button>
+              <button id="time-invalidation-submit" class="button button--quiet" type="button">
+                Buchung als ungültig markieren
+              </button>
               <p class="time-correction-note">Die bisherige Zeit bleibt sichtbar, bis das Büro die Änderung geprüft hat.</p>
               <p id="time-correction-message" class="form-message" aria-live="polite"></p>
             </form>
+          </dialog>
+
+          <dialog id="time-addition-dialog" class="time-correction-dialog" aria-labelledby="time-addition-title">
+            <form id="time-addition-form" class="time-correction-form" method="dialog" novalidate>
+              <div class="time-correction-form__heading">
+                <div>
+                  <p class="eyebrow">Stundenzettel vervollständigen</p>
+                  <h2 id="time-addition-title">Fehlende Buchung ergänzen</h2>
+                  <p id="time-addition-date" class="time-correction-original"></p>
+                </div>
+                <button id="time-addition-cancel" class="dialog-close" type="button" aria-label="Ergänzung schließen">×</button>
+              </div>
+              <label for="time-addition-type">Buchungsart</label>
+              <select id="time-addition-type" required>
+                <option value="clock_in">Arbeitsbeginn</option>
+                <option value="site_arrival">Ankunft Baustelle</option>
+                <option value="site_departure">Abfahrt Baustelle</option>
+                <option value="next_site">Nächste Baustelle</option>
+                <option value="clock_out">Feierabend</option>
+              </select>
+              <label for="time-addition-at">Datum und Uhrzeit</label>
+              <input id="time-addition-at" type="datetime-local" step="60" required>
+              <div id="time-addition-site-field" class="time-addition-site-field" hidden>
+                <label for="time-addition-site">Baustelle</label>
+                <select id="time-addition-site"></select>
+              </div>
+              <label for="time-addition-reason">Warum fehlt die Buchung?</label>
+              <textarea id="time-addition-reason" maxlength="500" rows="3" required></textarea>
+              <button id="time-addition-submit" class="button button--primary" type="submit">
+                Ergänzung zur Prüfung senden
+              </button>
+              <p class="time-correction-note">Die Ergänzung wird erst nach Freigabe durch das Büro wirksam.</p>
+              <p id="time-addition-message" class="form-message" aria-live="polite"></p>
+            </form>
+          </dialog>
+
+          <dialog id="site-choice-dialog" class="time-correction-dialog site-choice-dialog" aria-labelledby="site-choice-title">
+            <div class="time-correction-form site-choice-form">
+              <div class="time-correction-form__heading">
+                <div>
+                  <p class="eyebrow">Baustellenplan als Vorschlag</p>
+                  <h2 id="site-choice-title">Baustelle wählen</h2>
+                </div>
+                <button id="site-choice-cancel" class="dialog-close" type="button" aria-label="Baustellenwahl schließen">×</button>
+              </div>
+              <p id="site-choice-suggestion" class="site-choice-suggestion"></p>
+              <form id="site-choice-form" class="site-choice-existing-form">
+                <label for="site-choice-select">Geplante oder andere Baustelle</label>
+                <select id="site-choice-select" required></select>
+                <button id="site-choice-submit" class="button button--primary" type="submit">
+                  Diese Baustelle verwenden
+                </button>
+              </form>
+              <details class="site-choice-new">
+                <summary>Baustelle nicht vorhanden? Neu anlegen</summary>
+                <form id="field-site-form" class="site-choice-new-form">
+                  <label for="field-site-project">Projekt</label>
+                  <select id="field-site-project" required></select>
+                  <label for="field-site-name">Baustellenname</label>
+                  <input id="field-site-name" maxlength="200" required>
+                  <label for="field-site-short-text">Aufgabe <span>(optional)</span></label>
+                  <input id="field-site-short-text" maxlength="300">
+                  <div class="form-grid form-grid--two">
+                    <label for="field-site-street">Straße
+                      <input id="field-site-street" maxlength="150" required>
+                    </label>
+                    <label for="field-site-house-number">Hausnummer
+                      <input id="field-site-house-number" maxlength="20" required>
+                    </label>
+                    <label for="field-site-postal-code">PLZ
+                      <input id="field-site-postal-code" maxlength="12" required>
+                    </label>
+                    <label for="field-site-city">Ort
+                      <input id="field-site-city" maxlength="100" required>
+                    </label>
+                  </div>
+                  <button id="field-site-submit" class="button button--secondary" type="submit">
+                    Anlegen und verwenden
+                  </button>
+                </form>
+              </details>
+              <p id="site-choice-message" class="form-message" aria-live="polite"></p>
+            </div>
           </dialog>
 
           <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>

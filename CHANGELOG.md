@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.30.0 – Zeiterfassung vollständig
+
+- beendete Arbeitstage erscheinen ohne zusätzlichen Einreich-Schritt automatisch im Büro; die Oberfläche bündelt den Ablauf in „In Arbeit“, „Abgeschlossen“ und „Abgerechnet“
+- Büro, Projektleitung und Geschäftsführung sehen alle laufenden und abgeschlossenen Stundenzettel samt Warnhinweisen und können abgeschlossene Tage direkt prüfen und abrechnen
+- Mitarbeiter erhalten die geplante Baustelle als Vorschlag, dürfen eine andere vorhandene Baustelle wählen oder eine fehlende Baustelle mit Projekt und Adresse zur Bürobestätigung anlegen
+- fehlende Buchungen lassen sich mit Zeitpunkt, Buchungsart, Baustelle und Pflichtgrund ergänzen; falsche Buchungen werden nachvollziehbar als ungültig beantragt statt gelöscht
+- Zeitkorrektur, Ergänzung und Ungültigmarkierung verwenden denselben Freigabeworkflow und bewahren Original, Grund, Entscheidung und Prüfer dauerhaft
+- Excel-Export für frei wählbare Zeiträume, Mitarbeiter und Status enthält Tageswerte, Warnhinweise und die vollständige Buchungshistorie
+- automatische Pausen bleiben bei 3,5 Stunden mit 30 Minuten und ab 6 Stunden mit insgesamt 60 Minuten wirksam; Fahrtzeit zählt zur Arbeitszeit
+- Migration 032, erweiterte API-/Validierungs-/PWA-/PostgreSQL-Tests und Rechenregel Version 3
+
 ### V0.29.0 – Stundenzettel prüfen und abrechnen
 
 - Monteure reichen einen vollständig beendeten Tages-Stundenzettel direkt in der Wochenansicht zur Prüfung ein

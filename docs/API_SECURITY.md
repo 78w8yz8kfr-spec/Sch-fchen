@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 26.07.2026
-Technischer Stand: V0.29.0
+Technischer Stand: V0.30.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -100,6 +100,7 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/projects/:id` | Projektdaten und Status versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/construction-sites` | Baustelle mit Standort einem aktiven Projekt zuordnen |
 | `PATCH` | `/api/v1/admin/construction-sites/:id` | Baustellendaten und Status versionsgeschützt ändern |
+| `POST` | `/api/v1/admin/construction-sites/:id/confirm` | Eine im Feld angelegte Baustelle fachlich bestätigen |
 | `POST` | `/api/v1/admin/sites` | Kompatibler Paket-Endpunkt für bestehende Integrationen |
 | `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz freigeben |
 | `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung verschieben oder Startzeit ändern |
@@ -112,18 +113,23 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/api/v1/session` | Eigene Firma, Person, Rollen und Ablaufzeit lesen |
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
 | `GET` | `/api/v1/work-days/:date` | Eigenen berechneten Arbeitstag und Ereignisse lesen |
-| `POST` | `/api/v1/work-days/:date/submit` | Vollständig beendeten eigenen Stundenzettel zur Büroprüfung einreichen |
 | `GET` | `/api/v1/work-weeks/:monday` | Eigene sieben Kalendertage mit wirksamen Buchungen und Summen lesen |
 | `GET` | `/api/v1/site-assignments/:date` | Eigene freigegebene Tageseinsätze lesen |
+| `GET` | `/api/v1/time-tracking/site-options/:date` | Geplante und weitere Baustellen sowie Projekte für die aktuelle Auswahl lesen |
+| `POST` | `/api/v1/time-tracking/site-selection` | Andere vorhandene Baustelle als spontanen Tageseinsatz wählen |
+| `POST` | `/api/v1/time-tracking/sites` | Fehlende Baustelle im Feld anlegen und als Tageseinsatz auswählen |
 | `POST` | `/api/v1/site-reports` | Mobilen Bericht idempotent erfassen; nur für den berichtspflichtig eingeteilten Vorarbeiter |
 | `POST` | `/api/v1/time-entries` | Offline-Zeitereignis idempotent synchronisieren |
 | `POST` | `/api/v1/time-entry-corrections` | Begründete Korrektur einer eigenen wirksamen Zeitbuchung beantragen |
+| `POST` | `/api/v1/time-entry-additions` | Fehlende eigene Zeitbuchung mit Pflichtgrund zur Freigabe ergänzen |
+| `POST` | `/api/v1/time-entry-invalidations` | Eigene falsche Zeitbuchung ohne Löschung als ungültig beantragen |
 | `PATCH` | `/api/v1/admin/time-entry-corrections/:id` | Offenen Korrekturantrag genehmigen oder ablehnen |
-| `PATCH` | `/api/v1/admin/work-days/:id` | Eingereichten Stundenzettel freigeben oder freigegebenen Tag als abgerechnet sperren |
+| `PATCH` | `/api/v1/admin/work-days/:id` | Automatisch sichtbaren abgeschlossenen Stundenzettel freigeben oder als abgerechnet sperren |
+| `GET` | `/api/v1/admin/timesheets.xlsx` | Stundenzettel und Buchungshistorie nach Zeitraum, Mitarbeiter und Status exportieren |
 
 Der Zeitendpunkt verlangt eine Client-UUID, Buchungsart und ISO-Zeitpunkte mit
-Zeitzone. Baustellenereignisse benötigen eine für diesen Mitarbeiter und Tag
-freigegebene Baustelle. Der Server sperrt den jeweiligen Mitarbeiter-Tag
+Zeitzone. Baustellenereignisse benötigen eine geplante oder vom Mitarbeiter
+für den aktuellen Tag ausgewählte Baustelle. Der Server sperrt den jeweiligen Mitarbeiter-Tag
 transaktional, prüft Zeitreihenfolge und nächsten logischen Schritt und legt den
 Arbeitstag bei Bedarf an. Eine bereits identisch gespeicherte Client-UUID ist
 erfolgreich idempotent; abweichende Daten führen zu `409 Conflict`.
@@ -136,8 +142,9 @@ Client. Die API löst das eigene wirksame Original aus der Sitzung auf, verlangt
 denselben lokalen Arbeitstag und prüft die vollständige Ereignis- und
 Baustellenreihenfolge. Ein offener Antrag verändert den Stundenzettel nicht.
 Erst eine berechtigte Genehmigung entwertet das Original historisch und löst
-die serverseitige Neuberechnung aus. Ablehnungen lassen die Originalzeit
-unverändert.
+die serverseitige Neuberechnung aus. Ergänzungen und Ungültigmarkierungen
+verwenden denselben nachvollziehbaren Prüfpfad. Ablehnungen lassen die
+wirksame Zeit unverändert; Originale werden niemals gelöscht.
 
 Die Verwaltungsendpunkte prüfen zusätzlich die aktiven Rollen aus der
 serverseitig aufgelösten Sitzung. Administrator, Geschäftsführer,

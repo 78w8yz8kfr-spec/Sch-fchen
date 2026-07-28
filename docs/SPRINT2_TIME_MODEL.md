@@ -1,10 +1,10 @@
 # Sprint 2: Planung und Zeiterfassung
 
-Stand: 26.07.2026
-Technischer Stand: V0.29.0
+Stand: 28.07.2026
+Technischer Stand: V0.30.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
-012 sowie 027 und 031. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,
+012 sowie 027, 031 und 032. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,
 Offline-Zeitereignisse und den berechneten Stundenzettel.
 
 Die PWA stellt den berechneten Stundenzettel zusätzlich als vollständige
@@ -33,6 +33,13 @@ verbindlichen Reihenfolge erhalten. `sequence_number` ist Pflicht; eine
 Startzeit bleibt optional. Dieselbe Baustelle darf in der Tagesfolge mehrfach
 vorkommen.
 
+Die freigegebene Planung ist eine Empfehlung und keine Sperre. Der Mitarbeiter
+darf für den aktuellen Tag eine andere vorhandene Baustelle auswählen. Fehlt
+sie, kann er sie innerhalb eines vorhandenen Projekts mit vollständiger Adresse
+anlegen; sie wird sofort als Einsatz nutzbar und im Büro als noch zu bestätigen
+markiert. Der spontane Einsatz und die Feldanlage bleiben mit Urheber und
+Entstehungsquelle nachvollziehbar.
+
 Entwürfe können als Tages- oder Wochenplanung freigegeben werden. Wiederholungen
 und Vorlagen besitzen Referenzschlüssel, bleiben aber einzelne historische
 Datensätze. Änderungen an freigegebenen Baustellen, Tagen, Reihenfolgen oder
@@ -59,7 +66,7 @@ Freitag 360 Minuten und am Wochenende 0 Minuten. Beim Anlegen eines Arbeitstags
 wird das jeweilige Soll als unveränderlicher Tageswert übernommen.
 
 `work_days` ist die berechnete Tageszusammenfassung. Die derzeitige
-`calculation_version = 2` verwendet folgende Regeln:
+`calculation_version = 3` verwendet folgende Regeln:
 
 - ab 3 Stunden 30 Minuten Bruttozeit: 30 Minuten Pause,
 - ab 6 Stunden Bruttozeit: insgesamt 60 Minuten Pause,
@@ -69,15 +76,15 @@ wird das jeweilige Soll als unveränderlicher Tageswert übernommen.
 - Fahrtzeit zählt zur Arbeitszeit,
 - Mehrarbeit = Arbeitszeit oberhalb des individuellen Tagessolls.
 
-Berechnete Werte können nicht direkt über die API geändert werden. Nach
-Einreichung und Freigabe kann ein Arbeitstag für die Abrechnung gesperrt werden;
-danach sind reguläre Änderungen und neue Buchungen ausgeschlossen.
-
-Der Mitarbeiter reicht einen vollständig mit Feierabend beendeten Tag selbst
-ein. Offene Korrekturen blockieren die Einreichung. Das Büro gibt den
-eingereichten Tag frei und sperrt ihn erst in einem zweiten, bewussten Schritt
-als abgerechnet. Die Zustände lauten `open`, `submitted`, `approved` und
-`locked`.
+Berechnete Werte können nicht direkt über die API geändert werden. Ein mit
+Feierabend beendeter Tag erscheint automatisch im Büro; ein gesondertes
+Einreichen durch den Mitarbeiter existiert nicht. Das Büro prüft den
+abgeschlossenen Tag und sperrt ihn nach der Freigabe in einem zweiten,
+bewussten Schritt als abgerechnet. Offene Korrekturen blockieren die Freigabe.
+Die Oberfläche fasst den Ablauf in `in_progress`, `completed` und `billed`
+zusammen. Die Datenbank behält die historischen Zustände `open`, `submitted`,
+`approved` und `locked`, damit bereits vorhandene Stundenzettel kompatibel
+bleiben. Nach der Abrechnung sind reguläre neue Buchungen ausgeschlossen.
 
 ## 012 `time_entries`
 
@@ -98,11 +105,18 @@ Die Felder `client_entry_id`, `client_created_at` und `source` unterstützen ein
 idempotente Offline-Synchronisation. Eine doppelt übertragene Client-ID erzeugt
 keine zweite Buchung.
 
-## Korrekturen
+## Korrekturen, Ergänzungen und Ungültigmarkierungen
 
-Ein Korrekturantrag ist ein neuer `time_entries`-Datensatz mit Referenz auf das
-Original, dem gewünschten Zeitpunkt und einer Begründung. Er startet mit Status
-`pending`. Bis zur Entscheidung bleibt der Stundenzettel unverändert.
+Jede nachträgliche Änderung ist ein neuer `time_entries`-Datensatz mit
+Pflichtbegründung und `correction_kind`:
+
+- `replacement` ersetzt nach Freigabe die Uhrzeit einer vorhandenen Buchung,
+- `addition` ergänzt eine tatsächlich fehlende Buchung,
+- `invalidation` markiert eine falsche Buchung als unwirksam.
+
+Ein Antrag startet mit Status `pending`. Bis zur Entscheidung bleibt der
+Stundenzettel unverändert. Zukünftige Zeitpunkte sind verboten und vor jeder
+Anlage sowie Freigabe wird die vollständige Schrittfolge geprüft.
 
 Bei Genehmigung wird das Original lediglich entwertet und bleibt vollständig
 erhalten; anschließend wird der Arbeitstag neu berechnet. Ablehnungen bleiben
@@ -117,10 +131,27 @@ einer Genehmigung prüft die API die vollständige Zeit- und Baustellenfolge
 erneut, damit zwischenzeitliche Buchungen keinen ungültigen Tagesablauf
 erzeugen.
 
-Migration 031 erlaubt diesen begründeten Antrag auch an einem bereits
+Migration 031 erlaubt einen begründeten Ersatzantrag auch an einem bereits
 abgerechneten Tag. Normale neue Buchungen bleiben dort gesperrt. Wird die
 Korrektur genehmigt, wird der gesperrte Tag reproduzierbar neu berechnet und
 behält seinen Status `locked`.
+
+Migration 032 erweitert den Ablauf auf Ergänzungen und Ungültigmarkierungen.
+Originale werden niemals gelöscht. Eine genehmigte Ungültigmarkierung entwertet
+das Original nachvollziehbar; die Rechenregel Version 3 ignoriert ausschließlich
+genehmigte Ungültigmarkierungen und berechnet den Tag reproduzierbar neu.
+
+## Büroprüfung und Excel
+
+Die Wochenprüfung zeigt laufende und abgeschlossene Arbeitstage automatisch.
+Plausibilitätswarnungen markieren unter anderem einen fehlenden Feierabend,
+ungewöhnlich lange Zeitspannen, mehr als zwölf Netto-Arbeitsstunden, fehlende
+Baustellenankunft und offene Korrekturen.
+
+`GET /api/v1/admin/timesheets.xlsx` exportiert jeden gewählten Zeitraum sofort.
+Optional kann nach Mitarbeiter und den drei sichtbaren Status gefiltert werden.
+Die Arbeitsmappe enthält Tageswerte und Warnungen sowie ein zweites Blatt mit
+der vollständigen, unveränderlichen Buchungs- und Korrekturhistorie.
 
 ## Öffentliche PWA-Demo
 

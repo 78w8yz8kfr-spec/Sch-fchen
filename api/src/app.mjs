@@ -27,6 +27,7 @@ import {
 } from "./assignment-import.mjs";
 import { buildSiteImportPreview, parseSiteWorkbook } from "./site-import.mjs";
 import { buildFinalReportPdf } from "./report-pdf.mjs";
+import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -60,8 +61,12 @@ import {
   validateSiteTaskUpdate,
   validateSiteBundle,
   validateTimeEntry,
+  validateTimeEntryAddition,
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
+  validateTimeEntryInvalidation,
+  validateSpontaneousSiteSelection,
+  validateFieldConstructionSite,
   validateWorkDayDecision,
   validateWorkDate
 } from "./validation.mjs";
@@ -119,6 +124,24 @@ function attachment(response, document) {
     ...securityHeaders()
   });
   response.end(document.content);
+}
+
+function binaryAttachment(response, { content, fileName, mimeType }) {
+  const fallbackName = fileName
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "export.xlsx";
+  const encodedName = encodeURIComponent(fileName).replace(/[!'()*]/g, (character) => (
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  ));
+  response.writeHead(200, {
+    "Content-Type": mimeType,
+    "Content-Length": content.length,
+    "Content-Disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
+    "Cache-Control": "no-store",
+    ...securityHeaders()
+  });
+  response.end(content);
 }
 
 async function setupStatus(pool, companyNumber) {
@@ -213,14 +236,76 @@ function timeEntryCorrectionDto(row) {
     workDayId: row.work_day_id,
     workDate: databaseDate(row.work_date),
     originalEntryId: row.original_entry_id,
+    correctionKind: row.correction_kind || "replacement",
     entryType: row.entry_type,
-    originalRecordedAt: new Date(row.original_recorded_at).toISOString(),
+    originalRecordedAt: row.original_recorded_at
+      ? new Date(row.original_recorded_at).toISOString()
+      : null,
     requestedRecordedAt: new Date(row.requested_recorded_at).toISOString(),
     reason: row.correction_reason,
     requestedAt: new Date(row.requested_at).toISOString(),
     status: row.correction_status || "pending",
     reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : null
   };
+}
+
+function workDayWorkflowStatus(day, entries = null) {
+  if (day.status === "locked") return "billed";
+  if (["submitted", "approved"].includes(day.status)) return "completed";
+  const lastType = entries?.at(-1)?.entry_type
+    || entries?.at(-1)?.entryType
+    || day.last_entry_type;
+  return lastType === "clock_out" ? "completed" : "in_progress";
+}
+
+function workDayWarnings(day, entries = null) {
+  const warnings = [];
+  const entryCount = entries ? entries.length : Number(day.entry_count || 0);
+  const lastType = entries?.at(-1)?.entry_type
+    || entries?.at(-1)?.entryType
+    || day.last_entry_type;
+  const siteVisitCount = entries
+    ? entries.filter((entry) => (
+      (entry.entry_type || entry.entryType) === "site_arrival"
+    )).length
+    : Number(day.site_visit_count || 0);
+  const hasPendingCorrection = Boolean(day.has_pending_correction) || (
+    entries
+      ? entries.some((entry) => Boolean(entry.pending_correction_id || entry.pendingCorrection))
+      : false
+  );
+
+  if (entryCount > 0 && lastType !== "clock_out") {
+    warnings.push({
+      code: "day_not_finished",
+      message: "Arbeitsblock noch nicht mit Feierabend beendet"
+    });
+  }
+  if (Number(day.gross_minutes || 0) > 16 * 60) {
+    warnings.push({
+      code: "long_day_span",
+      message: "Zeitspanne zwischen erstem Start und letztem Ende über 16 Stunden"
+    });
+  }
+  if (Number(day.work_minutes || 0) > 12 * 60) {
+    warnings.push({
+      code: "long_work_time",
+      message: "Netto-Arbeitszeit über 12 Stunden"
+    });
+  }
+  if (Number(day.work_minutes || 0) >= 120 && siteVisitCount === 0) {
+    warnings.push({
+      code: "no_site_visit",
+      message: "Keine Baustellenankunft erfasst"
+    });
+  }
+  if (hasPendingCorrection) {
+    warnings.push({
+      code: "correction_pending",
+      message: "Offene Zeitkorrektur"
+    });
+  }
+  return warnings;
 }
 
 function workDayDto(day, entries) {
@@ -241,6 +326,10 @@ function workDayDto(day, entries) {
     submittedAt: day.submitted_at ? new Date(day.submitted_at).toISOString() : null,
     approvedAt: day.approved_at ? new Date(day.approved_at).toISOString() : null,
     lockedAt: day.locked_at ? new Date(day.locked_at).toISOString() : null,
+    hasPendingCorrection: Boolean(day.has_pending_correction)
+      || entries.some((entry) => Boolean(entry.pending_correction_id)),
+    workflowStatus: workDayWorkflowStatus(day, entries),
+    warnings: workDayWarnings(day, entries),
     rowVersion: Number(day.row_version),
     entries: entries.map((entry) => timeEntryDto(entry))
   };
@@ -262,6 +351,13 @@ function adminWorkDayDto(day) {
     submittedAt: day.submitted_at ? new Date(day.submitted_at).toISOString() : null,
     approvedAt: day.approved_at ? new Date(day.approved_at).toISOString() : null,
     lockedAt: day.locked_at ? new Date(day.locked_at).toISOString() : null,
+    workflowStatus: workDayWorkflowStatus(day),
+    reviewable: (
+      ["open", "submitted"].includes(day.status)
+      && day.last_entry_type === "clock_out"
+      && !day.has_pending_correction
+    ),
+    warnings: workDayWarnings(day),
     rowVersion: Number(day.row_version)
   };
 }
@@ -317,8 +413,17 @@ async function createLogin(pool, config, limiter, request, body) {
 
 async function getWorkDay(client, context, date) {
   const dayResult = await client.query(
-    `SELECT * FROM work_days
-     WHERE company_id = $1 AND user_id = $2 AND work_date = $3`,
+    `SELECT day.*,
+            EXISTS (
+              SELECT 1
+              FROM time_entries AS correction
+              WHERE correction.company_id = day.company_id
+                AND correction.user_id = day.user_id
+                AND correction.work_day_id = day.id
+                AND correction.correction_status = 'pending'
+            ) AS has_pending_correction
+     FROM work_days AS day
+     WHERE day.company_id = $1 AND day.user_id = $2 AND day.work_date = $3`,
     [context.companyId, context.userId, date]
   );
   if (dayResult.rowCount === 0) return null;
@@ -345,7 +450,11 @@ async function getWorkDay(client, context, date) {
      ) AS pending ON TRUE
      WHERE entry.company_id = $1 AND entry.user_id = $2 AND entry.work_day_id = $3
        AND entry.invalidated_at IS NULL
-       AND (entry.original_entry_id IS NULL OR entry.correction_status = 'approved')
+       AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+       AND (
+         (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+         OR entry.correction_status = 'approved'
+       )
      ORDER BY entry.recorded_at, entry.created_at, entry.id`,
     [context.companyId, context.userId, day.id]
   );
@@ -389,79 +498,6 @@ async function getWorkWeek(client, context, weekStart) {
   };
 }
 
-async function submitOwnWorkDay(client, context, workDate) {
-  const dayResult = await client.query(
-    `SELECT id, status
-     FROM work_days
-     WHERE company_id = $1 AND user_id = $2 AND work_date = $3
-     FOR UPDATE`,
-    [context.companyId, context.userId, workDate]
-  );
-  if (dayResult.rowCount !== 1) {
-    throw new InputError(
-      "Für diesen Tag wurde noch kein Stundenzettel erfasst.",
-      404,
-      "work_day_not_found"
-    );
-  }
-  const day = dayResult.rows[0];
-  if (day.status === "submitted") return getWorkDay(client, context, workDate);
-  if (day.status !== "open") {
-    throw new InputError(
-      "Dieser Stundenzettel wurde bereits freigegeben oder abgerechnet.",
-      409,
-      "work_day_already_reviewed"
-    );
-  }
-
-  const timeline = await client.query(
-    `SELECT entry_type
-     FROM time_entries
-     WHERE company_id = $1
-       AND user_id = $2
-       AND work_day_id = $3
-       AND invalidated_at IS NULL
-       AND (
-         (original_entry_id IS NULL AND correction_status IS NULL)
-         OR correction_status = 'approved'
-       )
-     ORDER BY recorded_at DESC, created_at DESC, id DESC
-     LIMIT 1`,
-    [context.companyId, context.userId, day.id]
-  );
-  if (timeline.rowCount !== 1 || timeline.rows[0].entry_type !== "clock_out") {
-    throw new InputError(
-      "Der Arbeitstag muss zuerst mit Feierabend beendet werden.",
-      409,
-      "work_day_not_finished"
-    );
-  }
-  const pending = await client.query(
-    `SELECT 1
-     FROM time_entries
-     WHERE company_id = $1
-       AND user_id = $2
-       AND work_day_id = $3
-       AND correction_status = 'pending'
-     LIMIT 1`,
-    [context.companyId, context.userId, day.id]
-  );
-  if (pending.rowCount !== 0) {
-    throw new InputError(
-      "Bitte warte zuerst auf die Prüfung der offenen Zeitkorrektur.",
-      409,
-      "work_day_correction_pending"
-    );
-  }
-  await client.query(
-    `UPDATE work_days
-     SET status = 'submitted'
-     WHERE company_id = $1 AND user_id = $2 AND id = $3`,
-    [context.companyId, context.userId, day.id]
-  );
-  return getWorkDay(client, context, workDate);
-}
-
 async function getAdminWorkDay(client, context, workDayId) {
   const result = await client.query(
     `SELECT day.*, account.first_name || ' ' || account.last_name AS employee_name
@@ -497,11 +533,13 @@ async function reviewWorkDay(client, context, workDayId, input) {
       "work_day_not_found"
     );
   }
-  const expectedStatus = input.decision === "approved" ? "submitted" : "approved";
-  if (current.rows[0].status !== expectedStatus) {
+  const validStatus = input.decision === "approved"
+    ? ["open", "submitted"].includes(current.rows[0].status)
+    : current.rows[0].status === "approved";
+  if (!validStatus) {
     throw new InputError(
       input.decision === "approved"
-        ? "Nur ein eingereichter Stundenzettel kann freigegeben werden."
+        ? "Nur ein vollständig beendeter Stundenzettel kann freigegeben werden."
         : "Nur ein freigegebener Stundenzettel kann abgerechnet werden.",
       409,
       "work_day_status_conflict"
@@ -526,6 +564,27 @@ async function reviewWorkDay(client, context, workDayId, input) {
   }
 
   if (input.decision === "approved") {
+    const lastEntry = await client.query(
+      `SELECT entry_type
+       FROM time_entries
+       WHERE company_id = $1 AND user_id = $2 AND work_day_id = $3
+         AND invalidated_at IS NULL
+         AND correction_kind IS DISTINCT FROM 'invalidation'
+         AND (
+           (original_entry_id IS NULL AND correction_status IS NULL)
+           OR correction_status = 'approved'
+         )
+       ORDER BY recorded_at DESC, created_at DESC, id DESC
+       LIMIT 1`,
+      [context.companyId, current.rows[0].user_id, workDayId]
+    );
+    if (lastEntry.rowCount !== 1 || lastEntry.rows[0].entry_type !== "clock_out") {
+      throw new InputError(
+        "Der aktuelle Arbeitsblock ist noch nicht mit Feierabend beendet.",
+        409,
+        "work_day_not_finished"
+      );
+    }
     await client.query(
       `UPDATE work_days
        SET status = 'approved', approved_by_user_id = $3
@@ -605,6 +664,265 @@ async function getAssignments(client, context, date) {
       shortText: row.installer_short_text
     }
   }));
+}
+
+async function getTimeTrackingSiteOptions(client, context, date) {
+  const [suggested, sites, projects] = await Promise.all([
+    getAssignments(client, context, date),
+    client.query(
+      `SELECT site.id, site.project_id, project.customer_id, site.site_number,
+              site.name, site.installer_short_text, site.status, site.row_version,
+              site.updated_at, site.creation_source, site.field_review_status,
+              project.name AS project_name,
+              COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
+              location.street, location.house_number, location.postal_code, location.city
+       FROM construction_sites AS site
+       JOIN projects AS project
+         ON project.company_id = site.company_id AND project.id = site.project_id
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       LEFT JOIN customer_locations AS location
+         ON location.company_id = site.company_id AND location.id = site.customer_location_id
+       WHERE site.company_id = $1
+         AND (
+           site.status IN ('planned', 'active', 'on_hold', 'delayed')
+           OR site.id = ANY($2::UUID[])
+         )
+       ORDER BY
+         CASE WHEN site.id = ANY($2::UUID[]) THEN 0 ELSE 1 END,
+         LOWER(site.name), site.site_number`,
+      [context.companyId, suggested.map((assignment) => assignment.constructionSite.id)]
+    ),
+    client.query(
+      `SELECT project.id, project.customer_id, project.project_number,
+              project.name, project.installer_short_text, project.status,
+              project.row_version, project.updated_at,
+              COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
+              0::INTEGER AS site_count
+       FROM projects AS project
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       WHERE project.company_id = $1
+         AND project.status IN ('planned', 'active', 'on_hold')
+         AND customer.status = 'active'
+       ORDER BY LOWER(COALESCE(customer.company_name, customer.last_name)), LOWER(project.name)`,
+      [context.companyId]
+    )
+  ]);
+  return {
+    workDate: date,
+    suggestedAssignments: suggested,
+    sites: sites.rows.map(siteDto),
+    projects: projects.rows.map(projectDto)
+  };
+}
+
+function requireToday(workDate, timeZone) {
+  const today = localDate(new Date().toISOString(), timeZone);
+  if (workDate !== today) {
+    throw new InputError(
+      "Eine spontane Baustelle kann nur für den heutigen Arbeitstag gewählt werden.",
+      409,
+      "site_selection_not_today"
+    );
+  }
+}
+
+async function createEmployeeSelectedAssignment(
+  client,
+  context,
+  workDate,
+  constructionSiteId,
+  comment,
+  forceNewOccurrence = false
+) {
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`assignment:${context.companyId}:${context.userId}:${workDate}`]
+  );
+  const existing = await client.query(
+    `SELECT id
+     FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+       AND work_date = $4 AND status IN ('released', 'completed')
+     ORDER BY sequence_number
+     LIMIT 1`,
+    [context.companyId, context.userId, constructionSiteId, workDate]
+  );
+  if (existing.rowCount === 0 || forceNewOccurrence) {
+    const sequence = await client.query(
+      `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_sequence
+       FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND work_date = $3
+         AND status <> 'cancelled'`,
+      [context.companyId, context.userId, workDate]
+    );
+    await client.query(
+      `INSERT INTO site_assignments (
+         company_id, user_id, construction_site_id, work_date,
+         sequence_number, status, comment, published_at,
+         created_by_user_id, changed_by_user_id, last_change_reason
+       ) VALUES (
+         $1, $2, $3, $4, $5, 'released', $6, CURRENT_TIMESTAMP,
+         $2, $2, 'Spontane Auswahl durch den Mitarbeiter'
+       )`,
+      [
+        context.companyId,
+        context.userId,
+        constructionSiteId,
+        workDate,
+        sequence.rows[0].next_sequence,
+        comment
+      ]
+    );
+  }
+  await reconcileAutomaticSiteForeman(client, context, constructionSiteId, workDate);
+  return getAssignments(client, context, workDate);
+}
+
+async function selectSpontaneousSite(client, context, input, timeZone) {
+  requireToday(input.workDate, timeZone);
+  const site = await client.query(
+    `SELECT id, name
+     FROM construction_sites
+     WHERE company_id = $1 AND id = $2
+       AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId, input.constructionSiteId]
+  );
+  if (site.rowCount !== 1) {
+    throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
+  }
+  const assignments = await createEmployeeSelectedAssignment(
+    client,
+    context,
+    input.workDate,
+    input.constructionSiteId,
+    `Spontan gewählt · ${site.rows[0].name}`,
+    input.newOccurrence
+  );
+  return { assignments, selectedSiteId: input.constructionSiteId };
+}
+
+async function createFieldConstructionSite(client, context, input, timeZone) {
+  requireToday(input.workDate, timeZone);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`sites:${context.companyId}`]
+  );
+  const project = await client.query(
+    `SELECT project.id, project.name, project.customer_id,
+            customer.customer_type, customer.company_name,
+            customer.first_name, customer.last_name
+     FROM projects AS project
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id AND customer.id = project.customer_id
+     WHERE project.company_id = $1 AND project.id = $2
+       AND project.status IN ('planned', 'active', 'on_hold')
+       AND customer.status = 'active'`,
+    [context.companyId, input.projectId]
+  );
+  if (project.rowCount !== 1) {
+    throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
+  }
+  const duplicate = await client.query(
+    `SELECT id, name
+     FROM construction_sites
+     WHERE company_id = $1
+       AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId]
+  );
+  if (duplicate.rows.some((row) => normalizeImportText(row.name) === normalizeImportText(input.name))) {
+    throw new InputError(
+      "Eine aktive Baustelle mit diesem Namen existiert bereits. Bitte diese auswählen.",
+      409,
+      "site_name_exists"
+    );
+  }
+
+  const projectRow = project.rows[0];
+  const location = await client.query(
+    `INSERT INTO customer_locations (
+       company_id, customer_id, name, location_type,
+       street, house_number, postal_code, city, is_billing_location
+     ) VALUES ($1, $2, $3, 'construction', $4, $5, $6, $7, FALSE)
+     RETURNING id`,
+    [
+      context.companyId,
+      projectRow.customer_id,
+      input.name,
+      input.street,
+      input.houseNumber,
+      input.postalCode,
+      input.city
+    ]
+  );
+  await client.query(
+    `INSERT INTO project_locations (company_id, project_id, customer_location_id)
+     VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+    [context.companyId, input.projectId, location.rows[0].id]
+  );
+  const inserted = await client.query(
+    `INSERT INTO construction_sites (
+       company_id, project_id, customer_location_id, name,
+       installer_short_text, status, creation_source,
+       field_created_by_user_id, field_review_status
+     ) VALUES (
+       $1, $2, $3, $4, $5, 'active', 'field', $6, 'pending'
+     )
+     RETURNING id, project_id, site_number, name, installer_short_text,
+               status, row_version, updated_at, creation_source, field_review_status`,
+    [
+      context.companyId,
+      input.projectId,
+      location.rows[0].id,
+      input.name,
+      input.installerShortText,
+      context.userId
+    ]
+  );
+  const site = siteDto({
+    ...inserted.rows[0],
+    customer_id: projectRow.customer_id,
+    customer_name: projectRow.customer_type === "company"
+      ? projectRow.company_name
+      : `${projectRow.first_name} ${projectRow.last_name}`,
+    project_name: projectRow.name,
+    street: input.street,
+    house_number: input.houseNumber,
+    postal_code: input.postalCode,
+    city: input.city
+  });
+  const assignments = await createEmployeeSelectedAssignment(
+    client,
+    context,
+    input.workDate,
+    site.id,
+    "Neue Baustelle vom Mitarbeiter angelegt",
+    false
+  );
+  return { site, assignments, selectedSiteId: site.id };
+}
+
+async function confirmFieldConstructionSite(client, context, siteId) {
+  await requirePlanner(client, context);
+  const updated = await client.query(
+    `UPDATE construction_sites
+     SET field_review_status = 'confirmed',
+         field_reviewed_at = CURRENT_TIMESTAMP,
+         field_reviewed_by_user_id = $3
+     WHERE company_id = $1 AND id = $2
+       AND creation_source = 'field' AND field_review_status = 'pending'
+     RETURNING id`,
+    [context.companyId, siteId, context.userId]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Der Baustellenvorschlag wurde nicht gefunden oder bereits bestätigt.",
+      409,
+      "field_site_not_pending"
+    );
+  }
+  return { id: siteId, fieldReviewStatus: "confirmed" };
 }
 
 async function activeRoleKeys(client, context) {
@@ -775,6 +1093,9 @@ function siteDto(row) {
     name: row.name,
     shortText: row.installer_short_text,
     status: row.status || "active",
+    creationSource: row.creation_source || "office",
+    fieldReviewStatus: row.field_review_status || "not_required",
+    fieldCreatedByName: row.field_created_by_name || null,
     rowVersion: Number(row.row_version || 1),
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
     customerName: row.customer_name,
@@ -958,6 +1279,205 @@ function databaseDate(value) {
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 }
 
+function timesheetExportParameters(url) {
+  const from = validateWorkDate(url.searchParams.get("from"));
+  const to = validateWorkDate(url.searchParams.get("to"));
+  if (to < from) {
+    throw new InputError("Das Enddatum darf nicht vor dem Startdatum liegen.");
+  }
+  const dayCount = Math.floor(
+    (new Date(`${to}T00:00:00Z`) - new Date(`${from}T00:00:00Z`)) / 86_400_000
+  ) + 1;
+  if (dayCount > 1096) {
+    throw new InputError("Ein Excel-Export darf höchstens drei Jahre umfassen.");
+  }
+  const employeeValue = url.searchParams.get("employeeId");
+  const employeeId = employeeValue ? validateId(employeeValue, "Mitarbeiter-ID") : null;
+  const status = url.searchParams.get("status") || null;
+  if (status && !["in_progress", "completed", "billed"].includes(status)) {
+    throw new InputError("Der Exportstatus ist ungültig.");
+  }
+  return { from, to, employeeId, status };
+}
+
+async function exportTimesheets(client, context, parameters, timeZone) {
+  await requirePlanner(client, context);
+  const [company, dayResult] = await Promise.all([
+    client.query(
+      "SELECT display_name FROM companies WHERE id = $1",
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT day.*, account.personnel_number,
+              account.first_name || ' ' || account.last_name AS employee_name,
+              (
+                SELECT entry.entry_type
+                FROM time_entries AS entry
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+                ORDER BY entry.recorded_at DESC, entry.created_at DESC, entry.id DESC
+                LIMIT 1
+              ) AS last_entry_type,
+              (
+                SELECT COUNT(*)::INTEGER
+                FROM time_entries AS entry
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+              ) AS entry_count,
+              (
+                SELECT COUNT(*)::INTEGER
+                FROM time_entries AS entry
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.entry_type = 'site_arrival'
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+              ) AS site_visit_count,
+              EXISTS (
+                SELECT 1 FROM time_entries AS correction
+                WHERE correction.company_id = day.company_id
+                  AND correction.user_id = day.user_id
+                  AND correction.work_day_id = day.id
+                  AND correction.correction_status = 'pending'
+              ) AS has_pending_correction,
+              COALESCE((
+                SELECT ARRAY_AGG(DISTINCT site.name ORDER BY site.name)
+                FROM time_entries AS entry
+                JOIN construction_sites AS site
+                  ON site.company_id = entry.company_id
+                 AND site.id = entry.construction_site_id
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+              ), ARRAY[]::TEXT[]) AS site_names
+       FROM work_days AS day
+       JOIN users AS account
+         ON account.company_id = day.company_id AND account.id = day.user_id
+       WHERE day.company_id = $1
+         AND day.work_date BETWEEN $2 AND $3
+         AND ($4::UUID IS NULL OR day.user_id = $4)
+       ORDER BY day.work_date, LOWER(account.last_name), LOWER(account.first_name), day.id`,
+      [context.companyId, parameters.from, parameters.to, parameters.employeeId]
+    )
+  ]);
+  let workDays = dayResult.rows.map((day) => ({
+    id: day.id,
+    personnelNumber: day.personnel_number,
+    employeeName: day.employee_name,
+    workDate: databaseDate(day.work_date),
+    workflowStatus: workDayWorkflowStatus(day),
+    firstClockInAt: day.first_clock_in_at,
+    lastClockOutAt: day.last_clock_out_at,
+    targetWorkMinutes: day.target_work_minutes,
+    grossMinutes: day.gross_minutes,
+    breakMinutes: day.break_minutes,
+    workMinutes: day.work_minutes,
+    travelMinutes: day.travel_minutes,
+    overtimeMinutes: day.overtime_minutes,
+    siteNames: day.site_names || [],
+    warnings: workDayWarnings(day)
+  }));
+  if (parameters.status) {
+    workDays = workDays.filter((day) => day.workflowStatus === parameters.status);
+  }
+
+  const workDayIds = workDays.map((day) => day.id);
+  const entries = workDayIds.length === 0
+    ? []
+    : (await client.query(
+      `SELECT entry.id, day.work_date, account.personnel_number,
+              account.first_name || ' ' || account.last_name AS employee_name,
+              entry.entry_type, entry.recorded_at, entry.source,
+              entry.original_entry_id, entry.correction_kind,
+              entry.correction_status, entry.correction_reason,
+              entry.reviewed_at, entry.invalidated_at,
+              CASE WHEN reviewer.id IS NULL THEN NULL
+                   ELSE reviewer.first_name || ' ' || reviewer.last_name
+              END AS reviewed_by_name,
+              site.name AS site_name
+       FROM time_entries AS entry
+       JOIN work_days AS day
+         ON day.company_id = entry.company_id
+        AND day.user_id = entry.user_id
+        AND day.id = entry.work_day_id
+       JOIN users AS account
+         ON account.company_id = entry.company_id AND account.id = entry.user_id
+       LEFT JOIN construction_sites AS site
+         ON site.company_id = entry.company_id AND site.id = entry.construction_site_id
+       LEFT JOIN users AS reviewer
+         ON reviewer.company_id = entry.company_id
+        AND reviewer.id = entry.reviewed_by_user_id
+       WHERE entry.company_id = $1 AND entry.work_day_id = ANY($2::UUID[])
+       ORDER BY day.work_date, LOWER(account.last_name), LOWER(account.first_name),
+                entry.recorded_at, entry.created_at, entry.id`,
+      [context.companyId, workDayIds]
+    )).rows.map((entry) => ({
+      personnelNumber: entry.personnel_number,
+      employeeName: entry.employee_name,
+      workDate: databaseDate(entry.work_date),
+      recordedAt: entry.recorded_at,
+      entryType: entry.entry_type,
+      siteName: entry.site_name,
+      source: entry.source,
+      id: entry.id,
+      originalEntryId: entry.original_entry_id,
+      reason: entry.correction_reason,
+      reviewedByName: entry.reviewed_by_name,
+      reviewedAt: entry.reviewed_at,
+      historyStatus: entry.invalidated_at
+        ? "Historisch entwertet"
+        : entry.correction_status === "pending"
+          ? "Prüfung offen"
+          : entry.correction_status === "rejected"
+            ? "Abgelehnt"
+            : entry.correction_kind === "addition"
+              ? "Genehmigte Ergänzung"
+              : entry.correction_kind === "replacement"
+                ? "Genehmigte Korrektur"
+                : entry.correction_kind === "invalidation"
+                  ? "Ungültig-Markierung"
+                  : "Wirksam"
+    }));
+
+  return {
+    content: await buildTimesheetWorkbook({
+      companyName: company.rows[0]?.display_name || "Schäfchen",
+      from: parameters.from,
+      to: parameters.to,
+      workDays,
+      entries,
+      timeZone
+    }),
+    fileName: `Stundenzettel_${parameters.from}_${parameters.to}.xlsx`,
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  };
+}
+
 async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
   const weekStart = mondayFor(date);
@@ -1040,8 +1560,12 @@ async function adminOverview(client, context, date) {
     client.query(
       `SELECT site.id, site.project_id, project.customer_id, site.site_number, site.name, site.installer_short_text,
               site.status, site.row_version, site.updated_at,
+              site.creation_source, site.field_review_status,
               project.name AS project_name,
               COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
+              CASE WHEN field_creator.id IS NULL THEN NULL
+                   ELSE field_creator.first_name || ' ' || field_creator.last_name
+              END AS field_created_by_name,
               location.street, location.house_number, location.postal_code, location.city
        FROM construction_sites AS site
        JOIN projects AS project
@@ -1050,6 +1574,9 @@ async function adminOverview(client, context, date) {
          ON customer.company_id = project.company_id AND customer.id = project.customer_id
        LEFT JOIN customer_locations AS location
          ON location.company_id = site.company_id AND location.id = site.customer_location_id
+       LEFT JOIN users AS field_creator
+         ON field_creator.company_id = site.company_id
+        AND field_creator.id = site.field_created_by_user_id
        WHERE site.company_id = $1
          AND site.status <> 'cancelled'
        ORDER BY
@@ -1177,13 +1704,61 @@ async function adminOverview(client, context, date) {
       [context.companyId]
     ),
     client.query(
-      `SELECT day.*, account.first_name || ' ' || account.last_name AS employee_name
+      `SELECT day.*, account.first_name || ' ' || account.last_name AS employee_name,
+              (
+                SELECT entry.entry_type
+                FROM time_entries AS entry
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+                ORDER BY entry.recorded_at DESC, entry.created_at DESC, entry.id DESC
+                LIMIT 1
+              ) AS last_entry_type,
+              (
+                SELECT COUNT(*)::INTEGER
+                FROM time_entries AS entry
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+              ) AS entry_count,
+              (
+                SELECT COUNT(*)::INTEGER
+                FROM time_entries AS entry
+                WHERE entry.company_id = day.company_id
+                  AND entry.user_id = day.user_id
+                  AND entry.work_day_id = day.id
+                  AND entry.entry_type = 'site_arrival'
+                  AND entry.invalidated_at IS NULL
+                  AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+                  AND (
+                    (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+                    OR entry.correction_status = 'approved'
+                  )
+              ) AS site_visit_count,
+              EXISTS (
+                SELECT 1 FROM time_entries AS correction
+                WHERE correction.company_id = day.company_id
+                  AND correction.user_id = day.user_id
+                  AND correction.work_day_id = day.id
+                  AND correction.correction_status = 'pending'
+              ) AS has_pending_correction
        FROM work_days AS day
        JOIN users AS account
          ON account.company_id = day.company_id AND account.id = day.user_id
        WHERE day.company_id = $1
          AND day.work_date BETWEEN $2 AND $3
-         AND day.status IN ('submitted', 'approved', 'locked')
        ORDER BY day.work_date DESC,
                 LOWER(account.last_name), LOWER(account.first_name), day.id`,
       [context.companyId, weekStart, reviewWeekEnd]
@@ -1191,6 +1766,7 @@ async function adminOverview(client, context, date) {
     client.query(
       `SELECT correction.id, correction.user_id, correction.work_day_id,
               correction.work_date, correction.original_entry_id,
+              correction.correction_kind,
               correction.entry_type, correction.requested_recorded_at,
               correction.original_recorded_at, correction.correction_reason,
               correction.requested_at, 'pending'::TEXT AS correction_status,
@@ -3772,7 +4348,11 @@ async function insertTimeEntry(client, context, input, timeZone) {
       AND day.id = entry.work_day_id
      WHERE entry.company_id = $1 AND entry.user_id = $2 AND day.work_date = $3
        AND entry.invalidated_at IS NULL
-       AND (entry.original_entry_id IS NULL OR entry.correction_status = 'approved')
+       AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+       AND (
+         (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+         OR entry.correction_status = 'approved'
+       )
      ORDER BY entry.recorded_at DESC, entry.created_at DESC, entry.id DESC
      LIMIT 1`,
     [context.companyId, context.userId, workDate]
@@ -3844,7 +4424,8 @@ async function assertCorrectionTimeline(client, {
   originalEntryId,
   entryType,
   recordedAt,
-  constructionSiteId
+  constructionSiteId,
+  omitProposed = false
 }) {
   const result = await client.query(
     `SELECT id, entry_type, recorded_at, construction_site_id
@@ -3852,8 +4433,9 @@ async function assertCorrectionTimeline(client, {
      WHERE company_id = $1
        AND user_id = $2
        AND work_day_id = $3
-       AND id <> $4
+       AND ($4::UUID IS NULL OR id <> $4)
        AND invalidated_at IS NULL
+       AND correction_kind IS DISTINCT FROM 'invalidation'
        AND (
          (original_entry_id IS NULL AND correction_status IS NULL)
          OR correction_status = 'approved'
@@ -3861,15 +4443,16 @@ async function assertCorrectionTimeline(client, {
      ORDER BY recorded_at, created_at, id`,
     [companyId, userId, workDayId, originalEntryId]
   );
-  const timeline = [
-    ...result.rows,
-    {
+  const timeline = [...result.rows];
+  if (!omitProposed) {
+    timeline.push({
       id: originalEntryId,
       entry_type: entryType,
       recorded_at: recordedAt,
       construction_site_id: constructionSiteId
-    }
-  ].sort((left, right) => (
+    });
+  }
+  timeline.sort((left, right) => (
     new Date(left.recorded_at).valueOf() - new Date(right.recorded_at).valueOf()
   ));
 
@@ -3913,7 +4496,7 @@ async function assertCorrectionTimeline(client, {
 
 async function createTimeEntryCorrection(client, context, input, timeZone) {
   const requestedAt = new Date(input.requestedRecordedAt);
-  if (requestedAt.valueOf() > Date.now() + 5 * 60 * 1000) {
+  if (requestedAt.valueOf() > Date.now()) {
     throw new InputError("Die gewünschte Uhrzeit darf nicht in der Zukunft liegen.");
   }
 
@@ -3929,6 +4512,7 @@ async function createTimeEntryCorrection(client, context, input, timeZone) {
        AND entry.user_id = $2
        AND entry.id = $3
        AND entry.invalidated_at IS NULL
+       AND entry.correction_kind IS DISTINCT FROM 'invalidation'
        AND (
          (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
          OR entry.correction_status = 'approved'
@@ -3945,7 +4529,7 @@ async function createTimeEntryCorrection(client, context, input, timeZone) {
   }
   const original = originalResult.rows[0];
   const workDate = databaseDate(original.work_date);
-  if (localDate(input.requestedRecordedAt, timeZone) !== workDate) {
+  if (localDate(input.requestedRecordedAt, timeZone) !== localDate(original.recorded_at, timeZone)) {
     throw new InputError(
       "Die korrigierte Uhrzeit muss am selben Arbeitstag liegen.",
       409,
@@ -3993,11 +4577,11 @@ async function createTimeEntryCorrection(client, context, input, timeZone) {
     `INSERT INTO time_entries (
        id, company_id, user_id, work_day_id, construction_site_id,
        entry_type, recorded_at, client_entry_id, client_created_at,
-       source, entered_by_user_id, original_entry_id, correction_reason
+       source, entered_by_user_id, original_entry_id, correction_kind, correction_reason
      ) VALUES (
        $1, $2, $3, $4, $5,
        $6, $7, $8, CURRENT_TIMESTAMP,
-       'employee', $3, $9, $10
+       'employee', $3, $9, 'replacement', $10
      )`,
     [
       correctionId,
@@ -4016,9 +4600,215 @@ async function createTimeEntryCorrection(client, context, input, timeZone) {
   const created = await client.query(
     `SELECT correction.id, correction.user_id, correction.work_day_id,
             correction.work_date, correction.original_entry_id,
+            correction.correction_kind,
             correction.entry_type, correction.requested_recorded_at,
             correction.original_recorded_at, correction.correction_reason,
             correction.requested_at, 'pending'::TEXT AS correction_status,
+            NULL::TIMESTAMPTZ AS reviewed_at,
+            account.first_name || ' ' || account.last_name AS employee_name
+     FROM pending_time_entry_corrections AS correction
+     JOIN users AS account
+       ON account.company_id = correction.company_id
+      AND account.id = correction.user_id
+     WHERE correction.company_id = $1 AND correction.id = $2`,
+    [context.companyId, correctionId]
+  );
+  return timeEntryCorrectionDto(created.rows[0]);
+}
+
+async function createTimeEntryAddition(client, context, input, timeZone) {
+  const requestedAt = new Date(input.recordedAt);
+  if (requestedAt.valueOf() > Date.now()) {
+    throw new InputError("Die ergänzte Uhrzeit darf nicht in der Zukunft liegen.");
+  }
+  if (localDate(input.recordedAt, timeZone) !== input.workDate) {
+    throw new InputError(
+      "Die ergänzte Uhrzeit muss am ausgewählten Arbeitstag liegen.",
+      409,
+      "time_addition_wrong_day"
+    );
+  }
+
+  const dayResult = await client.query(
+    `SELECT id, status
+     FROM work_days
+     WHERE company_id = $1 AND user_id = $2 AND work_date = $3
+     FOR UPDATE`,
+    [context.companyId, context.userId, input.workDate]
+  );
+  if (dayResult.rowCount !== 1) {
+    throw new InputError(
+      "Für diesen Tag existiert noch kein Stundenzettel.",
+      404,
+      "work_day_not_found"
+    );
+  }
+  const day = dayResult.rows[0];
+
+  if (input.constructionSiteId) {
+    const assignment = await client.query(
+      `SELECT 1
+       FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+         AND work_date = $4 AND status IN ('released', 'completed')
+       LIMIT 1`,
+      [context.companyId, context.userId, input.constructionSiteId, input.workDate]
+    );
+    if (assignment.rowCount !== 1) {
+      throw new InputError(
+        "Die Baustelle war diesem Arbeitstag nicht zugeordnet.",
+        403,
+        "site_not_assigned"
+      );
+    }
+  }
+
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`time-correction:${context.companyId}:${context.userId}:${day.id}`]
+  );
+  await assertCorrectionTimeline(client, {
+    companyId: context.companyId,
+    userId: context.userId,
+    workDayId: day.id,
+    originalEntryId: null,
+    entryType: input.entryType,
+    recordedAt: input.recordedAt,
+    constructionSiteId: input.constructionSiteId
+  });
+
+  const correctionId = randomUUID();
+  await client.query(
+    `INSERT INTO time_entries (
+       id, company_id, user_id, work_day_id, construction_site_id,
+       entry_type, recorded_at, client_entry_id, client_created_at,
+       source, entered_by_user_id, correction_kind, correction_reason
+     ) VALUES (
+       $1, $2, $3, $4, $5,
+       $6, $7, $8, CURRENT_TIMESTAMP,
+       'employee', $3, 'addition', $9
+     )`,
+    [
+      correctionId,
+      context.companyId,
+      context.userId,
+      day.id,
+      input.constructionSiteId,
+      input.entryType,
+      input.recordedAt,
+      randomUUID(),
+      input.reason
+    ]
+  );
+  const created = await client.query(
+    `SELECT correction.id, correction.user_id, correction.work_day_id,
+            correction.work_date, correction.original_entry_id,
+            correction.correction_kind, correction.entry_type,
+            correction.requested_recorded_at, correction.original_recorded_at,
+            correction.correction_reason, correction.requested_at,
+            'pending'::TEXT AS correction_status,
+            NULL::TIMESTAMPTZ AS reviewed_at,
+            account.first_name || ' ' || account.last_name AS employee_name
+     FROM pending_time_entry_corrections AS correction
+     JOIN users AS account
+       ON account.company_id = correction.company_id
+      AND account.id = correction.user_id
+     WHERE correction.company_id = $1 AND correction.id = $2`,
+    [context.companyId, correctionId]
+  );
+  return timeEntryCorrectionDto(created.rows[0]);
+}
+
+async function createTimeEntryInvalidation(client, context, input) {
+  const originalResult = await client.query(
+    `SELECT entry.id, entry.user_id, entry.work_day_id, entry.entry_type,
+            entry.recorded_at, entry.construction_site_id, day.work_date
+     FROM time_entries AS entry
+     JOIN work_days AS day
+       ON day.company_id = entry.company_id
+      AND day.user_id = entry.user_id
+      AND day.id = entry.work_day_id
+     WHERE entry.company_id = $1
+       AND entry.user_id = $2
+       AND entry.id = $3
+       AND entry.invalidated_at IS NULL
+       AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+       AND (
+         (entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+         OR entry.correction_status = 'approved'
+       )
+     FOR UPDATE OF entry, day`,
+    [context.companyId, context.userId, input.originalEntryId]
+  );
+  if (originalResult.rowCount !== 1) {
+    throw new InputError(
+      "Die eigene Zeitbuchung wurde nicht gefunden.",
+      404,
+      "time_entry_not_found"
+    );
+  }
+  const original = originalResult.rows[0];
+  const pending = await client.query(
+    `SELECT 1 FROM time_entries
+     WHERE company_id = $1 AND user_id = $2
+       AND original_entry_id = $3 AND correction_status = 'pending'
+     LIMIT 1`,
+    [context.companyId, context.userId, original.id]
+  );
+  if (pending.rowCount !== 0) {
+    throw new InputError(
+      "Für diese Buchung wartet bereits eine Änderung auf Prüfung.",
+      409,
+      "time_correction_pending"
+    );
+  }
+
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`time-correction:${context.companyId}:${context.userId}:${original.work_day_id}`]
+  );
+  await assertCorrectionTimeline(client, {
+    companyId: context.companyId,
+    userId: context.userId,
+    workDayId: original.work_day_id,
+    originalEntryId: original.id,
+    entryType: original.entry_type,
+    recordedAt: original.recorded_at,
+    constructionSiteId: original.construction_site_id,
+    omitProposed: true
+  });
+
+  const correctionId = randomUUID();
+  await client.query(
+    `INSERT INTO time_entries (
+       id, company_id, user_id, work_day_id, construction_site_id,
+       entry_type, recorded_at, client_entry_id, client_created_at,
+       source, entered_by_user_id, original_entry_id, correction_kind, correction_reason
+     ) VALUES (
+       $1, $2, $3, $4, $5,
+       $6, $7, $8, CURRENT_TIMESTAMP,
+       'employee', $3, $9, 'invalidation', $10
+     )`,
+    [
+      correctionId,
+      context.companyId,
+      context.userId,
+      original.work_day_id,
+      original.construction_site_id,
+      original.entry_type,
+      original.recorded_at,
+      randomUUID(),
+      original.id,
+      input.reason
+    ]
+  );
+  const created = await client.query(
+    `SELECT correction.id, correction.user_id, correction.work_day_id,
+            correction.work_date, correction.original_entry_id,
+            correction.correction_kind, correction.entry_type,
+            correction.requested_recorded_at, correction.original_recorded_at,
+            correction.correction_reason, correction.requested_at,
+            'pending'::TEXT AS correction_status,
             NULL::TIMESTAMPTZ AS reviewed_at,
             account.first_name || ' ' || account.last_name AS employee_name
      FROM pending_time_entry_corrections AS correction
@@ -4036,6 +4826,7 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
   const correctionResult = await client.query(
     `SELECT correction.id, correction.user_id, correction.work_day_id,
             day.work_date, correction.original_entry_id,
+            correction.correction_kind,
             correction.entry_type,
             correction.recorded_at AS requested_recorded_at,
             original.recorded_at AS original_recorded_at,
@@ -4045,7 +4836,7 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
             correction.correction_status, correction.reviewed_at,
             account.first_name || ' ' || account.last_name AS employee_name
      FROM time_entries AS correction
-     JOIN time_entries AS original
+     LEFT JOIN time_entries AS original
        ON original.company_id = correction.company_id
       AND original.user_id = correction.user_id
       AND original.id = correction.original_entry_id
@@ -4059,7 +4850,7 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
      WHERE correction.company_id = $1
        AND correction.id = $2
        AND correction.correction_status = 'pending'
-     FOR UPDATE OF correction, original, day`,
+     FOR UPDATE OF correction, day`,
     [context.companyId, correctionId]
   );
   if (correctionResult.rowCount !== 1) {
@@ -4082,7 +4873,8 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
       originalEntryId: correction.original_entry_id,
       entryType: correction.entry_type,
       recordedAt: correction.requested_recorded_at,
-      constructionSiteId: correction.construction_site_id
+      constructionSiteId: correction.construction_site_id,
+      omitProposed: correction.correction_kind === "invalidation"
     });
   }
   const reviewed = await client.query(
@@ -4523,6 +5315,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { site });
       }
 
+      const adminFieldSiteConfirmMatch =
+        /^\/api\/v1\/admin\/construction-sites\/([^/]+)\/confirm$/.exec(url.pathname);
+      if (request.method === "POST" && adminFieldSiteConfirmMatch) {
+        const siteId = validateId(adminFieldSiteConfirmMatch[1], "Baustellen-ID");
+        const site = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => confirmFieldConstructionSite(client, context, siteId)
+        );
+        return json(response, 200, { site });
+      }
+
       if (request.method === "POST" && url.pathname === "/api/v1/admin/sites") {
         const input = validateSiteBundle(await readJson(request));
         const site = await withReadySession(
@@ -4592,16 +5396,14 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { workDay });
       }
 
-      const workDaySubmitMatch =
-        /^\/api\/v1\/work-days\/(\d{4}-\d{2}-\d{2})\/submit$/.exec(url.pathname);
-      if (request.method === "POST" && workDaySubmitMatch) {
-        const date = validateWorkDate(workDaySubmitMatch[1]);
-        const day = await withReadySession(
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/timesheets.xlsx") {
+        const parameters = timesheetExportParameters(url);
+        const document = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => submitOwnWorkDay(client, context, date)
+          (client, context) => exportTimesheets(client, context, parameters, config.timeZone)
         );
-        return json(response, 200, { workDay: day });
+        return binaryAttachment(response, document);
       }
 
       const workDayMatch = /^\/api\/v1\/work-days\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
@@ -4631,6 +5433,38 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => getAssignments(client, context, date)
         );
         return json(response, 200, { assignments });
+      }
+
+      const timeTrackingSiteOptionsMatch =
+        /^\/api\/v1\/time-tracking\/site-options\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+      if (request.method === "GET" && timeTrackingSiteOptionsMatch) {
+        const date = validateWorkDate(timeTrackingSiteOptionsMatch[1]);
+        const options = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getTimeTrackingSiteOptions(client, context, date)
+        );
+        return json(response, 200, { options });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/time-tracking/site-selection") {
+        const input = validateSpontaneousSiteSelection(await readJson(request));
+        const selection = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => selectSpontaneousSite(client, context, input, config.timeZone)
+        );
+        return json(response, 200, { selection });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/time-tracking/sites") {
+        const input = validateFieldConstructionSite(await readJson(request));
+        const selection = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createFieldConstructionSite(client, context, input, config.timeZone)
+        );
+        return json(response, 201, { selection });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/site-reports") {
@@ -4664,6 +5498,26 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             input,
             config.timeZone
           )
+        );
+        return json(response, 201, { timeCorrection: correction });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/time-entry-additions") {
+        const input = validateTimeEntryAddition(await readJson(request));
+        const correction = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createTimeEntryAddition(client, context, input, config.timeZone)
+        );
+        return json(response, 201, { timeCorrection: correction });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/time-entry-invalidations") {
+        const input = validateTimeEntryInvalidation(await readJson(request));
+        const correction = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createTimeEntryInvalidation(client, context, input)
         );
         return json(response, 201, { timeCorrection: correction });
       }

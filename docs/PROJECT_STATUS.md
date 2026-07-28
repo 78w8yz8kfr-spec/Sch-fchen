@@ -1,7 +1,7 @@
 # Projektstatus
 
-Stand: 26.07.2026
-Technischer Stand: V0.29.0
+Stand: 28.07.2026
+Technischer Stand: V0.30.0
 
 ## Abgeschlossen
 
@@ -10,9 +10,13 @@ Technischer Stand: V0.29.0
 - eigener Wochen-Stundenzettel mit Tageskarten, Wochensummen und allen wirksamen Buchungen
 - eigene synchronisierte Zeitbuchungen können mit neuer Uhrzeit und Pflichtbegründung zur Korrektur eingereicht werden
 - Zeitkorrekturen werden an der betroffenen Buchung auf Start oder in der Woche geöffnet und im Stundenzettel geprüft; nur eine Genehmigung ändert die Zeit und bewahrt das Original historisch
-- abgeschlossene Tages-Stundenzettel können eingereicht, im Büro freigegeben und anschließend als abgerechnet gesperrt werden
+- abgeschlossene Tages-Stundenzettel werden ohne manuellen Einreich-Schritt automatisch im Büro sichtbar, können dort freigegeben und anschließend als abgerechnet gesperrt werden
 - auch nach der Abrechnung bleibt ein begründeter Korrekturantrag möglich; normale neue Buchungen bleiben gesperrt
 - Mandanten-, Eigentümer-, Tages-, Zeitreihenfolge- und Baustellenfolgeprüfung schützen Antrag und Entscheidung serverseitig
+- freie Baustellenwahl am aktuellen Tag mit Vorschlag der Planung, Auswahl einer anderen Baustelle und nachvollziehbarer Feldanlage fehlender Baustellen
+- fehlende Zeitbuchungen können begründet ergänzt und falsche Buchungen begründet als ungültig markiert werden; Originale werden nicht gelöscht
+- automatische Büroprüfung aller laufenden und abgeschlossenen Arbeitstage mit Plausibilitätswarnungen
+- Excel-Stundenzettelexport nach Zeitraum, Mitarbeiter und Status einschließlich vollständiger Buchungs- und Korrekturhistorie
 
 - Phase 0: Vision, Anforderungen, Rollenmodell und ER-Struktur mit 20 Kerntabellen
 - GitHub-Projektbasis und verbindliche Entwicklungsregeln
@@ -150,6 +154,7 @@ Technischer Stand: V0.29.0
 - deaktivierte oder noch nicht vollständig angebundene Module erzeugen keine leeren Menüpunkte
 - Migration 030 begrenzt die Modulplanung verbindlich auf VDE und DGUV; LWL und KNX gehören nicht zum Projektumfang
 - Migration 031 erlaubt nachvollziehbare Zeitkorrekturen an abgerechneten Tagen ohne die Abrechnungssperre für neue Buchungen aufzuweichen
+- Migration 032 vervollständigt die Zeiterfassung um Feldbaustellen, spontane Einsatzwahl, Ergänzungen, Ungültigmarkierungen, automatische Büroprüfung und Rechenregel Version 3
 
 ## Noch zu prüfen
 
@@ -161,7 +166,7 @@ Technischer Stand: V0.29.0
 
 ## Nächster Entwicklungsschritt
 
-Die vorhandene VDE-Anwendung wird als erstes aktivierbares Elektro-Spezialmodul
+Nach Abschluss der Zeiterfassung wird die vorhandene VDE-Anwendung als erstes aktivierbares Elektro-Spezialmodul
 kontrolliert an den gemeinsamen Kunden-, Projekt-, Baustellen-, Mitarbeiter-
 und Dokumentenbestand angebunden.
 

@@ -78,7 +78,7 @@ API stellt mindestens folgende Endpunkte bereit, bevor der Login produktiv wird:
 - `GET /api/v1/dashboard` – rollenabhängige Startdaten liefern
 - `POST /api/v1/time-entries` – Client-ID idempotent synchronisieren
 - `GET /api/v1/work-days/{date}` – berechneten Tagesstand laden
-- `POST /api/v1/work-days/{date}/submit` – beendeten eigenen Tag einreichen
+- vollständig beendete Arbeitstage werden ohne eigenen Einreich-Endpunkt automatisch in der Büroprüfung sichtbar
 - `GET /api/v1/work-weeks/{montag}` – eigene Arbeitswoche mit Buchungen und Summen laden
 - `POST /api/v1/time-entry-corrections` – begründete Korrektur beantragen
 - `PATCH /api/v1/admin/time-entry-corrections/{id}` – Korrektur genehmigen oder ablehnen
