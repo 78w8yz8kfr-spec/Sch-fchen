@@ -425,7 +425,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE VIEW pending_time_entry_corrections
+CREATE OR REPLACE VIEW pending_time_entry_corrections_v2
 WITH (security_invoker = TRUE)
 AS
 SELECT
@@ -452,7 +452,7 @@ JOIN work_days AS day
  AND day.id = entry.work_day_id
 WHERE entry.correction_status = 'pending';
 
-GRANT SELECT ON pending_time_entry_corrections TO schaefchen_api;
+GRANT SELECT ON pending_time_entry_corrections_v2 TO schaefchen_api;
 
 COMMENT ON COLUMN construction_sites.creation_source IS
     'office für regulär angelegte Baustellen; field für Vorschläge aus der Monteur-Zeiterfassung.';
@@ -460,6 +460,8 @@ COMMENT ON COLUMN construction_sites.field_review_status IS
     'Neue Baustellen aus dem Feld bleiben sichtbar als pending, bis das Büro die Stammdaten bestätigt.';
 COMMENT ON COLUMN time_entries.correction_kind IS
     'replacement ändert eine Buchungszeit, addition ergänzt eine fehlende Buchung, invalidation entwertet eine Fehlbuchung.';
+COMMENT ON VIEW pending_time_entry_corrections_v2 IS
+    'Offene Ersetzungen, Ergänzungen und Ungültig-Markierungen für die Büroprüfung.';
 COMMENT ON FUNCTION recalculate_work_day(UUID, UUID, UUID) IS
     'Berechnet Mehrfach-Arbeitsblöcke, automatische Pause, Fahrtzeit und genehmigte Ergänzungen; Ungültig-Markierungen bleiben historisch.';
 

@@ -1772,7 +1772,7 @@ async function adminOverview(client, context, date) {
               correction.requested_at, 'pending'::TEXT AS correction_status,
               NULL::TIMESTAMPTZ AS reviewed_at,
               account.first_name || ' ' || account.last_name AS employee_name
-       FROM pending_time_entry_corrections AS correction
+       FROM pending_time_entry_corrections_v2 AS correction
        JOIN users AS account
          ON account.company_id = correction.company_id
         AND account.id = correction.user_id
@@ -4606,7 +4606,7 @@ async function createTimeEntryCorrection(client, context, input, timeZone) {
             correction.requested_at, 'pending'::TEXT AS correction_status,
             NULL::TIMESTAMPTZ AS reviewed_at,
             account.first_name || ' ' || account.last_name AS employee_name
-     FROM pending_time_entry_corrections AS correction
+     FROM pending_time_entry_corrections_v2 AS correction
      JOIN users AS account
        ON account.company_id = correction.company_id
       AND account.id = correction.user_id
@@ -4709,7 +4709,7 @@ async function createTimeEntryAddition(client, context, input, timeZone) {
             'pending'::TEXT AS correction_status,
             NULL::TIMESTAMPTZ AS reviewed_at,
             account.first_name || ' ' || account.last_name AS employee_name
-     FROM pending_time_entry_corrections AS correction
+     FROM pending_time_entry_corrections_v2 AS correction
      JOIN users AS account
        ON account.company_id = correction.company_id
       AND account.id = correction.user_id
@@ -4811,7 +4811,7 @@ async function createTimeEntryInvalidation(client, context, input) {
             'pending'::TEXT AS correction_status,
             NULL::TIMESTAMPTZ AS reviewed_at,
             account.first_name || ' ' || account.last_name AS employee_name
-     FROM pending_time_entry_corrections AS correction
+     FROM pending_time_entry_corrections_v2 AS correction
      JOIN users AS account
        ON account.company_id = correction.company_id
       AND account.id = correction.user_id

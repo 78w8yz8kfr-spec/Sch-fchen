@@ -97,7 +97,7 @@ BEGIN
     ) RETURNING id INTO addition_id;
 
     IF NOT EXISTS (
-        SELECT 1 FROM pending_time_entry_corrections
+        SELECT 1 FROM pending_time_entry_corrections_v2
         WHERE id = addition_id
           AND correction_kind = 'addition'
           AND original_entry_id IS NULL
@@ -116,11 +116,12 @@ BEGIN
         original_entry_id, correction_kind, correction_reason
     )
     SELECT
-        company_id, user_id, work_day_id, entry_type, recorded_at,
+        original.company_id, original.user_id, original.work_day_id,
+        original.entry_type, original.recorded_at,
         gen_random_uuid(), CURRENT_TIMESTAMP, 'employee', employee_id,
-        id, 'invalidation', 'Feierabendbuchung war versehentlich gesetzt'
-    FROM time_entries
-    WHERE id = original_clock_out_id
+        original.id, 'invalidation', 'Feierabendbuchung war versehentlich gesetzt'
+    FROM time_entries AS original
+    WHERE original.id = original_clock_out_id
     RETURNING id INTO invalidation_id;
 
     UPDATE time_entries
