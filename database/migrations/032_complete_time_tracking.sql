@@ -145,6 +145,9 @@ BEGIN
 
     IF TG_OP = 'INSERT' THEN
         NEW.invalidated_at := NULL;
+        IF NEW.original_entry_id IS NOT NULL THEN
+            NEW.correction_kind := COALESCE(NEW.correction_kind, 'replacement');
+        END IF;
     END IF;
 
     SELECT status
@@ -165,7 +168,6 @@ BEGIN
     END IF;
 
     IF TG_OP = 'INSERT' AND NEW.original_entry_id IS NOT NULL THEN
-        NEW.correction_kind := COALESCE(NEW.correction_kind, 'replacement');
         SELECT work_day_id, entry_type, construction_site_id
         INTO original_work_day_id, original_entry_type, original_site_id
         FROM time_entries
