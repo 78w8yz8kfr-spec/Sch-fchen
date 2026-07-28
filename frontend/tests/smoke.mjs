@@ -138,9 +138,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.32\.0/);
-assert.match(html, /app\.js\?v=0\.32\.0/);
-assert.match(html, /version\.js\?v=0\.32\.0/);
+assert.match(html, /styles\.css\?v=0\.33\.0/);
+assert.match(html, /app\.js\?v=0\.33\.0/);
+assert.match(html, /version\.js\?v=0\.33\.0/);
 assert.match(html, /id="site-choice-open"/);
 assert.match(html, /id="site-choice-dialog"/);
 assert.match(html, /id="field-site-form"/);
@@ -149,7 +149,12 @@ assert.match(html, /id="field-site-customer-name"/);
 assert.match(html, /id="field-site-project-name"/);
 assert.match(html, /id="time-addition-dialog"/);
 assert.match(html, /id="timesheet-export-form"/);
-assert.match(html, /Stundenzettel als Excel/);
+assert.match(html, /id="employee-timesheet-export-pdf-submit"/);
+assert.match(html, /id="timesheet-export-pdf-submit"/);
+assert.match(html, /Stundenzettel exportieren/);
+assert.match(html, /<summary>Baustellen<\/summary>/);
+assert.match(html, /id="site-customer"/);
+assert.match(html, /id="project-panel" class="admin-panel" hidden/);
 assert.match(html, /id="mobile-report-card"/);
 assert.match(html, /id="mobile-report-form"/);
 assert.match(html, /id="mobile-report-personnel-list"/);
@@ -248,7 +253,7 @@ assert.match(app, /openEmployeeEditor/);
 assert.match(app, /collectMobileReportPersonnel/);
 assert.match(app, /saveMobileReportDraft/);
 assert.match(app, /updateFieldSiteHierarchy/);
-assert.match(app, /\.\/api\/v1\/timesheets\.xlsx/);
+assert.match(app, /\.\/api\/v1\/timesheets\.\$\{format\}/);
 assert.match(app, /downloadFile/);
 assert.match(app, /selectWeek/);
 assert.match(app, /reportResponsibilitySource/);
@@ -321,7 +326,7 @@ assert.match(app, /\.\/api\/v1\/time-entry-additions/);
 assert.match(app, /\.\/api\/v1\/time-entry-invalidations/);
 assert.match(app, /\.\/api\/v1\/time-tracking\/site-selection/);
 assert.match(app, /\.\/api\/v1\/time-tracking\/sites/);
-assert.match(app, /\.\/api\/v1\/admin\/timesheets\.xlsx/);
+assert.match(app, /\.\/api\/v1\/admin\/timesheets\.\$\{format\}/);
 assert.match(app, /\.\/api\/v1\/admin\/time-entry-corrections\//);
 assert.match(app, /Änderung wird geprüft/);
 assert.match(app, /Prüfung offen/);
@@ -358,9 +363,9 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.32.0"'));
-assert.ok(worker.includes('"./app.js?v=0.32.0"'));
-assert.ok(worker.includes('"./version.js?v=0.32.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.33.0"'));
+assert.ok(worker.includes('"./app.js?v=0.33.0"'));
+assert.ok(worker.includes('"./version.js?v=0.33.0"'));
 assert.match(
   styles,
   /\.login-form input,\s*\.admin-form input,\s*\.admin-form select\s*\{\s*height: 52px;/,

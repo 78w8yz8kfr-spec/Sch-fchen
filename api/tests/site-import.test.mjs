@@ -4,9 +4,9 @@ import { buildSiteImportPreview, parseSiteWorkbookRows } from "../src/site-impor
 
 function sampleRows() {
   return [
-    ["Kunde", "Baustelle", "Projekt", "Aufgabe", "Straße", "Hausnummer", "PLZ", "Ort"],
-    ["Muster GmbH", "Neubau Nord", "Neubau", "Verteilung", "Nordweg", "7", "01234", "Dresden"],
-    ["Bestand AG", "Umbau Süd", "", "", "Südstraße", "12a", "98765", "Leipzig"]
+    ["Kunde", "Baustelle", "Aufgabe", "Straße", "Hausnummer", "PLZ", "Ort"],
+    ["Muster GmbH", "Neubau Nord", "Verteilung", "Nordweg", "7", "01234", "Dresden"],
+    ["Bestand AG", "Umbau Süd", "", "Südstraße", "12a", "98765", "Leipzig"]
   ];
 }
 
@@ -15,7 +15,7 @@ test("Baustellenliste erkennt Pflichtspalten und bewahrt die PLZ als Text", () =
   assert.equal(plan.sourceRowCount, 2);
   assert.equal(plan.rows.length, 2);
   assert.equal(plan.rows[0].postalCode, "01234");
-  assert.equal(plan.rows[0].projectName, "Neubau");
+  assert.equal(plan.rows[0].projectName, null);
 });
 
 test("Baustellenvorschau schützt Bestand und verwendet bekannte Kunden", () => {
@@ -32,7 +32,7 @@ test("Baustellenvorschau schützt Bestand und verwendet bekannte Kunden", () => 
 
 test("Fehlerhafte Zeilen werden einzeln gemeldet", () => {
   const rows = sampleRows();
-  rows.push(["Kunde", "Ohne Adresse", "", "", "", "", "", ""]);
+  rows.push(["Kunde", "Ohne Adresse", "", "", "", "", ""]);
   const plan = parseSiteWorkbookRows(rows);
   assert.equal(plan.rows.length, 2);
   assert.equal(plan.invalidRows.length, 1);

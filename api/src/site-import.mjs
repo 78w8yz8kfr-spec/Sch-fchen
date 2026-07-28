@@ -132,7 +132,6 @@ export function buildSiteImportPreview(plan, existingSites, existingCustomers) {
       customerName: row.customerName,
       customerAction: row.customerAction,
       siteName: row.siteName,
-      projectName: row.projectName,
       address: `${row.street} ${row.houseNumber}, ${row.postalCode} ${row.city}`
     })),
     readyRows

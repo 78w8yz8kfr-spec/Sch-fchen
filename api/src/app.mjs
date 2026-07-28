@@ -28,6 +28,7 @@ import {
 import { buildSiteImportPreview, parseSiteWorkbook } from "./site-import.mjs";
 import { buildFinalReportPdf } from "./report-pdf.mjs";
 import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
+import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -817,6 +818,101 @@ async function selectSpontaneousSite(client, context, input, timeZone) {
   return { assignments, selectedSiteId: input.constructionSiteId };
 }
 
+async function resolveConstructionSiteParent(client, context, input) {
+  if (input.projectId) {
+    const project = await client.query(
+      `SELECT project.id, project.name, project.customer_id,
+              customer.customer_type, customer.company_name,
+              customer.first_name, customer.last_name
+       FROM projects AS project
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       WHERE project.company_id = $1 AND project.id = $2
+         AND project.status IN ('planned', 'active', 'on_hold')
+         AND customer.status = 'active'`,
+      [context.companyId, input.projectId]
+    );
+    if (project.rowCount !== 1) {
+      throw new InputError("Die Baustelle kann nicht mehr diesem Auftrag zugeordnet werden.", 404, "project_not_found");
+    }
+    return project.rows[0];
+  }
+
+  let customerRow;
+  if (input.customerId) {
+    const customer = await client.query(
+      `SELECT id, customer_type, company_name, first_name, last_name
+       FROM customers
+       WHERE company_id = $1 AND id = $2 AND status = 'active'`,
+      [context.companyId, input.customerId]
+    );
+    if (customer.rowCount !== 1) {
+      throw new InputError("Der Kunde wurde nicht gefunden.", 404, "customer_not_found");
+    }
+    customerRow = customer.rows[0];
+  } else {
+    const activeCustomers = await client.query(
+      `SELECT id, COALESCE(company_name, first_name || ' ' || last_name) AS display_name
+       FROM customers
+       WHERE company_id = $1 AND status = 'active'`,
+      [context.companyId]
+    );
+    if (
+      activeCustomers.rows.some(
+        (customer) => normalizeImportText(customer.display_name) === normalizeImportText(input.customerName)
+      )
+    ) {
+      throw new InputError(
+        "Dieser Kunde ist bereits vorhanden. Bitte den vorhandenen Kunden auswählen.",
+        409,
+        "customer_name_exists"
+      );
+    }
+    const customer = await client.query(
+      `INSERT INTO customers (
+         company_id, customer_type, company_name,
+         billing_street, billing_house_number, billing_postal_code, billing_city
+       ) VALUES ($1, 'company', $2, $3, $4, $5, $6)
+       RETURNING id, customer_type, company_name, first_name, last_name`,
+      [
+        context.companyId,
+        input.customerName,
+        input.street,
+        input.houseNumber,
+        input.postalCode,
+        input.city
+      ]
+    );
+    customerRow = customer.rows[0];
+  }
+
+  let project = await client.query(
+    `SELECT id, name, customer_id
+     FROM projects
+     WHERE company_id = $1 AND customer_id = $2
+       AND status IN ('planned', 'active', 'on_hold')
+       AND LOWER(name) = LOWER('Baustellen')
+     ORDER BY created_at
+     LIMIT 1`,
+    [context.companyId, customerRow.id]
+  );
+  if (project.rowCount === 0) {
+    project = await client.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, 'Baustellen', 'active')
+       RETURNING id, name, customer_id`,
+      [context.companyId, customerRow.id]
+    );
+  }
+  return {
+    ...project.rows[0],
+    customer_type: customerRow.customer_type,
+    company_name: customerRow.company_name,
+    first_name: customerRow.first_name,
+    last_name: customerRow.last_name
+  };
+}
+
 async function createFieldConstructionSite(client, context, input, timeZone) {
   requireToday(input.workDate, timeZone);
   await client.query(
@@ -838,106 +934,7 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
     );
   }
 
-  let projectRow;
-  if (input.projectId) {
-    const project = await client.query(
-      `SELECT project.id, project.name, project.customer_id,
-              customer.customer_type, customer.company_name,
-              customer.first_name, customer.last_name
-       FROM projects AS project
-       JOIN customers AS customer
-         ON customer.company_id = project.company_id AND customer.id = project.customer_id
-       WHERE project.company_id = $1 AND project.id = $2
-         AND project.status IN ('planned', 'active', 'on_hold')
-         AND customer.status = 'active'`,
-      [context.companyId, input.projectId]
-    );
-    if (project.rowCount !== 1) {
-      throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
-    }
-    projectRow = project.rows[0];
-  } else {
-    let customerRow;
-    if (input.customerId) {
-      const customer = await client.query(
-        `SELECT id, customer_type, company_name, first_name, last_name
-         FROM customers
-         WHERE company_id = $1 AND id = $2 AND status = 'active'`,
-        [context.companyId, input.customerId]
-      );
-      if (customer.rowCount !== 1) {
-        throw new InputError("Der Kunde wurde nicht gefunden.", 404, "customer_not_found");
-      }
-      customerRow = customer.rows[0];
-    } else {
-      const activeCustomers = await client.query(
-        `SELECT id, COALESCE(company_name, first_name || ' ' || last_name) AS display_name
-         FROM customers
-         WHERE company_id = $1 AND status = 'active'`,
-        [context.companyId]
-      );
-      if (
-        activeCustomers.rows.some(
-          (customer) => normalizeImportText(customer.display_name) === normalizeImportText(input.customerName)
-        )
-      ) {
-        throw new InputError(
-          "Dieser Kunde ist bereits vorhanden. Bitte den vorhandenen Kunden auswählen.",
-          409,
-          "customer_name_exists"
-        );
-      }
-      const customer = await client.query(
-        `INSERT INTO customers (
-           company_id, customer_type, company_name,
-           billing_street, billing_house_number, billing_postal_code, billing_city
-         ) VALUES ($1, 'company', $2, $3, $4, $5, $6)
-         RETURNING id, customer_type, company_name, first_name, last_name`,
-        [
-          context.companyId,
-          input.customerName,
-          input.street,
-          input.houseNumber,
-          input.postalCode,
-          input.city
-        ]
-      );
-      customerRow = customer.rows[0];
-    }
-
-    const activeProjects = await client.query(
-      `SELECT name
-       FROM projects
-       WHERE company_id = $1 AND customer_id = $2
-         AND status IN ('planned', 'active', 'on_hold')`,
-      [context.companyId, customerRow.id]
-    );
-    if (
-      activeProjects.rows.some(
-        (project) => normalizeImportText(project.name) === normalizeImportText(input.projectName)
-      )
-    ) {
-      throw new InputError(
-        "Dieses Projekt ist für den Kunden bereits vorhanden. Bitte das vorhandene Projekt auswählen.",
-        409,
-        "project_name_exists"
-      );
-    }
-    const project = await client.query(
-      `INSERT INTO projects (
-         company_id, customer_id, name, status, installer_short_text
-       ) VALUES ($1, $2, $3, 'active', $4)
-       RETURNING id, name, customer_id`,
-      [context.companyId, customerRow.id, input.projectName, input.installerShortText]
-    );
-    projectRow = {
-      ...project.rows[0],
-      customer_type: customerRow.customer_type,
-      company_name: customerRow.company_name,
-      first_name: customerRow.first_name,
-      last_name: customerRow.last_name
-    };
-  }
+  const projectRow = await resolveConstructionSiteParent(client, context, input);
 
   const location = await client.query(
     `INSERT INTO customer_locations (
@@ -1416,7 +1413,7 @@ async function exportTimesheets(
   context,
   parameters,
   timeZone,
-  { ownApprovedOnly = false } = {}
+  { ownApprovedOnly = false, format = "xlsx" } = {}
 ) {
   if (!ownApprovedOnly) await requirePlanner(client, context);
   const employeeId = ownApprovedOnly ? context.userId : parameters.employeeId;
@@ -1591,18 +1588,31 @@ async function exportTimesheets(
                   : "Wirksam"
     }));
 
+  const companyName = company.rows[0]?.display_name || "Schäfchen";
+  const ownPrefix = ownApprovedOnly ? "Mein_Stundenzettel" : "Stundenzettel";
+  if (format === "pdf") {
+    return {
+      content: await buildTimesheetPdf({
+        companyName,
+        from: parameters.from,
+        to: parameters.to,
+        workDays,
+        timeZone
+      }),
+      fileName: `${ownPrefix}_${parameters.from}_${parameters.to}.pdf`,
+      mimeType: "application/pdf"
+    };
+  }
   return {
     content: await buildTimesheetWorkbook({
-      companyName: company.rows[0]?.display_name || "Schäfchen",
+      companyName,
       from: parameters.from,
       to: parameters.to,
       workDays,
       entries,
       timeZone
     }),
-    fileName: ownApprovedOnly
-      ? `Mein_Stundenzettel_${parameters.from}_${parameters.to}.xlsx`
-      : `Stundenzettel_${parameters.from}_${parameters.to}.xlsx`,
+    fileName: `${ownPrefix}_${parameters.from}_${parameters.to}.xlsx`,
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   };
 }
@@ -3192,22 +3202,23 @@ async function importSitesFromWorkbook(client, context, plan) {
         isBillingLocation
       ]
     );
-    const project = await client.query(
-      `INSERT INTO projects (company_id, customer_id, name, status, installer_short_text)
-       VALUES ($1, $2, $3, 'active', $4)
-       RETURNING id`,
-      [context.companyId, customerId, row.projectName || row.siteName, row.installerShortText]
-    );
+    const project = await resolveConstructionSiteParent(client, context, {
+      customerId,
+      street: row.street,
+      houseNumber: row.houseNumber,
+      postalCode: row.postalCode,
+      city: row.city
+    });
     await client.query(
       `INSERT INTO project_locations (company_id, project_id, customer_location_id)
        VALUES ($1, $2, $3)`,
-      [context.companyId, project.rows[0].id, location.rows[0].id]
+      [context.companyId, project.id, location.rows[0].id]
     );
     await client.query(
       `INSERT INTO construction_sites (
          company_id, project_id, customer_location_id, name, installer_short_text, status
        ) VALUES ($1, $2, $3, $4, $5, 'active')`,
-      [context.companyId, project.rows[0].id, location.rows[0].id, row.siteName, row.installerShortText]
+      [context.companyId, project.id, location.rows[0].id, row.siteName, row.installerShortText]
     );
     createdCount += 1;
   }
@@ -3720,20 +3731,6 @@ async function createConstructionSite(client, context, input) {
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`sites:${context.companyId}`]
   );
-  const project = await client.query(
-    `SELECT project.id, project.name, project.customer_id,
-            customer.customer_type, customer.company_name, customer.first_name, customer.last_name
-     FROM projects AS project
-     JOIN customers AS customer
-       ON customer.company_id = project.company_id AND customer.id = project.customer_id
-     WHERE project.company_id = $1 AND project.id = $2
-       AND project.status IN ('planned', 'active', 'on_hold')
-       AND customer.status = 'active'`,
-    [context.companyId, input.projectId]
-  );
-  if (project.rowCount !== 1) {
-    throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
-  }
   const existingNames = await client.query(
     `SELECT name FROM construction_sites
      WHERE company_id = $1 AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
@@ -3743,7 +3740,7 @@ async function createConstructionSite(client, context, input) {
     throw new InputError("Eine aktive Baustelle mit diesem Namen existiert bereits.", 409, "site_name_exists");
   }
 
-  const projectRow = project.rows[0];
+  const projectRow = await resolveConstructionSiteParent(client, context, input);
   const location = await client.query(
     `INSERT INTO customer_locations (
        company_id, customer_id, name, location_type, street, house_number,
@@ -3763,14 +3760,14 @@ async function createConstructionSite(client, context, input) {
   await client.query(
     `INSERT INTO project_locations (company_id, project_id, customer_location_id)
      VALUES ($1, $2, $3)`,
-    [context.companyId, input.projectId, location.rows[0].id]
+    [context.companyId, projectRow.id, location.rows[0].id]
   );
   const inserted = await client.query(
     `INSERT INTO construction_sites (
        company_id, project_id, customer_location_id, name, installer_short_text, status
      ) VALUES ($1, $2, $3, $4, $5, 'active')
      RETURNING id, project_id, site_number, name, installer_short_text, status, row_version, updated_at`,
-    [context.companyId, input.projectId, location.rows[0].id, input.name, input.installerShortText]
+    [context.companyId, projectRow.id, location.rows[0].id, input.name, input.installerShortText]
   );
   return siteDto({
     ...inserted.rows[0],
@@ -3967,7 +3964,7 @@ async function createSiteBundle(client, context, input) {
        company_id, customer_id, name, status, installer_short_text
      ) VALUES ($1, $2, $3, 'active', $4)
      RETURNING id, project_number`,
-    [context.companyId, customer.rows[0].id, input.projectName || input.siteName, input.installerShortText]
+    [context.companyId, customer.rows[0].id, "Baustellen", input.installerShortText]
   );
   await client.query(
     `INSERT INTO project_locations (company_id, project_id, customer_location_id)
@@ -3985,7 +3982,7 @@ async function createSiteBundle(client, context, input) {
     ...site.rows[0],
     customer_id: customer.rows[0].id,
     customer_name: input.customerName,
-    project_name: input.projectName || input.siteName,
+    project_name: "Baustellen",
     street: input.street,
     house_number: input.houseNumber,
     postal_code: input.postalCode,
@@ -5547,6 +5544,22 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return binaryAttachment(response, document);
       }
 
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/timesheets.pdf") {
+        const parameters = timesheetExportParameters(url);
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => exportTimesheets(
+            client,
+            context,
+            parameters,
+            config.timeZone,
+            { format: "pdf" }
+          )
+        );
+        return binaryAttachment(response, document);
+      }
+
       if (request.method === "GET" && url.pathname === "/api/v1/timesheets.xlsx") {
         const parameters = employeeTimesheetExportParameters(url);
         const document = await withReadySession(
@@ -5558,6 +5571,22 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             parameters,
             config.timeZone,
             { ownApprovedOnly: true }
+          )
+        );
+        return binaryAttachment(response, document);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/timesheets.pdf") {
+        const parameters = employeeTimesheetExportParameters(url);
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => exportTimesheets(
+            client,
+            context,
+            parameters,
+            config.timeZone,
+            { ownApprovedOnly: true, format: "pdf" }
           )
         );
         return binaryAttachment(response, document);

@@ -274,8 +274,22 @@ export function validateProjectUpdate(body) {
 
 export function validateConstructionSite(body) {
   rejectTenantFields(body);
+  const projectId = optionalUuid(body.projectId, "Auftrag");
+  const customerId = optionalUuid(body.customerId, "Kunde");
+  const customerName = optionalText(body.customerName, "Neuer Kunde", 200);
+  if (projectId && (customerId || customerName)) {
+    throw new InputError("Bitte die Baustelle nur einem Kunden zuordnen.");
+  }
+  if (!projectId && !customerId && !customerName) {
+    throw new InputError("Bitte einen vorhandenen oder neuen Kunden auswählen.");
+  }
+  if (customerId && customerName) {
+    throw new InputError("Bitte entweder einen vorhandenen oder einen neuen Kunden verwenden.");
+  }
   return {
-    projectId: uuid(body.projectId, "Projekt"),
+    projectId,
+    customerId,
+    customerName,
     name: text(body.name, "Baustellenname", 2, 200),
     installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
     street: text(body.street, "Straße", 1, 150),
@@ -748,9 +762,6 @@ export function validateFieldConstructionSite(body) {
   }
   if (!projectId && !customerId && !customerName) {
     throw new InputError("Bitte einen vorhandenen oder neuen Kunden auswählen.");
-  }
-  if (!projectId && !projectName) {
-    throw new InputError("Bitte ein vorhandenes Projekt auswählen oder ein neues Projekt benennen.");
   }
   if (customerId && customerName) {
     throw new InputError("Bitte entweder einen vorhandenen oder einen neuen Kunden verwenden.");
