@@ -1,7 +1,7 @@
 # Sprint 2: Planung und Zeiterfassung
 
 Stand: 28.07.2026
-Technischer Stand: V0.30.0
+Technischer Stand: V0.32.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
 012 sowie 027, 031 und 032. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,
@@ -143,15 +143,26 @@ genehmigte Ungültigmarkierungen und berechnet den Tag reproduzierbar neu.
 
 ## Büroprüfung und Excel
 
-Die Wochenprüfung zeigt laufende und abgeschlossene Arbeitstage automatisch.
+Die Wochenprüfung zeigt laufende und abgeschlossene Arbeitstage automatisch,
+nach Monteur gruppiert und innerhalb jedes Monteurs nach Datum sortiert. Jede
+Gruppe zeigt die im Zeitraum gearbeiteten Stunden.
 Plausibilitätswarnungen markieren unter anderem einen fehlenden Feierabend,
 ungewöhnlich lange Zeitspannen, mehr als zwölf Netto-Arbeitsstunden, fehlende
 Baustellenankunft und offene Korrekturen.
 
 `GET /api/v1/admin/timesheets.xlsx` exportiert jeden gewählten Zeitraum sofort.
 Optional kann nach Mitarbeiter und den drei sichtbaren Status gefiltert werden.
-Die Arbeitsmappe enthält Tageswerte und Warnungen sowie ein zweites Blatt mit
-der vollständigen, unveränderlichen Buchungs- und Korrekturhistorie.
+Die Arbeitsmappe enthält eine Mitarbeiterübersicht, ein eigenes nach Datum
+sortiertes Stundenzettelblatt mit Arbeitsstundensumme je Monteur sowie ein
+separates Blatt mit der vollständigen, unveränderlichen Buchungs- und
+Korrekturhistorie. Das gilt auch bei einem Export für nur einen Mitarbeiter.
+
+`GET /api/v1/timesheets.xlsx` ist der persönliche Mitarbeiterexport. Die
+Mitarbeiter-ID wird ausschließlich aus der Sitzung übernommen. Der Endpunkt
+liefert nur Tage im Status `approved` oder `locked`; offene, laufende oder
+lediglich beendete Zeiten sind weder abrufbar noch durch URL-Parameter
+freischaltbar. In der PWA kann zwischen vergangenen Wochen gewechselt werden;
+Freigabestatus, Sollzeit und Mehrzeit sind direkt an der Woche sichtbar.
 
 ## Öffentliche PWA-Demo
 

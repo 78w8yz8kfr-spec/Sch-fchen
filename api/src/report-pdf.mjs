@@ -7,7 +7,7 @@ const MUTED = rgb(0.38, 0.38, 0.38);
 const LINE = rgb(0.86, 0.86, 0.86);
 
 function reportTypeLabel(value) {
-  return value === "daily" ? "Bautagesbericht" : "Montagebericht";
+  return value === "daily" ? "Bautagesbericht" : "Montageschein";
 }
 
 function germanDate(value) {
@@ -215,6 +215,30 @@ export async function buildFinalReportPdf({
   if (structured.openItems) {
     section("Offene Punkte");
     paragraph(structured.openItems);
+    y -= 8;
+  }
+
+  if (structured.weather) {
+    section("Witterung");
+    paragraph(structured.weather);
+    y -= 8;
+  }
+
+  if (structured.materialsAndEquipment) {
+    section("Material und Geräte");
+    paragraph(structured.materialsAndEquipment);
+    y -= 8;
+  }
+
+  if (structured.agreements) {
+    section("Absprachen und Anweisungen");
+    paragraph(structured.agreements);
+    y -= 8;
+  }
+
+  if (structured.incidents) {
+    section("Mängel, Schäden und Sicherheit");
+    paragraph(structured.incidents);
     y -= 8;
   }
 

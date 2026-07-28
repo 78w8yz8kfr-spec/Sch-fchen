@@ -669,7 +669,7 @@ async function getAssignments(client, context, date) {
 async function getTimeTrackingSiteOptions(client, context, date) {
   const suggested = await getAssignments(client, context, date);
   const suggestedSiteIds = suggested.map((assignment) => assignment.constructionSite.id);
-  const [sites, projects] = await Promise.all([
+  const [sites, projects, customers] = await Promise.all([
     client.query(
       `SELECT site.id, site.project_id, project.customer_id, site.site_number,
               site.name, site.installer_short_text, site.status, site.row_version,
@@ -706,7 +706,15 @@ async function getTimeTrackingSiteOptions(client, context, date) {
        WHERE project.company_id = $1
          AND project.status IN ('planned', 'active', 'on_hold')
          AND customer.status = 'active'
-       ORDER BY LOWER(COALESCE(customer.company_name, customer.last_name)), LOWER(project.name)`,
+      ORDER BY LOWER(COALESCE(customer.company_name, customer.last_name)), LOWER(project.name)`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT id, customer_number,
+              COALESCE(company_name, first_name || ' ' || last_name) AS display_name
+       FROM customers
+       WHERE company_id = $1 AND status = 'active'
+       ORDER BY LOWER(COALESCE(company_name, last_name)), customer_number`,
       [context.companyId]
     )
   ]);
@@ -714,7 +722,12 @@ async function getTimeTrackingSiteOptions(client, context, date) {
     workDate: date,
     suggestedAssignments: suggested,
     sites: sites.rows.map(siteDto),
-    projects: projects.rows.map(projectDto)
+    projects: projects.rows.map(projectDto),
+    customers: customers.rows.map((customer) => ({
+      id: customer.id,
+      number: customer.customer_number,
+      displayName: customer.display_name
+    }))
   };
 }
 
@@ -810,21 +823,6 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`sites:${context.companyId}`]
   );
-  const project = await client.query(
-    `SELECT project.id, project.name, project.customer_id,
-            customer.customer_type, customer.company_name,
-            customer.first_name, customer.last_name
-     FROM projects AS project
-     JOIN customers AS customer
-       ON customer.company_id = project.company_id AND customer.id = project.customer_id
-     WHERE project.company_id = $1 AND project.id = $2
-       AND project.status IN ('planned', 'active', 'on_hold')
-       AND customer.status = 'active'`,
-    [context.companyId, input.projectId]
-  );
-  if (project.rowCount !== 1) {
-    throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
-  }
   const duplicate = await client.query(
     `SELECT id, name
      FROM construction_sites
@@ -840,7 +838,107 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
     );
   }
 
-  const projectRow = project.rows[0];
+  let projectRow;
+  if (input.projectId) {
+    const project = await client.query(
+      `SELECT project.id, project.name, project.customer_id,
+              customer.customer_type, customer.company_name,
+              customer.first_name, customer.last_name
+       FROM projects AS project
+       JOIN customers AS customer
+         ON customer.company_id = project.company_id AND customer.id = project.customer_id
+       WHERE project.company_id = $1 AND project.id = $2
+         AND project.status IN ('planned', 'active', 'on_hold')
+         AND customer.status = 'active'`,
+      [context.companyId, input.projectId]
+    );
+    if (project.rowCount !== 1) {
+      throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
+    }
+    projectRow = project.rows[0];
+  } else {
+    let customerRow;
+    if (input.customerId) {
+      const customer = await client.query(
+        `SELECT id, customer_type, company_name, first_name, last_name
+         FROM customers
+         WHERE company_id = $1 AND id = $2 AND status = 'active'`,
+        [context.companyId, input.customerId]
+      );
+      if (customer.rowCount !== 1) {
+        throw new InputError("Der Kunde wurde nicht gefunden.", 404, "customer_not_found");
+      }
+      customerRow = customer.rows[0];
+    } else {
+      const activeCustomers = await client.query(
+        `SELECT id, COALESCE(company_name, first_name || ' ' || last_name) AS display_name
+         FROM customers
+         WHERE company_id = $1 AND status = 'active'`,
+        [context.companyId]
+      );
+      if (
+        activeCustomers.rows.some(
+          (customer) => normalizeImportText(customer.display_name) === normalizeImportText(input.customerName)
+        )
+      ) {
+        throw new InputError(
+          "Dieser Kunde ist bereits vorhanden. Bitte den vorhandenen Kunden auswählen.",
+          409,
+          "customer_name_exists"
+        );
+      }
+      const customer = await client.query(
+        `INSERT INTO customers (
+           company_id, customer_type, company_name,
+           billing_street, billing_house_number, billing_postal_code, billing_city
+         ) VALUES ($1, 'company', $2, $3, $4, $5, $6)
+         RETURNING id, customer_type, company_name, first_name, last_name`,
+        [
+          context.companyId,
+          input.customerName,
+          input.street,
+          input.houseNumber,
+          input.postalCode,
+          input.city
+        ]
+      );
+      customerRow = customer.rows[0];
+    }
+
+    const activeProjects = await client.query(
+      `SELECT name
+       FROM projects
+       WHERE company_id = $1 AND customer_id = $2
+         AND status IN ('planned', 'active', 'on_hold')`,
+      [context.companyId, customerRow.id]
+    );
+    if (
+      activeProjects.rows.some(
+        (project) => normalizeImportText(project.name) === normalizeImportText(input.projectName)
+      )
+    ) {
+      throw new InputError(
+        "Dieses Projekt ist für den Kunden bereits vorhanden. Bitte das vorhandene Projekt auswählen.",
+        409,
+        "project_name_exists"
+      );
+    }
+    const project = await client.query(
+      `INSERT INTO projects (
+         company_id, customer_id, name, status, installer_short_text
+       ) VALUES ($1, $2, $3, 'active', $4)
+       RETURNING id, name, customer_id`,
+      [context.companyId, customerRow.id, input.projectName, input.installerShortText]
+    );
+    projectRow = {
+      ...project.rows[0],
+      customer_type: customerRow.customer_type,
+      company_name: customerRow.company_name,
+      first_name: customerRow.first_name,
+      last_name: customerRow.last_name
+    };
+  }
+
   const location = await client.query(
     `INSERT INTO customer_locations (
        company_id, customer_id, name, location_type,
@@ -860,7 +958,7 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
   await client.query(
     `INSERT INTO project_locations (company_id, project_id, customer_location_id)
      VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-    [context.companyId, input.projectId, location.rows[0].id]
+    [context.companyId, projectRow.id, location.rows[0].id]
   );
   const inserted = await client.query(
     `INSERT INTO construction_sites (
@@ -874,7 +972,7 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
                status, row_version, updated_at, creation_source, field_review_status`,
     [
       context.companyId,
-      input.projectId,
+      projectRow.id,
       location.rows[0].id,
       input.name,
       input.installerShortText,
@@ -1280,7 +1378,7 @@ function databaseDate(value) {
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 }
 
-function timesheetExportParameters(url) {
+function timesheetExportRange(url) {
   const from = validateWorkDate(url.searchParams.get("from"));
   const to = validateWorkDate(url.searchParams.get("to"));
   if (to < from) {
@@ -1292,17 +1390,36 @@ function timesheetExportParameters(url) {
   if (dayCount > 1096) {
     throw new InputError("Ein Excel-Export darf höchstens drei Jahre umfassen.");
   }
+  return { from, to };
+}
+
+function timesheetExportParameters(url) {
+  const range = timesheetExportRange(url);
   const employeeValue = url.searchParams.get("employeeId");
   const employeeId = employeeValue ? validateId(employeeValue, "Mitarbeiter-ID") : null;
   const status = url.searchParams.get("status") || null;
   if (status && !["in_progress", "completed", "billed"].includes(status)) {
     throw new InputError("Der Exportstatus ist ungültig.");
   }
-  return { from, to, employeeId, status };
+  return { ...range, employeeId, status };
 }
 
-async function exportTimesheets(client, context, parameters, timeZone) {
-  await requirePlanner(client, context);
+function employeeTimesheetExportParameters(url) {
+  if (url.searchParams.has("employeeId") || url.searchParams.has("status")) {
+    throw new InputError("Der persönliche Export enthält ausschließlich eigene freigegebene Zeiten.");
+  }
+  return timesheetExportRange(url);
+}
+
+async function exportTimesheets(
+  client,
+  context,
+  parameters,
+  timeZone,
+  { ownApprovedOnly = false } = {}
+) {
+  if (!ownApprovedOnly) await requirePlanner(client, context);
+  const employeeId = ownApprovedOnly ? context.userId : parameters.employeeId;
   const [company, dayResult] = await Promise.all([
     client.query(
       "SELECT display_name FROM companies WHERE id = $1",
@@ -1382,8 +1499,9 @@ async function exportTimesheets(client, context, parameters, timeZone) {
        WHERE day.company_id = $1
          AND day.work_date BETWEEN $2 AND $3
          AND ($4::UUID IS NULL OR day.user_id = $4)
+         AND ($5::BOOLEAN = FALSE OR day.status IN ('approved', 'locked'))
        ORDER BY day.work_date, LOWER(account.last_name), LOWER(account.first_name), day.id`,
-      [context.companyId, parameters.from, parameters.to, parameters.employeeId]
+      [context.companyId, parameters.from, parameters.to, employeeId, ownApprovedOnly]
     )
   ]);
   let workDays = dayResult.rows.map((day) => ({
@@ -1391,6 +1509,7 @@ async function exportTimesheets(client, context, parameters, timeZone) {
     personnelNumber: day.personnel_number,
     employeeName: day.employee_name,
     workDate: databaseDate(day.work_date),
+    approvalStatus: day.status,
     workflowStatus: workDayWorkflowStatus(day),
     firstClockInAt: day.first_clock_in_at,
     lastClockOutAt: day.last_clock_out_at,
@@ -1403,8 +1522,15 @@ async function exportTimesheets(client, context, parameters, timeZone) {
     siteNames: day.site_names || [],
     warnings: workDayWarnings(day)
   }));
-  if (parameters.status) {
+  if (!ownApprovedOnly && parameters.status) {
     workDays = workDays.filter((day) => day.workflowStatus === parameters.status);
+  }
+  if (ownApprovedOnly && workDays.length === 0) {
+    throw new InputError(
+      "Im gewählten Zeitraum ist noch kein freigegebener Stundenzettel vorhanden.",
+      404,
+      "approved_timesheet_not_found"
+    );
   }
 
   const workDayIds = workDays.map((day) => day.id);
@@ -1474,7 +1600,9 @@ async function exportTimesheets(client, context, parameters, timeZone) {
       entries,
       timeZone
     }),
-    fileName: `Stundenzettel_${parameters.from}_${parameters.to}.xlsx`,
+    fileName: ownApprovedOnly
+      ? `Mein_Stundenzettel_${parameters.from}_${parameters.to}.xlsx`
+      : `Stundenzettel_${parameters.from}_${parameters.to}.xlsx`,
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   };
 }
@@ -1592,6 +1720,7 @@ async function adminOverview(client, context, date) {
       `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
               assignment.work_date,
               assignment.sequence_number, assignment.planned_start_time::TEXT,
+              assignment.planned_duration_minutes,
               assignment.report_responsible, assignment.report_responsibility_source,
               account.first_name, account.last_name, site.name AS site_name
        FROM site_assignments AS assignment
@@ -1790,6 +1919,9 @@ async function adminOverview(client, context, date) {
     workDate: databaseDate(row.work_date),
     sequenceNumber: row.sequence_number,
     plannedStartTime: row.planned_start_time,
+    plannedDurationMinutes: row.planned_duration_minutes === null
+      ? null
+      : Number(row.planned_duration_minutes),
     reportResponsible: row.report_responsible,
     reportResponsibilitySource: row.report_responsibility_source,
     employeeName: `${row.first_name} ${row.last_name}`,
@@ -2543,6 +2675,10 @@ function structuredReportData(input, personnel) {
     workPerformed: input.workPerformed,
     obstructions: input.obstructions,
     openItems: input.openItems,
+    weather: input.weather,
+    materialsAndEquipment: input.materialsAndEquipment,
+    agreements: input.agreements,
+    incidents: input.incidents,
     personnel
   };
 }
@@ -2608,6 +2744,10 @@ async function createMobileSiteReport(client, context, input) {
       && (row.structured_data?.workPerformed || row.details || row.summary) === input.workPerformed
       && (row.structured_data?.obstructions || null) === input.obstructions
       && (row.structured_data?.openItems || null) === input.openItems
+      && (row.structured_data?.weather || null) === input.weather
+      && (row.structured_data?.materialsAndEquipment || null) === input.materialsAndEquipment
+      && (row.structured_data?.agreements || null) === input.agreements
+      && (row.structured_data?.incidents || null) === input.incidents
       && JSON.stringify((row.structured_data?.personnel || []).map((entry) => ({
         userId: entry.userId,
         minutes: entry.minutes
@@ -2784,7 +2924,7 @@ async function finalizeSiteReport(client, context, reportId, input, staticDirect
     finalizedAt,
     companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key)
   });
-  const reportLabel = row.report_type === "daily" ? "Bautagesbericht" : "Montagebericht";
+  const reportLabel = row.report_type === "daily" ? "Bautagesbericht" : "Montageschein";
   const finalDocument = await createDocument(client, context, {
     title: `${reportLabel} ${row.report_number}`,
     category: "report",
@@ -5403,6 +5543,22 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           pool,
           tokenHash,
           (client, context) => exportTimesheets(client, context, parameters, config.timeZone)
+        );
+        return binaryAttachment(response, document);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/timesheets.xlsx") {
+        const parameters = employeeTimesheetExportParameters(url);
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => exportTimesheets(
+            client,
+            context,
+            parameters,
+            config.timeZone,
+            { ownApprovedOnly: true }
+          )
         );
         return binaryAttachment(response, document);
       }

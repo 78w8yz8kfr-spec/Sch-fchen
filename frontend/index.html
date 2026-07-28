@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.30.0">
-    <script src="./app.js?v=0.30.0" defer></script>
-    <script src="./version.js?v=0.30.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.32.0">
+    <script src="./app.js?v=0.32.0" defer></script>
+    <script src="./version.js?v=0.32.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.30.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.32.0</p>
         </div>
       </section>
 
@@ -224,11 +224,12 @@
               <label for="mobile-report-type">Berichtsart</label>
               <select id="mobile-report-type" required>
                 <option value="daily">Bautagesbericht</option>
-                <option value="montage">Montagebericht</option>
+                <option value="montage">Montageschein</option>
               </select>
               <fieldset class="mobile-report-personnel">
-                <legend>Mitarbeiter und Stunden</legend>
+                <legend>Mitarbeiter und tatsächliche Stunden</legend>
                 <div id="mobile-report-personnel-list"></div>
+                <strong id="mobile-report-personnel-total" class="mobile-report-personnel__total">Gesamt: 0:00 h</strong>
                 <p>Aus der heutigen Einsatzplanung vorausgefüllt. Bitte die tatsächlichen Stunden prüfen.</p>
               </fieldset>
               <label for="mobile-report-summary">Kurzbeschreibung</label>
@@ -239,6 +240,25 @@
               <textarea id="mobile-report-obstructions" maxlength="3000" rows="3" placeholder="z. B. fehlendes Material, Wartezeit, Fremdgewerk"></textarea>
               <label for="mobile-report-open-items">Offene Punkte <span>(optional)</span></label>
               <textarea id="mobile-report-open-items" maxlength="3000" rows="3" placeholder="Was muss als Nächstes erledigt werden?"></textarea>
+              <details class="mobile-report-more">
+                <summary>Weitere Angaben</summary>
+                <div class="mobile-report-more__fields">
+                  <label id="mobile-report-weather-field" for="mobile-report-weather">
+                    Witterung <span>(optional, Bautagesbericht)</span>
+                  </label>
+                  <input id="mobile-report-weather" maxlength="200" placeholder="z. B. trocken, 18 °C">
+                  <label for="mobile-report-materials">Material und Geräte <span>(optional)</span></label>
+                  <textarea id="mobile-report-materials" maxlength="3000" rows="3" placeholder="Verbrauchtes Material, Lieferungen oder eingesetzte Geräte"></textarea>
+                  <label for="mobile-report-agreements">Absprachen und Anweisungen <span>(optional)</span></label>
+                  <textarea id="mobile-report-agreements" maxlength="3000" rows="3" placeholder="Absprachen mit Bauleitung, Kunde oder anderen Gewerken"></textarea>
+                  <label for="mobile-report-incidents">Mängel, Schäden oder Sicherheit <span>(optional)</span></label>
+                  <textarea id="mobile-report-incidents" maxlength="3000" rows="3" placeholder="Nur eintragen, wenn etwas dokumentiert werden muss"></textarea>
+                </div>
+              </details>
+              <section id="mobile-report-check" class="mobile-report-check" aria-live="polite">
+                <strong>Vollständigkeitsprüfung</strong>
+                <span>Pflichtangaben werden vor dem Speichern geprüft.</span>
+              </section>
               <button id="mobile-report-submit" class="button button--primary" type="submit">Bericht speichern &amp; Baustelle verlassen</button>
               <p class="mobile-report-hint">Funktioniert auch offline. Der Bericht wird vor der Zeitbuchung sicher synchronisiert.</p>
               <p id="mobile-report-message" class="form-message" aria-live="polite"></p>
@@ -421,15 +441,46 @@
                 <p class="eyebrow">Deine erfassten Zeiten</p>
                 <h2 id="week-title">Stundenzettel</h2>
               </div>
-              <strong id="week-period" class="week-period">Diese Woche</strong>
+              <div class="week-heading__controls">
+                <strong id="week-period" class="week-period">Diese Woche</strong>
+                <div class="week-navigation" aria-label="Angezeigte Woche wechseln">
+                  <button id="week-previous" class="text-button" type="button" aria-label="Vorherige Woche">‹</button>
+                  <button id="week-current" class="text-button" type="button">Diese Woche</button>
+                  <button id="week-next" class="text-button" type="button" aria-label="Nächste Woche">›</button>
+                </div>
+              </div>
             </div>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
             <div class="week-totals" aria-label="Wochensummen">
               <div><span>Arbeit</span><strong id="week-total-work">00:00</strong></div>
               <div><span>Pause</span><strong id="week-total-break">00:00</strong></div>
               <div><span>Fahrt</span><strong id="week-total-travel">00:00</strong></div>
+              <div><span>Mehrzeit</span><strong id="week-total-overtime">00:00</strong></div>
             </div>
             <p id="week-message" class="form-message week-message" aria-live="polite"></p>
+
+            <section id="employee-timesheet-export-panel" class="week-review-panel employee-timesheet-export-panel" aria-labelledby="employee-timesheet-export-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Dein freigegebener Nachweis</p>
+                  <h3 id="employee-timesheet-export-title">Stundenzettel exportieren</h3>
+                </div>
+              </div>
+              <p id="employee-timesheet-export-summary" class="employee-timesheet-export-summary">
+                Enthält ausschließlich deine vom Büro freigegebenen oder bereits abgerechneten Tage.
+              </p>
+              <form id="employee-timesheet-export-form" class="timesheet-export-form">
+                <label for="employee-timesheet-export-from">Von</label>
+                <input id="employee-timesheet-export-from" type="date" required>
+                <label for="employee-timesheet-export-to">Bis</label>
+                <input id="employee-timesheet-export-to" type="date" required>
+                <button id="employee-timesheet-export-submit" class="button button--primary" type="submit">
+                  Meine Excel-Datei herunterladen
+                </button>
+              </form>
+              <p id="employee-timesheet-export-message" class="form-message" aria-live="polite"></p>
+            </section>
+
             <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
 
             <section id="timesheet-export-panel" class="week-review-panel timesheet-export-panel" aria-labelledby="timesheet-export-title" hidden>
@@ -568,10 +619,23 @@
                 </button>
               </form>
               <details class="site-choice-new">
-                <summary>Baustelle nicht vorhanden? Neu anlegen</summary>
+                <summary>Kunde, Projekt oder Baustelle nicht vorhanden? Neu anlegen</summary>
                 <form id="field-site-form" class="site-choice-new-form">
+                  <p class="site-choice-new-form__intro">
+                    Lege die fehlende Struktur in einem Schritt an. Vorhandene Kunden und Projekte werden weiterverwendet.
+                  </p>
+                  <label for="field-site-customer">Kunde</label>
+                  <select id="field-site-customer" required></select>
+                  <div id="field-site-new-customer" class="site-choice-dependent-field" hidden>
+                    <label for="field-site-customer-name">Neuer Kunde</label>
+                    <input id="field-site-customer-name" maxlength="200" placeholder="Firmen- oder Kundenname">
+                  </div>
                   <label for="field-site-project">Projekt</label>
                   <select id="field-site-project" required></select>
+                  <div id="field-site-new-project" class="site-choice-dependent-field" hidden>
+                    <label for="field-site-project-name">Neues Projekt</label>
+                    <input id="field-site-project-name" maxlength="200" placeholder="Projektname oder Auftrag">
+                  </div>
                   <label for="field-site-name">Baustellenname</label>
                   <input id="field-site-name" maxlength="200" required>
                   <label for="field-site-short-text">Aufgabe <span>(optional)</span></label>
@@ -631,9 +695,28 @@
             </section>
 
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
-              <summary>Betriebsstruktur</summary>
+              <summary>Kunden &amp; Baustellen</summary>
               <div class="structure-legend" aria-hidden="true">
                 <span>Kunde</span><i>›</i><span>Projekt</span><i>›</i><span>Baustelle</span>
+              </div>
+              <div class="hierarchy-toolbar">
+                <label for="hierarchy-search">
+                  <span>Suchen</span>
+                  <input id="hierarchy-search" type="search" maxlength="120" placeholder="Kunde, Projekt, Baustelle oder Ort">
+                </label>
+                <label for="hierarchy-status-filter">
+                  <span>Status</span>
+                  <select id="hierarchy-status-filter">
+                    <option value="active">Laufend</option>
+                    <option value="completed">Abgeschlossen</option>
+                    <option value="all">Alle</option>
+                  </select>
+                </label>
+              </div>
+              <div class="hierarchy-create-actions" aria-label="Stammdaten anlegen">
+                <button id="hierarchy-new-customer" class="text-button" type="button">＋ Kunde</button>
+                <button id="hierarchy-new-project" class="text-button" type="button">＋ Projekt</button>
+                <button id="hierarchy-new-site" class="text-button" type="button">＋ Baustelle</button>
               </div>
               <div id="business-hierarchy" class="business-hierarchy"></div>
             </details>
@@ -713,7 +796,7 @@
                 <div class="site-work-module">
                   <div class="report-entry-actions" aria-label="Bericht erfassen">
                     <button id="site-report-digital" class="module-action module-action--primary" type="button">
-                      <strong>Digital erstellen</strong><span>Montage- oder Bautagesbericht</span>
+                      <strong>Digital erstellen</strong><span>Montageschein oder Bautagesbericht</span>
                     </button>
                     <button id="site-report-photo" class="module-action" type="button">
                       <strong>Papierbericht fotografieren</strong><span>Original direkt ablegen</span>
@@ -729,7 +812,7 @@
                       <div>
                         <label for="site-report-type">Berichtsart</label>
                         <select id="site-report-type" required>
-                          <option value="montage">Montagebericht</option>
+                          <option value="montage">Montageschein</option>
                           <option value="daily">Bautagesbericht</option>
                         </select>
                       </div>
@@ -738,10 +821,33 @@
                         <input id="site-report-date" type="date" required>
                       </div>
                     </div>
+                    <fieldset class="mobile-report-personnel">
+                      <legend>Mitarbeiter und tatsächliche Stunden</legend>
+                      <div id="site-report-personnel-list"></div>
+                      <strong id="site-report-personnel-total" class="mobile-report-personnel__total">Gesamt: 0:00 h</strong>
+                      <p>Aus der Einsatzplanung für den gewählten Tag vorausgefüllt.</p>
+                    </fieldset>
                     <label for="site-report-summary">Titel</label>
                     <input id="site-report-summary" maxlength="200" required placeholder="z. B. Unterverteilung montiert">
                     <label for="site-report-details">Ausgeführte Arbeiten</label>
                     <textarea id="site-report-details" maxlength="5000" rows="5" placeholder="Arbeiten, Besonderheiten und Hinweise"></textarea>
+                    <details class="mobile-report-more">
+                      <summary>Weitere Angaben</summary>
+                      <div class="mobile-report-more__fields">
+                        <label for="site-report-obstructions">Behinderungen <span>(optional)</span></label>
+                        <textarea id="site-report-obstructions" maxlength="3000" rows="3"></textarea>
+                        <label for="site-report-open-items">Offene Punkte <span>(optional)</span></label>
+                        <textarea id="site-report-open-items" maxlength="3000" rows="3"></textarea>
+                        <label for="site-report-weather">Witterung <span>(optional)</span></label>
+                        <input id="site-report-weather" maxlength="200">
+                        <label for="site-report-materials">Material und Geräte <span>(optional)</span></label>
+                        <textarea id="site-report-materials" maxlength="3000" rows="3"></textarea>
+                        <label for="site-report-agreements">Absprachen und Anweisungen <span>(optional)</span></label>
+                        <textarea id="site-report-agreements" maxlength="3000" rows="3"></textarea>
+                        <label for="site-report-incidents">Mängel, Schäden oder Sicherheit <span>(optional)</span></label>
+                        <textarea id="site-report-incidents" maxlength="3000" rows="3"></textarea>
+                      </div>
+                    </details>
                     <p id="site-report-source-note" class="site-module-form__note"></p>
                     <div class="site-module-form__actions">
                       <button id="site-report-submit" class="button button--primary" type="submit">Bericht speichern</button>
@@ -1083,6 +1189,10 @@
               </form>
             </details>
 
+            <details id="site-master-data-tools" class="admin-panel site-master-data-tools">
+              <summary>Stammdaten anlegen &amp; bearbeiten</summary>
+              <p class="planning-intro">Hier erscheinen nur die gerade benötigten Formulare. Übersicht, Suche und Statusfilter bleiben oben in der Ordneransicht.</p>
+
             <details id="customer-panel" class="admin-panel">
               <summary>Kunde anlegen</summary>
               <form id="customer-form" class="admin-form" novalidate>
@@ -1141,15 +1251,15 @@
               </form>
             </details>
 
-            <section id="customer-management-panel" class="site-management-panel entity-management-panel" aria-labelledby="customer-management-title">
-              <div class="site-management-panel__heading">
+            <section id="customer-management-panel" class="site-management-panel entity-management-panel" aria-labelledby="customer-management-title" hidden>
+              <div class="site-management-panel__heading" hidden>
                 <div>
                   <p class="eyebrow">Stammdaten</p>
                   <h3 id="customer-management-title">Kunden verwalten</h3>
                 </div>
                 <span id="customer-list-summary" class="site-list-summary" aria-live="polite"></span>
               </div>
-              <div class="site-list-toolbar">
+              <div class="site-list-toolbar" hidden>
                 <label for="customer-search">
                   <span>Kunden durchsuchen</span>
                   <input id="customer-search" type="search" maxlength="120" placeholder="Name, Nummer, Ort oder Kontakt">
@@ -1231,7 +1341,7 @@
                 </div>
                 <p id="customer-edit-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="customer-list" class="admin-list site-management-list" aria-label="Kunden"></ul>
+              <ul id="customer-list" class="admin-list site-management-list" aria-label="Kunden" hidden></ul>
             </section>
 
             <details id="project-panel" class="admin-panel">
@@ -1248,15 +1358,15 @@
               </form>
             </details>
 
-            <section id="project-management-panel" class="site-management-panel entity-management-panel" aria-labelledby="project-management-title">
-              <div class="site-management-panel__heading">
+            <section id="project-management-panel" class="site-management-panel entity-management-panel" aria-labelledby="project-management-title" hidden>
+              <div class="site-management-panel__heading" hidden>
                 <div>
                   <p class="eyebrow">Aufträge</p>
                   <h3 id="project-management-title">Projekte verwalten</h3>
                 </div>
                 <span id="project-list-summary" class="site-list-summary" aria-live="polite"></span>
               </div>
-              <div class="site-list-toolbar">
+              <div class="site-list-toolbar" hidden>
                 <label for="project-search">
                   <span>Projekte durchsuchen</span>
                   <input id="project-search" type="search" maxlength="120" placeholder="Projekt, Nummer oder Kunde">
@@ -1297,7 +1407,7 @@
                 </div>
                 <p id="project-edit-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="project-list" class="admin-list site-management-list" aria-label="Projekte"></ul>
+              <ul id="project-list" class="admin-list site-management-list" aria-label="Projekte" hidden></ul>
             </section>
 
             <details id="site-form-panel" class="admin-panel">
@@ -1334,7 +1444,7 @@
               </form>
             </details>
 
-            <section id="site-management-panel" class="site-management-panel" aria-labelledby="site-management-title">
+            <section id="site-management-panel" class="site-management-panel" aria-labelledby="site-management-title" hidden>
               <div class="site-management-panel__heading">
                 <div>
                   <p class="eyebrow">Übersicht</p>
@@ -1359,8 +1469,10 @@
               </div>
               <ul id="site-list" class="admin-list site-management-list" aria-label="Baustellen"></ul>
             </section>
+            </details>
 
-            <section id="document-management-panel" class="site-management-panel document-management-panel" aria-labelledby="document-management-title">
+            <details id="document-management-panel" class="admin-panel site-management-panel document-management-panel">
+              <summary>Zentrale Dokumentablage</summary>
               <div class="site-management-panel__heading">
                 <div>
                   <p class="eyebrow">Einmal speichern · überall verwenden</p>
@@ -1430,7 +1542,7 @@
                 </label>
               </div>
               <ul id="document-list" class="document-list" aria-label="Zentrale Dokumente"></ul>
-            </section>
+            </details>
 
             <details id="assignment-panel" class="admin-panel" open>
               <summary>Einsätze anlegen</summary>

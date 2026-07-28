@@ -84,10 +84,17 @@
     mobileReportSite: document.querySelector("#mobile-report-site"),
     mobileReportType: document.querySelector("#mobile-report-type"),
     mobileReportPersonnelList: document.querySelector("#mobile-report-personnel-list"),
+    mobileReportPersonnelTotal: document.querySelector("#mobile-report-personnel-total"),
     mobileReportSummary: document.querySelector("#mobile-report-summary"),
     mobileReportDetails: document.querySelector("#mobile-report-details"),
     mobileReportObstructions: document.querySelector("#mobile-report-obstructions"),
     mobileReportOpenItems: document.querySelector("#mobile-report-open-items"),
+    mobileReportWeatherField: document.querySelector("#mobile-report-weather-field"),
+    mobileReportWeather: document.querySelector("#mobile-report-weather"),
+    mobileReportMaterials: document.querySelector("#mobile-report-materials"),
+    mobileReportAgreements: document.querySelector("#mobile-report-agreements"),
+    mobileReportIncidents: document.querySelector("#mobile-report-incidents"),
+    mobileReportCheck: document.querySelector("#mobile-report-check"),
     mobileReportSubmit: document.querySelector("#mobile-report-submit"),
     mobileReportMessage: document.querySelector("#mobile-report-message"),
     employeeSiteWorkspace: document.querySelector("#employee-site-workspace"),
@@ -125,11 +132,22 @@
     todayLabel: document.querySelector("#today-label"),
     weekStrip: document.querySelector("#week-strip"),
     weekPeriod: document.querySelector("#week-period"),
+    weekPrevious: document.querySelector("#week-previous"),
+    weekCurrent: document.querySelector("#week-current"),
+    weekNext: document.querySelector("#week-next"),
     weekTotalWork: document.querySelector("#week-total-work"),
     weekTotalBreak: document.querySelector("#week-total-break"),
     weekTotalTravel: document.querySelector("#week-total-travel"),
+    weekTotalOvertime: document.querySelector("#week-total-overtime"),
     weekMessage: document.querySelector("#week-message"),
     weekTimesheetList: document.querySelector("#week-timesheet-list"),
+    employeeTimesheetExportPanel: document.querySelector("#employee-timesheet-export-panel"),
+    employeeTimesheetExportSummary: document.querySelector("#employee-timesheet-export-summary"),
+    employeeTimesheetExportForm: document.querySelector("#employee-timesheet-export-form"),
+    employeeTimesheetExportFrom: document.querySelector("#employee-timesheet-export-from"),
+    employeeTimesheetExportTo: document.querySelector("#employee-timesheet-export-to"),
+    employeeTimesheetExportSubmit: document.querySelector("#employee-timesheet-export-submit"),
+    employeeTimesheetExportMessage: document.querySelector("#employee-timesheet-export-message"),
     workDayReviewPanel: document.querySelector("#work-day-review-panel"),
     workDayReviewCount: document.querySelector("#work-day-review-count"),
     workDayReviewList: document.querySelector("#work-day-review-list"),
@@ -181,7 +199,12 @@
     siteChoiceSelect: document.querySelector("#site-choice-select"),
     siteChoiceSubmit: document.querySelector("#site-choice-submit"),
     fieldSiteForm: document.querySelector("#field-site-form"),
+    fieldSiteCustomer: document.querySelector("#field-site-customer"),
+    fieldSiteNewCustomer: document.querySelector("#field-site-new-customer"),
+    fieldSiteCustomerName: document.querySelector("#field-site-customer-name"),
     fieldSiteProject: document.querySelector("#field-site-project"),
+    fieldSiteNewProject: document.querySelector("#field-site-new-project"),
+    fieldSiteProjectName: document.querySelector("#field-site-project-name"),
     fieldSiteName: document.querySelector("#field-site-name"),
     fieldSiteShortText: document.querySelector("#field-site-short-text"),
     fieldSiteStreet: document.querySelector("#field-site-street"),
@@ -215,6 +238,12 @@
     adminProjectCount: document.querySelector("#admin-project-count"),
     adminSiteCount: document.querySelector("#admin-site-count"),
     businessHierarchy: document.querySelector("#business-hierarchy"),
+    hierarchySearch: document.querySelector("#hierarchy-search"),
+    hierarchyStatusFilter: document.querySelector("#hierarchy-status-filter"),
+    hierarchyNewCustomer: document.querySelector("#hierarchy-new-customer"),
+    hierarchyNewProject: document.querySelector("#hierarchy-new-project"),
+    hierarchyNewSite: document.querySelector("#hierarchy-new-site"),
+    siteMasterDataTools: document.querySelector("#site-master-data-tools"),
     siteDashboard: document.querySelector("#site-dashboard"),
     siteDashboardTitle: document.querySelector("#site-dashboard-title"),
     siteDashboardMeta: document.querySelector("#site-dashboard-meta"),
@@ -234,8 +263,16 @@
     siteReportSourceMode: document.querySelector("#site-report-source-mode"),
     siteReportType: document.querySelector("#site-report-type"),
     siteReportDate: document.querySelector("#site-report-date"),
+    siteReportPersonnelList: document.querySelector("#site-report-personnel-list"),
+    siteReportPersonnelTotal: document.querySelector("#site-report-personnel-total"),
     siteReportSummary: document.querySelector("#site-report-summary"),
     siteReportDetails: document.querySelector("#site-report-details"),
+    siteReportObstructions: document.querySelector("#site-report-obstructions"),
+    siteReportOpenItems: document.querySelector("#site-report-open-items"),
+    siteReportWeather: document.querySelector("#site-report-weather"),
+    siteReportMaterials: document.querySelector("#site-report-materials"),
+    siteReportAgreements: document.querySelector("#site-report-agreements"),
+    siteReportIncidents: document.querySelector("#site-report-incidents"),
     siteReportSourceNote: document.querySelector("#site-report-source-note"),
     siteReportSubmit: document.querySelector("#site-report-submit"),
     siteReportCancel: document.querySelector("#site-report-cancel"),
@@ -480,12 +517,7 @@
   );
   elements.sitePlanningContent.append(
     elements.businessStructurePanel,
-    elements.customerPanel,
-    elements.customerManagementPanel,
-    elements.projectPanel,
-    elements.projectManagementPanel,
-    elements.siteFormPanel,
-    elements.siteManagementPanel,
+    elements.siteMasterDataTools,
     elements.documentManagementPanel,
     elements.siteDashboard
   );
@@ -508,6 +540,7 @@
   let session = null;
   let adminState = null;
   let weekState = null;
+  let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
   let correctingTimeEntryId = null;
   let addingTimeEntryDate = null;
@@ -622,6 +655,7 @@
       workDayStatus: null,
       events: [],
       reports: [],
+      reportDraft: null,
       siteWorkspace: null
     };
   }
@@ -641,6 +675,9 @@
           workDayStatus: saved.workDayStatus || null,
           events: saved.events,
           reports: Array.isArray(saved.reports) ? saved.reports : [],
+          reportDraft: saved.reportDraft && typeof saved.reportDraft === "object"
+            ? saved.reportDraft
+            : null,
           siteWorkspace: saved.siteWorkspace || null
         };
       }
@@ -708,6 +745,39 @@
     return body;
   }
 
+  async function downloadFile(path, fallbackName) {
+    let response;
+    try {
+      response = await fetch(path, { credentials: "include" });
+    } catch {
+      const error = new Error("Der Server ist momentan nicht erreichbar.");
+      error.network = true;
+      throw error;
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const error = new Error(body.error?.message || "Die Datei konnte nicht erstellt werden.");
+      error.status = response.status;
+      error.code = body.error?.code;
+      throw error;
+    }
+    const disposition = response.headers.get("content-disposition") || "";
+    const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    const plainName = /filename="([^"]+)"/i.exec(disposition)?.[1];
+    const fileName = encodedName
+      ? decodeURIComponent(encodedName)
+      : plainName || fallbackName;
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    return fileName;
+  }
+
   function configureModeCopy() {
     elements.openPreview.hidden = !demoMode;
     elements.previewDivider.hidden = !demoMode;
@@ -720,7 +790,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.30.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.32.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -789,8 +859,12 @@
     openedCustomerId = null;
     openedProjectId = null;
     openedSiteId = null;
+    selectedWeekStart = currentWeekStart();
+    weekState = null;
     elements.customerEditForm.hidden = true;
     elements.projectEditForm.hidden = true;
+    elements.customerManagementPanel.hidden = true;
+    elements.projectManagementPanel.hidden = true;
     elements.siteDashboard.hidden = true;
     elements.siteEditForm.hidden = true;
     closeTimeCorrectionForm();
@@ -1255,6 +1329,7 @@
     setDocumentTargets(targets);
     elements.documentSearch.value = entity.displayName || entity.name;
     renderDocumentList();
+    elements.documentManagementPanel.open = true;
     elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -1369,7 +1444,7 @@
   }
 
   function reportTypeLabel(type) {
-    return { montage: "Montagebericht", daily: "Bautagesbericht" }[type] || type;
+    return { montage: "Montageschein", daily: "Bautagesbericht" }[type] || type;
   }
 
   function reportSourceLabel(source) {
@@ -1649,6 +1724,66 @@
     elements.siteMaterialMessage.textContent = "";
   }
 
+  function collectSiteReportPersonnel() {
+    return [...elements.siteReportPersonnelList.querySelectorAll("input[data-user-id]")]
+      .map((input) => ({
+        userId: input.dataset.userId,
+        minutes: Math.round(Number(input.value) * 60)
+      }))
+      .filter((entry) => Number.isSafeInteger(entry.minutes) && entry.minutes > 0);
+  }
+
+  function updateSiteReportPersonnelTotal() {
+    const total = collectSiteReportPersonnel().reduce((sum, entry) => sum + entry.minutes, 0);
+    elements.siteReportPersonnelTotal.textContent = `Gesamt: ${formatMinutes(total)} h`;
+  }
+
+  function renderSiteReportPersonnel() {
+    const members = new Map();
+    (adminState?.weekAssignments || [])
+      .filter((assignment) => (
+        assignment.constructionSiteId === openedSiteId
+        && assignment.workDate === elements.siteReportDate.value
+      ))
+      .forEach((assignment) => {
+        if (!members.has(assignment.employeeId)) members.set(assignment.employeeId, assignment);
+      });
+    elements.siteReportPersonnelList.replaceChildren();
+    if (members.size === 0) {
+      const empty = document.createElement("p");
+      empty.className = "site-module-form__note";
+      empty.textContent = "Für diesen Tag ist noch kein Mitarbeiter eingeplant.";
+      elements.siteReportPersonnelList.append(empty);
+      updateSiteReportPersonnelTotal();
+      return;
+    }
+    members.forEach((member) => {
+      const row = document.createElement("label");
+      const name = document.createElement("span");
+      const inputWrap = document.createElement("span");
+      const input = document.createElement("input");
+      const unit = document.createElement("small");
+      row.className = "mobile-report-personnel__row";
+      name.textContent = member.employeeName;
+      input.type = "number";
+      input.min = "0";
+      input.max = "24";
+      input.step = "0.25";
+      input.inputMode = "decimal";
+      input.dataset.userId = member.employeeId;
+      input.setAttribute("aria-label", `Stunden für ${member.employeeName}`);
+      input.value = member.plannedDurationMinutes
+        ? String(Math.round(member.plannedDurationMinutes / 15) / 4)
+        : "";
+      input.addEventListener("input", updateSiteReportPersonnelTotal);
+      unit.textContent = "Std.";
+      inputWrap.append(input, unit);
+      row.append(name, inputWrap);
+      elements.siteReportPersonnelList.append(row);
+    });
+    updateSiteReportPersonnelTotal();
+  }
+
   function resetSiteReportForm() {
     if (speechRecognition) {
       speechRecognition.stop();
@@ -1661,6 +1796,8 @@
     elements.siteReportDate.value = localDateKey();
     elements.siteReportSourceNote.textContent = "";
     elements.siteReportMessage.textContent = "";
+    elements.siteReportPersonnelList.replaceChildren();
+    updateSiteReportPersonnelTotal();
     elements.siteReportForm.hidden = true;
     elements.siteReportSubmit.disabled = false;
   }
@@ -1670,6 +1807,7 @@
     reportPhotoFile = photoFile;
     elements.siteReportSourceMode.value = sourceMode;
     elements.siteReportDate.value = localDateKey();
+    renderSiteReportPersonnel();
     elements.siteReportSourceNote.textContent = {
       digital: "Der Bericht wird direkt digital erfasst.",
       photo: reportPhotoFile ? `${reportPhotoFile.name} · ${formatFileSize(reportPhotoFile.size)}` : "Originalfoto auswählen.",
@@ -1819,6 +1957,12 @@
 
   function openCustomerEditor(customer) {
     openedCustomerId = customer.id;
+    elements.siteMasterDataTools.open = true;
+    [elements.customerPanel, elements.projectPanel, elements.siteFormPanel]
+      .forEach((panel) => { panel.open = false; });
+    elements.projectEditForm.hidden = true;
+    elements.projectManagementPanel.hidden = true;
+    elements.customerManagementPanel.hidden = false;
     elements.customerEditNumber.textContent = customer.number;
     elements.customerEditType.value = customer.type;
     elements.customerEditCompanyName.value = customer.companyName || "";
@@ -1839,6 +1983,12 @@
 
   function openProjectEditor(project) {
     openedProjectId = project.id;
+    elements.siteMasterDataTools.open = true;
+    [elements.customerPanel, elements.projectPanel, elements.siteFormPanel]
+      .forEach((panel) => { panel.open = false; });
+    elements.customerEditForm.hidden = true;
+    elements.customerManagementPanel.hidden = true;
+    elements.projectManagementPanel.hidden = false;
     elements.projectEditNumber.textContent = project.number;
     elements.projectEditCustomer.textContent = project.customerName;
     elements.projectEditName.value = project.name;
@@ -2040,57 +2190,145 @@
     if (items.some((item) => item.id === selected)) select.value = selected;
   }
 
-  function hierarchySummary(title, meta) {
+  function hierarchySummary(title, meta, kind, status = null) {
     const summary = document.createElement("summary");
+    const icon = document.createElement("span");
     const content = document.createElement("span");
     const strong = document.createElement("strong");
     const small = document.createElement("small");
+    icon.className = `hierarchy-icon hierarchy-icon--${kind}`;
+    icon.textContent = kind === "customer" ? "K" : "P";
     strong.textContent = title;
     small.textContent = meta;
     content.append(strong, small);
-    summary.append(content);
+    summary.append(icon, content);
+    if (status) {
+      const badge = document.createElement("small");
+      badge.className = `site-status site-status--${status.group}`;
+      badge.textContent = status.label;
+      summary.append(badge);
+    }
     return summary;
+  }
+
+  function hierarchyActions(actions) {
+    const bar = document.createElement("div");
+    bar.className = "hierarchy-node-actions";
+    actions.forEach(({ label, handler }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = label;
+      button.addEventListener("click", handler);
+      bar.append(button);
+    });
+    return bar;
+  }
+
+  function openMasterDataForm(panel, focusElement = null) {
+    elements.siteMasterDataTools.open = true;
+    elements.customerEditForm.hidden = true;
+    elements.projectEditForm.hidden = true;
+    elements.customerManagementPanel.hidden = true;
+    elements.projectManagementPanel.hidden = true;
+    [elements.customerPanel, elements.projectPanel, elements.siteFormPanel]
+      .forEach((candidate) => { candidate.open = candidate === panel; });
+    window.setTimeout(() => {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusElement?.focus({ preventScroll: true });
+    }, 50);
   }
 
   function renderBusinessHierarchy() {
     elements.businessHierarchy.replaceChildren();
-    const activeCustomers = adminState.customers.filter(
-      (customer) => customerStatusGroup(customer.status) === "active"
+    const query = elements.hierarchySearch.value.trim().toLocaleLowerCase("de-DE");
+    const statusFilter = elements.hierarchyStatusFilter.value;
+    const statusMatches = (status, groupFunction) => (
+      statusFilter === "all" || groupFunction(status) === statusFilter
     );
-    if (activeCustomers.length === 0) {
+    const visibleCustomers = adminState.customers.map((customer) => {
+      const customerProjects = adminState.projects.filter((project) => project.customerId === customer.id);
+      const projects = customerProjects.map((project) => {
+        const projectSites = adminState.sites.filter((site) => site.projectId === project.id);
+        const queryMatchesProject = !query || projectSearchText(project).includes(query)
+          || customerSearchText(customer).includes(query);
+        const sites = projectSites.filter((site) => (
+          statusMatches(site.status, siteStatusGroup)
+          && (!query || queryMatchesProject || siteSearchText(site).includes(query))
+        ));
+        const projectMatches = statusMatches(project.status, projectStatusGroup)
+          && (queryMatchesProject || sites.length > 0);
+        return projectMatches || sites.length > 0 ? { project, sites } : null;
+      }).filter(Boolean);
+      const customerMatches = statusMatches(customer.status, customerStatusGroup)
+        && (!query || customerSearchText(customer).includes(query));
+      return customerMatches || projects.length > 0 ? { customer, projects } : null;
+    }).filter(Boolean);
+
+    if (visibleCustomers.length === 0) {
       const empty = document.createElement("p");
       empty.className = "hierarchy-empty";
       empty.textContent = adminState.customers.length === 0
         ? "Noch kein Kunde angelegt. Beginne mit dem ersten Kunden."
-        : "Aktuell gibt es keinen aktiven Kunden.";
+        : "Keine Kunden, Projekte oder Baustellen passen zu Suche und Status.";
       elements.businessHierarchy.append(empty);
       return;
     }
 
-    activeCustomers.forEach((customer) => {
+    visibleCustomers.forEach(({ customer, projects }) => {
       const customerNode = document.createElement("details");
       customerNode.className = "hierarchy-customer";
-      customerNode.append(hierarchySummary(customer.displayName, customer.number));
-      const projects = adminState.projects.filter((project) => (
-        project.customerId === customer.id && projectStatusGroup(project.status) === "active"
-      ));
+      customerNode.open = Boolean(query);
+      customerNode.append(
+        hierarchySummary(
+          customer.displayName,
+          `${customer.number} · ${projects.length} Projekt${projects.length === 1 ? "" : "e"}`,
+          "customer",
+          { group: customerStatusGroup(customer.status), label: customer.status === "archived" ? "Archiviert" : "Aktiv" }
+        ),
+        hierarchyActions([
+          { label: "Kunde bearbeiten", handler: () => openCustomerEditor(customer) },
+          {
+            label: "Projekt hinzufügen",
+            handler: () => {
+              elements.projectCustomer.value = customer.id;
+              openMasterDataForm(elements.projectPanel, elements.projectName);
+            }
+          }
+        ])
+      );
       if (projects.length === 0) {
         const empty = document.createElement("p");
         empty.className = "hierarchy-empty";
-        empty.textContent = "Noch kein Projekt für diesen Kunden.";
+        empty.textContent = "Kein Projekt passt zur aktuellen Auswahl.";
         customerNode.append(empty);
       } else {
-        projects.forEach((project) => {
+        projects.forEach(({ project, sites }) => {
           const projectNode = document.createElement("details");
           projectNode.className = "hierarchy-project";
-          projectNode.append(hierarchySummary(project.name, `${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`));
-          const sites = adminState.sites.filter((site) => (
-            site.projectId === project.id && siteStatusGroup(site.status) === "active"
-          ));
+          projectNode.open = Boolean(query);
+          projectNode.append(
+            hierarchySummary(
+              project.name,
+              `${project.number} · ${sites.length} Baustelle${sites.length === 1 ? "" : "n"}`,
+              "project",
+              { group: projectStatusGroup(project.status), label: projectStatusLabel(project.status) }
+            ),
+            hierarchyActions([
+              { label: "Projekt bearbeiten", handler: () => openProjectEditor(project) },
+              {
+                label: "Baustelle hinzufügen",
+                handler: () => {
+                  elements.siteProject.value = project.id;
+                  openMasterDataForm(elements.siteFormPanel, elements.siteName);
+                }
+              }
+            ])
+          );
           if (sites.length === 0) {
             const empty = document.createElement("p");
             empty.className = "hierarchy-empty";
-            empty.textContent = "Noch keine Baustelle in diesem Projekt.";
+            empty.textContent = "Keine Baustelle passt zur aktuellen Auswahl.";
             projectNode.append(empty);
           } else {
             const list = document.createElement("ul");
@@ -2098,12 +2336,28 @@
             sites.forEach((site) => {
               const item = document.createElement("li");
               const button = document.createElement("button");
+              const content = document.createElement("span");
               const title = document.createElement("strong");
               const meta = document.createElement("span");
+              const badge = document.createElement("small");
+              const address = [
+                `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
+                `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
+              ].filter(Boolean).join(", ");
               button.type = "button";
               title.textContent = site.name;
-              meta.textContent = `${site.number} · ${site.address.city}`;
-              button.append(title, meta);
+              meta.textContent = [
+                site.number,
+                address,
+                site.shortText,
+                `${documentsForEntity("construction_site", site.id).length} Dokumente`
+              ].filter(Boolean).join(" · ");
+              badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
+              badge.textContent = site.fieldReviewStatus === "pending"
+                ? "Büroprüfung"
+                : siteStatusLabel(site.status);
+              content.append(title, meta);
+              button.append(content, badge);
               button.addEventListener("click", () => openSiteDashboard(site));
               item.append(button);
               list.append(item);
@@ -2219,66 +2473,106 @@
       return;
     }
 
-    workDays.forEach((day) => {
-      const item = document.createElement("li");
-      const content = document.createElement("div");
-      const title = document.createElement("strong");
-      const meta = document.createElement("span");
-      const status = document.createElement("span");
-      title.textContent = `${day.employeeName} · ${shortDate(day.workDate)}`;
-      meta.textContent = `Arbeit ${formatMinutes(day.workMinutes)} · Pause ${
-        formatMinutes(day.breakMinutes)
-      } · Fahrt ${formatMinutes(day.travelMinutes)}`;
-      status.className = `work-day-review-status work-day-review-status--${day.workflowStatus}`;
-      status.textContent = {
-        in_progress: "In Arbeit",
-        completed: day.status === "approved" ? "Freigegeben" : "Abgeschlossen",
-        billed: "Abgerechnet"
-      }[day.workflowStatus] || day.workflowStatus;
-      content.append(title, meta, status);
-      if (day.warnings?.length) {
-        const warning = document.createElement("small");
-        warning.className = "work-day-review-warning";
-        warning.textContent = day.warnings.map((item) => item.message).join(" · ");
-        content.append(warning);
-      }
-      item.append(content);
+    const employees = new Map();
+    [...workDays]
+      .sort((left, right) => (
+        left.employeeName.localeCompare(right.employeeName, "de-DE")
+        || left.workDate.localeCompare(right.workDate)
+      ))
+      .forEach((day) => {
+        if (!employees.has(day.employeeName)) employees.set(day.employeeName, []);
+        employees.get(day.employeeName).push(day);
+      });
 
-      if (day.reviewable || day.status === "approved") {
-        const action = document.createElement("button");
-        const decision = day.status === "approved" ? "locked" : "approved";
-        action.type = "button";
-        action.className = decision === "approved"
-          ? "button button--secondary work-day-review-action"
-          : "button button--primary work-day-review-action";
-        action.textContent = decision === "approved" ? "Prüfen und freigeben" : "Abrechnen";
-        action.addEventListener("click", async () => {
-          if (
-            decision === "locked"
-            && !window.confirm(
-              `${day.employeeName}: Stundenzettel als abgerechnet sperren?`
-            )
-          ) return;
-          action.disabled = true;
-          try {
-            await requestJson(`./api/v1/admin/work-days/${encodeURIComponent(day.id)}`, {
-              method: "PATCH",
-              body: JSON.stringify({ decision })
-            });
-            await Promise.all([refreshAdmin(adminState.date), refreshWeekData()]);
-            showToast(
-              decision === "approved"
-                ? "Stundenzettel freigegeben."
-                : "Stundenzettel als abgerechnet gesperrt."
-            );
-          } catch (error) {
-            action.disabled = false;
-            showToast(error.message);
-          }
-        });
-        item.append(action);
-      }
-      elements.workDayReviewList.append(item);
+    employees.forEach((days, employeeName) => {
+      const group = document.createElement("li");
+      const heading = document.createElement("div");
+      const headingText = document.createElement("div");
+      const name = document.createElement("strong");
+      const summary = document.createElement("span");
+      const dayList = document.createElement("div");
+      const totalWorkMinutes = days.reduce((sum, day) => sum + Number(day.workMinutes || 0), 0);
+      const openCount = days.filter((day) => day.reviewable || day.status === "approved").length;
+      group.className = "work-day-review-employee";
+      heading.className = "work-day-review-employee__heading";
+      name.textContent = employeeName;
+      summary.textContent = `${days.length} Tag${days.length === 1 ? "" : "e"} · ${
+        formatMinutes(totalWorkMinutes)
+      } h gearbeitet${openCount ? ` · ${openCount} offen` : ""}`;
+      headingText.append(name, summary);
+      heading.append(headingText);
+      dayList.className = "work-day-review-days";
+
+      days.forEach((day) => {
+        const dayRow = document.createElement("article");
+        const content = document.createElement("div");
+        const rowHeading = document.createElement("div");
+        const date = document.createElement("strong");
+        const status = document.createElement("span");
+        const meta = document.createElement("span");
+        const statusKey = day.workflowStatus === "billed"
+          ? "locked"
+          : day.status === "approved"
+            ? "approved"
+            : day.workflowStatus;
+        dayRow.className = "work-day-review-day";
+        date.textContent = shortDate(day.workDate);
+        status.className = `work-day-review-status work-day-review-status--${statusKey}`;
+        status.textContent = {
+          in_progress: "In Arbeit",
+          completed: day.status === "approved" ? "Freigegeben" : "Abgeschlossen",
+          billed: "Abgerechnet"
+        }[day.workflowStatus] || day.workflowStatus;
+        meta.textContent = `Arbeit ${formatMinutes(day.workMinutes)} · Pause ${
+          formatMinutes(day.breakMinutes)
+        } · Fahrt ${formatMinutes(day.travelMinutes)}`;
+        rowHeading.append(date, status);
+        content.append(rowHeading, meta);
+        if (day.warnings?.length) {
+          const warning = document.createElement("small");
+          warning.className = "work-day-review-warning";
+          warning.textContent = day.warnings.map((item) => item.message).join(" · ");
+          content.append(warning);
+        }
+        dayRow.append(content);
+
+        if (day.reviewable || day.status === "approved") {
+          const action = document.createElement("button");
+          const decision = day.status === "approved" ? "locked" : "approved";
+          action.type = "button";
+          action.className = "text-button work-day-review-action";
+          action.textContent = decision === "approved" ? "Freigeben" : "Abrechnen";
+          action.addEventListener("click", async () => {
+            if (
+              decision === "locked"
+              && !window.confirm(
+                `${day.employeeName}: Stundenzettel als abgerechnet sperren?`
+              )
+            ) return;
+            action.disabled = true;
+            try {
+              await requestJson(`./api/v1/admin/work-days/${encodeURIComponent(day.id)}`, {
+                method: "PATCH",
+                body: JSON.stringify({ decision })
+              });
+              await Promise.all([refreshAdmin(adminState.date), refreshWeekData()]);
+              showToast(
+                decision === "approved"
+                  ? "Stundenzettel freigegeben."
+                  : "Stundenzettel als abgerechnet gesperrt."
+              );
+            } catch (error) {
+              action.disabled = false;
+              showToast(error.message);
+            }
+          });
+          dayRow.append(action);
+        }
+        dayList.append(dayRow);
+      });
+
+      group.append(heading, dayList);
+      elements.workDayReviewList.append(group);
     });
   }
 
@@ -2979,6 +3273,37 @@
     if (elements.siteChoiceDialog.open) elements.siteChoiceDialog.close();
   }
 
+  function updateFieldSiteHierarchy() {
+    const customerId = elements.fieldSiteCustomer.value;
+    const createsCustomer = customerId === "__new__";
+    elements.fieldSiteNewCustomer.hidden = !createsCustomer;
+    elements.fieldSiteCustomerName.required = createsCustomer;
+    elements.fieldSiteProject.replaceChildren();
+    const projects = createsCustomer
+      ? []
+      : (siteOptionsState?.projects || []).filter((project) => project.customerId === customerId);
+    projects.forEach((project) => {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = project.name;
+      elements.fieldSiteProject.append(option);
+    });
+    const createProject = document.createElement("option");
+    createProject.value = "__new__";
+    createProject.textContent = projects.length
+      ? "＋ Neues Projekt für diesen Kunden"
+      : "＋ Erstes Projekt für diesen Kunden anlegen";
+    elements.fieldSiteProject.append(createProject);
+    if (createsCustomer || projects.length === 0) elements.fieldSiteProject.value = "__new__";
+    updateFieldSiteProjectMode();
+  }
+
+  function updateFieldSiteProjectMode() {
+    const createsProject = elements.fieldSiteProject.value === "__new__";
+    elements.fieldSiteNewProject.hidden = !createsProject;
+    elements.fieldSiteProjectName.required = createsProject;
+  }
+
   function renderSiteChoiceOptions(options) {
     siteOptionsState = options;
     const targetIndex = siteChoiceTargetIndex();
@@ -3003,18 +3328,23 @@
       elements.siteChoiceSelect.append(option);
     });
 
-    elements.fieldSiteProject.replaceChildren();
-    (options.projects || []).forEach((project) => {
+    elements.fieldSiteCustomer.replaceChildren();
+    (options.customers || []).forEach((customer) => {
       const option = document.createElement("option");
-      option.value = project.id;
-      option.textContent = `${project.customerName} · ${project.name}`;
-      elements.fieldSiteProject.append(option);
+      option.value = customer.id;
+      option.textContent = `${customer.displayName} · ${customer.number}`;
+      elements.fieldSiteCustomer.append(option);
     });
+    const createCustomer = document.createElement("option");
+    createCustomer.value = "__new__";
+    createCustomer.textContent = "＋ Neuen Kunden anlegen";
+    elements.fieldSiteCustomer.append(createCustomer);
+    if (!(options.customers || []).length) elements.fieldSiteCustomer.value = "__new__";
+    updateFieldSiteHierarchy();
     const hasSites = elements.siteChoiceSelect.options.length > 0;
-    const hasProjects = elements.fieldSiteProject.options.length > 0;
     elements.siteChoiceSelect.disabled = !hasSites;
     elements.siteChoiceSubmit.disabled = !hasSites;
-    elements.fieldSiteSubmit.disabled = !hasProjects;
+    elements.fieldSiteSubmit.disabled = false;
   }
 
   async function openSiteChoice() {
@@ -3114,6 +3444,66 @@
     elements.mobileReportMessage.textContent = "";
   }
 
+  function mobileReportDraftFor(assignment) {
+    return state.reportDraft?.assignmentId === assignment?.id
+      && state.reportDraft?.workDate === state.workDate
+      ? state.reportDraft
+      : null;
+  }
+
+  function updateMobileReportPersonnelTotal() {
+    const total = collectMobileReportPersonnel()
+      .reduce((sum, entry) => sum + entry.minutes, 0);
+    elements.mobileReportPersonnelTotal.textContent = `Gesamt: ${formatMinutes(total)} h`;
+  }
+
+  function updateMobileReportTypeFields() {
+    const isDaily = elements.mobileReportType.value === "daily";
+    elements.mobileReportWeatherField.hidden = !isDaily;
+    elements.mobileReportWeather.hidden = !isDaily;
+    if (!isDaily) elements.mobileReportWeather.value = "";
+    updateMobileReportCheck();
+  }
+
+  function updateMobileReportCheck() {
+    const missing = [];
+    if (elements.mobileReportSummary.value.trim().length < 2) missing.push("Kurzbeschreibung");
+    if (elements.mobileReportDetails.value.trim().length < 2) missing.push("Leistungen");
+    if (
+      session?.user?.id
+      && !collectMobileReportPersonnel().some((entry) => entry.userId === session.user.id)
+    ) {
+      missing.push("eigene Stunden");
+    }
+    elements.mobileReportCheck.classList.toggle("mobile-report-check--warning", missing.length > 0);
+    elements.mobileReportCheck.querySelector("strong").textContent = missing.length
+      ? `${missing.length} Pflichtangabe${missing.length === 1 ? "" : "n"} fehlt`
+      : "Bericht ist vollständig";
+    elements.mobileReportCheck.querySelector("span").textContent = missing.length
+      ? missing.join(" · ")
+      : "Alle Pflichtangaben sind vorhanden. Weitere Angaben bleiben optional.";
+  }
+
+  function saveMobileReportDraft() {
+    const assignment = assignments[currentSiteIndex()];
+    if (!assignment || elements.mobileReportCard.hidden) return;
+    state.reportDraft = {
+      assignmentId: assignment.id,
+      workDate: state.workDate,
+      reportType: elements.mobileReportType.value,
+      summary: elements.mobileReportSummary.value,
+      workPerformed: elements.mobileReportDetails.value,
+      obstructions: elements.mobileReportObstructions.value,
+      openItems: elements.mobileReportOpenItems.value,
+      weather: elements.mobileReportWeather.value,
+      materialsAndEquipment: elements.mobileReportMaterials.value,
+      agreements: elements.mobileReportAgreements.value,
+      incidents: elements.mobileReportIncidents.value,
+      personnel: collectMobileReportPersonnel()
+    };
+    saveState();
+  }
+
   function currentSiteMinutes(assignment) {
     const arrival = [...state.events].reverse().find((entry) => (
       entry.type === "site_arrival"
@@ -3154,11 +3544,17 @@
       input.dataset.userId = member.id;
       input.setAttribute("aria-label", `Stunden für ${member.name}`);
       input.value = minutes ? String(Math.round(minutes / 15) / 4) : "";
+      input.addEventListener("input", () => {
+        updateMobileReportPersonnelTotal();
+        updateMobileReportCheck();
+        saveMobileReportDraft();
+      });
       unit.textContent = "Std.";
       inputWrap.append(input, unit);
       row.append(name, inputWrap);
       elements.mobileReportPersonnelList.append(row);
     });
+    updateMobileReportPersonnelTotal();
   }
 
   function collectMobileReportPersonnel() {
@@ -3171,11 +3567,17 @@
   }
 
   async function openMobileReportForm(assignment) {
+    const draft = mobileReportDraftFor(assignment);
     elements.mobileReportSite.textContent = assignment.constructionSite.name;
-    elements.mobileReportSummary.value = "";
-    elements.mobileReportDetails.value = "";
-    elements.mobileReportObstructions.value = "";
-    elements.mobileReportOpenItems.value = "";
+    elements.mobileReportType.value = draft?.reportType || "daily";
+    elements.mobileReportSummary.value = draft?.summary || "";
+    elements.mobileReportDetails.value = draft?.workPerformed || "";
+    elements.mobileReportObstructions.value = draft?.obstructions || "";
+    elements.mobileReportOpenItems.value = draft?.openItems || "";
+    elements.mobileReportWeather.value = draft?.weather || "";
+    elements.mobileReportMaterials.value = draft?.materialsAndEquipment || "";
+    elements.mobileReportAgreements.value = draft?.agreements || "";
+    elements.mobileReportIncidents.value = draft?.incidents || "";
     elements.mobileReportPersonnelList.replaceChildren();
     elements.mobileReportMessage.textContent = "";
     elements.mobileReportCard.hidden = false;
@@ -3201,6 +3603,15 @@
       }
     }
     renderMobileReportPersonnel(assignment, team);
+    (draft?.personnel || []).forEach((entry) => {
+      const input = elements.mobileReportPersonnelList.querySelector(
+        `input[data-user-id="${entry.userId}"]`
+      );
+      if (input) input.value = String(Math.round(entry.minutes / 15) / 4);
+    });
+    updateMobileReportPersonnelTotal();
+    updateMobileReportTypeFields();
+    updateMobileReportCheck();
     window.setTimeout(() => elements.mobileReportSummary.focus(), 250);
   }
 
@@ -3262,6 +3673,10 @@
             workPerformed: report.workPerformed || report.details || report.summary,
             obstructions: report.obstructions || null,
             openItems: report.openItems || null,
+            weather: report.weather || null,
+            materialsAndEquipment: report.materialsAndEquipment || null,
+            agreements: report.agreements || null,
+            incidents: report.incidents || null,
             personnel: report.personnel
           })
         });
@@ -3663,7 +4078,7 @@
 
   function renderWeek() {
     const today = new Date();
-    const weekStart = currentWeekStart(today);
+    const weekStart = selectedWeekStart;
     const fallbackTimes = calculatedTimes();
     const fallbackDay = {
       workDate: localDateKey(today),
@@ -3694,19 +4109,24 @@
           totals: {
             workMinutes: fallbackTimes.work,
             breakMinutes: fallbackTimes.pause,
-            travelMinutes: fallbackTimes.travel
+            travelMinutes: fallbackTimes.travel,
+            overtimeMinutes: 0
           }
         };
     const periodStart = dateFromIso(visibleWeek.weekStart);
     const periodEnd = dateFromIso(visibleWeek.weekEnd);
     elements.weekPeriod.textContent = `${
-      periodStart.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })
-    } – ${periodEnd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`;
+      periodStart.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
+    } – ${periodEnd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+    elements.weekCurrent.disabled = weekStart === currentWeekStart(today);
+    elements.weekNext.disabled = weekStart >= currentWeekStart(today);
     elements.weekTotalWork.textContent = formatMinutes(visibleWeek.totals.workMinutes || 0);
     elements.weekTotalBreak.textContent = formatMinutes(visibleWeek.totals.breakMinutes || 0);
     elements.weekTotalTravel.textContent = formatMinutes(visibleWeek.totals.travelMinutes || 0);
+    elements.weekTotalOvertime.textContent = formatMinutes(visibleWeek.totals.overtimeMinutes || 0);
     elements.weekStrip.replaceChildren();
     elements.weekTimesheetList.replaceChildren();
+    renderEmployeeTimesheetExport(visibleWeek);
 
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
@@ -3758,7 +4178,11 @@
             ? "completed"
             : "in_progress"
       );
-      dayStatus.textContent = !workDay ? "Keine Buchung" : statusLabels[workflowStatus] || "Erfasst";
+      dayStatus.textContent = !workDay
+        ? "Keine Buchung"
+        : workDay.status === "approved"
+          ? "Freigegeben"
+          : statusLabels[workflowStatus] || "Erfasst";
       total.textContent = formatMinutes(workDay?.workMinutes || 0);
       headingCopy.append(dateLabel, dayStatus);
       heading.append(headingCopy, total);
@@ -3773,9 +4197,11 @@
         const metrics = document.createElement("div");
         metrics.className = "week-day-metrics";
         [
+          ["Soll", workDay.targetWorkMinutes],
           ["Brutto", workDay.grossMinutes],
           ["Pause", workDay.breakMinutes],
-          ["Fahrt", workDay.travelMinutes]
+          ["Fahrt", workDay.travelMinutes],
+          ["Mehrzeit", workDay.overtimeMinutes]
         ].forEach(([labelText, minutes]) => {
           const metric = document.createElement("span");
           metric.textContent = `${labelText} ${formatMinutes(minutes || 0)}`;
@@ -3838,18 +4264,43 @@
           const stateNote = document.createElement("p");
           stateNote.className = "week-day-state week-day-state--approved";
           stateNote.textContent = workDay.status === "approved"
-            ? "Vom Büro freigegeben"
+            ? "Vom Büro freigegeben · im persönlichen Export enthalten"
             : "Arbeitsblock beendet · automatisch im Büro sichtbar";
           dayCard.append(stateNote);
         } else if (workflowStatus === "billed") {
           const stateNote = document.createElement("p");
           stateNote.className = "week-day-state week-day-state--locked";
-          stateNote.textContent = "Abgerechnet · neue Buchungen sind gesperrt";
+          stateNote.textContent = "Abgerechnet · im persönlichen Export enthalten";
           dayCard.append(stateNote);
         }
       }
       elements.weekTimesheetList.append(dayCard);
     });
+  }
+
+  function renderEmployeeTimesheetExport(visibleWeek) {
+    const available = !demoMode && !canPlan();
+    elements.employeeTimesheetExportPanel.hidden = !available;
+    if (!available) return;
+    if (elements.employeeTimesheetExportForm.dataset.weekStart !== visibleWeek.weekStart) {
+      elements.employeeTimesheetExportFrom.value = visibleWeek.weekStart;
+      elements.employeeTimesheetExportTo.value = visibleWeek.weekEnd;
+      elements.employeeTimesheetExportForm.dataset.weekStart = visibleWeek.weekStart;
+      elements.employeeTimesheetExportMessage.textContent = "";
+    }
+    const approvedDays = visibleWeek.days.filter(({ workDay }) => (
+      workDay && ["approved", "locked"].includes(workDay.status)
+    ));
+    const approvedMinutes = approvedDays.reduce(
+      (sum, { workDay }) => sum + Number(workDay.workMinutes || 0),
+      0
+    );
+    elements.employeeTimesheetExportSummary.textContent = approvedDays.length
+      ? `Diese Woche: ${approvedDays.length} freigegebene${
+        approvedDays.length === 1 ? "r Tag" : " Tage"
+      } · ${formatMinutes(approvedMinutes)} h. Exportiert werden nur freigegebene oder abgerechnete Tage.`
+      : "Diese Woche ist noch kein Tag freigegeben. Du kannst auch einen älteren Zeitraum auswählen.";
+    elements.employeeTimesheetExportSubmit.disabled = !navigator.onLine;
   }
 
   function render() {
@@ -3868,6 +4319,7 @@
     elements.connectionState.classList.toggle("connection-state--offline", !online || pendingCount > 0);
     const label = !online ? "Offline" : syncing ? "Sync …" : pendingCount > 0 ? `${pendingCount} offen` : "Online";
     elements.connectionState.querySelector("span").textContent = label;
+    elements.employeeTimesheetExportSubmit.disabled = !online;
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
@@ -3962,12 +4414,15 @@
       return;
     }
     elements.weekMessage.textContent = "Stundenzettel wird geladen …";
+    const requestedWeekStart = selectedWeekStart;
     try {
-      const body = await requestJson(`./api/v1/work-weeks/${currentWeekStart()}`);
+      const body = await requestJson(`./api/v1/work-weeks/${requestedWeekStart}`);
+      if (requestedWeekStart !== selectedWeekStart) return;
       weekState = body.week;
       elements.weekMessage.textContent = "";
       renderWeek();
     } catch (error) {
+      if (requestedWeekStart !== selectedWeekStart) return;
       if (error.status === 401) showLogin();
       else {
         elements.weekMessage.textContent = error.network
@@ -3975,6 +4430,13 @@
           : error.message;
       }
     }
+  }
+
+  async function selectWeek(weekStart) {
+    selectedWeekStart = weekStart;
+    weekState = null;
+    renderWeek();
+    await refreshWeekData();
   }
 
   async function refreshLiveData() {
@@ -4242,6 +4704,7 @@
   elements.customerEditCancel.addEventListener("click", () => {
     openedCustomerId = null;
     elements.customerEditForm.hidden = true;
+    elements.customerManagementPanel.hidden = true;
     elements.customerEditMessage.textContent = "";
   });
 
@@ -4279,6 +4742,7 @@
       });
       openedCustomerId = null;
       elements.customerEditForm.hidden = true;
+      elements.customerManagementPanel.hidden = true;
       await refreshAdmin();
       showToast("Kunde aktualisiert.");
     } catch (error) {
@@ -4311,6 +4775,7 @@
   elements.projectEditCancel.addEventListener("click", () => {
     openedProjectId = null;
     elements.projectEditForm.hidden = true;
+    elements.projectManagementPanel.hidden = true;
     elements.projectEditMessage.textContent = "";
   });
 
@@ -4344,6 +4809,7 @@
       });
       openedProjectId = null;
       elements.projectEditForm.hidden = true;
+      elements.projectManagementPanel.hidden = true;
       await refreshAdmin();
       showToast("Projekt aktualisiert.");
     } catch (error) {
@@ -4502,6 +4968,7 @@
     elements.documentSearch.value = "";
     setDocumentTargets({ customerId: site.customerId, projectId: site.projectId, constructionSiteId: site.id });
     renderDocumentList();
+    elements.documentManagementPanel.open = true;
     elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     elements.documentTitle.focus({ preventScroll: true });
   });
@@ -4672,6 +5139,7 @@
   });
 
   elements.siteReportDigital.addEventListener("click", () => openSiteReportForm("digital"));
+  elements.siteReportDate.addEventListener("change", renderSiteReportPersonnel);
   elements.siteReportPhoto.addEventListener("click", () => elements.siteReportPhotoInput.click());
   elements.siteReportPhotoInput.addEventListener("change", () => {
     const file = elements.siteReportPhotoInput.files?.[0] || null;
@@ -4770,6 +5238,16 @@
           sourceMode,
           summary: elements.siteReportSummary.value,
           details: elements.siteReportDetails.value,
+          workPerformed: elements.siteReportDetails.value,
+          obstructions: elements.siteReportObstructions.value,
+          openItems: elements.siteReportOpenItems.value,
+          weather: elements.siteReportType.value === "daily"
+            ? elements.siteReportWeather.value
+            : null,
+          materialsAndEquipment: elements.siteReportMaterials.value,
+          agreements: elements.siteReportAgreements.value,
+          incidents: elements.siteReportIncidents.value,
+          personnel: collectSiteReportPersonnel(),
           sourceDocumentId
         })
       });
@@ -4819,6 +5297,15 @@
     }
   });
 
+  elements.mobileReportType.addEventListener("change", () => {
+    updateMobileReportTypeFields();
+    saveMobileReportDraft();
+  });
+  elements.mobileReportForm.addEventListener("input", (event) => {
+    if (event.target.matches("input[data-user-id]")) return;
+    updateMobileReportCheck();
+    saveMobileReportDraft();
+  });
   elements.mobileReportForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const latest = lastEvent();
@@ -4862,12 +5349,19 @@
       workPerformed,
       obstructions: elements.mobileReportObstructions.value.trim() || null,
       openItems: elements.mobileReportOpenItems.value.trim() || null,
+      weather: elements.mobileReportType.value === "daily"
+        ? elements.mobileReportWeather.value.trim() || null
+        : null,
+      materialsAndEquipment: elements.mobileReportMaterials.value.trim() || null,
+      agreements: elements.mobileReportAgreements.value.trim() || null,
+      incidents: elements.mobileReportIncidents.value.trim() || null,
       personnel,
       pendingSync: !demoMode,
       syncError: null
     };
     if (!Array.isArray(state.reports)) state.reports = [];
     state.reports.push(report);
+    state.reportDraft = null;
     saveState();
     closeMobileReportForm();
     addEntry("site_departure", siteIndex);
@@ -5130,7 +5624,7 @@
 
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
   elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
-  elements.timesheetExportForm.addEventListener("submit", (event) => {
+  elements.timesheetExportForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const from = elements.timesheetExportFrom.value;
     const to = elements.timesheetExportTo.value;
@@ -5146,17 +5640,53 @@
     if (elements.timesheetExportStatus.value) {
       parameters.set("status", elements.timesheetExportStatus.value);
     }
-    const link = document.createElement("a");
-    link.href = `./api/v1/admin/timesheets.xlsx?${parameters}`;
-    link.download = "";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    elements.timesheetExportMessage.textContent =
-      "Excel-Datei wird erstellt und heruntergeladen.";
-    window.setTimeout(() => {
-      elements.timesheetExportMessage.textContent = "";
-    }, 4000);
+    elements.timesheetExportSubmit.disabled = true;
+    elements.timesheetExportMessage.textContent = "Excel-Datei wird erstellt …";
+    try {
+      await downloadFile(
+        `./api/v1/admin/timesheets.xlsx?${parameters}`,
+        `Stundenzettel_${from}_${to}.xlsx`
+      );
+      elements.timesheetExportMessage.textContent = "Excel-Datei wurde heruntergeladen.";
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.timesheetExportMessage.textContent = error.message;
+    } finally {
+      elements.timesheetExportSubmit.disabled = false;
+    }
+  });
+
+  elements.employeeTimesheetExportForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const from = elements.employeeTimesheetExportFrom.value;
+    const to = elements.employeeTimesheetExportTo.value;
+    if (!from || !to || to < from) {
+      elements.employeeTimesheetExportMessage.textContent =
+        "Bitte einen gültigen Zeitraum auswählen.";
+      return;
+    }
+    if (!navigator.onLine) {
+      elements.employeeTimesheetExportMessage.textContent =
+        "Der Export ist wieder verfügbar, sobald eine Verbindung besteht.";
+      return;
+    }
+    const parameters = new URLSearchParams({ from, to });
+    elements.employeeTimesheetExportSubmit.disabled = true;
+    elements.employeeTimesheetExportMessage.textContent =
+      "Dein freigegebener Stundenzettel wird erstellt …";
+    try {
+      await downloadFile(
+        `./api/v1/timesheets.xlsx?${parameters}`,
+        `Mein_Stundenzettel_${from}_${to}.xlsx`
+      );
+      elements.employeeTimesheetExportMessage.textContent =
+        "Deine Excel-Datei wurde heruntergeladen.";
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.employeeTimesheetExportMessage.textContent = error.message;
+    } finally {
+      elements.employeeTimesheetExportSubmit.disabled = !navigator.onLine;
+    }
   });
 
   elements.togglePassword.addEventListener("click", () => {
@@ -5212,6 +5742,8 @@
       elements.siteChoiceSubmit.disabled = false;
     }
   });
+  elements.fieldSiteCustomer.addEventListener("change", updateFieldSiteHierarchy);
+  elements.fieldSiteProject.addEventListener("change", updateFieldSiteProjectMode);
   elements.fieldSiteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (demoMode) {
@@ -5222,11 +5754,20 @@
     elements.fieldSiteSubmit.disabled = true;
     elements.siteChoiceMessage.textContent = "Neue Baustelle wird angelegt …";
     try {
+      const createsCustomer = elements.fieldSiteCustomer.value === "__new__";
+      const createsProject = elements.fieldSiteProject.value === "__new__";
       const body = await requestJson("./api/v1/time-tracking/sites", {
         method: "POST",
         body: JSON.stringify({
           workDate: state.workDate,
-          projectId: elements.fieldSiteProject.value,
+          projectId: createsProject ? null : elements.fieldSiteProject.value,
+          customerId: createsProject && !createsCustomer
+            ? elements.fieldSiteCustomer.value
+            : null,
+          customerName: createsProject && createsCustomer
+            ? elements.fieldSiteCustomerName.value
+            : null,
+          projectName: createsProject ? elements.fieldSiteProjectName.value : null,
           name: elements.fieldSiteName.value,
           installerShortText: elements.fieldSiteShortText.value,
           street: elements.fieldSiteStreet.value,
@@ -5240,7 +5781,13 @@
       closeSiteChoice();
       if (lastEvent()?.type === "site_departure") addEntry("next_site", targetIndex);
       elements.fieldSiteForm.reset();
-      showToast("Baustelle angelegt und gewählt · das Büro sieht sie zur Prüfung.");
+      showToast(
+        createsCustomer
+          ? "Kunde, Projekt und Baustelle angelegt · das Büro sieht alles zur Prüfung."
+          : createsProject
+            ? "Projekt und Baustelle angelegt · das Büro sieht beides zur Prüfung."
+            : "Baustelle angelegt und gewählt · das Büro sieht sie zur Prüfung."
+      );
     } catch (error) {
       if (error.status === 401) showLogin();
       else elements.siteChoiceMessage.textContent = error.message;
@@ -5425,6 +5972,17 @@
     showDashboardPane("week");
     void refreshWeekData();
   });
+  elements.weekPrevious.addEventListener("click", () => {
+    void selectWeek(addIsoDays(selectedWeekStart, -7));
+  });
+  elements.weekCurrent.addEventListener("click", () => {
+    void selectWeek(currentWeekStart());
+  });
+  elements.weekNext.addEventListener("click", () => {
+    if (selectedWeekStart < currentWeekStart()) {
+      void selectWeek(addIsoDays(selectedWeekStart, 7));
+    }
+  });
   elements.navAssignments.addEventListener("click", () => {
     showDashboardPane("assignments");
   });
@@ -5451,6 +6009,22 @@
     elements.siteEditMessage.textContent = "";
   });
   elements.siteSearch.addEventListener("input", renderSiteList);
+  elements.hierarchySearch.addEventListener("input", renderBusinessHierarchy);
+  elements.hierarchyStatusFilter.addEventListener("change", renderBusinessHierarchy);
+  elements.hierarchyNewCustomer.addEventListener("click", () => {
+    openMasterDataForm(
+      elements.customerPanel,
+      elements.customerType.value === "company"
+        ? elements.customerCompanyName
+        : elements.customerFirstName
+    );
+  });
+  elements.hierarchyNewProject.addEventListener("click", () => {
+    openMasterDataForm(elements.projectPanel, elements.projectName);
+  });
+  elements.hierarchyNewSite.addEventListener("click", () => {
+    openMasterDataForm(elements.siteFormPanel, elements.siteName);
+  });
   elements.siteStatusFilter.addEventListener("change", renderSiteList);
 
   elements.todayLabel.textContent = dateFormatter.format(new Date());

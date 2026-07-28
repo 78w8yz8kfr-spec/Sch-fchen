@@ -228,6 +228,10 @@ test("Baustellenmodule validieren Aufgaben, Notizen, Material und Berichte", () 
     workPerformed: "Leitungen und Kabel verlegt",
     obstructions: "Material verspätet",
     openItems: "Beschriftung",
+    weather: "Trocken, 18 °C",
+    materialsAndEquipment: "NYM-J 3x1,5 und Arbeitsbühne",
+    agreements: "Trasse mit Bauleitung abgestimmt",
+    incidents: "Keine",
     personnel: [{
       userId: "44444444-4444-4444-8444-444444444444",
       minutes: 480
@@ -235,6 +239,8 @@ test("Baustellenmodule validieren Aufgaben, Notizen, Material und Berichte", () 
   });
   assert.equal(mobileReport.clientReportId, "33333333-3333-4333-8333-333333333333");
   assert.equal(mobileReport.workPerformed, "Leitungen und Kabel verlegt");
+  assert.equal(mobileReport.weather, "Trocken, 18 °C");
+  assert.equal(mobileReport.materialsAndEquipment, "NYM-J 3x1,5 und Arbeitsbühne");
   assert.equal(mobileReport.personnel[0].minutes, 480);
   assert.throws(
     () => validateMobileSiteReport({
@@ -624,6 +630,36 @@ test("spontane Baustellenwahl und Feldanlage verlangen gültige Stammdaten", () 
     postalCode: "12345",
     city: "Musterstadt"
   }).city, "Musterstadt");
+  assert.equal(validateFieldConstructionSite({
+    workDate: "2026-07-17",
+    customerName: "Neukunde GmbH",
+    projectName: "Neuer Auftrag",
+    name: "Baustelle Neubau",
+    street: "Musterweg",
+    houseNumber: "14",
+    postalCode: "12345",
+    city: "Musterstadt"
+  }).projectName, "Neuer Auftrag");
+  assert.throws(() => validateFieldConstructionSite({
+    workDate: "2026-07-17",
+    customerName: "Neukunde GmbH",
+    name: "Baustelle Neubau",
+    street: "Musterweg",
+    houseNumber: "14",
+    postalCode: "12345",
+    city: "Musterstadt"
+  }), /Projekt/);
+  assert.throws(() => validateFieldConstructionSite({
+    workDate: "2026-07-17",
+    projectId,
+    customerName: "Nicht gleichzeitig",
+    projectName: "Nicht gleichzeitig",
+    name: "Baustelle Musterweg",
+    street: "Musterweg",
+    houseNumber: "12",
+    postalCode: "12345",
+    city: "Musterstadt"
+  }), /nicht mit neuen Stammdaten kombiniert/);
   assert.throws(() => validateFieldConstructionSite({
     workDate: "2026-07-17",
     projectId,

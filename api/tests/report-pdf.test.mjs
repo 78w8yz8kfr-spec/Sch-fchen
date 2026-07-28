@@ -21,6 +21,9 @@ test("freigegebener Bericht wird als unveränderliche PDF-Ausgabe erzeugt", asyn
         workPerformed: "Leitungen aufgelegt und Stromkreise beschriftet.",
         obstructions: "Keine",
         openItems: "Messung abschließen",
+        materialsAndEquipment: "NYM-J 3x1,5 und Prüfgerät",
+        agreements: "Messung am Folgetag",
+        incidents: "Keine Schäden",
         personnel: [{
           userId: "33333333-3333-4333-8333-333333333333",
           name: "Max Monteur",
@@ -56,6 +59,6 @@ test("freigegebener Bericht wird als unveränderliche PDF-Ausgabe erzeugt", asyn
   assert.ok(pdf.length > 1500);
   assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
   const loaded = await PDFDocument.load(pdf);
-  assert.equal(loaded.getTitle(), "Montagebericht SE-R-2026-00001");
+  assert.equal(loaded.getTitle(), "Montageschein SE-R-2026-00001");
   assert.equal(loaded.getPageCount(), 2);
 });
