@@ -667,8 +667,9 @@ async function getAssignments(client, context, date) {
 }
 
 async function getTimeTrackingSiteOptions(client, context, date) {
-  const [suggested, sites, projects] = await Promise.all([
-    getAssignments(client, context, date),
+  const suggested = await getAssignments(client, context, date);
+  const suggestedSiteIds = suggested.map((assignment) => assignment.constructionSite.id);
+  const [sites, projects] = await Promise.all([
     client.query(
       `SELECT site.id, site.project_id, project.customer_id, site.site_number,
               site.name, site.installer_short_text, site.status, site.row_version,
@@ -691,7 +692,7 @@ async function getTimeTrackingSiteOptions(client, context, date) {
        ORDER BY
          CASE WHEN site.id = ANY($2::UUID[]) THEN 0 ELSE 1 END,
          LOWER(site.name), site.site_number`,
-      [context.companyId, suggested.map((assignment) => assignment.constructionSite.id)]
+      [context.companyId, suggestedSiteIds]
     ),
     client.query(
       `SELECT project.id, project.customer_id, project.project_number,
