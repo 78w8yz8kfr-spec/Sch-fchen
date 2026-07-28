@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.34.0 – Direkte Baustellenabläufe
+
+- der heutige Einsatz bietet Navigation und Baustellenakte als eindeutige Schnellaktionen, ohne den großen Zeitbuchungs-Schritt zu verdrängen
+- berichtsverantwortliche Mitarbeiter können den Baustellenbericht schon während des Einsatzes speichern und bleiben dabei auf der Baustelle; beim späteren Verlassen wird der vorhandene Bericht wiederverwendet
+- Monteure ändern den Status sichtbarer Baustellenaufgaben direkt von Offen zu In Arbeit und Erledigt oder öffnen eine erledigte Aufgabe erneut
+- die mobile Aufgaben-API prüft Tageszuweisung, Baustelle, Mitarbeiterzuordnung, Rollen, erlaubte Statusfolge und Versionsstand serverseitig; Archivieren bleibt dem Büro vorbehalten
+- Büro und Disposition erreichen Einsatzplanung, Bericht, Dokument und Aufgabe direkt aus dem geöffneten Baustellen-Dashboard; die Baustelle wird automatisch vorausgewählt
+- die dokumentierte Plancraft-Featureprüfung trennt bewusst übernommene Arbeitsmuster von späteren oder für Schäfchen ungeeigneten Modulen
+
 ### V0.33.0 – Persönlicher PDF-Stundenzettel und einfache Baustellen
 
 - Mitarbeiter laden ihre eigenen freigegebenen oder abgerechneten Stundenzettel jetzt direkt als übersichtliches A4-PDF oder weiterhin als Excel-Datei herunter

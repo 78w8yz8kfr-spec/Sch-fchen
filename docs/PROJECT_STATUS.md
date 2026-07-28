@@ -1,10 +1,15 @@
 # Projektstatus
 
-Stand: 28.07.2026
-Technischer Stand: V0.33.0
+Stand: 29.07.2026
+Technischer Stand: V0.34.0
 
 ## Abgeschlossen
 
+- Schnellaktionen am heutigen Einsatz für Navigation, Baustellenakte und den vorgezogenen Bericht des verantwortlichen Mitarbeiters
+- Bericht kann während des laufenden Einsatzes gespeichert werden, ohne dadurch automatisch eine Abfahrtsbuchung auszulösen
+- mobile Aufgabenstatus mit Beginnen, Erledigen und Wiederöffnen sowie serverseitiger Prüfung von Tageszuweisung, Rolle, Mitarbeiterzuordnung, Statusfolge und Versionsstand
+- vier direkte Büroaktionen am geöffneten Baustellen-Dashboard für Einsatz, Bericht, Dokument und Aufgabe mit automatischer Baustellenvorauswahl
+- dokumentierter Abgleich öffentlicher Plancraft-Arbeitsmuster mit klarer Übernahme-, Später- und Nicht-übernehmen-Entscheidung
 - Login-Darstellung mit ursprünglicher Feldhöhe und korrekt positionierter Passwortanzeige wiederhergestellt
 - große Stundenzettel-Anzeige auf Netto-Arbeitszeit umgestellt; Pausen und Unterbrechungen bleiben getrennt nachvollziehbar
 - eigener Wochen-Stundenzettel mit Tageskarten, Wochensummen und allen wirksamen Buchungen

@@ -2500,6 +2500,94 @@ async function updateSiteTask(client, context, taskId, input) {
   return getSiteTaskRecord(client, context, taskId);
 }
 
+async function updateMobileSiteTask(
+  client,
+  context,
+  constructionSiteId,
+  taskId,
+  date,
+  input
+) {
+  const access = await requireSiteWorkspaceAccess(
+    client,
+    context,
+    constructionSiteId,
+    date
+  );
+  const current = await client.query(
+    `SELECT construction_site_id, assigned_user_id, status, row_version
+     FROM site_tasks
+     WHERE company_id = $1
+       AND id = $2
+       AND construction_site_id = $3
+       AND status <> 'archived'
+     FOR UPDATE`,
+    [context.companyId, taskId, constructionSiteId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Die Aufgabe wurde nicht gefunden.", 404, "site_task_not_found");
+  }
+  const task = current.rows[0];
+  if (!access.canLead && task.assigned_user_id && task.assigned_user_id !== context.userId) {
+    throw new InputError(
+      "Diese Aufgabe ist einem anderen Mitarbeiter zugewiesen.",
+      403,
+      "site_task_not_assigned"
+    );
+  }
+  if (input.status === "archived") {
+    throw new InputError(
+      "Aufgaben können nur im Büro archiviert werden.",
+      403,
+      "site_task_archive_forbidden"
+    );
+  }
+  if (Number(task.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Die Aufgabe wurde zwischenzeitlich geändert. Bitte die Baustellenakte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  const allowedTransitions = {
+    open: new Set(["in_progress"]),
+    in_progress: new Set(["done"]),
+    done: new Set(["in_progress"])
+  };
+  if (!allowedTransitions[task.status]?.has(input.status)) {
+    throw new InputError(
+      "Dieser Aufgabenstatus kann mobil nicht gesetzt werden.",
+      409,
+      "site_task_transition_invalid"
+    );
+  }
+  const updated = await client.query(
+    `UPDATE site_tasks
+     SET status = $4, changed_by_user_id = $5
+     WHERE company_id = $1
+       AND id = $2
+       AND construction_site_id = $3
+       AND row_version = $6
+     RETURNING id`,
+    [
+      context.companyId,
+      taskId,
+      constructionSiteId,
+      input.status,
+      context.userId,
+      input.rowVersion
+    ]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Die Aufgabe wurde zwischenzeitlich geändert. Bitte die Baustellenakte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return getSiteTaskRecord(client, context, taskId);
+}
+
 async function getSiteMaterialRecord(client, context, materialId) {
   const result = await client.query(
     `SELECT id, construction_site_id, item_name, quantity, unit, status,
@@ -5131,6 +5219,30 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => getSiteWorkspace(client, context, constructionSiteId, date)
         );
         return json(response, 200, { dashboard });
+      }
+
+      const mobileSiteTaskMatch =
+        /^\/api\/v1\/construction-sites\/([^/]+)\/tasks\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && mobileSiteTaskMatch) {
+        const constructionSiteId = validateId(mobileSiteTaskMatch[1], "Baustellen-ID");
+        const taskId = validateId(mobileSiteTaskMatch[2], "Aufgaben-ID");
+        const date = validateWorkDate(
+          url.searchParams.get("date") || localDate(new Date().toISOString(), config.timeZone)
+        );
+        const input = validateSiteTaskUpdate(await readJson(request));
+        const siteTask = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateMobileSiteTask(
+            client,
+            context,
+            constructionSiteId,
+            taskId,
+            date,
+            input
+          )
+        );
+        return json(response, 200, { siteTask });
       }
 
       const siteNoteMatch = /^\/api\/v1\/construction-sites\/([^/]+)\/notes$/.exec(url.pathname);

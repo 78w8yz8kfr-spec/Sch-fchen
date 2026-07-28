@@ -1,7 +1,7 @@
 # Sprint 2: Planung und Zeiterfassung
 
-Stand: 28.07.2026
-Technischer Stand: V0.33.0
+Stand: 29.07.2026
+Technischer Stand: V0.34.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
 012 sowie 027, 031 und 032. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,

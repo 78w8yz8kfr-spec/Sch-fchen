@@ -1125,6 +1125,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(assignment.reportResponsible, true);
   assert.equal(assignment.reportResponsibilitySource, "automatic");
 
+  const installerTaskResponse = await fetch(`${baseUrl}/api/v1/admin/site-tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      constructionSiteId: site.id,
+      title: "Stromkreise kennzeichnen",
+      details: "Beschriftung direkt vor Ort abschließen",
+      assignedUserId: employee.id,
+      priority: "normal",
+      dueDate: assignmentDate
+    })
+  });
+  assert.equal(installerTaskResponse.status, 201, await installerTaskResponse.clone().text());
+  const installerTask = (await installerTaskResponse.json()).siteTask;
+  assert.equal(installerTask.status, "open");
+
   const blockedArchiveResponse = await fetch(
     `${baseUrl}/api/v1/admin/construction-sites/${site.id}`,
     {
@@ -1198,6 +1214,54 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(assignedInstallerDashboard.viewer.canLead, true);
   assert.equal(assignedInstallerDashboard.viewer.canManage, false);
   assert.equal(assignedInstallerDashboard.viewer.reportResponsible, true);
+  assert.ok(assignedInstallerDashboard.tasks.some((item) => item.id === installerTask.id));
+
+  const startedInstallerTaskResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${site.id}/tasks/${installerTask.id}?date=${assignmentDate}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({ status: "in_progress", rowVersion: installerTask.rowVersion })
+    }
+  );
+  assert.equal(
+    startedInstallerTaskResponse.status,
+    200,
+    await startedInstallerTaskResponse.clone().text()
+  );
+  const startedInstallerTask = (await startedInstallerTaskResponse.json()).siteTask;
+  assert.equal(startedInstallerTask.status, "in_progress");
+
+  const finishedInstallerTaskResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${site.id}/tasks/${installerTask.id}?date=${assignmentDate}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({ status: "done", rowVersion: startedInstallerTask.rowVersion })
+    }
+  );
+  assert.equal(
+    finishedInstallerTaskResponse.status,
+    200,
+    await finishedInstallerTaskResponse.clone().text()
+  );
+  const finishedInstallerTask = (await finishedInstallerTaskResponse.json()).siteTask;
+  assert.equal(finishedInstallerTask.status, "done");
+  assert.ok(finishedInstallerTask.completedAt);
+
+  const forbiddenMobileArchiveResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${site.id}/tasks/${installerTask.id}?date=${assignmentDate}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({ status: "archived", rowVersion: finishedInstallerTask.rowVersion })
+    }
+  );
+  assert.equal(forbiddenMobileArchiveResponse.status, 403);
+  assert.equal(
+    (await forbiddenMobileArchiveResponse.json()).error.code,
+    "site_task_archive_forbidden"
+  );
 
   const installerPhotoResponse = await fetch(
     `${baseUrl}/api/v1/construction-sites/${site.id}/photos?date=${assignmentDate}`,
@@ -1221,6 +1285,17 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   );
   assert.equal(unassignedInstallerDashboardResponse.status, 403);
   assert.equal((await unassignedInstallerDashboardResponse.json()).error.code, "site_not_assigned");
+
+  const unassignedInstallerTaskResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/tasks/${completedSiteTask.id}?date=${assignmentDate}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({ status: "in_progress", rowVersion: completedSiteTask.rowVersion })
+    }
+  );
+  assert.equal(unassignedInstallerTaskResponse.status, 403);
+  assert.equal((await unassignedInstallerTaskResponse.json()).error.code, "site_not_assigned");
 
   const unassignedInstallerPhotoResponse = await fetch(
     `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/photos?date=${assignmentDate}`,
