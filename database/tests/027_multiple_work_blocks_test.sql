@@ -57,7 +57,7 @@ BEGIN
           AND day.break_minutes = 120
           AND day.work_minutes = 420
           AND day.overtime_minutes = 0
-          AND day.calculation_version = 2
+          AND day.calculation_version >= 2
     ) THEN
         RAISE EXCEPTION 'Mehrere Arbeitsblöcke wurden nicht korrekt zusammengeführt';
     END IF;

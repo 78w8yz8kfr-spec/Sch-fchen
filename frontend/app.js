@@ -11,12 +11,20 @@
     {
       sequenceNumber: 1,
       plannedStartTime: "07:30:00",
-      constructionSite: { id: null, name: "Demo · Musterstraße 12", shortText: "Verteilung erneuern" }
+      constructionSite: {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "Demo · Musterstraße 12",
+        shortText: "Verteilung erneuern"
+      }
     },
     {
       sequenceNumber: 2,
       plannedStartTime: null,
-      constructionSite: { id: null, name: "Demo · Hafenweg 4", shortText: "Beleuchtung prüfen" }
+      constructionSite: {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "Demo · Hafenweg 4",
+        shortText: "Beleuchtung prüfen"
+      }
     }
   ];
 
@@ -125,11 +133,20 @@
     workDayReviewPanel: document.querySelector("#work-day-review-panel"),
     workDayReviewCount: document.querySelector("#work-day-review-count"),
     workDayReviewList: document.querySelector("#work-day-review-list"),
+    timesheetExportPanel: document.querySelector("#timesheet-export-panel"),
+    timesheetExportForm: document.querySelector("#timesheet-export-form"),
+    timesheetExportFrom: document.querySelector("#timesheet-export-from"),
+    timesheetExportTo: document.querySelector("#timesheet-export-to"),
+    timesheetExportEmployee: document.querySelector("#timesheet-export-employee"),
+    timesheetExportStatus: document.querySelector("#timesheet-export-status"),
+    timesheetExportSubmit: document.querySelector("#timesheet-export-submit"),
+    timesheetExportMessage: document.querySelector("#timesheet-export-message"),
     assignmentCard: document.querySelector("#assignment-card"),
     assignmentOrder: document.querySelector("#assignment-order"),
     assignmentTitle: document.querySelector("#assignment-title"),
     assignmentMeta: document.querySelector("#assignment-meta"),
     assignmentDetails: document.querySelector("#assignment-details"),
+    siteChoiceOpen: document.querySelector("#site-choice-open"),
     liveDuration: document.querySelector("#live-duration"),
     grossTime: document.querySelector("#gross-time"),
     breakTime: document.querySelector("#break-time"),
@@ -143,8 +160,36 @@
     timeCorrectionAt: document.querySelector("#time-correction-at"),
     timeCorrectionReason: document.querySelector("#time-correction-reason"),
     timeCorrectionSubmit: document.querySelector("#time-correction-submit"),
+    timeInvalidationSubmit: document.querySelector("#time-invalidation-submit"),
     timeCorrectionCancel: document.querySelector("#time-correction-cancel"),
     timeCorrectionMessage: document.querySelector("#time-correction-message"),
+    timeAdditionDialog: document.querySelector("#time-addition-dialog"),
+    timeAdditionForm: document.querySelector("#time-addition-form"),
+    timeAdditionDate: document.querySelector("#time-addition-date"),
+    timeAdditionType: document.querySelector("#time-addition-type"),
+    timeAdditionAt: document.querySelector("#time-addition-at"),
+    timeAdditionSiteField: document.querySelector("#time-addition-site-field"),
+    timeAdditionSite: document.querySelector("#time-addition-site"),
+    timeAdditionReason: document.querySelector("#time-addition-reason"),
+    timeAdditionSubmit: document.querySelector("#time-addition-submit"),
+    timeAdditionCancel: document.querySelector("#time-addition-cancel"),
+    timeAdditionMessage: document.querySelector("#time-addition-message"),
+    siteChoiceDialog: document.querySelector("#site-choice-dialog"),
+    siteChoiceCancel: document.querySelector("#site-choice-cancel"),
+    siteChoiceSuggestion: document.querySelector("#site-choice-suggestion"),
+    siteChoiceForm: document.querySelector("#site-choice-form"),
+    siteChoiceSelect: document.querySelector("#site-choice-select"),
+    siteChoiceSubmit: document.querySelector("#site-choice-submit"),
+    fieldSiteForm: document.querySelector("#field-site-form"),
+    fieldSiteProject: document.querySelector("#field-site-project"),
+    fieldSiteName: document.querySelector("#field-site-name"),
+    fieldSiteShortText: document.querySelector("#field-site-short-text"),
+    fieldSiteStreet: document.querySelector("#field-site-street"),
+    fieldSiteHouseNumber: document.querySelector("#field-site-house-number"),
+    fieldSitePostalCode: document.querySelector("#field-site-postal-code"),
+    fieldSiteCity: document.querySelector("#field-site-city"),
+    fieldSiteSubmit: document.querySelector("#field-site-submit"),
+    siteChoiceMessage: document.querySelector("#site-choice-message"),
     timesheetSection: document.querySelector("#timesheet-section"),
     resetDemo: document.querySelector("#reset-demo"),
     bottomNav: document.querySelector(".bottom-nav"),
@@ -465,6 +510,8 @@
   let weekState = null;
   let editingAssignmentId = null;
   let correctingTimeEntryId = null;
+  let addingTimeEntryDate = null;
+  let siteOptionsState = null;
   let openedCustomerId = null;
   let openedProjectId = null;
   let openedSiteId = null;
@@ -673,7 +720,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.29.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.30.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1688,8 +1735,8 @@
       const badge = document.createElement("span");
       const meta = document.createElement("span");
       const button = document.createElement("button");
-      const documentsButton = document.createElement("button");
       const actions = document.createElement("div");
+      const documentsButton = document.createElement("button");
       const documentCount = documentsForEntity("customer", customer.id).length;
       const location = [customer.address?.postalCode, customer.address?.city].filter(Boolean).join(" ");
       title.textContent = customer.displayName;
@@ -1746,8 +1793,8 @@
       const badge = document.createElement("span");
       const meta = document.createElement("span");
       const button = document.createElement("button");
-      const documentsButton = document.createElement("button");
       const actions = document.createElement("div");
+      const documentsButton = document.createElement("button");
       const documentCount = documentsForEntity("project", project.id).length;
       title.textContent = project.name;
       badge.className = `site-status site-status--${projectStatusGroup(project.status)}`;
@@ -1856,12 +1903,16 @@
       const badge = document.createElement("span");
       const meta = document.createElement("span");
       const button = document.createElement("button");
+      const actions = document.createElement("div");
       title.textContent = site.name;
       badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
       badge.textContent = siteStatusLabel(site.status);
       meta.textContent = [
         site.customerName,
         site.projectName,
+        site.fieldReviewStatus === "pending"
+          ? `Vom Monteur ${site.fieldCreatedByName ? `(${site.fieldCreatedByName}) ` : ""}angelegt · Büroprüfung offen`
+          : null,
         `${documentsForEntity("construction_site", site.id).length} Dokumente`,
         `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
         `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
@@ -1872,7 +1923,30 @@
       button.className = "text-button";
       button.textContent = "Öffnen";
       button.addEventListener("click", () => openSiteDashboard(site));
-      item.append(content, button);
+      actions.className = "site-list-actions";
+      if (site.fieldReviewStatus === "pending") {
+        const confirm = document.createElement("button");
+        confirm.type = "button";
+        confirm.className = "text-button";
+        confirm.textContent = "Bestätigen";
+        confirm.addEventListener("click", async () => {
+          confirm.disabled = true;
+          try {
+            await requestJson(
+              `./api/v1/admin/construction-sites/${encodeURIComponent(site.id)}/confirm`,
+              { method: "POST" }
+            );
+            await refreshAdmin(adminState.date);
+            showToast("Neue Baustelle durch das Büro bestätigt.");
+          } catch (error) {
+            confirm.disabled = false;
+            showToast(error.message);
+          }
+        });
+        actions.append(confirm);
+      }
+      actions.append(button);
+      item.append(content, actions);
       elements.siteList.append(item);
     });
   }
@@ -2133,14 +2207,14 @@
 
   function renderWorkDayReviews() {
     const workDays = adminState?.workDays || [];
-    const actionable = workDays.filter((day) => ["submitted", "approved"].includes(day.status));
+    const actionable = workDays.filter((day) => day.reviewable || day.status === "approved");
     elements.workDayReviewPanel.hidden = !canPlan();
     elements.workDayReviewCount.textContent = String(actionable.length);
     elements.workDayReviewList.replaceChildren();
     if (workDays.length === 0) {
       const empty = document.createElement("li");
       empty.className = "admin-list__empty";
-      empty.textContent = "In dieser Woche wurde noch kein Stundenzettel eingereicht.";
+      empty.textContent = "In dieser Woche wurden noch keine Zeiten erfasst.";
       elements.workDayReviewList.append(empty);
       return;
     }
@@ -2155,23 +2229,29 @@
       meta.textContent = `Arbeit ${formatMinutes(day.workMinutes)} · Pause ${
         formatMinutes(day.breakMinutes)
       } · Fahrt ${formatMinutes(day.travelMinutes)}`;
-      status.className = `work-day-review-status work-day-review-status--${day.status}`;
+      status.className = `work-day-review-status work-day-review-status--${day.workflowStatus}`;
       status.textContent = {
-        submitted: "Zur Prüfung",
-        approved: "Freigegeben",
-        locked: "Abgerechnet"
-      }[day.status] || day.status;
+        in_progress: "In Arbeit",
+        completed: day.status === "approved" ? "Freigegeben" : "Abgeschlossen",
+        billed: "Abgerechnet"
+      }[day.workflowStatus] || day.workflowStatus;
       content.append(title, meta, status);
+      if (day.warnings?.length) {
+        const warning = document.createElement("small");
+        warning.className = "work-day-review-warning";
+        warning.textContent = day.warnings.map((item) => item.message).join(" · ");
+        content.append(warning);
+      }
       item.append(content);
 
-      if (["submitted", "approved"].includes(day.status)) {
+      if (day.reviewable || day.status === "approved") {
         const action = document.createElement("button");
-        const decision = day.status === "submitted" ? "approved" : "locked";
+        const decision = day.status === "approved" ? "locked" : "approved";
         action.type = "button";
-        action.className = day.status === "submitted"
+        action.className = decision === "approved"
           ? "button button--secondary work-day-review-action"
           : "button button--primary work-day-review-action";
-        action.textContent = day.status === "submitted" ? "Freigeben" : "Abrechnen";
+        action.textContent = decision === "approved" ? "Prüfen und freigeben" : "Abrechnen";
         action.addEventListener("click", async () => {
           if (
             decision === "locked"
@@ -2224,10 +2304,25 @@
       const actions = document.createElement("div");
       const approve = document.createElement("button");
       const reject = document.createElement("button");
-      title.textContent = `${correction.employeeName} · ${timeEntryTypeLabel(correction.entryType)}`;
-      meta.textContent = `${shortDate(correction.workDate)} · ${
-        timeFormatter.format(new Date(correction.originalRecordedAt))
-      } → ${timeFormatter.format(new Date(correction.requestedRecordedAt))} Uhr`;
+      const kindLabel = {
+        addition: "Fehlende Buchung",
+        invalidation: "Ungültig-Markierung",
+        replacement: "Zeitkorrektur"
+      }[correction.correctionKind] || "Zeitkorrektur";
+      title.textContent = `${correction.employeeName} · ${kindLabel} · ${
+        timeEntryTypeLabel(correction.entryType)
+      }`;
+      meta.textContent = correction.correctionKind === "addition"
+        ? `${shortDate(correction.workDate)} · ergänzen um ${
+          timeFormatter.format(new Date(correction.requestedRecordedAt))
+        } Uhr`
+        : correction.correctionKind === "invalidation"
+          ? `${shortDate(correction.workDate)} · ${
+            timeFormatter.format(new Date(correction.originalRecordedAt))
+          } Uhr als ungültig markieren`
+          : `${shortDate(correction.workDate)} · ${
+            timeFormatter.format(new Date(correction.originalRecordedAt))
+          } → ${timeFormatter.format(new Date(correction.requestedRecordedAt))} Uhr`;
       reason.textContent = correction.reason;
       reason.className = "time-correction-review-reason";
       content.append(title, meta, reason);
@@ -2242,7 +2337,7 @@
       const review = async (decision) => {
         if (
           decision === "approved"
-          && !window.confirm("Korrektur genehmigen und den Stundenzettel neu berechnen?")
+          && !window.confirm("Änderung genehmigen und den Stundenzettel neu berechnen?")
         ) return;
         approve.disabled = true;
         reject.disabled = true;
@@ -2269,6 +2364,30 @@
       actions.append(approve, reject);
       item.append(content, actions);
       elements.timeCorrectionReviewList.append(item);
+    });
+  }
+
+  function renderTimesheetExport() {
+    elements.timesheetExportPanel.hidden = !canPlan();
+    if (!canPlan() || !adminState) return;
+    if (!elements.timesheetExportFrom.value) {
+      elements.timesheetExportFrom.value = adminState.weekStart;
+    }
+    if (!elements.timesheetExportTo.value) {
+      elements.timesheetExportTo.value = addIsoDays(adminState.weekStart, 6);
+    }
+    const selectedEmployee = elements.timesheetExportEmployee.value;
+    elements.timesheetExportEmployee.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "Alle Mitarbeiter";
+    elements.timesheetExportEmployee.append(all);
+    adminState.employees.forEach((employee) => {
+      const option = document.createElement("option");
+      option.value = employee.id;
+      option.textContent = `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`;
+      option.selected = employee.id === selectedEmployee;
+      elements.timesheetExportEmployee.append(option);
     });
   }
 
@@ -2395,6 +2514,7 @@
     renderDocumentList();
     renderWorkDayReviews();
     renderTimeCorrections();
+    renderTimesheetExport();
     if (openedSiteId && !elements.siteDashboard.hidden) {
       renderSiteDocuments(openedSiteId);
       renderSiteTasks(openedSiteId);
@@ -2801,10 +2921,171 @@
 
   function currentSiteIndex() {
     if (assignments.length === 0) return 0;
-    return Math.min(
-      state.events.filter((entry) => entry.type === "next_site").length,
-      assignments.length - 1
+    let latestSiteEventIndex = -1;
+    state.events.forEach((entry, index) => {
+      if (
+        ["site_arrival", "site_departure", "next_site"].includes(entry.type)
+        && entry.constructionSiteId
+      ) {
+        latestSiteEventIndex = index;
+      }
+    });
+    if (latestSiteEventIndex < 0) return 0;
+    const latestSiteEvent = state.events[latestSiteEventIndex];
+    const candidates = assignments
+      .map((assignment, index) => (
+        assignment.constructionSite.id === latestSiteEvent.constructionSiteId ? index : -1
+      ))
+      .filter((index) => index >= 0);
+    if (candidates.length === 0) return 0;
+    const occurrence = state.events
+      .slice(0, latestSiteEventIndex + 1)
+      .filter((entry) => (
+        entry.type === "next_site"
+        && entry.constructionSiteId === latestSiteEvent.constructionSiteId
+      )).length;
+    return candidates[Math.min(occurrence, candidates.length - 1)];
+  }
+
+  function siteChoiceTargetIndex() {
+    const current = currentSiteIndex();
+    return lastEvent()?.type === "site_departure"
+      ? Math.min(current + 1, assignments.length)
+      : current;
+  }
+
+  function reorderSelectedAssignment(nextAssignments, selectedSiteId, preferLast = false) {
+    const ordered = [...nextAssignments];
+    let selectedIndex = -1;
+    ordered.forEach((assignment, index) => {
+      if (
+        assignment.constructionSite.id === selectedSiteId
+        && (selectedIndex < 0 || preferLast)
+      ) {
+        selectedIndex = index;
+      }
+    });
+    if (selectedIndex < 0) return;
+    const [selected] = ordered.splice(selectedIndex, 1);
+    const targetIndex = Math.min(siteChoiceTargetIndex(), ordered.length);
+    ordered.splice(targetIndex, 0, selected);
+    assignments = ordered;
+    saveState();
+    render();
+  }
+
+  function closeSiteChoice() {
+    elements.siteChoiceMessage.textContent = "";
+    if (elements.siteChoiceDialog.open) elements.siteChoiceDialog.close();
+  }
+
+  function renderSiteChoiceOptions(options) {
+    siteOptionsState = options;
+    const targetIndex = siteChoiceTargetIndex();
+    const suggested = assignments[targetIndex] || assignments[0] || null;
+    elements.siteChoiceSuggestion.textContent = suggested
+      ? `Vorgeschlagen laut Baustellenplan: ${suggested.constructionSite.name}`
+      : "Für heute ist keine Baustelle vorgeschlagen. Du kannst eine vorhandene wählen oder eine neue anlegen.";
+
+    const suggestedIds = new Set(
+      (options.suggestedAssignments || []).map(
+        (assignment) => assignment.constructionSite.id
+      )
     );
+    elements.siteChoiceSelect.replaceChildren();
+    (options.sites || []).forEach((site) => {
+      const option = document.createElement("option");
+      option.value = site.id;
+      option.textContent = `${
+        suggestedIds.has(site.id) ? "Vorschlag · " : ""
+      }${site.name} · ${site.projectName || "Projekt"}`;
+      option.selected = site.id === suggested?.constructionSite.id;
+      elements.siteChoiceSelect.append(option);
+    });
+
+    elements.fieldSiteProject.replaceChildren();
+    (options.projects || []).forEach((project) => {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = `${project.customerName} · ${project.name}`;
+      elements.fieldSiteProject.append(option);
+    });
+    const hasSites = elements.siteChoiceSelect.options.length > 0;
+    const hasProjects = elements.fieldSiteProject.options.length > 0;
+    elements.siteChoiceSelect.disabled = !hasSites;
+    elements.siteChoiceSubmit.disabled = !hasSites;
+    elements.fieldSiteSubmit.disabled = !hasProjects;
+  }
+
+  async function openSiteChoice() {
+    if (demoMode) {
+      renderSiteChoiceOptions({
+        suggestedAssignments: assignments,
+        sites: assignments.map((assignment) => ({
+          id: assignment.constructionSite.id,
+          name: assignment.constructionSite.name,
+          projectName: "Demo"
+        })),
+        projects: []
+      });
+      elements.siteChoiceDialog.showModal();
+      return;
+    }
+    if (!navigator.onLine) {
+      showToast("Andere oder neue Baustellen können gewählt werden, sobald wieder eine Verbindung besteht.");
+      return;
+    }
+    elements.siteChoiceMessage.textContent = "Baustellen werden geladen …";
+    elements.siteChoiceDialog.showModal();
+    try {
+      const body = await requestJson(
+        `./api/v1/time-tracking/site-options/${encodeURIComponent(state.workDate)}`
+      );
+      renderSiteChoiceOptions(body.options);
+      elements.siteChoiceMessage.textContent = "";
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.siteChoiceMessage.textContent = error.message;
+    }
+  }
+
+  async function applySelectedSite(selectedSiteId) {
+    if (!selectedSiteId) return;
+    const targetIndex = siteChoiceTargetIndex();
+    const existingIndex = assignments.findIndex(
+      (assignment) => assignment.constructionSite.id === selectedSiteId
+    );
+    const newOccurrence = lastEvent()?.type === "site_departure"
+      && existingIndex >= 0
+      && existingIndex < targetIndex;
+    let nextAssignments = assignments;
+    if (!demoMode) {
+      const body = await requestJson("./api/v1/time-tracking/site-selection", {
+        method: "POST",
+        body: JSON.stringify({
+          workDate: state.workDate,
+          constructionSiteId: selectedSiteId,
+          newOccurrence
+        })
+      });
+      nextAssignments = body.selection.assignments;
+    } else if (newOccurrence) {
+      const previous = assignments[existingIndex];
+      nextAssignments = [
+        ...assignments,
+        {
+          ...previous,
+          id: `demo-return-${Date.now()}`,
+          sequenceNumber: assignments.length + 1
+        }
+      ];
+    }
+    reorderSelectedAssignment(nextAssignments, selectedSiteId, newOccurrence);
+    closeSiteChoice();
+    if (lastEvent()?.type === "site_departure") {
+      addEntry("next_site", targetIndex);
+    }
+    showToast("Baustelle gewählt · der Baustellenplan bleibt als Vorschlag erhalten.");
   }
 
   function lastEvent() {
@@ -3048,7 +3329,7 @@
       return;
     }
     if (!latest || latest.type === "clock_out") addEntry("clock_in");
-    else if (latest.type === "clock_in" && assignments.length === 0) addEntry("clock_out");
+    else if (latest.type === "clock_in" && assignments.length === 0) void openSiteChoice();
     else if (latest.type === "clock_in" || latest.type === "next_site") addEntry("site_arrival", siteIndex);
     else if (latest.type === "site_arrival") {
       const assignment = assignments[siteIndex];
@@ -3059,7 +3340,7 @@
       }
     }
     else if (latest.type === "site_departure" && siteIndex < assignments.length - 1) addEntry("next_site", siteIndex + 1);
-    else if (latest.type === "site_departure") addEntry("clock_out");
+    else if (latest.type === "site_departure") void openSiteChoice();
   }
 
   function setPrimaryAction(label, icon, disabled = false) {
@@ -3075,8 +3356,8 @@
 
     if (!demoMode && state.workDayStatus && state.workDayStatus !== "open") {
       const labels = {
-        submitted: ["Zur Prüfung eingereicht", "Das Büro prüft deinen Stundenzettel"],
-        approved: ["Stundenzettel freigegeben", "Vom Büro geprüft"],
+        submitted: ["Stundenzettel abgeschlossen", "Automatisch im Büro sichtbar"],
+        approved: ["Stundenzettel abgeschlossen", "Vom Büro geprüft"],
         locked: ["Stundenzettel abgerechnet", "Für neue Buchungen gesperrt"]
       };
       const [title, hint] = labels[state.workDayStatus] || labels.submitted;
@@ -3094,7 +3375,8 @@
     }
 
     if (latest.type === "clock_in" && assignments.length === 0) {
-      setPrimaryAction("Feierabend", "■");
+      setPrimaryAction("Baustelle wählen", "⌖");
+      elements.secondaryAction.hidden = false;
       elements.workdayTitle.textContent = "Keine Baustelle eingeplant";
     } else if (latest.type === "clock_in") {
       setPrimaryAction("Auf Baustelle angekommen", "✓");
@@ -3107,7 +3389,8 @@
       elements.secondaryAction.hidden = false;
       elements.workdayTitle.textContent = "Baustelle verlassen";
     } else if (latest.type === "site_departure") {
-      setPrimaryAction("Feierabend", "■");
+      setPrimaryAction("Nächste Baustelle wählen", "→");
+      elements.secondaryAction.hidden = false;
       elements.workdayTitle.textContent = "Letzte Baustelle verlassen";
     } else if (latest.type === "next_site") {
       setPrimaryAction("Auf Baustelle angekommen", "✓");
@@ -3130,17 +3413,23 @@
   }
 
   function renderAssignment() {
+    const latest = lastEvent();
+    elements.siteChoiceOpen.hidden = latest?.type === "site_arrival";
+    elements.siteChoiceOpen.textContent = latest?.type === "site_departure"
+      ? "Nächste wählen"
+      : "Baustelle wählen";
     if (assignments.length === 0) {
       elements.assignmentOrder.textContent = "Heute";
       elements.assignmentTitle.textContent = "Kein Einsatz freigegeben";
       elements.assignmentMeta.textContent = "Die Zeiterfassung kann trotzdem gestartet werden.";
       elements.assignmentCard.classList.remove("assignment-card--active");
+      elements.assignmentDetails.disabled = true;
       return;
     }
 
+    elements.assignmentDetails.disabled = false;
     const siteIndex = currentSiteIndex();
     const assignment = assignments[siteIndex];
-    const latest = lastEvent();
     let status = assignmentMeta(assignment);
 
     if (latest?.type === "clock_in" && siteIndex === 0) status = `Anfahrt läuft · ${status}`;
@@ -3272,6 +3561,55 @@
     elements.timeCorrectionMessage.textContent = "";
     elements.timeCorrectionDialog.showModal();
     window.setTimeout(() => elements.timeCorrectionAt.focus(), 250);
+  }
+
+  function timeAdditionNeedsSite() {
+    return ["site_arrival", "site_departure", "next_site"].includes(
+      elements.timeAdditionType.value
+    );
+  }
+
+  function updateTimeAdditionSiteField() {
+    const needsSite = timeAdditionNeedsSite();
+    elements.timeAdditionSiteField.hidden = !needsSite;
+    elements.timeAdditionSite.required = needsSite;
+  }
+
+  function closeTimeAdditionForm() {
+    addingTimeEntryDate = null;
+    elements.timeAdditionForm.reset();
+    elements.timeAdditionMessage.textContent = "";
+    updateTimeAdditionSiteField();
+    if (elements.timeAdditionDialog.open) elements.timeAdditionDialog.close();
+  }
+
+  async function openTimeAdditionForm(workDate) {
+    addingTimeEntryDate = workDate;
+    elements.timeAdditionForm.reset();
+    elements.timeAdditionDate.textContent = shortDate(workDate);
+    const initial = workDate === localDateKey()
+      ? new Date()
+      : new Date(`${workDate}T12:00:00`);
+    elements.timeAdditionAt.value = localDateTimeInputValue(initial.toISOString());
+    elements.timeAdditionMessage.textContent = "Baustellen werden geladen …";
+    updateTimeAdditionSiteField();
+    elements.timeAdditionDialog.showModal();
+    try {
+      const body = await requestJson(
+        `./api/v1/time-tracking/site-options/${encodeURIComponent(workDate)}`
+      );
+      elements.timeAdditionSite.replaceChildren();
+      body.options.sites.forEach((site) => {
+        const option = document.createElement("option");
+        option.value = site.id;
+        option.textContent = `${site.name} · ${site.projectName || "Projekt"}`;
+        elements.timeAdditionSite.append(option);
+      });
+      elements.timeAdditionMessage.textContent = "";
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.timeAdditionMessage.textContent = error.message;
+    }
   }
 
   function renderEntries() {
@@ -3409,12 +3747,18 @@
         month: "2-digit"
       });
       const statusLabels = {
-        open: workDay?.entries?.at(-1)?.entryType === "clock_out" ? "Beendet" : "Läuft",
-        submitted: "Zur Prüfung",
-        approved: "Freigegeben",
-        locked: "Abgerechnet"
+        in_progress: "In Arbeit",
+        completed: "Abgeschlossen",
+        billed: "Abgerechnet"
       };
-      dayStatus.textContent = !workDay ? "Keine Buchung" : statusLabels[workDay.status] || "Erfasst";
+      const workflowStatus = workDay?.workflowStatus || (
+        workDay?.status === "locked"
+          ? "billed"
+          : workDay?.entries?.at(-1)?.entryType === "clock_out"
+            ? "completed"
+            : "in_progress"
+      );
+      dayStatus.textContent = !workDay ? "Keine Buchung" : statusLabels[workflowStatus] || "Erfasst";
       total.textContent = formatMinutes(workDay?.workMinutes || 0);
       headingCopy.append(dateLabel, dayStatus);
       heading.append(headingCopy, total);
@@ -3470,32 +3814,37 @@
         });
         dayCard.append(metrics, entries);
 
-        const lastEntry = workDay.entries.at(-1);
-        const hasPendingCorrection = workDay.entries.some((entry) => entry.pendingCorrection);
-        if (
-          workDay.status === "open"
-          && lastEntry?.entryType === "clock_out"
-          && !hasPendingCorrection
-        ) {
-          const submit = document.createElement("button");
-          submit.type = "button";
-          submit.className = "button button--secondary week-day-submit";
-          submit.textContent = "Stundenzettel einreichen";
-          submit.disabled = demoMode;
-          if (!submit.disabled) {
-            submit.addEventListener("click", () => {
-              void submitWorkDayForReview(workDate, submit);
-            });
-          }
-          dayCard.append(submit);
-        } else if (["submitted", "approved", "locked"].includes(workDay.status)) {
+        if (workDay.warnings?.length) {
+          const warnings = document.createElement("ul");
+          warnings.className = "week-day-warnings";
+          workDay.warnings.forEach((warning) => {
+            const item = document.createElement("li");
+            item.textContent = warning.message;
+            warnings.append(item);
+          });
+          dayCard.append(warnings);
+        }
+
+        if (!demoMode) {
+          const addMissing = document.createElement("button");
+          addMissing.type = "button";
+          addMissing.className = "button button--quiet week-day-addition";
+          addMissing.textContent = "Fehlende Buchung ergänzen";
+          addMissing.addEventListener("click", () => void openTimeAdditionForm(workDate));
+          dayCard.append(addMissing);
+        }
+
+        if (workflowStatus === "completed") {
           const stateNote = document.createElement("p");
-          stateNote.className = `week-day-state week-day-state--${workDay.status}`;
-          stateNote.textContent = {
-            submitted: "Eingereicht · wartet auf Prüfung im Büro",
-            approved: "Vom Büro freigegeben",
-            locked: "Abgerechnet · neue Buchungen sind gesperrt"
-          }[workDay.status];
+          stateNote.className = "week-day-state week-day-state--approved";
+          stateNote.textContent = workDay.status === "approved"
+            ? "Vom Büro freigegeben"
+            : "Arbeitsblock beendet · automatisch im Büro sichtbar";
+          dayCard.append(stateNote);
+        } else if (workflowStatus === "billed") {
+          const stateNote = document.createElement("p");
+          stateNote.className = "week-day-state week-day-state--locked";
+          stateNote.textContent = "Abgerechnet · neue Buchungen sind gesperrt";
           dayCard.append(stateNote);
         }
       }
@@ -3598,29 +3947,6 @@
       pendingSync: false,
       syncError: null
     }));
-  }
-
-  async function submitWorkDayForReview(workDate, button) {
-    if (
-      !window.confirm(
-        "Stundenzettel zur Prüfung einreichen? Danach sind keine neuen Buchungen für diesen Tag möglich."
-      )
-    ) return;
-    button.disabled = true;
-    elements.weekMessage.textContent = "Stundenzettel wird sicher eingereicht …";
-    try {
-      await requestJson(`./api/v1/work-days/${encodeURIComponent(workDate)}/submit`, {
-        method: "POST"
-      });
-      await Promise.all([refreshLiveData(), refreshWeekData(), refreshAdmin()]);
-      showToast("Stundenzettel eingereicht · das Büro kann ihn jetzt prüfen.");
-    } catch (error) {
-      if (error.status === 401) showLogin();
-      else {
-        elements.weekMessage.textContent = error.message;
-        button.disabled = false;
-      }
-    }
   }
 
   async function refreshWeekData() {
@@ -4804,6 +5130,34 @@
 
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
   elements.assignmentDate.addEventListener("change", () => void refreshAdmin(elements.assignmentDate.value));
+  elements.timesheetExportForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const from = elements.timesheetExportFrom.value;
+    const to = elements.timesheetExportTo.value;
+    if (!from || !to || to < from) {
+      elements.timesheetExportMessage.textContent =
+        "Bitte einen gültigen Zeitraum auswählen.";
+      return;
+    }
+    const parameters = new URLSearchParams({ from, to });
+    if (elements.timesheetExportEmployee.value) {
+      parameters.set("employeeId", elements.timesheetExportEmployee.value);
+    }
+    if (elements.timesheetExportStatus.value) {
+      parameters.set("status", elements.timesheetExportStatus.value);
+    }
+    const link = document.createElement("a");
+    link.href = `./api/v1/admin/timesheets.xlsx?${parameters}`;
+    link.download = "";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    elements.timesheetExportMessage.textContent =
+      "Excel-Datei wird erstellt und heruntergeladen.";
+    window.setTimeout(() => {
+      elements.timesheetExportMessage.textContent = "";
+    }, 4000);
+  });
 
   elements.togglePassword.addEventListener("click", () => {
     const show = elements.passwordInput.type === "password";
@@ -4831,6 +5185,69 @@
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
   elements.secondaryAction.addEventListener("click", () => addEntry("clock_out"));
   elements.assignmentDetails.addEventListener("click", openEmployeeSiteWorkspace);
+  elements.siteChoiceOpen.addEventListener("click", () => void openSiteChoice());
+  elements.siteChoiceCancel.addEventListener("click", closeSiteChoice);
+  elements.siteChoiceDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeSiteChoice();
+  });
+  elements.siteChoiceDialog.addEventListener("click", (event) => {
+    if (event.target === elements.siteChoiceDialog) closeSiteChoice();
+  });
+  elements.siteChoiceForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const siteId = elements.siteChoiceSelect.value;
+    if (!siteId) {
+      elements.siteChoiceMessage.textContent = "Bitte eine Baustelle auswählen.";
+      return;
+    }
+    elements.siteChoiceSubmit.disabled = true;
+    elements.siteChoiceMessage.textContent = "Baustelle wird übernommen …";
+    try {
+      await applySelectedSite(siteId);
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.siteChoiceMessage.textContent = error.message;
+    } finally {
+      elements.siteChoiceSubmit.disabled = false;
+    }
+  });
+  elements.fieldSiteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (demoMode) {
+      elements.siteChoiceMessage.textContent = "Neue Baustellen werden nur in der Online-App gespeichert.";
+      return;
+    }
+    const targetIndex = siteChoiceTargetIndex();
+    elements.fieldSiteSubmit.disabled = true;
+    elements.siteChoiceMessage.textContent = "Neue Baustelle wird angelegt …";
+    try {
+      const body = await requestJson("./api/v1/time-tracking/sites", {
+        method: "POST",
+        body: JSON.stringify({
+          workDate: state.workDate,
+          projectId: elements.fieldSiteProject.value,
+          name: elements.fieldSiteName.value,
+          installerShortText: elements.fieldSiteShortText.value,
+          street: elements.fieldSiteStreet.value,
+          houseNumber: elements.fieldSiteHouseNumber.value,
+          postalCode: elements.fieldSitePostalCode.value,
+          city: elements.fieldSiteCity.value
+        })
+      });
+      const { assignments: nextAssignments, selectedSiteId } = body.selection;
+      reorderSelectedAssignment(nextAssignments, selectedSiteId);
+      closeSiteChoice();
+      if (lastEvent()?.type === "site_departure") addEntry("next_site", targetIndex);
+      elements.fieldSiteForm.reset();
+      showToast("Baustelle angelegt und gewählt · das Büro sieht sie zur Prüfung.");
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.siteChoiceMessage.textContent = error.message;
+    } finally {
+      elements.fieldSiteSubmit.disabled = false;
+    }
+  });
   elements.employeeSiteBack.addEventListener("click", () => showDashboardPane("start"));
   elements.employeeSitePhotoAdd.addEventListener("click", () => {
     if (!navigator.onLine) {
@@ -4899,6 +5316,39 @@
       elements.timeCorrectionCancel.disabled = false;
     }
   });
+  elements.timeInvalidationSubmit.addEventListener("click", async () => {
+    if (!correctingTimeEntryId) return;
+    const reason = elements.timeCorrectionReason.value.trim();
+    if (reason.length < 5) {
+      elements.timeCorrectionMessage.textContent =
+        "Bitte zuerst einen kurzen Grund für die Ungültig-Markierung eingeben.";
+      return;
+    }
+    if (!window.confirm("Buchung als ungültig markieren? Sie bleibt in der Historie erhalten.")) return;
+    elements.timeCorrectionSubmit.disabled = true;
+    elements.timeInvalidationSubmit.disabled = true;
+    elements.timeCorrectionCancel.disabled = true;
+    elements.timeCorrectionMessage.textContent = "Ungültig-Markierung wird eingereicht …";
+    try {
+      await requestJson("./api/v1/time-entry-invalidations", {
+        method: "POST",
+        body: JSON.stringify({
+          originalEntryId: correctingTimeEntryId,
+          reason
+        })
+      });
+      closeTimeCorrectionForm();
+      await Promise.all([refreshLiveData(), refreshWeekData(), refreshAdmin()]);
+      showToast("Ungültig-Markierung eingereicht · die Buchung bleibt bis zur Prüfung wirksam.");
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.timeCorrectionMessage.textContent = error.message;
+    } finally {
+      elements.timeCorrectionSubmit.disabled = false;
+      elements.timeInvalidationSubmit.disabled = false;
+      elements.timeCorrectionCancel.disabled = false;
+    }
+  });
   elements.timeCorrectionCancel.addEventListener("click", closeTimeCorrectionForm);
   elements.timeCorrectionDialog.addEventListener("click", (event) => {
     if (event.target === elements.timeCorrectionDialog) closeTimeCorrectionForm();
@@ -4906,6 +5356,59 @@
   elements.timeCorrectionDialog.addEventListener("cancel", (event) => {
     event.preventDefault();
     closeTimeCorrectionForm();
+  });
+  elements.timeAdditionType.addEventListener("change", updateTimeAdditionSiteField);
+  elements.timeAdditionForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!addingTimeEntryDate) return;
+    const recordedAt = new Date(elements.timeAdditionAt.value);
+    const reason = elements.timeAdditionReason.value.trim();
+    if (Number.isNaN(recordedAt.valueOf())) {
+      elements.timeAdditionMessage.textContent = "Bitte Datum und Uhrzeit vollständig eingeben.";
+      return;
+    }
+    if (reason.length < 5) {
+      elements.timeAdditionMessage.textContent = "Bitte einen kurzen Ergänzungsgrund eingeben.";
+      return;
+    }
+    if (timeAdditionNeedsSite() && !elements.timeAdditionSite.value) {
+      elements.timeAdditionMessage.textContent = "Bitte die zugehörige Baustelle auswählen.";
+      return;
+    }
+    elements.timeAdditionSubmit.disabled = true;
+    elements.timeAdditionCancel.disabled = true;
+    elements.timeAdditionMessage.textContent = "Ergänzung wird zur Prüfung gesendet …";
+    try {
+      await requestJson("./api/v1/time-entry-additions", {
+        method: "POST",
+        body: JSON.stringify({
+          workDate: addingTimeEntryDate,
+          entryType: elements.timeAdditionType.value,
+          recordedAt: recordedAt.toISOString(),
+          reason,
+          ...(timeAdditionNeedsSite()
+            ? { constructionSiteId: elements.timeAdditionSite.value }
+            : {})
+        })
+      });
+      closeTimeAdditionForm();
+      await Promise.all([refreshLiveData(), refreshWeekData(), refreshAdmin()]);
+      showToast("Fehlende Buchung eingereicht · sie wird nach Bürofreigabe wirksam.");
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.timeAdditionMessage.textContent = error.message;
+    } finally {
+      elements.timeAdditionSubmit.disabled = false;
+      elements.timeAdditionCancel.disabled = false;
+    }
+  });
+  elements.timeAdditionCancel.addEventListener("click", closeTimeAdditionForm);
+  elements.timeAdditionDialog.addEventListener("click", (event) => {
+    if (event.target === elements.timeAdditionDialog) closeTimeAdditionForm();
+  });
+  elements.timeAdditionDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeTimeAdditionForm();
   });
   elements.resetDemo.addEventListener("click", () => {
     if (!demoMode || !window.confirm("Alle lokalen Demo-Buchungen auf diesem Gerät zurücksetzen?")) return;

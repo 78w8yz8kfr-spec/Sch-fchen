@@ -15,6 +15,7 @@ import {
   validateDocumentUpload,
   validateEmployee,
   validateEmployeeUpdate,
+  validateFieldConstructionSite,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
@@ -28,10 +29,13 @@ import {
   validateSiteReportFinalization,
   validateSiteTask,
   validateSiteTaskUpdate,
+  validateSpontaneousSiteSelection,
   validateSiteBundle,
   validateTimeEntry,
+  validateTimeEntryAddition,
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
+  validateTimeEntryInvalidation,
   validateWorkDayDecision,
   validateWorkDate
 } from "../src/validation.mjs";
@@ -556,6 +560,79 @@ test("Zeitkorrekturen verlangen eigene Buchung Uhrzeit Grund und gültige Entsch
     () => validateTimeEntryCorrectionDecision({ decision: "offen" }),
     /Entscheidung/
   );
+});
+
+test("Fehlende und ungültige Zeitbuchungen werden sicher validiert", () => {
+  const siteId = "22222222-2222-4222-8222-222222222222";
+  assert.deepEqual(validateTimeEntryAddition({
+    workDate: "2026-07-17",
+    entryType: "site_arrival",
+    recordedAt: "2026-07-17T08:00:00+02:00",
+    constructionSiteId: siteId,
+    reason: "Ankunft wurde unterwegs nicht gespeichert"
+  }), {
+    workDate: "2026-07-17",
+    entryType: "site_arrival",
+    recordedAt: "2026-07-17T08:00:00+02:00",
+    constructionSiteId: siteId,
+    reason: "Ankunft wurde unterwegs nicht gespeichert"
+  });
+  assert.deepEqual(validateTimeEntryInvalidation({
+    originalEntryId: "11111111-1111-4111-8111-111111111111",
+    reason: "Buchung wurde versehentlich doppelt ausgelöst"
+  }), {
+    originalEntryId: "11111111-1111-4111-8111-111111111111",
+    reason: "Buchung wurde versehentlich doppelt ausgelöst"
+  });
+  assert.throws(() => validateTimeEntryAddition({
+    workDate: "2026-07-17",
+    entryType: "clock_out",
+    recordedAt: "2026-07-17T16:00:00+02:00",
+    constructionSiteId: siteId,
+    reason: "Feierabend fehlt"
+  }), /keine Baustelle/);
+  assert.throws(() => validateTimeEntryInvalidation({
+    originalEntryId: "11111111-1111-4111-8111-111111111111",
+    reason: "kurz"
+  }), /Ungültigkeitsgrund/);
+});
+
+test("spontane Baustellenwahl und Feldanlage verlangen gültige Stammdaten", () => {
+  const siteId = "22222222-2222-4222-8222-222222222222";
+  const projectId = "33333333-3333-4333-8333-333333333333";
+  assert.deepEqual(validateSpontaneousSiteSelection({
+    workDate: "2026-07-17",
+    constructionSiteId: siteId,
+    newOccurrence: true
+  }), {
+    workDate: "2026-07-17",
+    constructionSiteId: siteId,
+    newOccurrence: true
+  });
+  assert.throws(() => validateSpontaneousSiteSelection({
+    workDate: "2026-07-17",
+    constructionSiteId: siteId,
+    newOccurrence: "ja"
+  }), /erneuten Baustellenfahrt/);
+  assert.equal(validateFieldConstructionSite({
+    workDate: "2026-07-17",
+    projectId,
+    name: "Baustelle Musterweg",
+    installerShortText: "Störung prüfen",
+    street: "Musterweg",
+    houseNumber: "12",
+    postalCode: "12345",
+    city: "Musterstadt"
+  }).city, "Musterstadt");
+  assert.throws(() => validateFieldConstructionSite({
+    workDate: "2026-07-17",
+    projectId,
+    name: "Baustelle Musterweg",
+    street: "Musterweg",
+    houseNumber: "12",
+    postalCode: "12345",
+    city: ""
+  }), /Ort/);
 });
 
 test("Stundenzettelentscheidungen erlauben nur Freigabe und Abrechnung", () => {

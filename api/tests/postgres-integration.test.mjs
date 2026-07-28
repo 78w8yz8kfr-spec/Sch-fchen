@@ -1349,6 +1349,82 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(assignments.status, 200);
   assert.deepEqual((await assignments.json()).assignments, []);
 
+  const siteOptionsResponse = await fetch(
+    `${baseUrl}/api/v1/time-tracking/site-options/${assignmentDate}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(siteOptionsResponse.status, 200, await siteOptionsResponse.clone().text());
+  const siteOptions = (await siteOptionsResponse.json()).options;
+  assert.ok(siteOptions.sites.some((option) => option.id === structuredSite.id));
+  assert.ok(siteOptions.projects.some((option) => option.id === project.id));
+
+  const spontaneousSelectionResponse = await fetch(
+    `${baseUrl}/api/v1/time-tracking/site-selection`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        workDate: assignmentDate,
+        constructionSiteId: structuredSite.id,
+        newOccurrence: false
+      })
+    }
+  );
+  assert.equal(
+    spontaneousSelectionResponse.status,
+    200,
+    await spontaneousSelectionResponse.clone().text()
+  );
+  assert.ok(
+    (await spontaneousSelectionResponse.json()).selection.assignments
+      .some((item) => item.constructionSite.id === structuredSite.id)
+  );
+
+  const repeatedSelectionResponse = await fetch(
+    `${baseUrl}/api/v1/time-tracking/site-selection`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        workDate: assignmentDate,
+        constructionSiteId: structuredSite.id,
+        newOccurrence: true
+      })
+    }
+  );
+  assert.equal(repeatedSelectionResponse.status, 200);
+  assert.equal(
+    (await repeatedSelectionResponse.json()).selection.assignments
+      .filter((item) => item.constructionSite.id === structuredSite.id).length,
+    2
+  );
+
+  const fieldSiteResponse = await fetch(`${baseUrl}/api/v1/time-tracking/sites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      workDate: assignmentDate,
+      projectId: project.id,
+      name: `Feldbaustelle ${suffix}`,
+      installerShortText: "Spontanen Einsatz dokumentieren",
+      street: "Feldweg",
+      houseNumber: "32",
+      postalCode: "09599",
+      city: "Freiberg"
+    })
+  });
+  assert.equal(fieldSiteResponse.status, 201, await fieldSiteResponse.clone().text());
+  const fieldSite = (await fieldSiteResponse.json()).selection.site;
+  assert.equal(fieldSite.creationSource, "field");
+  assert.equal(fieldSite.fieldReviewStatus, "pending");
+
+  const confirmFieldSiteResponse = await fetch(
+    `${baseUrl}/api/v1/admin/construction-sites/${fieldSite.id}/confirm`,
+    { method: "POST", headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(confirmFieldSiteResponse.status, 200, await confirmFieldSiteResponse.clone().text());
+  assert.equal((await confirmFieldSiteResponse.json()).site.fieldReviewStatus, "confirmed");
+
   const clockInAt = new Date(Date.now() - 5000).toISOString();
   const clockOutAt = new Date(Date.now() - 4000).toISOString();
   const clockIn = {
@@ -1386,17 +1462,41 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   const secondClockInAt = new Date(Date.now() - 2000).toISOString();
   const secondClockOutAt = new Date(Date.now() - 1000).toISOString();
-  const secondClockIn = await fetch(`${baseUrl}/api/v1/time-entries`, {
+  const workDate = localDate(clockInAt, config.timeZone);
+  const secondClockIn = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({
-      clientEntryId: randomUUID(),
+      workDate,
       entryType: "clock_in",
       recordedAt: secondClockInAt,
-      clientCreatedAt: secondClockInAt
+      reason: "Zweiter Arbeitsbeginn wurde im Integrationstest vergessen"
     })
   });
-  assert.equal(secondClockIn.status, 201, await secondClockIn.text());
+  assert.equal(secondClockIn.status, 201, await secondClockIn.clone().text());
+  const secondClockInAddition = (await secondClockIn.json()).timeCorrection;
+  assert.equal(secondClockInAddition.correctionKind, "addition");
+  assert.equal(secondClockInAddition.status, "pending");
+
+  const pendingAdditionWorkDayResponse = await fetch(
+    `${baseUrl}/api/v1/work-days/${workDate}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(pendingAdditionWorkDayResponse.status, 200);
+  const pendingAdditionWorkDay = (await pendingAdditionWorkDayResponse.json()).workDay;
+  assert.equal(pendingAdditionWorkDay.entries.length, 2);
+  assert.equal(pendingAdditionWorkDay.hasPendingCorrection, true);
+
+  const approveAdditionResponse = await fetch(
+    `${baseUrl}/api/v1/admin/time-entry-corrections/${secondClockInAddition.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ decision: "approved" })
+    }
+  );
+  assert.equal(approveAdditionResponse.status, 200, await approveAdditionResponse.clone().text());
+  assert.equal((await approveAdditionResponse.json()).timeCorrection.status, "approved");
 
   const secondClockOut = await fetch(`${baseUrl}/api/v1/time-entries`, {
     method: "POST",
@@ -1411,7 +1511,6 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(secondClockOut.status, 201, await secondClockOut.clone().text());
   const secondClockOutEntry = (await secondClockOut.json()).timeEntry;
 
-  const workDate = localDate(clockInAt, config.timeZone);
   const workDay = await fetch(`${baseUrl}/api/v1/work-days/${workDate}`, { headers: { Cookie: cookie } });
   assert.equal(workDay.status, 200);
   assert.equal((await workDay.json()).workDay.entries.length, 4);
@@ -1488,27 +1587,21 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(correctedWorkDay.entries.at(-1).recordedAt, correctedClockOutAt);
   assert.equal(correctedWorkDay.entries.at(-1).pendingCorrection, null);
 
-  const submittedWorkDayResponse = await fetch(
-    `${baseUrl}/api/v1/work-days/${workDate}/submit`,
-    { method: "POST", headers: { Cookie: cookie } }
-  );
-  assert.equal(submittedWorkDayResponse.status, 200, await submittedWorkDayResponse.clone().text());
-  const submittedWorkDay = (await submittedWorkDayResponse.json()).workDay;
-  assert.equal(submittedWorkDay.status, "submitted");
-  assert.ok(submittedWorkDay.submittedAt);
-
-  const submittedOverviewResponse = await fetch(
+  const completedOverviewResponse = await fetch(
     `${baseUrl}/api/v1/admin/overview?date=${workDate}`,
     { headers: { Cookie: plannerCookie } }
   );
-  assert.equal(submittedOverviewResponse.status, 200);
-  const submittedOverview = (await submittedOverviewResponse.json()).overview;
-  assert.ok(submittedOverview.workDays.some((day) => (
-    day.id === submittedWorkDay.id && day.status === "submitted"
-  )));
+  assert.equal(completedOverviewResponse.status, 200);
+  const completedOverview = (await completedOverviewResponse.json()).overview;
+  const reviewableWorkDay = completedOverview.workDays.find((day) => (
+    day.id === correctedWorkDay.id
+  ));
+  assert.equal(reviewableWorkDay.status, "open");
+  assert.equal(reviewableWorkDay.workflowStatus, "completed");
+  assert.equal(reviewableWorkDay.reviewable, true);
 
   const approvedWorkDayResponse = await fetch(
-    `${baseUrl}/api/v1/admin/work-days/${submittedWorkDay.id}`,
+    `${baseUrl}/api/v1/admin/work-days/${reviewableWorkDay.id}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Cookie: plannerCookie },
@@ -1519,7 +1612,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal((await approvedWorkDayResponse.json()).workDay.status, "approved");
 
   const lockedWorkDayResponse = await fetch(
-    `${baseUrl}/api/v1/admin/work-days/${submittedWorkDay.id}`,
+    `${baseUrl}/api/v1/admin/work-days/${reviewableWorkDay.id}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Cookie: plannerCookie },
@@ -1528,6 +1621,16 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   );
   assert.equal(lockedWorkDayResponse.status, 200, await lockedWorkDayResponse.clone().text());
   assert.equal((await lockedWorkDayResponse.json()).workDay.status, "locked");
+
+  const timesheetExportResponse = await fetch(
+    `${baseUrl}/api/v1/admin/timesheets.xlsx?from=${workDate}&to=${workDate}&status=billed`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(timesheetExportResponse.status, 200, await timesheetExportResponse.clone().text());
+  assert.match(timesheetExportResponse.headers.get("content-type"), /spreadsheetml/);
+  assert.match(timesheetExportResponse.headers.get("content-disposition"), /Stundenzettel_/);
+  const timesheetExport = Buffer.from(await timesheetExportResponse.arrayBuffer());
+  assert.equal(timesheetExport.subarray(0, 2).toString("ascii"), "PK");
 
   const blockedNewBlock = await fetch(`${baseUrl}/api/v1/time-entries`, {
     method: "POST",
