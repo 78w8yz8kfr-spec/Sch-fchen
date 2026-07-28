@@ -157,6 +157,8 @@ export function validateEmployee(body) {
     personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
     firstName: text(body.firstName, "Vorname", 1, 100),
     lastName: text(body.lastName, "Nachname", 1, 100),
+    email: optionalText(body.email, "E-Mail", 254),
+    phone: optionalText(body.phone, "Telefon", 50),
     role,
     temporaryPassword: password(body.temporaryPassword)
   };
@@ -174,6 +176,8 @@ export function validateEmployeeUpdate(body) {
     personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
     firstName: text(body.firstName, "Vorname", 1, 100),
     lastName: text(body.lastName, "Nachname", 1, 100),
+    email: optionalText(body.email, "E-Mail", 254),
+    phone: optionalText(body.phone, "Telefon", 50),
     role,
     rowVersion
   };
@@ -329,12 +333,28 @@ export function validateAssignment(body) {
   if (plannedStartTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedStartTime)) {
     throw new InputError("Die Startzeit muss dem Format HH:MM entsprechen.");
   }
+  const plannedDurationMinutes = body.plannedDurationMinutes === undefined
+    || body.plannedDurationMinutes === null
+    || body.plannedDurationMinutes === ""
+    ? null
+    : Number(body.plannedDurationMinutes);
+  if (
+    plannedDurationMinutes !== null
+    && (
+      !Number.isSafeInteger(plannedDurationMinutes)
+      || plannedDurationMinutes < 15
+      || plannedDurationMinutes > 1440
+    )
+  ) {
+    throw new InputError("Die geplante Einsatzdauer muss zwischen 15 Minuten und 24 Stunden liegen.");
+  }
   return {
     employeeId: uuid(body.employeeId, "Mitarbeiter"),
     constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
     workDate: validateWorkDate(body.workDate),
     plannedStartTime,
-    comment: optionalText(body.comment, "Hinweis", 500),
+    plannedDurationMinutes,
+    comment: optionalText(body.comment, "Arbeitsanweisung", 500),
     reportResponsible: boolean(body.reportResponsible, "Vorarbeiterzuweisung")
   };
 }
@@ -347,9 +367,30 @@ export function validateAssignmentUpdate(body) {
   if (plannedStartTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedStartTime)) {
     throw new InputError("Die Startzeit muss dem Format HH:MM entsprechen.");
   }
+  const hasPlannedDuration = body.plannedDurationMinutes !== undefined;
+  const plannedDurationMinutes = !hasPlannedDuration
+    ? undefined
+    : body.plannedDurationMinutes === null || body.plannedDurationMinutes === ""
+      ? null
+      : Number(body.plannedDurationMinutes);
+  if (
+    plannedDurationMinutes !== undefined
+    && plannedDurationMinutes !== null
+    && (
+      !Number.isSafeInteger(plannedDurationMinutes)
+      || plannedDurationMinutes < 15
+      || plannedDurationMinutes > 1440
+    )
+  ) {
+    throw new InputError("Die geplante Einsatzdauer muss zwischen 15 Minuten und 24 Stunden liegen.");
+  }
   return {
     workDate: validateWorkDate(body.workDate),
     plannedStartTime,
+    plannedDurationMinutes,
+    comment: body.comment === undefined
+      ? undefined
+      : optionalText(body.comment, "Arbeitsanweisung", 500),
     changeReason: text(body.changeReason, "Änderungsgrund", 3, 500),
     reportResponsible: Object.hasOwn(body, "reportResponsible")
       ? boolean(body.reportResponsible, "Vorarbeiterzuweisung")

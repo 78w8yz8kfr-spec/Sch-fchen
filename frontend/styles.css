@@ -930,6 +930,17 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+.assignment-card .assignment-instruction {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 9px 9px 0;
+  color: var(--ink);
+  background: var(--brand-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .assignment-quick-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1169,6 +1180,20 @@ select:focus-visible {
 .employee-site-list .text-button {
   flex: 0 0 auto;
   min-height: 40px;
+}
+
+.employee-site-list > li > .employee-site-item-actions {
+  min-width: max-content;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 4px;
+}
+
+.employee-site-item-actions .text-button {
+  min-height: 34px;
+  padding: 0 9px;
+  font-size: 0.64rem;
+  text-decoration: none;
 }
 
 .employee-site-task-actions {
@@ -2114,6 +2139,72 @@ select:focus-visible {
   font-size: 0.62rem;
 }
 
+.dispatch-summary {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid #e5c7c9;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #fff 0%, #fff6f7 100%);
+}
+
+.dispatch-summary__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dispatch-summary__heading h3,
+.dispatch-summary__heading p,
+.dispatch-summary > p {
+  margin: 0;
+}
+
+.dispatch-summary__heading h3 {
+  font-size: 0.88rem;
+}
+
+.dispatch-summary__heading > span {
+  color: var(--brand);
+  font-size: 0.63rem;
+  font-weight: 800;
+}
+
+.dispatch-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.dispatch-summary__grid div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 9px 5px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.dispatch-summary__grid strong {
+  color: var(--brand);
+  font-size: 1rem;
+}
+
+.dispatch-summary__grid span,
+.dispatch-summary > p {
+  color: var(--muted);
+  font-size: 0.59rem;
+  line-height: 1.4;
+}
+
+.dispatch-summary > p {
+  padding-top: 1px;
+}
+
 .admin-week {
   margin-bottom: 14px;
   overflow: hidden;
@@ -2229,6 +2320,16 @@ select:focus-visible {
 .admin-week-empty {
   color: var(--muted);
   font-size: 0.64rem;
+}
+
+.week-assignment .week-assignment__instruction {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 0.61rem;
+  line-height: 1.35;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .week-assignment .foreman-duty {

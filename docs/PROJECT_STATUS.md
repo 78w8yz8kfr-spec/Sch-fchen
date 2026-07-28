@@ -1,10 +1,14 @@
 # Projektstatus
 
 Stand: 29.07.2026
-Technischer Stand: V0.34.0
+Technischer Stand: V0.35.0
 
 ## Abgeschlossen
 
+- Tageslage für Büro und Disposition mit eingeplanten und freien Feldmitarbeitern, laufenden Arbeitstagen und offenen Zeitprüfungen
+- geplante Einsatzdauer und konkrete Arbeitsanweisung beim Anlegen, Bearbeiten, in der Wochenplanung und im mobilen Arbeitstag
+- Mitarbeiterstammdaten mit optionaler Telefonnummer und E-Mail sowie direkte Kontaktaktionen im mobilen Baustellenteam
+- mobile Baustellenakte übernimmt Startzeit, Dauer und Arbeitsanweisung aus dem eigenen Tageseinsatz
 - Schnellaktionen am heutigen Einsatz für Navigation, Baustellenakte und den vorgezogenen Bericht des verantwortlichen Mitarbeiters
 - Bericht kann während des laufenden Einsatzes gespeichert werden, ohne dadurch automatisch eine Abfahrtsbuchung auszulösen
 - mobile Aufgabenstatus mit Beginnen, Erledigen und Wiederöffnen sowie serverseitiger Prüfung von Tageszuweisung, Rolle, Mitarbeiterzuordnung, Statusfolge und Versionsstand

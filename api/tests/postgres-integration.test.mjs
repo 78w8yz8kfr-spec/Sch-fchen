@@ -275,6 +275,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       personnelNumber: employeePersonnelNumber,
       firstName: "Mara",
       lastName: "Montage",
+      email: "mara.montage@example.test",
+      phone: "+49 170 1234567",
       role: "installer",
       temporaryPassword: employeeTemporaryPassword
     })
@@ -282,7 +284,27 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(employeeResponse.status, 201);
   const employee = (await employeeResponse.json()).employee;
   assert.equal(employee.mustChangePassword, true);
+  assert.equal(employee.email, "mara.montage@example.test");
+  assert.equal(employee.phone, "+49 170 1234567");
   assert.deepEqual(employee.roles, ["installer"]);
+
+  const duplicateEmployeeEmailResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      personnelNumber: `DUP-MAIL-${suffix}`,
+      firstName: "Doppelte",
+      lastName: "Adresse",
+      email: "MARA.MONTAGE@EXAMPLE.TEST",
+      role: "installer",
+      temporaryPassword: "Doppelte-Adresse-2026!"
+    })
+  });
+  assert.equal(duplicateEmployeeEmailResponse.status, 409);
+  assert.equal(
+    (await duplicateEmployeeEmailResponse.json()).error.code,
+    "employee_email_exists"
+  );
 
   const foremanResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
     method: "POST",
@@ -325,6 +347,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
         personnelNumber: editableEmployee.personnelNumber,
         firstName: "Erika",
         lastName: "Vorarbeiterin",
+        email: "erika.vorarbeiterin@example.test",
+        phone: "+49 171 7654321",
         role: "foreman",
         rowVersion: editableEmployee.rowVersion
       })
@@ -333,6 +357,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(employeeUpdateResponse.status, 200, await employeeUpdateResponse.clone().text());
   const updatedEditableEmployee = (await employeeUpdateResponse.json()).employee;
   assert.equal(updatedEditableEmployee.firstName, "Erika");
+  assert.equal(updatedEditableEmployee.email, "erika.vorarbeiterin@example.test");
+  assert.equal(updatedEditableEmployee.phone, "+49 171 7654321");
   assert.deepEqual(updatedEditableEmployee.roles, ["foreman"]);
   assert.ok(updatedEditableEmployee.rowVersion > editableEmployee.rowVersion);
 
@@ -1117,11 +1143,14 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       constructionSiteId: site.id,
       workDate: assignmentDate,
       plannedStartTime: "07:30",
-      comment: "API-Test"
+      plannedDurationMinutes: 450,
+      comment: "API-Test Arbeitsanweisung"
     })
   });
   assert.equal(assignmentResponse.status, 201, await assignmentResponse.clone().text());
   const assignment = (await assignmentResponse.json()).assignment;
+  assert.equal(assignment.plannedDurationMinutes, 450);
+  assert.equal(assignment.comment, "API-Test Arbeitsanweisung");
   assert.equal(assignment.reportResponsible, true);
   assert.equal(assignment.reportResponsibilitySource, "automatic");
 
@@ -1197,6 +1226,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(employeeAssignments.status, 200);
   const employeeAssignment = (await employeeAssignments.json()).assignments[0];
   assert.equal(employeeAssignment.constructionSite.id, site.id);
+  assert.equal(employeeAssignment.plannedDurationMinutes, 450);
+  assert.equal(employeeAssignment.comment, "API-Test Arbeitsanweisung");
   assert.equal(employeeAssignment.reportResponsible, true);
   assert.equal(employeeAssignment.reportResponsibilitySource, "automatic");
 
@@ -1214,6 +1245,12 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(assignedInstallerDashboard.viewer.canLead, true);
   assert.equal(assignedInstallerDashboard.viewer.canManage, false);
   assert.equal(assignedInstallerDashboard.viewer.reportResponsible, true);
+  assert.equal(assignedInstallerDashboard.assignment.plannedDurationMinutes, 450);
+  assert.equal(assignedInstallerDashboard.assignment.comment, "API-Test Arbeitsanweisung");
+  assert.equal(
+    assignedInstallerDashboard.team.find((member) => member.id === employee.id).phone,
+    "+49 170 1234567"
+  );
   assert.ok(assignedInstallerDashboard.tasks.some((item) => item.id === installerTask.id));
 
   const startedInstallerTaskResponse = await fetch(
@@ -1336,6 +1373,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       constructionSiteId: site.id,
       workDate: assignmentDate,
       plannedStartTime: "07:30",
+      plannedDurationMinutes: 300,
       comment: "Zweiter Mitarbeiter beendet automatische Vorarbeiterfunktion"
     })
   });
@@ -1365,6 +1403,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       body: JSON.stringify({
         workDate: assignmentDate,
         plannedStartTime: "07:30",
+        plannedDurationMinutes: 360,
+        comment: "Vorarbeiter übernimmt Koordination und Bericht",
         reportResponsible: true,
         changeReason: "Vorarbeiter für das Zweierteam festgelegt"
       })
@@ -1376,6 +1416,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     await manualForemanUpdateResponse.clone().text()
   );
   const manualForemanAssignment = (await manualForemanUpdateResponse.json()).assignment;
+  assert.equal(manualForemanAssignment.plannedDurationMinutes, 360);
+  assert.equal(manualForemanAssignment.comment, "Vorarbeiter übernimmt Koordination und Bericht");
   assert.equal(manualForemanAssignment.reportResponsible, true);
   assert.equal(manualForemanAssignment.reportResponsibilitySource, "manual");
 
@@ -1396,7 +1438,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     })
   });
   assert.equal(movedAssignment.status, 200, await movedAssignment.clone().text());
-  assert.equal((await movedAssignment.json()).assignment.workDate, movedDate);
+  const movedAssignmentBody = (await movedAssignment.json()).assignment;
+  assert.equal(movedAssignmentBody.workDate, movedDate);
+  assert.equal(movedAssignmentBody.plannedDurationMinutes, 450);
+  assert.equal(movedAssignmentBody.comment, "API-Test Arbeitsanweisung");
 
   const originalDayAssignments = await fetch(
     `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,
