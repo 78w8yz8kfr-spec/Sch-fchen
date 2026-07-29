@@ -68,6 +68,9 @@ import {
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
   validateTimeEntryInvalidation,
+  validateTimeAccountAdjustment,
+  validateTimeAccountProfile,
+  validateTimeAccountYear,
   validateSpontaneousSiteSelection,
   validateFieldConstructionSite,
   validateWorkDayDecision,
@@ -1092,6 +1095,18 @@ async function requireModuleAdministrator(client, context) {
   return roles;
 }
 
+async function requireTimeAccountAdministrator(client, context) {
+  const roles = await activeRoleKeys(client, context);
+  if (![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
+    throw new InputError(
+      "Stundenkonten dürfen nur durch Administration oder Geschäftsführung geändert werden.",
+      403,
+      "time_account_administration_forbidden"
+    );
+  }
+  return roles;
+}
+
 async function requirePasswordReady(client, context) {
   const result = await client.query(
     "SELECT must_change_password FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
@@ -2027,6 +2042,485 @@ async function assertNoApprovedFullDayAbsence(client, context, employeeId, workD
       "employee_absent"
     );
   }
+}
+
+function timeAccountAdjustmentDto(row) {
+  return {
+    id: row.id,
+    clientAdjustmentId: row.client_adjustment_id,
+    employeeId: row.user_id,
+    adjustmentDate: databaseDate(row.adjustment_date),
+    adjustmentMinutes: Number(row.adjustment_minutes),
+    adjustmentType: row.adjustment_type,
+    note: row.note,
+    createdByName: row.created_by_name,
+    createdAt: new Date(row.created_at).toISOString()
+  };
+}
+
+async function getTimeAccountEmployee(client, context, employeeId, year) {
+  const result = await client.query(
+    `SELECT account.id, account.first_name, account.last_name,
+            account.personnel_number, account.weekly_target_minutes,
+            account.created_at,
+            COALESCE(profile.enabled, TRUE) AS time_account_enabled,
+            COALESCE(profile.account_start_date, account.created_at::DATE) AS account_start_date,
+            COALESCE(entitlement.vacation_days, 30.0) AS annual_vacation_days,
+            COALESCE(profile.row_version, 0) AS profile_row_version,
+            COALESCE(entitlement.row_version, 0) AS vacation_row_version
+     FROM users AS account
+     LEFT JOIN time_account_profiles AS profile
+       ON profile.company_id = account.company_id
+      AND profile.user_id = account.id
+     LEFT JOIN time_account_vacation_entitlements AS entitlement
+       ON entitlement.company_id = account.company_id
+      AND entitlement.user_id = account.id
+      AND entitlement.calendar_year = $3
+     WHERE account.company_id = $1
+       AND account.id = $2
+       AND account.status = 'active'`,
+    [context.companyId, employeeId, year]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  return result.rows[0];
+}
+
+async function getTimeAccount(client, context, employeeId, year, asOfDate) {
+  const employee = await getTimeAccountEmployee(client, context, employeeId, year);
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const lastCompletedDate = addUtcDays(asOfDate, -1);
+  const yearBalanceEnd = lastCompletedDate < yearEnd ? lastCompletedDate : yearEnd;
+  const yearAdjustmentEnd = asOfDate < yearEnd ? asOfDate : yearEnd;
+  const openingEnd = addUtcDays(yearStart, -1);
+  const openingBalanceEnd = lastCompletedDate < openingEnd ? lastCompletedDate : openingEnd;
+  const openingAdjustmentEnd = asOfDate < openingEnd ? asOfDate : openingEnd;
+  const enabled = Boolean(employee.time_account_enabled);
+  const accountStartDate = databaseDate(employee.account_start_date);
+
+  let openingDailyMinutes = 0;
+  let monthlyRows = [];
+  if (enabled) {
+    if (accountStartDate <= openingBalanceEnd) {
+      const openingDaily = await client.query(
+        `SELECT COALESCE(SUM(balance_minutes), 0)::BIGINT AS balance_minutes
+         FROM time_account_daily_balances($1, $2, $3, $4)`,
+        [context.companyId, employeeId, accountStartDate, openingBalanceEnd]
+      );
+      openingDailyMinutes = Number(openingDaily.rows[0].balance_minutes);
+    }
+    if (yearStart <= yearBalanceEnd) {
+      const monthly = await client.query(
+        `SELECT
+           EXTRACT(MONTH FROM work_date)::INTEGER AS month,
+           COALESCE(SUM(target_minutes), 0)::BIGINT AS target_minutes,
+           COALESCE(SUM(worked_minutes), 0)::BIGINT AS worked_minutes,
+           COALESCE(SUM(absence_credit_minutes), 0)::BIGINT AS absence_credit_minutes,
+           COALESCE(SUM(balance_minutes), 0)::BIGINT AS balance_minutes
+         FROM time_account_daily_balances($1, $2, $3, $4)
+         GROUP BY EXTRACT(MONTH FROM work_date)
+         ORDER BY month`,
+        [context.companyId, employeeId, yearStart, yearBalanceEnd]
+      );
+      monthlyRows = monthly.rows;
+    }
+  }
+
+  let openingAdjustmentMinutes = 0;
+  if (enabled && accountStartDate <= openingAdjustmentEnd) {
+    const openingAdjustments = await client.query(
+      `SELECT COALESCE(SUM(adjustment_minutes), 0)::BIGINT AS adjustment_minutes
+       FROM time_account_adjustments
+       WHERE company_id = $1
+         AND user_id = $2
+         AND adjustment_date BETWEEN $3 AND $4`,
+      [context.companyId, employeeId, accountStartDate, openingAdjustmentEnd]
+    );
+    openingAdjustmentMinutes = Number(openingAdjustments.rows[0].adjustment_minutes);
+  }
+
+  const adjustmentResult = await client.query(
+    `SELECT adjustment.id, adjustment.client_adjustment_id,
+            adjustment.user_id, adjustment.adjustment_date,
+            adjustment.adjustment_minutes, adjustment.adjustment_type,
+            adjustment.note, adjustment.created_at,
+            creator.first_name || ' ' || creator.last_name AS created_by_name
+     FROM time_account_adjustments AS adjustment
+     JOIN users AS creator
+       ON creator.company_id = adjustment.company_id
+      AND creator.id = adjustment.created_by_user_id
+     WHERE adjustment.company_id = $1
+       AND adjustment.user_id = $2
+       AND adjustment.adjustment_date BETWEEN $3 AND $4
+     ORDER BY adjustment.adjustment_date DESC, adjustment.created_at DESC`,
+    [context.companyId, employeeId, yearStart, yearEnd]
+  );
+  const adjustments = adjustmentResult.rows.map(timeAccountAdjustmentDto);
+  const adjustmentByMonth = new Map();
+  if (enabled) {
+    adjustments
+      .filter((adjustment) => adjustment.adjustmentDate <= yearAdjustmentEnd)
+      .forEach((adjustment) => {
+        const month = Number(adjustment.adjustmentDate.slice(5, 7));
+        adjustmentByMonth.set(
+          month,
+          (adjustmentByMonth.get(month) || 0) + adjustment.adjustmentMinutes
+        );
+      });
+  }
+
+  const absenceResult = await client.query(
+    `WITH absence_days AS (
+       SELECT
+         request.absence_type,
+         request.status,
+         CASE request.day_part WHEN 'full_day' THEN 1.0 ELSE 0.5 END AS day_value,
+         day.work_date::DATE AS work_date,
+         (
+           account.weekly_target_minutes
+           ->> EXTRACT(ISODOW FROM day.work_date)::INTEGER::TEXT
+         )::INTEGER AS target_minutes
+       FROM absence_requests AS request
+       JOIN users AS account
+         ON account.company_id = request.company_id
+        AND account.id = request.user_id
+       CROSS JOIN LATERAL generate_series(
+         GREATEST(request.start_date, $3::DATE, $5::DATE),
+         LEAST(request.end_date, $4::DATE),
+         INTERVAL '1 day'
+       ) AS day(work_date)
+       WHERE request.company_id = $1
+         AND request.user_id = $2
+         AND request.status IN ('office_review', 'management_review', 'approved')
+         AND request.end_date >= $3
+         AND request.start_date <= $4
+     )
+     SELECT
+       COALESCE(SUM(day_value) FILTER (
+         WHERE absence_type = 'vacation'
+           AND status = 'approved'
+           AND target_minutes > 0
+       ), 0) AS vacation_approved_days,
+       COALESCE(SUM(day_value) FILTER (
+         WHERE absence_type = 'vacation'
+           AND status IN ('office_review', 'management_review')
+           AND target_minutes > 0
+       ), 0) AS vacation_pending_days,
+       COALESCE(SUM(day_value) FILTER (
+         WHERE absence_type = 'time_off'
+           AND status = 'approved'
+           AND target_minutes > 0
+       ), 0) AS time_off_approved_days
+     FROM absence_days`,
+    [context.companyId, employeeId, yearStart, yearEnd, accountStartDate]
+  );
+
+  const monthlyByNumber = new Map(
+    monthlyRows.map((row) => [Number(row.month), row])
+  );
+  const openingBalanceMinutes = enabled
+    ? openingDailyMinutes + openingAdjustmentMinutes
+    : 0;
+  let closingBalanceMinutes = openingBalanceMinutes;
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const row = monthlyByNumber.get(month);
+    const adjustmentMinutes = adjustmentByMonth.get(month) || 0;
+    const targetMinutes = Number(row?.target_minutes || 0);
+    const workedMinutes = Number(row?.worked_minutes || 0);
+    const absenceCreditMinutes = Number(row?.absence_credit_minutes || 0);
+    const changeMinutes = Number(row?.balance_minutes || 0) + adjustmentMinutes;
+    closingBalanceMinutes += changeMinutes;
+    return {
+      month,
+      targetMinutes,
+      workedMinutes,
+      absenceCreditMinutes,
+      adjustmentMinutes,
+      changeMinutes,
+      closingBalanceMinutes
+    };
+  });
+  const vacationApprovedDays = Number(absenceResult.rows[0].vacation_approved_days);
+  const vacationPendingDays = Number(absenceResult.rows[0].vacation_pending_days);
+  const annualVacationDays = Number(employee.annual_vacation_days);
+
+  return {
+    employeeId,
+    employeeName: `${employee.first_name} ${employee.last_name}`,
+    personnelNumber: employee.personnel_number,
+    year,
+    asOfDate,
+    enabled,
+    accountStartDate,
+    annualVacationDays,
+    profileRowVersion: Number(employee.profile_row_version),
+    vacationRowVersion: Number(employee.vacation_row_version),
+    openingBalanceMinutes,
+    totals: {
+      targetMinutes: months.reduce((sum, month) => sum + month.targetMinutes, 0),
+      workedMinutes: months.reduce((sum, month) => sum + month.workedMinutes, 0),
+      absenceCreditMinutes: months.reduce(
+        (sum, month) => sum + month.absenceCreditMinutes,
+        0
+      ),
+      adjustmentMinutes: months.reduce(
+        (sum, month) => sum + month.adjustmentMinutes,
+        0
+      ),
+      yearBalanceChangeMinutes: months.reduce(
+        (sum, month) => sum + month.changeMinutes,
+        0
+      ),
+      balanceMinutes: closingBalanceMinutes
+    },
+    vacation: {
+      entitlementDays: annualVacationDays,
+      approvedDays: vacationApprovedDays,
+      pendingDays: vacationPendingDays,
+      remainingDays: annualVacationDays - vacationApprovedDays
+    },
+    timeOff: {
+      approvedDays: Number(absenceResult.rows[0].time_off_approved_days)
+    },
+    months,
+    adjustments
+  };
+}
+
+async function getOwnTimeAccount(client, context, year, asOfDate) {
+  return getTimeAccount(client, context, context.userId, year, asOfDate);
+}
+
+async function getAdminTimeAccounts(client, context, year, asOfDate) {
+  await requirePlanner(client, context);
+  const employees = await client.query(
+    `SELECT id
+     FROM users
+     WHERE company_id = $1 AND status = 'active'
+     ORDER BY LOWER(last_name), LOWER(first_name), personnel_number`,
+    [context.companyId]
+  );
+  const accounts = [];
+  for (const employee of employees.rows) {
+    const account = await getTimeAccount(client, context, employee.id, year, asOfDate);
+    const { adjustments: _adjustments, ...overviewAccount } = account;
+    accounts.push(overviewAccount);
+  }
+  return { year, asOfDate, accounts };
+}
+
+async function updateTimeAccountProfile(client, context, employeeId, input) {
+  await requireTimeAccountAdministrator(client, context);
+  await getTimeAccountEmployee(client, context, employeeId, input.year);
+  const existingProfile = await client.query(
+    `SELECT enabled, account_start_date, row_version
+     FROM time_account_profiles
+     WHERE company_id = $1 AND user_id = $2
+     FOR UPDATE`,
+    [context.companyId, employeeId]
+  );
+  if (existingProfile.rowCount === 0) {
+    if (input.profileRowVersion !== 0) {
+      throw new InputError(
+        "Das Stundenkonto wurde zwischenzeitlich angelegt. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+    const inserted = await client.query(
+      `INSERT INTO time_account_profiles (
+         company_id, user_id, enabled, account_start_date,
+         updated_by_user_id
+       ) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (company_id, user_id) DO NOTHING
+       RETURNING user_id`,
+      [
+        context.companyId,
+        employeeId,
+        input.enabled,
+        input.accountStartDate,
+        context.userId
+      ]
+    );
+    if (inserted.rowCount !== 1) {
+      throw new InputError(
+        "Das Stundenkonto wurde gleichzeitig angelegt. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+  } else {
+    const current = existingProfile.rows[0];
+    if (Number(current.row_version) !== input.profileRowVersion) {
+      throw new InputError(
+        "Das Stundenkonto wurde zwischenzeitlich geändert. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+    const unchanged = current.enabled === input.enabled
+      && databaseDate(current.account_start_date) === input.accountStartDate;
+    if (!unchanged) {
+      await client.query(
+        `UPDATE time_account_profiles
+         SET enabled = $3,
+             account_start_date = $4,
+             updated_by_user_id = $5
+         WHERE company_id = $1 AND user_id = $2`,
+        [
+          context.companyId,
+          employeeId,
+          input.enabled,
+          input.accountStartDate,
+          context.userId
+        ]
+      );
+    }
+  }
+
+  const existingEntitlement = await client.query(
+    `SELECT vacation_days, row_version
+     FROM time_account_vacation_entitlements
+     WHERE company_id = $1 AND user_id = $2 AND calendar_year = $3
+     FOR UPDATE`,
+    [context.companyId, employeeId, input.year]
+  );
+  if (existingEntitlement.rowCount === 0) {
+    if (input.vacationRowVersion !== 0) {
+      throw new InputError(
+        "Der Urlaubsanspruch wurde zwischenzeitlich angelegt. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+    const inserted = await client.query(
+      `INSERT INTO time_account_vacation_entitlements (
+         company_id, user_id, calendar_year, vacation_days, updated_by_user_id
+       ) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (company_id, user_id, calendar_year) DO NOTHING
+       RETURNING user_id`,
+      [
+        context.companyId,
+        employeeId,
+        input.year,
+        input.annualVacationDays,
+        context.userId
+      ]
+    );
+    if (inserted.rowCount !== 1) {
+      throw new InputError(
+        "Der Urlaubsanspruch wurde gleichzeitig angelegt. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+  } else {
+    const current = existingEntitlement.rows[0];
+    if (Number(current.row_version) !== input.vacationRowVersion) {
+      throw new InputError(
+        "Der Urlaubsanspruch wurde zwischenzeitlich geändert. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+    if (Number(current.vacation_days) !== input.annualVacationDays) {
+      await client.query(
+        `UPDATE time_account_vacation_entitlements
+         SET vacation_days = $4, updated_by_user_id = $5
+         WHERE company_id = $1 AND user_id = $2 AND calendar_year = $3`,
+        [
+          context.companyId,
+          employeeId,
+          input.year,
+          input.annualVacationDays,
+          context.userId
+        ]
+      );
+    }
+  }
+
+  const updated = await getTimeAccountEmployee(
+    client,
+    context,
+    employeeId,
+    input.year
+  );
+  return {
+    employeeId,
+    year: input.year,
+    enabled: Boolean(updated.time_account_enabled),
+    accountStartDate: databaseDate(updated.account_start_date),
+    annualVacationDays: Number(updated.annual_vacation_days),
+    profileRowVersion: Number(updated.profile_row_version),
+    vacationRowVersion: Number(updated.vacation_row_version)
+  };
+}
+
+async function createTimeAccountAdjustment(client, context, input, asOfDate) {
+  await requireTimeAccountAdministrator(client, context);
+  await getTimeAccountEmployee(
+    client,
+    context,
+    input.employeeId,
+    Number(input.adjustmentDate.slice(0, 4))
+  );
+  if (input.adjustmentDate > asOfDate) {
+    throw new InputError(
+      "Eine Stundenkonto-Korrektur darf nicht in der Zukunft liegen.",
+      400,
+      "future_time_account_adjustment"
+    );
+  }
+  const inserted = await client.query(
+    `INSERT INTO time_account_adjustments (
+       company_id, user_id, client_adjustment_id, adjustment_date,
+       adjustment_minutes, adjustment_type, note, created_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (company_id, client_adjustment_id) DO NOTHING
+     RETURNING id`,
+    [
+      context.companyId,
+      input.employeeId,
+      input.clientAdjustmentId,
+      input.adjustmentDate,
+      input.adjustmentMinutes,
+      input.adjustmentType,
+      input.note,
+      context.userId
+    ]
+  );
+  const result = await client.query(
+    `SELECT adjustment.id, adjustment.client_adjustment_id,
+            adjustment.user_id, adjustment.adjustment_date,
+            adjustment.adjustment_minutes, adjustment.adjustment_type,
+            adjustment.note, adjustment.created_at,
+            creator.first_name || ' ' || creator.last_name AS created_by_name
+     FROM time_account_adjustments AS adjustment
+     JOIN users AS creator
+       ON creator.company_id = adjustment.company_id
+      AND creator.id = adjustment.created_by_user_id
+     WHERE adjustment.company_id = $1
+       AND adjustment.client_adjustment_id = $2`,
+    [context.companyId, input.clientAdjustmentId]
+  );
+  const adjustment = timeAccountAdjustmentDto(result.rows[0]);
+  if (
+    adjustment.employeeId !== input.employeeId
+    || adjustment.adjustmentDate !== input.adjustmentDate
+    || adjustment.adjustmentMinutes !== input.adjustmentMinutes
+    || adjustment.adjustmentType !== input.adjustmentType
+    || adjustment.note !== input.note
+  ) {
+    throw new InputError(
+      "Diese Buchungs-ID wurde bereits für eine andere Korrektur verwendet.",
+      409,
+      "time_account_adjustment_id_conflict"
+    );
+  }
+  return { adjustment, idempotent: inserted.rowCount === 0 };
 }
 
 async function adminOverview(client, context, date) {
@@ -5715,6 +6209,24 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { changed: true, session: view });
       }
 
+      if (request.method === "GET" && url.pathname === "/api/v1/time-account") {
+        const asOfDate = localDate(new Date().toISOString(), config.timeZone);
+        const year = validateTimeAccountYear(
+          url.searchParams.get("year") || asOfDate.slice(0, 4)
+        );
+        const timeAccount = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getOwnTimeAccount(
+            client,
+            context,
+            year,
+            asOfDate
+          )
+        );
+        return json(response, 200, { timeAccount });
+      }
+
       if (request.method === "GET" && url.pathname === "/api/v1/absences") {
         const range = timesheetExportRange(url);
         const absences = await withReadySession(
@@ -5855,6 +6367,68 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/time-accounts") {
+        const asOfDate = localDate(new Date().toISOString(), config.timeZone);
+        const year = validateTimeAccountYear(
+          url.searchParams.get("year") || asOfDate.slice(0, 4)
+        );
+        const timeAccounts = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getAdminTimeAccounts(
+            client,
+            context,
+            year,
+            asOfDate
+          )
+        );
+        return json(response, 200, { timeAccounts });
+      }
+
+      const adminTimeAccountProfileMatch =
+        /^\/api\/v1\/admin\/time-accounts\/([^/]+)\/profile$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminTimeAccountProfileMatch) {
+        const employeeId = validateId(
+          adminTimeAccountProfileMatch[1],
+          "Mitarbeiter-ID"
+        );
+        const input = validateTimeAccountProfile(await readJson(request));
+        const profile = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateTimeAccountProfile(
+            client,
+            context,
+            employeeId,
+            input
+          )
+        );
+        return json(response, 200, { profile });
+      }
+
+      if (
+        request.method === "POST"
+        && url.pathname === "/api/v1/admin/time-account-adjustments"
+      ) {
+        const input = validateTimeAccountAdjustment(await readJson(request));
+        const asOfDate = localDate(new Date().toISOString(), config.timeZone);
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createTimeAccountAdjustment(
+            client,
+            context,
+            input,
+            asOfDate
+          )
+        );
+        return json(
+          response,
+          result.idempotent ? 200 : 201,
+          { adjustment: result.adjustment, idempotent: result.idempotent }
+        );
       }
 
       const adminAbsenceMatch = /^\/api\/v1\/admin\/absence-requests\/([^/]+)$/.exec(url.pathname);

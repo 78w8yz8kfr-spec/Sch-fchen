@@ -1,7 +1,7 @@
 # Plancraft-Featureprüfung für Schäfchen
 
 Stand: 29.07.2026  
-Technischer Stand: V0.36.0
+Technischer Stand: V0.37.0
 
 ## Ziel und Leitplanken
 
@@ -35,6 +35,7 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 | Tagesübersicht für die Disposition | In V0.35.0 übernehmen | Eingeplante und freie Feldmitarbeiter, laufende Zeiten und Prüfbedarf werden in einer ruhigen Tageskarte zusammengeführt. |
 | Team und Kontaktdaten am mobilen Einsatz | In V0.35.0 übernehmen | Telefonnummer und E-Mail gehören zu den Mitarbeiterstammdaten und sind aus der tagesbezogenen Baustellenakte erreichbar. |
 | Abwesenheiten mobil erfassen und in der Plantafel anzeigen | In V0.36.0 übernehmen und absichern | Schäfchen ergänzt eigene Anträge, ganze und halbe Tage sowie eine zweistufige Freigabe. Erst danach wirkt die Abwesenheit verbindlich auf die Einsatzplanung. |
+| Fortlaufendes Arbeitszeitkonto und Jahresurlaub | In V0.37.0 in eigener Form übernehmen | Schäfchen verbindet vorhandenes Soll, berechnete Arbeitstage und verbindliche Abwesenheiten. Urlaub bleibt kalenderjahrbezogen; manuelle Salden sind unveränderliche Gegenbuchungen statt überschreibbarer Werte. |
 | Frei konfigurierbare Projektstatus | Später prüfen | Die vorhandenen Status reichen für den aktuellen Betriebsablauf. Zusätzliche Status lohnen sich erst mit klaren realen Fällen. |
 | Freigabe einzelner Dokumente für Mobilrollen | Später prüfen | Fachlich sinnvoll, benötigt aber ein eigenes Freigabemodell und eine Datenmigration. |
 | Plan-/Ist-Nachkalkulation | Später prüfen | Erst sinnvoll, wenn Zeit-, Material- und Kostenstammdaten über mehrere reale Aufträge stabil gepflegt werden. |
@@ -86,6 +87,21 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 3. Vor einer ganztägigen Freigabe müssen vorhandene Einsätze verschoben oder storniert werden.
 4. Freigegebene Abwesenheiten erscheinen in Wochenplanung und Tageslage und sperren denselben Mitarbeiter-Tag transaktional gegen neue Einsätze.
 
+## In V0.37.0 ergänzter Ablauf
+
+### Mitarbeiter
+
+1. Die vorhandene Woche zeigt das eigene fortlaufende Stundenkonto, ohne eine weitere Hauptnavigation einzuführen.
+2. Soll, Ist, Abwesenheitsgutschrift, monatliche Bewegung und laufender Stand bleiben getrennt nachvollziehbar.
+3. Jahresurlaub zeigt Anspruch, verbindlich genehmigte Tage, offene Anträge und verbleibende Tage; Überstundenabbau wird separat ausgewiesen.
+
+### Büro und Geschäftsführung
+
+1. Planungsrollen sehen die Kontostände aller aktiven Mitarbeiter als kompakte Jahresliste.
+2. Nur Administration oder Geschäftsführung ändern Startdatum, Aktivierung oder den Anspruch des gewählten Kalenderjahres.
+3. Startsaldo und spätere Korrekturen benötigen Datum, Vorzeichen und Begründung. Eine gespeicherte Buchung bleibt unverändert; Fehler werden gegengebucht.
+4. Heute und Zukunft erzeugen noch kein Minus. Vergangene fehlende Arbeitstage werden ab Kontostart gegen das Wochensoll gerechnet.
+
 ## Öffentliche Referenzen
 
 - [Zeiterfassung im Handwerk](https://plancraft.com/de-de/funktionen/zeiterfassung-handwerk)
@@ -99,4 +115,6 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 - [Plantafel für Einsatzplanung](https://help.plancraft.com/de/articles/382799-plantafel-fur-projekt-einsatz-und-abwesenheitsplanung)
 - [Plancraft-App und mobiler Aufbau](https://help.plancraft.com/de/articles/382683-plancraft-app-zielgruppe-download-registrierung-und-aufbau)
 - [Arbeitszeiten und Abwesenheiten erfassen](https://help.plancraft.com/de/articles/382797-arbeitszeiten-und-abwesenheiten-erfassen-und-exportieren)
+- [Arbeitszeitkonto und Berechnung](https://help.plancraft.com/de/articles/543983-arbeitszeitkonto-finden-kontostand-korrigieren-und-berechnung-verstehen)
+- [Urlaubsanspruch und Resturlaub](https://help.plancraft.com/de/articles/517281-urlaubsanspruch-in-plancraft-festlegen-und-resturlaub-verwalten)
 - [Nachkalkulation](https://help.plancraft.com/de/articles/382735-nachkalkulation-plan-und-ist-kosten-im-projekt-vergleichen)

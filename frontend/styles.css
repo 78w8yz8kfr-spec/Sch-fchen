@@ -1692,6 +1692,220 @@ select:focus-visible {
   background: #fafafa;
 }
 
+.time-account-panel {
+  border-color: rgba(227, 6, 19, 0.2);
+  background: linear-gradient(180deg, #fff 0%, #fff9f9 100%);
+}
+
+.time-account-balance {
+  font-size: 1.18rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-account-balance--positive {
+  color: #176b45;
+}
+
+.time-account-balance--negative {
+  color: var(--brand);
+}
+
+.time-account-status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.time-account-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.time-account-metrics > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.time-account-metrics span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+
+.time-account-metrics strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-account-months-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.time-account-months-panel > summary {
+  padding: 12px 2px 3px;
+  color: var(--brand);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.time-account-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
+.time-account-table {
+  width: 100%;
+  min-width: 590px;
+  border-collapse: collapse;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-account-table th,
+.time-account-table td {
+  padding: 8px 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.time-account-table th:first-child,
+.time-account-table td:first-child {
+  text-align: left;
+}
+
+.time-account-table th {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+.time-account-table td:last-child {
+  font-weight: 800;
+}
+
+.time-account-admin-list {
+  display: grid;
+  gap: 9px;
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.time-account-admin-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.time-account-admin-item > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.time-account-admin-item strong {
+  font-size: 0.75rem;
+}
+
+.time-account-admin-item span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+}
+
+.time-account-admin-item__actions {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 5px;
+}
+
+.time-account-admin-item__balance {
+  font-size: 0.78rem !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-account-admin-form {
+  display: grid;
+  gap: 11px;
+  margin-top: 15px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.time-account-admin-form label,
+.time-account-adjustment legend {
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.time-account-admin-form input,
+.time-account-admin-form select,
+.time-account-admin-form textarea {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #d6d9d7;
+  border-radius: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+
+.time-account-enabled {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+
+.time-account-enabled input {
+  width: 22px;
+  min-height: 22px;
+  margin: 0;
+}
+
+.time-account-adjustment {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+}
+
+.time-account-adjustment legend {
+  padding: 0 5px;
+  color: var(--ink);
+}
+
 .absence-form {
   display: grid;
   gap: 11px;
