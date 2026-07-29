@@ -25,7 +25,8 @@ const DOCUMENT_CATEGORIES = new Set([
   "report",
   "delivery_note",
   "invoice",
-  "photo"
+  "photo",
+  "inspection"
 ]);
 const DOCUMENT_MIME_TYPES = new Map([
   ["application/pdf", new Set(["pdf"])],
@@ -44,6 +45,28 @@ const SITE_MATERIAL_STATUSES = new Set(["planned", "ordered", "available", "used
 const SITE_REPORT_TYPES = new Set(["montage", "daily"]);
 const SITE_REPORT_SOURCES = new Set(["digital", "photo", "speech"]);
 const ELECTRICAL_MODULE_KEYS = new Set(["vde", "dguv"]);
+const VDE_SOURCE_MODES = new Set(["integrated", "legacy_v15"]);
+const VDE_NETWORK_TYPES = new Set(["TN-S", "TN-C-S", "TN-C", "TT", "IT"]);
+const VDE_CHECK_RESULTS = new Set(["ok", "not_ok", "not_checked"]);
+const VDE_RESULTS = new Set(["ok", "operational_with_defects", "not_operational"]);
+const VDE_PROTECTION_TYPES = new Set([
+  "mcb",
+  "rcbo",
+  "fuse_nh",
+  "fuse_diazed",
+  "fuse_neozed",
+  "other"
+]);
+const VDE_VISUAL_CHECK_KEYS = [
+  "electric_shock_protection",
+  "protective_conductor",
+  "equipment_selection",
+  "circuit_labelling",
+  "rcd_test_button",
+  "phase_sequence",
+  "polarity",
+  "disconnection_conditions"
+];
 const TIME_CORRECTION_DECISIONS = new Set(["approved", "rejected"]);
 const WORK_DAY_DECISIONS = new Set(["approved", "locked"]);
 const ABSENCE_TYPES = new Set([
@@ -700,6 +723,672 @@ export function validateCompanyModuleUpdate(moduleKey, body) {
     moduleKey: normalizedKey,
     enabled: boolean(body.enabled, "Modulstatus"),
     rowVersion
+  };
+}
+
+function object(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new InputError(`${label} ist ungültig.`);
+  }
+  return value;
+}
+
+function allowedObjectKeys(value, allowedKeys, label) {
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) {
+      throw new InputError(`${label} enthält das unbekannte Feld ${key}.`);
+    }
+  }
+}
+
+function optionalVdeText(value, label, maximum) {
+  if (value === undefined || value === null || value === "") return null;
+  if (!["string", "number"].includes(typeof value)) {
+    throw new InputError(`${label} ist ungültig.`);
+  }
+  return text(String(value), label, 1, maximum);
+}
+
+function vdeDecimal(value, label, maximum = 1_000_000) {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = String(value).trim().replace(",", ".");
+  if (!/^\d{1,7}(?:\.\d{1,6})?$/.test(normalized)) {
+    throw new InputError(`${label} ist keine gültige positive Messzahl.`);
+  }
+  const numberValue = Number(normalized);
+  if (!Number.isFinite(numberValue) || numberValue > maximum) {
+    throw new InputError(`${label} ist außerhalb des zulässigen Bereichs.`);
+  }
+  return normalized;
+}
+
+function vdePositiveDecimal(value, label, maximum = 1_000_000) {
+  const normalized = vdeDecimal(value, label, maximum);
+  if (normalized !== null && Number(normalized) <= 0) {
+    throw new InputError(`${label} muss größer als null sein.`);
+  }
+  return normalized;
+}
+
+function vdeClientId(value, label) {
+  if (value === undefined || value === null || value === "") {
+    throw new InputError(`${label} fehlt.`);
+  }
+  if (typeof value !== "string") {
+    throw new InputError(`${label} ist ungültig.`);
+  }
+  return text(value, label, 1, 100);
+}
+
+function vdeProtectionDevice(value, label) {
+  const device = object(value || {}, label);
+  allowedObjectKeys(
+    device,
+    new Set([
+      "type",
+      "characteristic",
+      "ratedCurrent",
+      "designation",
+      "rcdType",
+      "rcdCharacteristic",
+      "ratedResidualCurrent",
+      "testButton"
+    ]),
+    label
+  );
+  const typeValue = optionalVdeText(device.type, `${label} Typ`, 30) || "mcb";
+  if (!VDE_PROTECTION_TYPES.has(typeValue)) {
+    throw new InputError(`${label} Typ ist ungültig.`);
+  }
+  const isBreaker = ["mcb", "rcbo"].includes(typeValue);
+  const isRcbo = typeValue === "rcbo";
+  return {
+    type: typeValue,
+    characteristic: isBreaker
+      ? optionalVdeText(device.characteristic, `${label} Charakteristik`, 20)
+      : null,
+    ratedCurrent: vdePositiveDecimal(
+      device.ratedCurrent,
+      `${label} Nennstrom`,
+      10_000
+    ),
+    designation: optionalVdeText(device.designation, `${label} Bezeichnung`, 120),
+    rcdType: isRcbo
+      ? optionalVdeText(device.rcdType, `${label} FI-Typ`, 20)
+      : null,
+    rcdCharacteristic: isRcbo
+      ? optionalVdeText(
+        device.rcdCharacteristic,
+        `${label} FI-Charakteristik`,
+        50
+      )
+      : null,
+    ratedResidualCurrent: isRcbo
+      ? vdePositiveDecimal(
+        device.ratedResidualCurrent,
+        `${label} Bemessungsdifferenzstrom`,
+        10_000
+      )
+      : null,
+    testButton: isRcbo
+      ? boolean(device.testButton, `${label} Prüftaste`)
+      : false
+  };
+}
+
+function vdeMeasurements(value, label, detailedInsulationMeasurement) {
+  const measurements = object(value || {}, label);
+  allowedObjectKeys(
+    measurements,
+    new Set([
+      "rpe",
+      "riso",
+      "zi",
+      "zs",
+      "ik",
+      "rcdTripTime",
+      "rcdTripCurrent",
+      "risoL1Pe",
+      "risoL2Pe",
+      "risoL3Pe",
+      "risoNPe"
+    ]),
+    label
+  );
+  return {
+    rpe: vdeDecimal(measurements.rpe, `${label} RPE`),
+    riso: vdeDecimal(measurements.riso, `${label} RISO`),
+    zi: vdeDecimal(measurements.zi, `${label} Zi`),
+    zs: vdeDecimal(measurements.zs, `${label} Zs`),
+    ik: vdeDecimal(measurements.ik, `${label} Ik`),
+    rcdTripTime: vdeDecimal(
+      measurements.rcdTripTime,
+      `${label} RCD-Auslösezeit`,
+      100_000
+    ),
+    rcdTripCurrent: vdeDecimal(
+      measurements.rcdTripCurrent,
+      `${label} RCD-Auslösestrom`,
+      100_000
+    ),
+    risoL1Pe: detailedInsulationMeasurement
+      ? vdeDecimal(measurements.risoL1Pe, `${label} RISO L1-PE`)
+      : null,
+    risoL2Pe: detailedInsulationMeasurement
+      ? vdeDecimal(measurements.risoL2Pe, `${label} RISO L2-PE`)
+      : null,
+    risoL3Pe: detailedInsulationMeasurement
+      ? vdeDecimal(measurements.risoL3Pe, `${label} RISO L3-PE`)
+      : null,
+    risoNPe: detailedInsulationMeasurement
+      ? vdeDecimal(measurements.risoNPe, `${label} RISO N-PE`)
+      : null
+  };
+}
+
+function vdeCircuit(value, label, detailedInsulationMeasurement) {
+  const circuit = object(value, label);
+  allowedObjectKeys(
+    circuit,
+    new Set([
+      "clientId",
+      "name",
+      "cableType",
+      "cores",
+      "crossSection",
+      "protectiveDevice",
+      "measurements",
+      "note"
+    ]),
+    label
+  );
+  return {
+    clientId: vdeClientId(circuit.clientId, `${label} ID`),
+    name: optionalVdeText(circuit.name, `${label} Name`, 200),
+    cableType: optionalVdeText(circuit.cableType, `${label} Leitung`, 100),
+    cores: optionalVdeText(circuit.cores, `${label} Adernzahl`, 20),
+    crossSection: vdePositiveDecimal(
+      circuit.crossSection,
+      `${label} Querschnitt`,
+      10_000
+    ),
+    protectiveDevice: vdeProtectionDevice(
+      circuit.protectiveDevice,
+      `${label} Schutzorgan`
+    ),
+    measurements: vdeMeasurements(
+      circuit.measurements,
+      `${label} Messwerte`,
+      detailedInsulationMeasurement
+    ),
+    note: optionalVdeText(circuit.note, `${label} Bemerkung`, 500)
+  };
+}
+
+function vdeCircuitList(value, label, detailedInsulationMeasurement) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 300) {
+    throw new InputError(`${label} ist ungültig oder enthält zu viele Stromkreise.`);
+  }
+  return value.map((circuit, index) => (
+    vdeCircuit(
+      circuit,
+      `${label} ${index + 1}`,
+      detailedInsulationMeasurement
+    )
+  ));
+}
+
+function vdeRcd(value, label, detailedInsulationMeasurement) {
+  const rcd = object(value, label);
+  allowedObjectKeys(
+    rcd,
+    new Set([
+      "clientId",
+      "name",
+      "type",
+      "characteristic",
+      "ratedCurrent",
+      "ratedResidualCurrent",
+      "testButton",
+      "circuits"
+    ]),
+    label
+  );
+  return {
+    clientId: vdeClientId(rcd.clientId, `${label} ID`),
+    name: optionalVdeText(rcd.name, `${label} Name`, 120),
+    type: optionalVdeText(rcd.type, `${label} Typ`, 20),
+    characteristic: optionalVdeText(
+      rcd.characteristic,
+      `${label} Charakteristik`,
+      50
+    ),
+    ratedCurrent: vdePositiveDecimal(
+      rcd.ratedCurrent,
+      `${label} Nennstrom`,
+      10_000
+    ),
+    ratedResidualCurrent: vdePositiveDecimal(
+      rcd.ratedResidualCurrent,
+      `${label} Bemessungsdifferenzstrom`,
+      10_000
+    ),
+    testButton: boolean(rcd.testButton, `${label} Prüftaste`),
+    circuits: vdeCircuitList(
+      rcd.circuits,
+      `${label} Stromkreis`,
+      detailedInsulationMeasurement
+    )
+  };
+}
+
+function vdeDistribution(value, label, detailedInsulationMeasurement) {
+  const distribution = object(value, label);
+  allowedObjectKeys(
+    distribution,
+    new Set([
+      "clientId",
+      "name",
+      "source",
+      "feedCableType",
+      "feedCores",
+      "feedCrossSection",
+      "feedProtection",
+      "location",
+      "rcds",
+      "directCircuits"
+    ]),
+    label
+  );
+  const rcds = distribution.rcds === undefined ? [] : distribution.rcds;
+  if (!Array.isArray(rcds) || rcds.length > 50) {
+    throw new InputError(`${label} enthält zu viele FI/RCD-Gruppen.`);
+  }
+  return {
+    clientId: vdeClientId(distribution.clientId, `${label} ID`),
+    name: optionalVdeText(distribution.name, `${label} Name`, 120),
+    source: optionalVdeText(distribution.source, `${label} Quelle`, 120),
+    feedCableType: optionalVdeText(
+      distribution.feedCableType,
+      `${label} Zuleitung`,
+      100
+    ),
+    feedCores: optionalVdeText(
+      distribution.feedCores,
+      `${label} Adernzahl`,
+      20
+    ),
+    feedCrossSection: vdePositiveDecimal(
+      distribution.feedCrossSection,
+      `${label} Zuleitungsquerschnitt`,
+      10_000
+    ),
+    feedProtection: optionalVdeText(
+      distribution.feedProtection,
+      `${label} Vorsicherung`,
+      120
+    ),
+    location: optionalVdeText(distribution.location, `${label} Ort`, 120),
+    rcds: rcds.map((rcd, index) => (
+      vdeRcd(
+        rcd,
+        `${label} FI/RCD ${index + 1}`,
+        detailedInsulationMeasurement
+      )
+    )),
+    directCircuits: vdeCircuitList(
+      distribution.directCircuits,
+      `${label} direkter Stromkreis`,
+      detailedInsulationMeasurement
+    )
+  };
+}
+
+function vdeSmallObject(value, allowedKeys, label) {
+  const normalized = object(value || {}, label);
+  allowedObjectKeys(normalized, new Set(allowedKeys), label);
+  return normalized;
+}
+
+export function validateVdeProtocolData(value) {
+  const protocol = object(value, "VDE-Prüfdaten");
+  allowedObjectKeys(
+    protocol,
+    new Set([
+      "schemaVersion",
+      "networkType",
+      "nominalVoltage",
+      "inspectionKinds",
+      "visualChecks",
+      "incomingSupply",
+      "circuitDirectoryIncluded",
+      "detailedInsulationMeasurement",
+      "distributions",
+      "testEquipment",
+      "defects",
+      "result",
+      "nextInspectionDate"
+    ]),
+    "VDE-Prüfdaten"
+  );
+  if (Number(protocol.schemaVersion) !== 1) {
+    throw new InputError("Die VDE-Prüfdatenversion wird nicht unterstützt.");
+  }
+  const networkType = optionalVdeText(
+    protocol.networkType,
+    "Netzform",
+    20
+  ) || "TN-S";
+  if (!VDE_NETWORK_TYPES.has(networkType)) {
+    throw new InputError("Die Netzform ist ungültig.");
+  }
+  const inspectionKinds = vdeSmallObject(
+    protocol.inspectionKinds,
+    ["initial", "recurring", "alteration"],
+    "Prüfarten"
+  );
+  const visualChecks = vdeSmallObject(
+    protocol.visualChecks,
+    VDE_VISUAL_CHECK_KEYS,
+    "Besichtigen und Erproben"
+  );
+  const incomingSupply = vdeSmallObject(
+    protocol.incomingSupply,
+    [
+      "designation",
+      "location",
+      "upstreamProtection",
+      "source",
+      "cableType",
+      "cores",
+      "crossSection"
+    ],
+    "Hausanschluss und Einspeisung"
+  );
+  const testEquipment = vdeSmallObject(
+    protocol.testEquipment,
+    ["manufacturer", "type", "serialNumber", "calibrationValidUntil"],
+    "Prüfgerät"
+  );
+  const detailedInsulationMeasurement = boolean(
+    protocol.detailedInsulationMeasurement,
+    "Detaillierte Isolationsmessung"
+  );
+  const distributions = protocol.distributions === undefined
+    ? []
+    : protocol.distributions;
+  if (!Array.isArray(distributions) || distributions.length > 50) {
+    throw new InputError("Die Verteilungsliste ist ungültig oder zu groß.");
+  }
+
+  const normalized = {
+    schemaVersion: 1,
+    networkType,
+    nominalVoltage: optionalVdeText(
+      protocol.nominalVoltage,
+      "Nennspannung",
+      50
+    ) || "230/400 V",
+    inspectionKinds: {
+      initial: boolean(inspectionKinds.initial, "Erstprüfung"),
+      recurring: boolean(inspectionKinds.recurring, "Wiederholungsprüfung"),
+      alteration: boolean(inspectionKinds.alteration, "Änderung oder Erweiterung")
+    },
+    visualChecks: Object.fromEntries(VDE_VISUAL_CHECK_KEYS.map((key) => {
+      const checkResult = visualChecks[key] || "not_checked";
+      if (!VDE_CHECK_RESULTS.has(checkResult)) {
+        throw new InputError(`Der Prüfstatus ${key} ist ungültig.`);
+      }
+      return [key, checkResult];
+    })),
+    incomingSupply: {
+      designation: optionalVdeText(
+        incomingSupply.designation,
+        "Einspeisungsbezeichnung",
+        120
+      ),
+      location: optionalVdeText(
+        incomingSupply.location,
+        "Einspeisungsort",
+        120
+      ),
+      upstreamProtection: optionalVdeText(
+        incomingSupply.upstreamProtection,
+        "Vorsicherung",
+        120
+      ),
+      source: optionalVdeText(
+        incomingSupply.source,
+        "Einspeisungsquelle",
+        120
+      ),
+      cableType: optionalVdeText(
+        incomingSupply.cableType,
+        "Einspeisungsleitung",
+        100
+      ),
+      cores: optionalVdeText(incomingSupply.cores, "Einspeisungsadern", 20),
+      crossSection: vdePositiveDecimal(
+        incomingSupply.crossSection,
+        "Einspeisungsquerschnitt",
+        10_000
+      )
+    },
+    circuitDirectoryIncluded: boolean(
+      protocol.circuitDirectoryIncluded,
+      "Stromkreisverzeichnis"
+    ),
+    detailedInsulationMeasurement,
+    distributions: distributions.map((distribution, index) => (
+      vdeDistribution(
+        distribution,
+        `Verteilung ${index + 1}`,
+        detailedInsulationMeasurement
+      )
+    )),
+    testEquipment: {
+      manufacturer: optionalVdeText(
+        testEquipment.manufacturer,
+        "Prüfgerätehersteller",
+        120
+      ),
+      type: optionalVdeText(testEquipment.type, "Prüfgerätetyp", 120),
+      serialNumber: optionalVdeText(
+        testEquipment.serialNumber,
+        "Prüfgeräteseriennummer",
+        120
+      ),
+      calibrationValidUntil: testEquipment.calibrationValidUntil
+        ? validateWorkDate(testEquipment.calibrationValidUntil)
+        : null
+    },
+    defects: optionalVdeText(protocol.defects, "Mängel und Hinweise", 10_000),
+    result: protocol.result || "ok",
+    nextInspectionDate: protocol.nextInspectionDate
+      ? validateWorkDate(protocol.nextInspectionDate)
+      : null
+  };
+  if (!VDE_RESULTS.has(normalized.result)) {
+    throw new InputError("Das VDE-Prüfergebnis ist ungültig.");
+  }
+  const clientIds = new Set();
+  const registerClientId = (clientId) => {
+    if (clientIds.has(clientId)) {
+      throw new InputError(
+        "Verteilungen, FI/RCD-Gruppen und Stromkreise benötigen eindeutige IDs."
+      );
+    }
+    clientIds.add(clientId);
+  };
+  normalized.distributions.forEach((distribution) => {
+    registerClientId(distribution.clientId);
+    distribution.rcds.forEach((rcd) => {
+      registerClientId(rcd.clientId);
+      rcd.circuits.forEach((circuit) => registerClientId(circuit.clientId));
+    });
+    distribution.directCircuits.forEach((circuit) => (
+      registerClientId(circuit.clientId)
+    ));
+  });
+  const totalCircuits = normalized.distributions.reduce(
+    (sum, distribution) => (
+      sum
+      + distribution.directCircuits.length
+      + distribution.rcds.reduce(
+        (rcdSum, rcd) => rcdSum + rcd.circuits.length,
+        0
+      )
+    ),
+    0
+  );
+  if (totalCircuits > 1_000) {
+    throw new InputError("Eine VDE-Prüfung darf höchstens 1.000 Stromkreise enthalten.");
+  }
+  if (Buffer.byteLength(JSON.stringify(normalized), "utf8") > 500_000) {
+    throw new InputError(
+      "Die VDE-Prüfdaten sind zu groß.",
+      413,
+      "vde_protocol_too_large"
+    );
+  }
+  return normalized;
+}
+
+function vdeInspectionCommon(body) {
+  rejectTenantFields(body);
+  return {
+    inspectionName: text(body.inspectionName, "Prüfungsname", 2, 200),
+    inspectionDate: validateWorkDate(body.inspectionDate),
+    protocolData: validateVdeProtocolData(body.protocolData)
+  };
+}
+
+export function validateVdeInspectionCreate(body) {
+  const common = vdeInspectionCommon(body);
+  const sourceMode = body.sourceMode
+    ? text(body.sourceMode, "VDE-Quelle", 3, 20).toLowerCase()
+    : "integrated";
+  if (!VDE_SOURCE_MODES.has(sourceMode)) {
+    throw new InputError("Die VDE-Quelle ist ungültig.");
+  }
+  const sourceName = sourceMode === "legacy_v15"
+    ? text(body.sourceName, "Name der V15-Quelldatei", 1, 255)
+    : null;
+  return {
+    ...common,
+    constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
+    clientInspectionId: uuid(body.clientInspectionId, "Offline-Prüfungs-ID"),
+    inspectorUserId: optionalUuid(body.inspectorUserId, "Prüfer"),
+    sourceMode,
+    sourceName
+  };
+}
+
+export function validateVdeInspectionUpdate(body) {
+  const common = vdeInspectionCommon(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die VDE-Prüfungsversion ist ungültig.");
+  }
+  return { ...common, rowVersion };
+}
+
+function assertVdeProtocolCanComplete(protocol) {
+  if (!Object.values(protocol.inspectionKinds).some(Boolean)) {
+    throw new InputError(
+      "Vor dem Abschluss muss mindestens eine Prüfungsart gewählt werden."
+    );
+  }
+  if (protocol.distributions.length === 0) {
+    throw new InputError(
+      "Vor dem Abschluss muss mindestens eine Verteilung erfasst werden."
+    );
+  }
+  let circuitCount = 0;
+  for (const distribution of protocol.distributions) {
+    if (!distribution.name) {
+      throw new InputError(
+        "Vor dem Abschluss benötigt jede Verteilung eine Bezeichnung."
+      );
+    }
+    const circuits = [
+      ...distribution.directCircuits,
+      ...distribution.rcds.flatMap((rcd) => rcd.circuits)
+    ];
+    circuitCount += circuits.length;
+    if (circuits.some((circuit) => !circuit.name)) {
+      throw new InputError(
+        "Vor dem Abschluss benötigt jeder Stromkreis eine Bezeichnung."
+      );
+    }
+  }
+  if (circuitCount === 0) {
+    throw new InputError(
+      "Vor dem Abschluss muss mindestens ein Stromkreis erfasst werden."
+    );
+  }
+}
+
+export function validateVdeInspectionCompletion(body) {
+  const update = validateVdeInspectionUpdate(body);
+  assertVdeProtocolCanComplete(update.protocolData);
+  return {
+    ...update,
+    inspectorSignatureData: signaturePng(
+      body.inspectorSignatureData,
+      "Prüferunterschrift"
+    )
+  };
+}
+
+function legacyOriginalPdf(value) {
+  if (value === undefined || value === null) return null;
+  const original = object(value, "VDE-Original-PDF");
+  allowedObjectKeys(
+    original,
+    new Set(["fileName", "contentBase64"]),
+    "VDE-Original-PDF"
+  );
+  const fileName = text(original.fileName, "Name der Original-PDF", 1, 255);
+  if (!/\.pdf$/i.test(fileName) || /[\\/\u0000-\u001f\u007f]/.test(fileName)) {
+    throw new InputError("Der Name der VDE-Original-PDF ist ungültig.");
+  }
+  if (typeof original.contentBase64 !== "string") {
+    throw new InputError("Der Inhalt der VDE-Original-PDF fehlt.");
+  }
+  const contentBase64 = original.contentBase64.trim();
+  if (
+    contentBase64.length === 0
+    || contentBase64.length % 4 !== 0
+    || !/^[A-Za-z0-9+/]+={0,2}$/.test(contentBase64)
+  ) {
+    throw new InputError("Der Inhalt der VDE-Original-PDF ist ungültig.");
+  }
+  const content = Buffer.from(contentBase64, "base64");
+  if (
+    content.toString("base64") !== contentBase64
+    || content.length < 5
+    || content.length > MAXIMUM_DOCUMENT_BYTES
+    || content.subarray(0, 5).toString("ascii") !== "%PDF-"
+  ) {
+    throw new InputError(
+      "Die VDE-Original-PDF ist ungültig oder größer als 5 MB.",
+      413,
+      "vde_original_pdf_invalid"
+    );
+  }
+  return { fileName, content };
+}
+
+export function validateVdeInspectionImport(body) {
+  const input = validateVdeInspectionCreate({
+    ...body,
+    sourceMode: "legacy_v15"
+  });
+  return {
+    ...input,
+    originalPdf: legacyOriginalPdf(body.originalPdf)
   };
 }
 

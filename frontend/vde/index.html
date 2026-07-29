@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#e30613">
+    <meta name="robots" content="noindex,nofollow">
+    <title>VDE-Prüfung · Schäfchen</title>
+    <link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css?v=0.39.0">
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="../" aria-label="Zurück zu Schäfchen">
+        <img src="../assets/mark.svg" alt="" width="42" height="42">
+        <span>
+          <strong>Schäfchen</strong>
+          <small>VDE-Prüfmodul</small>
+        </span>
+      </a>
+      <a id="back-link" class="button button--quiet" href="../">Zur Baustelle</a>
+    </header>
+
+    <main>
+      <section id="loading-state" class="state-card" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <div>
+          <strong>Prüfmodul wird geladen</strong>
+          <p>Kunde, Baustelle und Berechtigungen werden aus Schäfchen übernommen.</p>
+        </div>
+      </section>
+
+      <section id="fatal-state" class="state-card state-card--error" hidden>
+        <div>
+          <strong>VDE-Prüfmodul konnte nicht geöffnet werden</strong>
+          <p id="fatal-message"></p>
+          <a class="button button--primary" href="../">Zu Schäfchen</a>
+        </div>
+      </section>
+
+      <div id="vde-app" hidden>
+        <section class="context-card" aria-labelledby="context-title">
+          <div class="company">
+            <img id="company-logo" src="../assets/company-logos/schaaf-elektro.webp" alt="Firmenlogo">
+            <div>
+              <p class="eyebrow">Gemeinsame Schäfchen-Stammdaten</p>
+              <h1 id="context-title">VDE-Prüfung</h1>
+              <span id="company-name"></span>
+            </div>
+          </div>
+          <dl class="context-grid">
+            <div>
+              <dt>Kunde</dt>
+              <dd id="customer-name">–</dd>
+            </div>
+            <div>
+              <dt>Projekt</dt>
+              <dd id="project-name">–</dd>
+            </div>
+            <div>
+              <dt>Baustelle</dt>
+              <dd id="site-name">–</dd>
+            </div>
+            <div>
+              <dt>Adresse</dt>
+              <dd id="site-address">–</dd>
+            </div>
+          </dl>
+          <p class="context-note">Diese Angaben werden nicht im Prüfprotokoll dupliziert. Änderungen erfolgen zentral in Schäfchen.</p>
+        </section>
+
+        <div class="workspace">
+          <aside class="inspection-sidebar">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Baustellenakte</p>
+                <h2>Prüfungen</h2>
+              </div>
+              <button id="new-inspection" class="button button--small" type="button">Neu</button>
+            </div>
+            <ul id="inspection-list" class="inspection-list"></ul>
+
+            <details id="legacy-import-panel" class="import-panel">
+              <summary>V15-Bestand importieren</summary>
+              <form id="legacy-import-form">
+                <p>Die JSON-Datei wird in strukturierte VDE-Daten überführt. Ein vorhandenes Original-PDF bleibt unverändert in der zentralen Baustellenakte.</p>
+                <label>
+                  <span>V15-JSON</span>
+                  <input id="legacy-json-file" type="file" accept=".json,application/json" required>
+                </label>
+                <label>
+                  <span>Original-PDF <small>(optional)</small></span>
+                  <input id="legacy-pdf-file" type="file" accept=".pdf,application/pdf">
+                </label>
+                <label>
+                  <span>Prüfer</span>
+                  <select id="legacy-inspector"></select>
+                </label>
+                <button id="legacy-import-submit" class="button button--primary" type="submit">Als Entwurf importieren</button>
+                <button id="legacy-local-import" class="button button--quiet" type="button" hidden>V15-Gerätespeicher übernehmen</button>
+                <p id="legacy-import-message" class="form-message" aria-live="polite"></p>
+              </form>
+            </details>
+          </aside>
+
+          <section class="editor-shell">
+            <div class="editor-heading">
+              <div>
+                <p id="inspection-number" class="eyebrow">Neuer Entwurf</p>
+                <h2 id="editor-title">VDE-Prüfprotokoll</h2>
+              </div>
+              <span id="inspection-status" class="status-chip">Entwurf</span>
+            </div>
+
+            <form id="inspection-form" novalidate>
+              <fieldset id="inspection-fields">
+                <section class="form-section" aria-labelledby="basis-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>01</span>
+                      <h3 id="basis-title">Prüfungsbasis</h3>
+                    </div>
+                    <small>Stammdaten sind bereits verbunden</small>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field field--wide">
+                      <span>Prüfungsname</span>
+                      <input id="inspection-name" maxlength="200" placeholder="z. B. Erstprüfung Hauptverteilung" required>
+                    </label>
+                    <label class="field">
+                      <span>Prüfdatum</span>
+                      <input id="inspection-date" type="date" required>
+                    </label>
+                    <label class="field">
+                      <span>Prüfer</span>
+                      <select id="inspection-inspector" required></select>
+                    </label>
+                    <label class="field">
+                      <span>Netzform</span>
+                      <select id="network-type">
+                        <option>TN-S</option>
+                        <option>TN-C-S</option>
+                        <option>TN-C</option>
+                        <option>TT</option>
+                        <option>IT</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Nennspannung</span>
+                      <input id="nominal-voltage" maxlength="50" value="230/400 V">
+                    </label>
+                  </div>
+                  <div class="check-grid" aria-label="Prüfungsart">
+                    <label><input id="kind-initial" type="checkbox"> Erstprüfung</label>
+                    <label><input id="kind-recurring" type="checkbox"> Wiederholungsprüfung</label>
+                    <label><input id="kind-alteration" type="checkbox"> Änderung / Erweiterung</label>
+                  </div>
+                </section>
+
+                <section class="form-section" aria-labelledby="visual-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>02</span>
+                      <h3 id="visual-title">Besichtigen und Erproben</h3>
+                    </div>
+                  </div>
+                  <div id="visual-checks" class="visual-checks"></div>
+                </section>
+
+                <section class="form-section" aria-labelledby="incoming-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>03</span>
+                      <h3 id="incoming-title">Hausanschluss und Einspeisung</h3>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field">
+                      <span>Bezeichnung</span>
+                      <input id="incoming-designation" maxlength="120" placeholder="z. B. HAK">
+                    </label>
+                    <label class="field">
+                      <span>Ort</span>
+                      <input id="incoming-location" maxlength="120">
+                    </label>
+                    <label class="field">
+                      <span>Vorsicherung</span>
+                      <input id="incoming-protection" maxlength="120" placeholder="z. B. NH 00 63 A">
+                    </label>
+                    <label class="field">
+                      <span>Quelle</span>
+                      <input id="incoming-source" maxlength="120">
+                    </label>
+                    <label class="field">
+                      <span>Leitung</span>
+                      <input id="incoming-cable" maxlength="100" placeholder="z. B. NYY-J">
+                    </label>
+                    <label class="field">
+                      <span>Adernzahl</span>
+                      <input id="incoming-cores" maxlength="20" inputmode="numeric">
+                    </label>
+                    <label class="field">
+                      <span>Querschnitt mm²</span>
+                      <input id="incoming-cross-section" inputmode="decimal">
+                    </label>
+                  </div>
+                </section>
+
+                <section class="form-section" aria-labelledby="distribution-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>04</span>
+                      <h3 id="distribution-title">Verteilungen und Stromkreise</h3>
+                    </div>
+                    <button id="add-distribution" class="button button--small" type="button">Verteilung hinzufügen</button>
+                  </div>
+                  <div class="check-grid">
+                    <label><input id="circuit-directory-included" type="checkbox"> Stromkreisverzeichnis beilegen</label>
+                    <label><input id="detailed-insulation" type="checkbox"> Detaillierte Isolationsmessung erfassen</label>
+                  </div>
+                  <p class="section-note">Die angezeigte Reihenfolge wird unverändert in das PDF übernommen. RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis erfasst.</p>
+                  <div id="distribution-list" class="distribution-list"></div>
+                </section>
+
+                <section class="form-section" aria-labelledby="equipment-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>05</span>
+                      <h3 id="equipment-title">Prüfgerät und Ergebnis</h3>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field">
+                      <span>Hersteller</span>
+                      <input id="equipment-manufacturer" maxlength="120">
+                    </label>
+                    <label class="field">
+                      <span>Typ</span>
+                      <input id="equipment-type" maxlength="120">
+                    </label>
+                    <label class="field">
+                      <span>Seriennummer</span>
+                      <input id="equipment-serial" maxlength="120">
+                    </label>
+                    <label class="field">
+                      <span>Kalibrierung gültig bis</span>
+                      <input id="equipment-calibration" type="date">
+                    </label>
+                    <label class="field">
+                      <span>Gesamtergebnis</span>
+                      <select id="inspection-result">
+                        <option value="ok">In Ordnung</option>
+                        <option value="operational_with_defects">Betriebsfähig mit Mängeln</option>
+                        <option value="not_operational">Nicht betriebsfähig</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Nächste Prüfung</span>
+                      <input id="next-inspection-date" type="date">
+                    </label>
+                    <label class="field field--wide">
+                      <span>Mängel und Hinweise</span>
+                      <textarea id="inspection-defects" maxlength="10000" rows="5"></textarea>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="form-section form-section--evaluation" aria-labelledby="evaluation-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>06</span>
+                      <h3 id="evaluation-title">Plausibilitätsprüfung</h3>
+                    </div>
+                  </div>
+                  <div id="overall-evaluation" class="evaluation evaluation--neutral" aria-live="polite">
+                    Noch keine Stromkreise erfasst.
+                  </div>
+                  <ul id="evaluation-details" class="evaluation-details"></ul>
+                  <p class="section-note">Die Plausibilitätsanzeige unterstützt die fachkundige Prüfung, ersetzt aber weder die Beurteilung durch die Elektrofachkraft noch die anzuwendenden Normen.</p>
+                </section>
+
+                <section id="signature-section" class="form-section" aria-labelledby="signature-title">
+                  <div class="form-section__heading">
+                    <div>
+                      <span>07</span>
+                      <h3 id="signature-title">Prüferunterschrift</h3>
+                    </div>
+                    <button id="clear-signature" class="button button--quiet button--small" type="button">Leeren</button>
+                  </div>
+                  <canvas id="signature-pad" width="900" height="260" aria-label="Unterschriftsfeld"></canvas>
+                  <p class="section-note">Die Unterschrift wird erst beim unveränderlichen Abschluss gespeichert. Danach wird die PDF zentral zur Baustellenakte gelegt.</p>
+                </section>
+              </fieldset>
+
+              <div class="sticky-actions">
+                <div>
+                  <span id="save-state">Noch nicht gespeichert</span>
+                  <small id="local-draft-state">Lokale Zwischenablage aktiv</small>
+                </div>
+                <div class="sticky-actions__buttons">
+                  <a id="open-pdf" class="button button--quiet" href="#" target="_blank" rel="noopener" hidden>PDF öffnen</a>
+                  <button id="save-inspection" class="button" type="submit">Entwurf speichern</button>
+                  <button id="complete-inspection" class="button button--primary" type="button">Abschließen &amp; PDF</button>
+                </div>
+              </div>
+              <p id="form-message" class="form-message form-message--main" aria-live="polite"></p>
+            </form>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <template id="empty-inspections-template">
+      <li class="inspection-list__empty">Noch keine VDE-Prüfung für diese Baustelle.</li>
+    </template>
+
+    <script src="./app.js?v=0.39.0" defer></script>
+  </body>
+</html>

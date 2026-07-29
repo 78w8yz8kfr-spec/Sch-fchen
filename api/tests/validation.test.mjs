@@ -44,6 +44,11 @@ import {
   validateTimeAccountAdjustment,
   validateTimeAccountProfile,
   validateTimeAccountYear,
+  validateVdeInspectionCompletion,
+  validateVdeInspectionCreate,
+  validateVdeInspectionImport,
+  validateVdeInspectionUpdate,
+  validateVdeProtocolData,
   validateWorkDayDecision,
   validateWorkDate
 } from "../src/validation.mjs";
@@ -229,6 +234,211 @@ test("Elektro-Module verlangen bekannten Schlüssel Status und Versionsstand", (
     () => validateCompanyModuleUpdate("vde", { enabled: true, rowVersion: -1 }),
     /Modulversion/
   );
+});
+
+test("VDE-Prüfungen speichern nur strukturierte Fachdaten und passende Schutzorganparameter", () => {
+  const protocol = {
+    schemaVersion: 1,
+    networkType: "TN-S",
+    nominalVoltage: "230/400 V",
+    inspectionKinds: {
+      initial: true,
+      recurring: false,
+      alteration: false
+    },
+    visualChecks: {
+      electric_shock_protection: "ok"
+    },
+    incomingSupply: {
+      designation: "HAK",
+      upstreamProtection: "NH00 63 A",
+      crossSection: "16"
+    },
+    circuitDirectoryIncluded: true,
+    detailedInsulationMeasurement: false,
+    distributions: [{
+      clientId: "uv-1",
+      name: "UV EG",
+      source: "HAK",
+      feedCableType: "NYY-J",
+      feedCores: "5",
+      feedCrossSection: "10",
+      feedProtection: "35 A",
+      rcds: [],
+      directCircuits: [{
+        clientId: "circuit-1",
+        name: "Herd",
+        cableType: "NYM-J",
+        cores: "5",
+        crossSection: "2,5",
+        protectiveDevice: {
+          type: "fuse_nh",
+          characteristic: "B",
+          ratedCurrent: "50",
+          designation: "gG"
+        },
+        measurements: {
+          rpe: "0,21",
+          riso: "200",
+          zs: "0,42",
+          ik: "548",
+          risoL1Pe: "500"
+        }
+      }]
+    }],
+    testEquipment: {
+      manufacturer: "Gossen Metrawatt",
+      type: "Profitest",
+      serialNumber: "SN-1",
+      calibrationValidUntil: "2027-07-29"
+    },
+    defects: "",
+    result: "ok",
+    nextInspectionDate: "2030-07-29"
+  };
+  const normalized = validateVdeProtocolData(protocol);
+  assert.equal(normalized.distributions[0].directCircuits[0].crossSection, "2.5");
+  assert.equal(
+    normalized.distributions[0].directCircuits[0].protectiveDevice.characteristic,
+    null
+  );
+  assert.equal(
+    normalized.distributions[0].directCircuits[0].measurements.risoL1Pe,
+    null
+  );
+  assert.equal(normalized.visualChecks.phase_sequence, "not_checked");
+
+  const created = validateVdeInspectionCreate({
+    constructionSiteId: "22222222-2222-4222-8222-222222222222",
+    clientInspectionId: "11111111-1111-4111-8111-111111111111",
+    inspectorUserId: "33333333-3333-4333-8333-333333333333",
+    inspectionName: "  Erstprüfung Hauptverteilung  ",
+    inspectionDate: "2026-07-29",
+    protocolData: protocol
+  });
+  assert.equal(created.inspectionName, "Erstprüfung Hauptverteilung");
+  assert.equal(created.sourceMode, "integrated");
+  assert.equal(created.protocolData.schemaVersion, 1);
+
+  assert.deepEqual(
+    validateVdeInspectionUpdate({
+      inspectionName: "Erstprüfung Hauptverteilung",
+      inspectionDate: "2026-07-29",
+      protocolData: protocol,
+      rowVersion: 2
+    }).rowVersion,
+    2
+  );
+  assert.throws(
+    () => validateVdeProtocolData({ ...protocol, customerName: "Kopie" }),
+    /unbekannte Feld customerName/
+  );
+  const duplicateClientIds = structuredClone(protocol);
+  duplicateClientIds.distributions[0].directCircuits.push({
+    ...structuredClone(duplicateClientIds.distributions[0].directCircuits[0]),
+    name: "Zweiter Stromkreis"
+  });
+  assert.throws(
+    () => validateVdeProtocolData(duplicateClientIds),
+    /eindeutige IDs/
+  );
+  const zeroRatedCurrent = structuredClone(protocol);
+  zeroRatedCurrent.distributions[0].directCircuits[0]
+    .protectiveDevice.ratedCurrent = "0";
+  assert.throws(
+    () => validateVdeProtocolData(zeroRatedCurrent),
+    /größer als null/
+  );
+});
+
+test("VDE-Abschluss verlangt fachlichen Inhalt und gültige Prüferunterschrift", () => {
+  const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const protocol = {
+    schemaVersion: 1,
+    networkType: "TN-S",
+    inspectionKinds: { initial: true },
+    distributions: [{
+      clientId: "uv-1",
+      name: "UV EG",
+      rcds: [],
+      directCircuits: [{
+        clientId: "circuit-1",
+        name: "Licht",
+        protectiveDevice: {
+          type: "mcb",
+          characteristic: "B",
+          ratedCurrent: "16"
+        },
+        measurements: { rpe: "0.2", riso: "200", zs: "0.6", ik: "380" }
+      }]
+    }],
+    result: "ok"
+  };
+  const completed = validateVdeInspectionCompletion({
+    inspectionName: "Erstprüfung UV EG",
+    inspectionDate: "2026-07-29",
+    protocolData: protocol,
+    rowVersion: 3,
+    inspectorSignatureData: signatureData
+  });
+  assert.equal(completed.rowVersion, 3);
+  assert.ok(Buffer.isBuffer(completed.inspectorSignatureData));
+
+  assert.throws(() => validateVdeInspectionCompletion({
+    inspectionName: "Leerer Entwurf",
+    inspectionDate: "2026-07-29",
+    protocolData: {
+      schemaVersion: 1,
+      networkType: "TN-S",
+      inspectionKinds: {},
+      distributions: [],
+      result: "ok"
+    },
+    rowVersion: 1,
+    inspectorSignatureData: signatureData
+  }), /Prüfungsart/);
+});
+
+test("V15-Import bewahrt eine gültige Original-PDF unverändert", () => {
+  const original = Buffer.from("%PDF-1.4\nVDE Original", "utf8");
+  const imported = validateVdeInspectionImport({
+    constructionSiteId: "22222222-2222-4222-8222-222222222222",
+    clientInspectionId: "11111111-1111-4111-8111-111111111111",
+    inspectionName: "Importierte Prüfung",
+    inspectionDate: "2026-07-20",
+    sourceName: "vde-v15.json",
+    protocolData: {
+      schemaVersion: 1,
+      networkType: "TN-S",
+      inspectionKinds: { recurring: true },
+      distributions: [],
+      result: "operational_with_defects"
+    },
+    originalPdf: {
+      fileName: "VDE-Altbestand.pdf",
+      contentBase64: original.toString("base64")
+    }
+  });
+  assert.equal(imported.sourceMode, "legacy_v15");
+  assert.deepEqual(imported.originalPdf.content, original);
+  assert.throws(() => validateVdeInspectionImport({
+    constructionSiteId: "22222222-2222-4222-8222-222222222222",
+    clientInspectionId: "11111111-1111-4111-8111-111111111111",
+    inspectionName: "Importierte Prüfung",
+    inspectionDate: "2026-07-20",
+    sourceName: "vde-v15.json",
+    protocolData: {
+      schemaVersion: 1,
+      networkType: "TN-S",
+      inspectionKinds: {},
+      distributions: [],
+      result: "ok"
+    },
+    originalPdf: {
+      fileName: "kein-pdf.pdf",
+      contentBase64: Buffer.from("kein PDF").toString("base64")
+    }
+  }), /Original-PDF/);
 });
 
 test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {

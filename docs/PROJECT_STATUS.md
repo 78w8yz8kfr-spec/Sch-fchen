@@ -1,10 +1,18 @@
 # Projektstatus
 
 Stand: 29.07.2026
-Technischer Stand: V0.38.0
+Technischer Stand: V0.39.0
 
 ## Abgeschlossen
 
+- vorhandene V15-Anwendung als erstes vollständig integriertes, firmenweit aktivierbares VDE-Spezialmodul aus der Schäfchen-Baustellenakte
+- gemeinsame Referenzen für Firma, Logo, Kunde, Projekt, Baustelle und Prüfer statt paralleler oder kopierter Stammdaten
+- strukturierte, reihenfolgetreue Verteilungen, FI/RCD-Gruppen und Stromkreise mit LS, FI/LS, NH, Diazed, Neozed und sonstigen Schutzorganen
+- getrennte Messwerte RPE, RISO, Zi, Zs und Ik sowie RCD-Auslösezeit und -strom am betroffenen Stromkreis
+- optionales Stromkreisverzeichnis und ausschließlich bei Auswahl sichtbare detaillierte Isolationsmessung
+- mobiler VDE-Editor mit Plausibilitätsanzeige, lokaler Entwurfssicherung ohne Signatur und kontrolliertem V15-JSON/PDF-Bestandsimport
+- unveränderlicher, unterschriebener VDE-Abschluss als A4-PDF mit Firmenlogo, fester Fußzeile und Stromkreisen ab Seite zwei in der zentralen Baustellenakte
+- vollständige Versionshistorie, Idempotenz, RLS, Mandantentrennung, Rollen- und Tageszuweisungsprüfung in Migration 036
 - automatischer deutscher Feiertagskalender mit bundesweiten und landesweiten Regeln aller 16 Bundesländer sowie reproduzierbarer Osterberechnung
 - bestehender Schaaf-Mandant auf Sachsen vorkonfiguriert; das Bundesland ist versionsgeschützt durch Administration oder Geschäftsführung änderbar
 - Feiertage setzen das Tagessoll vor der Stundenkontoberechnung auf null; tatsächliche Feiertagsarbeit bleibt als positive Kontobewegung sichtbar
@@ -192,6 +200,7 @@ Technischer Stand: V0.38.0
 - Migration 033 ergänzt zweistufig geprüfte Abwesenheiten mit unveränderlicher Historie und konfliktfester Verknüpfung zur Einsatzplanung
 - Migration 034 ergänzt Stundenkonto-Profile, kalenderjahrbezogene Urlaubsansprüche, unveränderliche Korrekturbuchungen und die mandantengeschützte Tagesberechnung
 - Migration 035 ergänzt Mandantenkalender, gesetzliche Feiertagsregeln, betriebliche freie Tage und ihre verbindliche Wirkung auf die Tagesberechnung
+- Migration 036 integriert VDE-Prüfungen, unveränderliche Vollversionen, V15-Originale und zentrale Abschlussdokumente ohne doppelte Stammdaten
 
 ## Noch zu prüfen
 
@@ -203,9 +212,10 @@ Technischer Stand: V0.38.0
 
 ## Nächster Entwicklungsschritt
 
-Als nächstes wird die vorhandene VDE-Anwendung als erstes aktivierbares
-Elektro-Spezialmodul kontrolliert an den gemeinsamen Kunden-, Baustellen-,
-Mitarbeiter- und Dokumentenbestand angebunden.
+Als nächstes wird DGUV nach dem jetzt bewährten VDE-Muster als zweites
+aktivierbares Elektro-Spezialmodul fachlich spezifiziert: gemeinsamer
+Stammdatenbestand, rollenbezogener Baustelleneinstieg, strukturierte
+Prüfdaten, unveränderliche Historie und zentrale Abschlussdokumente.
 
 Betriebssicherheit mit dauerhafter Datenbank, Backup-Plan,
 Wiederherstellungsprobe, Überwachung und Objektspeicher wurde auf ausdrücklichen

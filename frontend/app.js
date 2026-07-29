@@ -134,6 +134,10 @@
     employeeSitePhotos: document.querySelector("#employee-site-photos"),
     employeeSiteMaterialCount: document.querySelector("#employee-site-material-count"),
     employeeSiteMaterials: document.querySelector("#employee-site-materials"),
+    employeeSiteVdeModule: document.querySelector("#employee-site-vde-module"),
+    employeeSiteVdeCount: document.querySelector("#employee-site-vde-count"),
+    employeeSiteVdeStart: document.querySelector("#employee-site-vde-start"),
+    employeeSiteVdeInspections: document.querySelector("#employee-site-vde-inspections"),
     connectionState: document.querySelector("#connection-state"),
     todayLabel: document.querySelector("#today-label"),
     weekStrip: document.querySelector("#week-strip"),
@@ -309,6 +313,9 @@
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
     sitePlanningShell: document.querySelector("#site-planning-shell"),
     sitePlanningContent: document.querySelector("#site-planning-content"),
+    electricalModuleAdmin: document.querySelector("#electrical-module-admin"),
+    electricalModuleList: document.querySelector("#electrical-module-list"),
+    electricalModuleMessage: document.querySelector("#electrical-module-message"),
     businessStructurePanel: document.querySelector("#business-structure-panel"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminCustomerCount: document.querySelector("#admin-customer-count"),
@@ -413,6 +420,10 @@
     siteMaterialNote: document.querySelector("#site-material-note"),
     siteMaterialCancel: document.querySelector("#site-material-cancel"),
     siteMaterialMessage: document.querySelector("#site-material-message"),
+    siteDashboardVdePanel: document.querySelector("#site-dashboard-vde-panel"),
+    siteDashboardVdeCount: document.querySelector("#site-dashboard-vde-count"),
+    siteDashboardVdeStart: document.querySelector("#site-dashboard-vde-start"),
+    siteDashboardVdeInspections: document.querySelector("#site-dashboard-vde-inspections"),
     siteDashboardEdit: document.querySelector("#site-dashboard-edit"),
     adminWeek: document.querySelector("#admin-week"),
     siteDashboardClose: document.querySelector("#site-dashboard-close"),
@@ -892,7 +903,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.38.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.39.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1018,6 +1029,14 @@
       "executive_assistant"
     ]);
     return !demoMode && Boolean(session?.user.roles?.some((role) => planningRoles.has(role)));
+  }
+
+  function canAdministerModules() {
+    return !demoMode && Boolean(
+      session?.user.roles?.some((role) => (
+        role === "admin" || role === "managing_director"
+      ))
+    );
   }
 
   function addIsoDays(date, days) {
@@ -1328,7 +1347,8 @@
       report: "Bericht",
       delivery_note: "Lieferschein",
       invoice: "Rechnung",
-      photo: "Foto"
+      photo: "Foto",
+      inspection: "Prüfprotokoll"
     }[category] || category;
   }
 
@@ -1798,6 +1818,167 @@
       }
       if (actions.childElementCount > 0) item.append(actions);
       elements.siteDashboardReports.append(item);
+    });
+  }
+
+  function vdeInspectionStatusLabel(status) {
+    return status === "completed" ? "Abgeschlossen" : "Entwurf";
+  }
+
+  function vdeModuleEnabled() {
+    return Boolean(adminState?.modules?.some((module) => (
+      module.key === "vde" && module.enabled
+    )));
+  }
+
+  function vdeEditorUrl(siteId, inspectionId = null, date = null) {
+    const search = new URLSearchParams({
+      constructionSiteId: siteId,
+      date: date || adminState?.date || localDateKey()
+    });
+    if (inspectionId) search.set("inspectionId", inspectionId);
+    return `./vde/index.html?${search.toString()}`;
+  }
+
+  function vdePdfUrl(inspectionId, date = null) {
+    const search = new URLSearchParams({
+      date: date || adminState?.date || localDateKey()
+    });
+    return `./api/v1/vde/inspections/${encodeURIComponent(inspectionId)}/pdf?${search.toString()}`;
+  }
+
+  function appendVdeInspection(list, inspection, siteId, date) {
+    const item = document.createElement("li");
+    const content = document.createElement("div");
+    const heading = document.createElement("div");
+    const title = document.createElement("strong");
+    const badge = document.createElement("small");
+    const meta = document.createElement("span");
+    const action = document.createElement("a");
+    title.textContent = inspection.name;
+    badge.className = inspection.status === "completed"
+      ? "module-chip module-chip--approved"
+      : "module-chip";
+    badge.textContent = vdeInspectionStatusLabel(inspection.status);
+    heading.append(title, badge);
+    meta.textContent = [
+      inspection.number,
+      new Intl.DateTimeFormat("de-DE").format(
+        new Date(`${inspection.inspectionDate}T12:00:00`)
+      ),
+      inspection.inspectorName,
+      inspection.sourceMode === "legacy_v15" ? "V15-Import" : null
+    ].filter(Boolean).join(" · ");
+    content.append(heading, meta);
+    action.className = "text-button site-module-item__action";
+    action.href = inspection.status === "completed"
+      ? vdePdfUrl(inspection.id, date)
+      : vdeEditorUrl(siteId, inspection.id, date);
+    action.textContent = inspection.status === "completed" ? "PDF" : "Weiter";
+    if (inspection.status === "completed") {
+      action.target = "_blank";
+      action.rel = "noopener";
+    }
+    item.className = "site-module-item";
+    item.append(content, action);
+    list.append(item);
+  }
+
+  function renderSiteVdeInspections(siteId) {
+    const enabled = vdeModuleEnabled();
+    elements.siteDashboardVdePanel.hidden = !enabled;
+    elements.siteDashboardVdeInspections.replaceChildren();
+    if (!enabled) {
+      elements.siteDashboardVdeCount.textContent = "0";
+      return;
+    }
+    const inspections = (adminState?.vdeInspections || []).filter(
+      (inspection) => inspection.constructionSiteId === siteId
+    );
+    elements.siteDashboardVdeCount.textContent = String(inspections.length);
+    if (inspections.length === 0) {
+      appendSiteModuleEmpty(
+        elements.siteDashboardVdeInspections,
+        "Noch keine VDE-Prüfung für diese Baustelle."
+      );
+      return;
+    }
+    inspections.forEach((inspection) => {
+      appendVdeInspection(
+        elements.siteDashboardVdeInspections,
+        inspection,
+        siteId,
+        adminState.date
+      );
+    });
+  }
+
+  function renderElectricalModuleAdministration() {
+    const allowed = canAdministerModules();
+    elements.electricalModuleAdmin.hidden = !allowed;
+    elements.electricalModuleList.replaceChildren();
+    elements.electricalModuleMessage.textContent = "";
+    if (!allowed) return;
+
+    (adminState?.modules || []).forEach((module) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const title = document.createElement("strong");
+      const description = document.createElement("span");
+      const control = document.createElement("label");
+      const toggle = document.createElement("input");
+      const stateLabel = document.createElement("span");
+      const connected = Boolean(module.available);
+      title.textContent = module.name;
+      description.textContent = connected
+        ? `${module.description} · aus der Baustelle startbar`
+        : `${module.description} · noch nicht fachlich angebunden`;
+      content.append(title, description);
+      control.className = "electrical-module-toggle";
+      toggle.type = "checkbox";
+      toggle.checked = connected && module.enabled;
+      toggle.disabled = !connected;
+      toggle.setAttribute("aria-label", `${module.name} firmenweit aktivieren`);
+      stateLabel.textContent = connected
+        ? (module.enabled ? "Aktiv" : "Inaktiv")
+        : "Vorbereitet";
+      control.append(toggle, stateLabel);
+      item.append(content, control);
+
+      if (connected) {
+        toggle.addEventListener("change", async () => {
+          const requested = toggle.checked;
+          toggle.disabled = true;
+          elements.electricalModuleMessage.textContent =
+            requested ? "VDE-Modul wird aktiviert …" : "VDE-Modul wird deaktiviert …";
+          try {
+            const body = await requestJson(
+              `./api/v1/admin/modules/${encodeURIComponent(module.key)}`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  enabled: requested,
+                  rowVersion: module.rowVersion
+                })
+              }
+            );
+            adminState.modules = adminState.modules.map((itemModule) => (
+              itemModule.key === body.module.key ? body.module : itemModule
+            ));
+            await refreshAdmin(adminState.date);
+            showToast(
+              requested
+                ? "VDE-Modul ist für die Firma aktiviert."
+                : "VDE-Modul ist deaktiviert; vorhandene Prüfungen bleiben erhalten."
+            );
+          } catch (error) {
+            toggle.checked = !requested;
+            toggle.disabled = false;
+            elements.electricalModuleMessage.textContent = error.message;
+          }
+        });
+      }
+      elements.electricalModuleList.append(item);
     });
   }
 
@@ -2275,6 +2456,7 @@
     renderSiteNotes(site.id);
     renderSiteMaterials(site.id);
     renderSiteReports(site.id);
+    renderSiteVdeInspections(site.id);
     elements.siteEditForm.hidden = true;
     elements.siteEditMessage.textContent = "";
     elements.siteDashboardEdit.hidden = false;
@@ -3177,12 +3359,14 @@
     renderAbsenceReviews();
     renderTimesheetExport();
     renderAdminTimeAccounts();
+    renderElectricalModuleAdministration();
     if (openedSiteId && !elements.siteDashboard.hidden) {
       renderSiteDocuments(openedSiteId);
       renderSiteTasks(openedSiteId);
       renderSiteNotes(openedSiteId);
       renderSiteMaterials(openedSiteId);
       renderSiteReports(openedSiteId);
+      renderSiteVdeInspections(openedSiteId);
     }
 
     elements.adminAssignmentList.replaceChildren();
@@ -3542,6 +3726,51 @@
           materialStatusLabel(material.status)
         );
       });
+    }
+
+    const vdeModule = dashboard.electricalModules?.vde;
+    const vdeEnabled = Boolean(vdeModule?.enabled);
+    elements.employeeSiteVdeModule.hidden = !vdeEnabled;
+    elements.employeeSiteVdeInspections.replaceChildren();
+    if (vdeEnabled) {
+      const inspections = vdeModule.inspections || [];
+      elements.employeeSiteVdeCount.textContent = String(inspections.length);
+      elements.employeeSiteVdeStart.hidden = !vdeModule.permissions?.create;
+      elements.employeeSiteVdeStart.disabled = !navigator.onLine;
+      if (inspections.length === 0) {
+        appendEmployeeSiteEmpty(
+          elements.employeeSiteVdeInspections,
+          "Noch keine VDE-Prüfung für diese Baustelle."
+        );
+      } else {
+        inspections.forEach((inspection) => {
+          appendEmployeeSiteItem(
+            elements.employeeSiteVdeInspections,
+            inspection.name,
+            [
+              inspection.number,
+              new Intl.DateTimeFormat("de-DE").format(
+                new Date(`${inspection.inspectionDate}T12:00:00`)
+              ),
+              inspection.inspectorName
+            ].filter(Boolean).join(" · "),
+            vdeInspectionStatusLabel(inspection.status),
+            {
+              href: inspection.status === "completed"
+                ? vdePdfUrl(inspection.id, dashboard.date)
+                : vdeEditorUrl(
+                  dashboard.site.id,
+                  inspection.id,
+                  dashboard.date
+                ),
+              label: inspection.status === "completed" ? "PDF" : "Weiter"
+            }
+          );
+        });
+      }
+    } else {
+      elements.employeeSiteVdeCount.textContent = "0";
+      elements.employeeSiteVdeStart.hidden = true;
     }
 
     elements.employeeSitePhotoAdd.disabled = !navigator.onLine;
@@ -5290,6 +5519,7 @@
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
+      elements.employeeSiteVdeStart.disabled = !online;
       elements.employeeSiteTasks
         .querySelectorAll(".employee-site-task-actions button")
         .forEach((button) => { button.disabled = !online; });
@@ -7147,6 +7377,19 @@
     }
   });
   elements.employeeSiteBack.addEventListener("click", () => showDashboardPane("start"));
+  elements.employeeSiteVdeStart.addEventListener("click", () => {
+    if (!employeeSiteState?.site?.id || !navigator.onLine) {
+      showToast("Die VDE-Prüfung kann mit Verbindung gestartet werden.");
+      return;
+    }
+    window.location.assign(
+      vdeEditorUrl(
+        employeeSiteState.site.id,
+        null,
+        employeeSiteState.date
+      )
+    );
+  });
   elements.employeeSitePhotoAdd.addEventListener("click", () => {
     if (!navigator.onLine) {
       showToast("Für das Foto ist momentan eine Verbindung erforderlich.");
@@ -7357,6 +7600,12 @@
   elements.siteDashboardCreateReport.addEventListener("click", openReportForSite);
   elements.siteDashboardAddDocumentShortcut.addEventListener("click", openDocumentUploadForSite);
   elements.siteDashboardCreateTask.addEventListener("click", openTaskForSite);
+  elements.siteDashboardVdeStart.addEventListener("click", () => {
+    if (!openedSiteId) return;
+    window.location.assign(
+      vdeEditorUrl(openedSiteId, null, adminState?.date)
+    );
+  });
   elements.siteDashboardEdit.addEventListener("click", openSiteEditor);
   elements.siteEditCancel.addEventListener("click", () => {
     elements.siteEditForm.hidden = true;

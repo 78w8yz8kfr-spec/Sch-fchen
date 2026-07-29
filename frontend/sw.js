@@ -1,10 +1,13 @@
-const CACHE_NAME = "schaefchen-online-v38";
+const CACHE_NAME = "schaefchen-online-v39";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=0.38.0",
-  "./app.js?v=0.38.0",
-  "./version.js?v=0.38.0",
+  "./styles.css?v=0.39.0",
+  "./app.js?v=0.39.0",
+  "./version.js?v=0.39.0",
+  "./vde/index.html",
+  "./vde/styles.css?v=0.39.0",
+  "./vde/app.js?v=0.39.0",
   "./manifest.webmanifest",
   "./assets/mark.svg",
   "./assets/company-logos/schaaf-elektro.webp",
@@ -41,16 +44,19 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (event.request.mode === "navigate" || requestUrl.pathname === "/" || requestUrl.pathname.endsWith(".html")) {
+    const fallbackDocument = requestUrl.pathname.includes("/vde/")
+      ? "./vde/index.html"
+      : "./index.html";
     event.respondWith(
       fetch(event.request, { cache: "no-store" })
         .then((response) => {
           if (response?.status === 200) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+            caches.open(CACHE_NAME).then((cache) => cache.put(fallbackDocument, copy));
           }
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(() => caches.match(fallbackDocument))
     );
     return;
   }

@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 29.07.2026
-Technischer Stand: V0.38.0
+Technischer Stand: V0.39.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -33,8 +33,10 @@ aus. Sie ist nur für die NOLOGIN-Rolle `schaefchen_api` ausführbar.
 
 `GET /api/v1/admin/modules` und `PATCH /api/v1/admin/modules/:moduleKey`
 arbeiten ausschließlich im Mandanten der aktiven Sitzung. Nur Administrator
-und Geschäftsführung dürfen VDE oder DGUV aktivieren und
-deaktivieren. Der Client sendet weder Firmen-ID noch Benutzer-ID. Änderungen
+und Geschäftsführung dürfen vollständig angebundene Module aktivieren oder
+deaktivieren. VDE ist verfügbar; ein Aktivierungsversuch für das noch nicht
+fachlich angebundene DGUV-Modul wird serverseitig abgewiesen. Der Client sendet
+weder Firmen-ID noch Benutzer-ID. Änderungen
 werden mit Versionsstand geprüft und serverseitig dem angemeldeten Benutzer
 zugeordnet; die zugehörige Historie ist unveränderlich.
 
@@ -90,6 +92,13 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/holiday-calendar` | Bundesland mit Versionsschutz ändern; nur Administration oder Geschäftsführung |
 | `POST` | `/api/v1/admin/holiday-calendar/closures` | Örtlichen oder betrieblichen freien Tag mit Pflichtgrund und Client-UUID anlegen; nur Administration oder Geschäftsführung |
 | `PATCH` | `/api/v1/admin/holiday-calendar/closures/:id/cancel` | Freien Tag mit Versionsstand und Pflichtbegründung aufheben; nur Administration oder Geschäftsführung |
+| `GET` | `/api/v1/vde/context?constructionSiteId=:id&date=JJJJ-MM-TT` | Gemeinsame Firmen-, Kunden-, Projekt-, Baustellen- und Prüferreferenzen sowie rollenbezogene VDE-Rechte lesen |
+| `POST` | `/api/v1/vde/inspections?date=JJJJ-MM-TT` | VDE-Entwurf mit Client-UUID und strukturierter Fachdatenauswahl idempotent anlegen |
+| `POST` | `/api/v1/vde/imports?date=JJJJ-MM-TT` | V15-Bestand als Entwurf importieren und optional ein geprüftes Original-PDF unverändert zentral bewahren |
+| `GET` | `/api/v1/vde/inspections/:id?date=JJJJ-MM-TT` | Zugriffsgeprüfte VDE-Prüfung einschließlich strukturierter Fachdaten lesen |
+| `PATCH` | `/api/v1/vde/inspections/:id?date=JJJJ-MM-TT` | VDE-Entwurf mit Versionskonfliktschutz fortschreiben |
+| `POST` | `/api/v1/vde/inspections/:id/complete?date=JJJJ-MM-TT` | Prüferunterschrift und fachliche Mindeststruktur prüfen, unveränderlich abschließen und zentrale PDF erzeugen |
+| `GET` | `/api/v1/vde/inspections/:id/pdf?date=JJJJ-MM-TT` | Abschluss-PDF nur mit fortbestehendem Baustellen- und Modulzugriff ausliefern |
 | `PATCH` | `/api/v1/admin/absence-requests/:id` | Büroprüfung, Geschäftsführungsentscheidung oder begründetes Aufheben einer verbindlichen Abwesenheit |
 | `POST` | `/api/v1/admin/site-notes` | Notiz für eine aktive Baustelle anlegen |
 | `POST` | `/api/v1/admin/site-tasks` | Aufgabe für eine aktive Baustelle anlegen |
@@ -211,6 +220,28 @@ Baustelle. Auch Foto-Upload, Notizspeicherung und Dateiabruf wiederholen dieselb
 Prüfung. Der mobile Notiz-Endpunkt verwendet zusätzlich eine Client-UUID für
 idempotente Wiederholungen; eine bereits für anderen Inhalt verwendete UUID
 wird als Konflikt abgewiesen.
+
+Das VDE-Modul wiederholt diese Baustellenprüfung an jedem Endpunkt. Eine
+Planungsrolle darf aktive Baustellen des eigenen Mandanten bearbeiten und einen
+aktiven Prüfer auswählen. Monteur oder Vorarbeiter benötigen für das übergebene
+Datum einen freigegebenen oder abgeschlossenen Einsatz und dürfen nur sich
+selbst als Prüfer verwenden. Abschließen dürfen ausschließlich Administrator,
+Geschäftsführung, Projektleitung oder ein an diesem Tag zugewiesener
+Vorarbeiter. Zusätzlich muss der abschließende Sitzungsbenutzer mit dem bei
+Anlage unveränderlich gewählten Prüfer übereinstimmen; eine stellvertretende
+Signatur unter fremdem Prüfernamen wird abgewiesen. Der V15-Import bleibt
+Planungsrollen vorbehalten. Ist das
+Firmenmodul deaktiviert, liefern die VDE-Endpunkte keine Fachdaten; zentrale
+Abschlussdokumente und gespeicherte Historien werden dadurch nicht gelöscht.
+
+VDE-Nutzdaten dürfen ausschließlich das dokumentierte Fachschema enthalten.
+Unbekannte Felder werden abgewiesen, Zahlenwerte begrenzt, Signaturen als echte
+PNG-Dateien bis 500 KB und Original-PDFs bis 5 MB geprüft. Firma, Kunde,
+Projekt, Baustellenbezeichnung, Firmenlogo und Prüfername werden nicht aus
+freiem Clienttext übernommen, sondern beim Lesen und PDF-Abschluss aus den
+mandantengebundenen Referenzen aufgelöst. Jede Änderung erhöht `row_version`
+und erzeugt eine vollständige unveränderliche Version. Ein abgeschlossener
+Datensatz kann weder geändert noch hart gelöscht werden.
 
 Der Excel-Import akzeptiert ausschließlich `.xlsx` bis 1,5 MB. Zusätzlich
 werden Archivstruktur, entpackte Gesamtgröße, Tabellenabmessungen und maximale

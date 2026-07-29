@@ -26,7 +26,7 @@ Aktuell enthalten:
 - Migration `015_add_organization_roles.sql` für die gleichberechtigten Organisationsrollen
 - Migration `016_add_business_roles.sql` für die sichtbaren Betriebsrollen und kompatible Bestandskonten
 - Migrationen `017_create_documents.sql` bis `026_automatic_site_foreman.sql` für zentrale Dokumente, Baustellenarbeit, strukturierte Berichte und Vorarbeiterverantwortung
-- Migrationen `027_allow_multiple_work_blocks.sql` bis `035_create_holiday_calendars.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule, Abwesenheiten, Stundenkonten und Feiertage
+- Migrationen `027_allow_multiple_work_blocks.sql` bis `036_create_vde_inspections.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule, Abwesenheiten, Stundenkonten, Feiertage und VDE-Prüfungen
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -60,6 +60,9 @@ Aktuell enthalten:
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
 - doppelte Touch-Unterschrift und unveränderliche Abschluss-PDF für Montage- und Bautagesberichte
 - strukturierte Montage- und Bautagesberichte mit Leistungen, Behinderungen, offenen Punkten und Mitarbeiterstunden
+- vollständig integriertes, firmenweit aktivierbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
+- mobiler VDE-Editor für geordnete Verteilungen, FI/RCD-Gruppen, Stromkreise, passende Schutzorganparameter und Messwerte einschließlich Zi, Zs, Ik und stromkreisbezogener RCD-Werte
+- kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF in der zentralen Baustellenakte
 
 ## Öffentliche Vorschau
 
@@ -143,6 +146,8 @@ Die technische Struktur und der aktuelle Umsetzungsstand stehen unter
 [`docs/SPRINT2_TIME_MODEL.md`](docs/SPRINT2_TIME_MODEL.md) beschrieben. Die
 Berechnungs- und Rollenregeln der Jahreskonten stehen in
 [`docs/TIME_ACCOUNTS.md`](docs/TIME_ACCOUNTS.md). Die
+Fach-, Rollen-, Import- und Abschlussregeln des VDE-Moduls stehen in
+[`docs/VDE_MODULE.md`](docs/VDE_MODULE.md). Die
 Sicherheitsgrenze und die Endpunkte der API stehen in
 [`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die verbindliche fachliche
 Grundlage steht in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).

@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Notizen, Material und Berichte
 
 Stand: 29.07.2026
-Technischer Stand: V0.38.0
+Technischer Stand: V0.39.0
 
 ## Bedienkonzept
 
@@ -29,6 +29,12 @@ Navigation stehen zuerst; darunter folgen
 sichtbare, getrennte Karten für Mitarbeiter, Aufgaben, Notizen, Berichte, Dokumente,
 Fotos und Material. Die Ansicht ist keine chronologische Pinnwand und erzeugt
 keinen zusätzlichen Hauptmenüpunkt.
+
+Ist das VDE-Spezialmodul für die Firma aktiviert, folgt als weitere Themenkarte
+die Liste der VDE-Prüfungen dieser Baustelle. Der Editor öffnet einen eigenen
+ruhigen Arbeitsbereich, übernimmt die gemeinsamen Stammdaten und legt seine
+Abschluss-PDF wieder in dieselbe Dokumentenkarte zurück. Fachdetails stehen in
+[`VDE_MODULE.md`](VDE_MODULE.md).
 
 Das tagesbezogene Team zeigt Rolle, geplante Einsatzdauer und vorhandene
 Telefon- oder E-Mail-Kontaktdaten. Die mobile Kontaktaktion verwendet nur die

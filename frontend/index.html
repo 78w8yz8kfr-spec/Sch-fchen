@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.38.0">
-    <script src="./app.js?v=0.38.0" defer></script>
-    <script src="./version.js?v=0.38.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.39.0">
+    <script src="./app.js?v=0.39.0" defer></script>
+    <script src="./version.js?v=0.39.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.38.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.39.0</p>
         </div>
       </section>
 
@@ -392,6 +392,18 @@
                   <span id="employee-site-material-count" class="module-count">0</span>
                 </div>
                 <ul id="employee-site-materials" class="employee-site-list"></ul>
+              </section>
+
+              <section id="employee-site-vde-module" class="employee-site-module employee-site-module--vde" aria-labelledby="employee-site-vde-title" hidden>
+                <div class="employee-site-module__heading">
+                  <div>
+                    <span class="employee-site-module__icon" aria-hidden="true">V</span>
+                    <h2 id="employee-site-vde-title">VDE-Prüfungen</h2>
+                  </div>
+                  <span id="employee-site-vde-count" class="module-count">0</span>
+                </div>
+                <button id="employee-site-vde-start" class="button button--primary" type="button">VDE-Prüfung starten</button>
+                <ul id="employee-site-vde-inspections" class="employee-site-list"></ul>
               </section>
             </div>
           </section>
@@ -980,6 +992,18 @@
               </div>
             </section>
 
+            <section id="electrical-module-admin" class="electrical-module-admin" aria-labelledby="electrical-module-admin-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Firmenweite Freigabe</p>
+                  <h3 id="electrical-module-admin-title">Elektro-Spezialmodule</h3>
+                </div>
+              </div>
+              <p>Nur vollständig angebundene Module erscheinen anschließend in der Baustellenakte.</p>
+              <ul id="electrical-module-list" class="electrical-module-list"></ul>
+              <p id="electrical-module-message" class="form-message" aria-live="polite"></p>
+            </section>
+
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
               <summary>Baustellen</summary>
               <div class="hierarchy-toolbar">
@@ -1296,6 +1320,14 @@
                     <p id="site-material-message" class="form-message" aria-live="polite"></p>
                   </form>
                   <ul id="site-dashboard-materials" class="site-module-list" aria-label="Material dieser Baustelle"></ul>
+                </div>
+              </details>
+              <details id="site-dashboard-vde-panel" class="site-dashboard-vde-panel" hidden>
+                <summary>VDE-Prüfungen <span id="site-dashboard-vde-count" class="module-count">0</span></summary>
+                <div class="site-work-module">
+                  <button id="site-dashboard-vde-start" class="button button--primary" type="button">VDE-Prüfung starten</button>
+                  <p class="site-module-form__note">Kunde, Baustelle, Prüfer und Firmenlogo werden aus Schäfchen übernommen.</p>
+                  <ul id="site-dashboard-vde-inspections" class="site-module-list" aria-label="VDE-Prüfungen dieser Baustelle"></ul>
                 </div>
               </details>
             </section>
