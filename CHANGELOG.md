@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.38.0 – Automatischer Feiertagskalender
+
+- der deutsche Feiertagskalender berechnet nach Rechtsstand 29.07.2026 die neun bundesweiten und die landesweiten Regeln aller 16 Bundesländer einschließlich beweglicher Feiertage reproduzierbar für 2000 bis 2100
+- der bestehende Schaaf-Mandant ist auf Sachsen vorkonfiguriert; Administration und Geschäftsführung ändern das Bundesland versionsgeschützt, Planungsrollen dürfen die Berechnungsgrundlage lesen
+- gesetzliche sowie bestätigte örtliche oder betriebliche freie Tage setzen das Tagessoll vor der Stundenkontoberechnung auf null; geleistete Feiertagsarbeit bleibt als positive Kontobewegung sichtbar
+- kommunale Sonderfälle und Betriebsschließtage werden mit Datum, Bezeichnung, Pflichtgrund, Client-UUID und Ersteller unveränderlich angelegt
+- fehlerhafte freie Tage werden nicht gelöscht, sondern mit Pflichtbegründung aufgehoben und bleiben vollständig in der Historie
+- Mitarbeiter sehen die berücksichtigten Feiertage im eigenen Stundenkonto; die Büro-Jahresübersicht bündelt Bundesland, Jahreskalender und Verwaltung zusätzlicher freier Tage
+- Migration 035, Row Level Security, zusammengesetzte Mandanten-Fremdschlüssel sowie SQL-, Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Kalenderregeln, Sollwirkung, Rollen, Versionskonflikte und Mandantentrennung
+
 ### V0.37.0 – Stundenkonten und Jahresübersicht
 
 - jeder Mitarbeiter sieht in der bestehenden Wochenansicht sein fortlaufendes Stundenkonto mit Jahres-Soll, Ist, Abwesenheitsgutschrift, laufendem Stand und zwölf kompakten Monatszeilen

@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.37.0">
-    <script src="./app.js?v=0.37.0" defer></script>
-    <script src="./version.js?v=0.37.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.38.0">
+    <script src="./app.js?v=0.38.0" defer></script>
+    <script src="./version.js?v=0.38.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.37.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.38.0</p>
         </div>
       </section>
 
@@ -487,6 +487,7 @@
                 <div><span>Urlaub übrig</span><strong id="time-account-vacation-remaining">0 Tage</strong></div>
                 <div><span>Urlaub offen</span><strong id="time-account-vacation-pending">0 Tage</strong></div>
                 <div><span>Abbau genehmigt</span><strong id="time-account-time-off">0 Tage</strong></div>
+                <div><span>Feiertage</span><strong id="time-account-holiday-count">0 berücksichtigt</strong></div>
               </div>
               <details class="time-account-months-panel">
                 <summary>Monate anzeigen</summary>
@@ -505,6 +506,13 @@
                     <tbody id="time-account-months"></tbody>
                   </table>
                 </div>
+              </details>
+              <details class="time-account-months-panel holiday-calendar-details">
+                <summary>Berücksichtigte Feiertage anzeigen</summary>
+                <p id="time-account-holiday-status" class="time-account-status">
+                  Feiertagskalender wird geladen …
+                </p>
+                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
               </details>
               <p id="time-account-message" class="form-message" aria-live="polite"></p>
             </section>
@@ -571,6 +579,71 @@
                   <p class="absence-flow-note">Buchungen werden nicht überschrieben. Fehler werden mit einer Gegenbuchung berichtigt.</p>
                 </fieldset>
               </form>
+              <section id="holiday-calendar-admin" class="holiday-calendar-admin" aria-labelledby="holiday-calendar-title">
+                <div class="site-management-panel__heading">
+                  <div>
+                    <p class="eyebrow">Verbindliche Sollzeit</p>
+                    <h4 id="holiday-calendar-title">Feiertagskalender</h4>
+                  </div>
+                  <span id="holiday-calendar-year" class="site-list-summary">Jahr</span>
+                </div>
+                <p id="holiday-calendar-status" class="time-account-status">
+                  Feiertagskalender wird geladen …
+                </p>
+                <form id="holiday-calendar-form" class="holiday-calendar-form" novalidate hidden>
+                  <input id="holiday-calendar-country" type="hidden" value="DE">
+                  <label for="holiday-calendar-state">Bundesland des Betriebsstandorts</label>
+                  <div class="holiday-calendar-form__row">
+                    <select id="holiday-calendar-state" required>
+                      <option value="BW">Baden-Württemberg</option>
+                      <option value="BY">Bayern</option>
+                      <option value="BE">Berlin</option>
+                      <option value="BB">Brandenburg</option>
+                      <option value="HB">Bremen</option>
+                      <option value="HH">Hamburg</option>
+                      <option value="HE">Hessen</option>
+                      <option value="MV">Mecklenburg-Vorpommern</option>
+                      <option value="NI">Niedersachsen</option>
+                      <option value="NW">Nordrhein-Westfalen</option>
+                      <option value="RP">Rheinland-Pfalz</option>
+                      <option value="SL">Saarland</option>
+                      <option value="SN">Sachsen</option>
+                      <option value="ST">Sachsen-Anhalt</option>
+                      <option value="SH">Schleswig-Holstein</option>
+                      <option value="TH">Thüringen</option>
+                    </select>
+                    <button id="holiday-calendar-save" class="button button--secondary" type="submit">
+                      Bundesland speichern
+                    </button>
+                  </div>
+                </form>
+                <ul id="holiday-calendar-list" class="holiday-list holiday-list--admin" aria-label="Feiertage des Betriebs"></ul>
+                <details id="holiday-closure-panel" class="time-account-months-panel holiday-closure-panel" hidden>
+                  <summary>Örtlichen oder betrieblichen freien Tag ergänzen</summary>
+                  <form id="holiday-closure-form" class="holiday-closure-form" novalidate>
+                    <div class="setup-grid">
+                      <div>
+                        <label for="holiday-closure-date">Datum</label>
+                        <input id="holiday-closure-date" type="date" required>
+                      </div>
+                      <div>
+                        <label for="holiday-closure-name">Bezeichnung</label>
+                        <input id="holiday-closure-name" maxlength="120" placeholder="z. B. regionales Fronleichnam" required>
+                      </div>
+                    </div>
+                    <label for="holiday-closure-note">Grund</label>
+                    <textarea id="holiday-closure-note" minlength="3" maxlength="500" rows="2" placeholder="Örtliche Regelung oder Betriebsvereinbarung" required></textarea>
+                    <button id="holiday-closure-submit" class="button button--secondary" type="submit">
+                      Freien Tag hinzufügen
+                    </button>
+                  </form>
+                  <ul id="holiday-closure-list" class="holiday-closure-list" aria-label="Historie betrieblicher freier Tage"></ul>
+                </details>
+                <p class="absence-flow-note">
+                  Kommunale Sonderfeiertage werden bewusst zusätzlich gepflegt. Ein gespeicherter freier Tag wird nicht gelöscht, sondern begründet aufgehoben.
+                </p>
+                <p id="holiday-calendar-message" class="form-message" aria-live="polite"></p>
+              </section>
               <p id="time-account-admin-message" class="form-message" aria-live="polite"></p>
             </section>
 

@@ -1,10 +1,10 @@
-const CACHE_NAME = "schaefchen-online-v37";
+const CACHE_NAME = "schaefchen-online-v38";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=0.37.0",
-  "./app.js?v=0.37.0",
-  "./version.js?v=0.37.0",
+  "./styles.css?v=0.38.0",
+  "./app.js?v=0.38.0",
+  "./version.js?v=0.38.0",
   "./manifest.webmanifest",
   "./assets/mark.svg",
   "./assets/company-logos/schaaf-elektro.webp",

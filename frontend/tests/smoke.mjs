@@ -43,6 +43,12 @@ assert.match(html, /id="time-account-admin-panel"/);
 assert.match(html, /id="time-account-admin-list"/);
 assert.match(html, /id="time-account-profile-form"/);
 assert.match(html, /id="time-account-adjustment-submit"/);
+assert.match(html, /id="time-account-holiday-list"/);
+assert.match(html, /id="holiday-calendar-form"/);
+assert.match(html, /id="holiday-calendar-state"/);
+assert.match(html, /id="holiday-calendar-list"/);
+assert.match(html, /id="holiday-closure-form"/);
+assert.match(html, /id="holiday-closure-list"/);
 assert.match(html, /id="employee-timesheet-export-panel"/);
 assert.match(html, /id="employee-timesheet-export-form"/);
 assert.match(html, /id="time-correction-dialog"/);
@@ -159,9 +165,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.37\.0/);
-assert.match(html, /app\.js\?v=0\.37\.0/);
-assert.match(html, /version\.js\?v=0\.37\.0/);
+assert.match(html, /styles\.css\?v=0\.38\.0/);
+assert.match(html, /app\.js\?v=0\.38\.0/);
+assert.match(html, /version\.js\?v=0\.38\.0/);
 assert.match(html, /id="site-choice-open"/);
 assert.match(html, /id="site-choice-dialog"/);
 assert.match(html, /id="field-site-form"/);
@@ -423,9 +429,9 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.37.0"'));
-assert.ok(worker.includes('"./app.js?v=0.37.0"'));
-assert.ok(worker.includes('"./version.js?v=0.37.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.38.0"'));
+assert.ok(worker.includes('"./app.js?v=0.38.0"'));
+assert.ok(worker.includes('"./version.js?v=0.38.0"'));
 assert.match(
   styles,
   /\.login-form input,\s*\.admin-form input,\s*\.admin-form select\s*\{\s*height: 52px;/,
@@ -435,8 +441,12 @@ assert.ok(worker.includes('"./assets/baustellen-import-vorlage.xlsx"'));
 assert.match(app, /\/api\/v1\/time-account\?year=/);
 assert.match(app, /\/api\/v1\/admin\/time-accounts\?year=/);
 assert.match(app, /\/api\/v1\/admin\/time-account-adjustments/);
+assert.match(app, /\/api\/v1\/admin\/holiday-calendar/);
+assert.match(app, /\/closures\/\$\{encodeURIComponent\(closure\.id\)\}\/cancel/);
 assert.match(styles, /\.time-account-table/);
 assert.match(styles, /\.time-account-admin-item/);
+assert.match(styles, /\.holiday-calendar-form/);
+assert.match(styles, /\.holiday-closure-list/);
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 assert.match(worker, /event\.request\.mode === "navigate"/);
 assert.match(worker, /cache: "no-store"/);

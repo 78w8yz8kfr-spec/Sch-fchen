@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 29.07.2026
-Technischer Stand: V0.37.0
+Technischer Stand: V0.38.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -86,6 +86,10 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/api/v1/admin/time-accounts?year=JJJJ` | Jahresübersicht aller aktiven Mitarbeiter nach serverseitiger Planungsrollenprüfung |
 | `PATCH` | `/api/v1/admin/time-accounts/:employeeId/profile` | Aktivierung, Startdatum und kalenderjahrbezogenen Urlaubsanspruch mit getrenntem Versionsschutz ändern; nur Administration oder Geschäftsführung |
 | `POST` | `/api/v1/admin/time-account-adjustments` | Begründete Stundenkonto-Buchung mit Client-UUID unveränderlich und idempotent anlegen; nur Administration oder Geschäftsführung |
+| `GET` | `/api/v1/admin/holiday-calendar?year=JJJJ` | Feiertagskalender und Historie nach serverseitiger Planungsrollenprüfung lesen |
+| `PATCH` | `/api/v1/admin/holiday-calendar` | Bundesland mit Versionsschutz ändern; nur Administration oder Geschäftsführung |
+| `POST` | `/api/v1/admin/holiday-calendar/closures` | Örtlichen oder betrieblichen freien Tag mit Pflichtgrund und Client-UUID anlegen; nur Administration oder Geschäftsführung |
+| `PATCH` | `/api/v1/admin/holiday-calendar/closures/:id/cancel` | Freien Tag mit Versionsstand und Pflichtbegründung aufheben; nur Administration oder Geschäftsführung |
 | `PATCH` | `/api/v1/admin/absence-requests/:id` | Büroprüfung, Geschäftsführungsentscheidung oder begründetes Aufheben einer verbindlichen Abwesenheit |
 | `POST` | `/api/v1/admin/site-notes` | Notiz für eine aktive Baustelle anlegen |
 | `POST` | `/api/v1/admin/site-tasks` | Aufgabe für eine aktive Baustelle anlegen |
@@ -189,6 +193,15 @@ werden dem angemeldeten Buchenden zugeordnet und sind nach dem Speichern
 unveränderlich. Eine mandantenweit eindeutige Client-UUID verhindert doppelte
 Buchungen bei wiederholter Übertragung.
 
+Der Feiertagskalender verwendet dieselbe Trennung. Das eigene Stundenkonto
+liefert nur den für die eigene Jahresberechnung verwendeten Kalender.
+Planungsrollen dürfen den Firmenkalender und seine Historie lesen; Änderungen
+bleiben Administration und Geschäftsführung vorbehalten. Firma und Benutzer
+stammen ausschließlich aus der Sitzung. Kalenderänderungen besitzen einen
+Versionsstand, zusätzliche freie Tage eine mandantenweit eindeutige
+Client-UUID. Anlage und Aufhebung bleiben unveränderlich; ein fachliches
+Hartlöschen ist gesperrt.
+
 Die mobile Baustellenakte besitzt eine zusätzliche fachliche Zugriffskontrolle:
 Ohne Planungsrolle muss für Benutzer, Baustelle und Datum ein freigegebener oder
 abgeschlossener Einsatz existieren. Eine gültige UUID oder derselbe Mandant
@@ -289,5 +302,7 @@ Büro/Disposition und Monteur anlegen, Excel-Import vorschauen und doppelt gesch
 ausführen, Einsatz freigeben, Startpasswort persönlich ändern,
 Rollenverbot prüfen, Abwesenheit zweistufig freigeben, Planungskonflikte
 auflösen und anschließend sperren, Einsatz historisiert verschieben und
-stornieren, Zeiten idempotent übertragen, Arbeitstag lesen, abmelden und den
-widerrufenen Cookie zurückweisen.
+stornieren, Feiertagskalender lesen und rollen- sowie versionsgeschützt ändern,
+einen betrieblichen freien Tag idempotent anlegen und begründet aufheben,
+Zeiten idempotent übertragen, Arbeitstag lesen, abmelden und den widerrufenen
+Cookie zurückweisen.
