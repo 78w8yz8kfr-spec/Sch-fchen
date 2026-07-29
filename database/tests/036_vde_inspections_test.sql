@@ -5,6 +5,9 @@ BEGIN;
 DO $$
 DECLARE
     target_company_id UUID;
+    target_customer_id UUID;
+    target_location_id UUID;
+    target_project_id UUID;
     target_site_id UUID;
     inspector_id UUID;
     target_inspection_id UUID;
@@ -16,12 +19,45 @@ BEGIN
     FROM companies
     WHERE company_number = 'F-000001';
 
-    SELECT id
-    INTO target_site_id
-    FROM construction_sites
-    WHERE company_id = target_company_id
-    ORDER BY created_at, id
-    LIMIT 1;
+    INSERT INTO customers (company_id, customer_type, company_name)
+    VALUES (target_company_id, 'company', 'VDE-SQL-Testkunde GmbH')
+    RETURNING id INTO target_customer_id;
+
+    INSERT INTO customer_locations (
+        company_id,
+        customer_id,
+        name,
+        street,
+        house_number,
+        postal_code,
+        city
+    ) VALUES (
+        target_company_id,
+        target_customer_id,
+        'VDE-SQL-Prüfort',
+        'Prüfweg',
+        '36',
+        '12345',
+        'Teststadt'
+    )
+    RETURNING id INTO target_location_id;
+
+    INSERT INTO projects (company_id, customer_id, name)
+    VALUES (target_company_id, target_customer_id, 'VDE-SQL-Testprojekt')
+    RETURNING id INTO target_project_id;
+
+    INSERT INTO construction_sites (
+        company_id,
+        project_id,
+        customer_location_id,
+        name
+    ) VALUES (
+        target_company_id,
+        target_project_id,
+        target_location_id,
+        'VDE-SQL-Testbaustelle'
+    )
+    RETURNING id INTO target_site_id;
 
     INSERT INTO users (
         company_id,
