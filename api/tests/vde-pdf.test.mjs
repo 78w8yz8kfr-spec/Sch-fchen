@@ -4,12 +4,12 @@ import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 import { buildVdeInspectionPdf } from "../src/vde-pdf.mjs";
 
-test("VDE-Abschluss erzeugt eine lesbare unveränderliche A4-PDF ab Seite zwei mit Stromkreisen", async () => {
+test("VDE-Abschluss beginnt Messwerte auf Seite zwei und setzt das Stromkreisverzeichnis auf eine eigene Folgeseite", async () => {
   const signature = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
     "base64"
   );
-  const pdf = await buildVdeInspectionPdf({
+  const input = {
     inspection: {
       id: "11111111-1111-4111-8111-111111111111",
       number: "SE-VDE-2026-00001",
@@ -156,13 +156,14 @@ test("VDE-Abschluss erzeugt eine lesbare unveränderliche A4-PDF ab Seite zwei m
         import.meta.url
       )
     )
-  });
+  };
+  const pdf = await buildVdeInspectionPdf(input);
 
   assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
   assert.ok(pdf.length > 3_000);
   const loaded = await PDFDocument.load(pdf);
   assert.equal(loaded.getTitle(), "VDE-Prüfprotokoll SE-VDE-2026-00001");
-  assert.ok(loaded.getPageCount() >= 2);
+  assert.equal(loaded.getPageCount(), 3);
   assert.deepEqual(
     loaded.getPage(0).getSize(),
     { width: 595.28, height: 841.89 }
@@ -171,4 +172,18 @@ test("VDE-Abschluss erzeugt eine lesbare unveränderliche A4-PDF ab Seite zwei m
     loaded.getPage(1).getSize(),
     { width: 595.28, height: 841.89 }
   );
+  assert.deepEqual(
+    loaded.getPage(2).getSize(),
+    { width: 595.28, height: 841.89 }
+  );
+
+  const withoutDirectory = await buildVdeInspectionPdf({
+    ...input,
+    protocol: {
+      ...input.protocol,
+      circuitDirectoryIncluded: false
+    }
+  });
+  const loadedWithoutDirectory = await PDFDocument.load(withoutDirectory);
+  assert.equal(loadedWithoutDirectory.getPageCount(), 2);
 });

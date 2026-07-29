@@ -37,8 +37,8 @@ Aktuell enthalten:
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
 - vereinfachter Login mit Personalnummer und Passwort; die Firmennummer bleibt nach der Einrichtung im Hintergrund
 - getrenntes Live-, Wochen- und Verwaltungsdashboard
-- gegliedertes Baustellen-Dashboard ohne Aktivitätschronik
-- mobile Baustellenakte für zugewiesene Monteure und Vorarbeiter mit Auftrag, Navigation, Team, Aufgaben, Berichten, Dokumenten, Fotos und Material
+- gegliedertes Baustellen-Dashboard mit einzeln wählbaren Arbeitsbereichen ohne Aktivitätschronik
+- mobile Baustellenakte für zugewiesene Monteure und Vorarbeiter mit Auftrag, Navigation sowie getrennten Ansichten für Team, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und optional VDE
 - direkter, berechtigungsgeprüfter Kamera-Upload in den zentralen Dokumentenbestand
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
 - geschützte Bearbeitung von Mitarbeiterstammdaten, Kontaktdaten und Betriebsrollen
@@ -62,7 +62,7 @@ Aktuell enthalten:
 - strukturierte Montage- und Bautagesberichte mit Leistungen, Behinderungen, offenen Punkten und Mitarbeiterstunden
 - vollständig integriertes, firmenweit aktivierbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
 - mobiler VDE-Editor für geordnete Verteilungen, FI/RCD-Gruppen, Stromkreise, passende Schutzorganparameter und Messwerte einschließlich Zi, Zs, Ik und stromkreisbezogener RCD-Werte
-- kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF in der zentralen Baustellenakte
+- kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF mit Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
 
 ## Öffentliche Vorschau
 

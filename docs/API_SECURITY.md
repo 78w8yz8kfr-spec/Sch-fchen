@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 29.07.2026
-Technischer Stand: V0.39.0
+Technischer Stand: V0.40.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb

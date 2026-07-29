@@ -1,17 +1,20 @@
 # Projektstatus
 
 Stand: 29.07.2026
-Technischer Stand: V0.39.0
+Technischer Stand: V0.40.0
 
 ## Abgeschlossen
 
+- getrennt wählbare Baustellenbereiche für Übersicht, Team, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und optional VDE in der mobilen sowie der Büroansicht
+- direkte Zuordnung der Baustellen-Schnellaktionen zum jeweils passenden Arbeitsbereich ohne lange Sammelansicht
+- VDE-Messwerte beginnen auf Seite zwei; das optionale Stromkreisverzeichnis startet nach allen Messwertseiten auf einer eigenen Folgeseite
 - vorhandene V15-Anwendung als erstes vollständig integriertes, firmenweit aktivierbares VDE-Spezialmodul aus der Schäfchen-Baustellenakte
 - gemeinsame Referenzen für Firma, Logo, Kunde, Projekt, Baustelle und Prüfer statt paralleler oder kopierter Stammdaten
 - strukturierte, reihenfolgetreue Verteilungen, FI/RCD-Gruppen und Stromkreise mit LS, FI/LS, NH, Diazed, Neozed und sonstigen Schutzorganen
 - getrennte Messwerte RPE, RISO, Zi, Zs und Ik sowie RCD-Auslösezeit und -strom am betroffenen Stromkreis
 - optionales Stromkreisverzeichnis und ausschließlich bei Auswahl sichtbare detaillierte Isolationsmessung
 - mobiler VDE-Editor mit Plausibilitätsanzeige, lokaler Entwurfssicherung ohne Signatur und kontrolliertem V15-JSON/PDF-Bestandsimport
-- unveränderlicher, unterschriebener VDE-Abschluss als A4-PDF mit Firmenlogo, fester Fußzeile und Stromkreisen ab Seite zwei in der zentralen Baustellenakte
+- unveränderlicher, unterschriebener VDE-Abschluss als A4-PDF mit Firmenlogo, fester Fußzeile, Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
 - vollständige Versionshistorie, Idempotenz, RLS, Mandantentrennung, Rollen- und Tageszuweisungsprüfung in Migration 036
 - automatischer deutscher Feiertagskalender mit bundesweiten und landesweiten Regeln aller 16 Bundesländer sowie reproduzierbarer Osterberechnung
 - bestehender Schaaf-Mandant auf Sachsen vorkonfiguriert; das Bundesland ist versionsgeschützt durch Administration oder Geschäftsführung änderbar

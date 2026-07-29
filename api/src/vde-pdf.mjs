@@ -573,60 +573,17 @@ export async function buildVdeInspectionPdf({
     color: MUTED
   });
 
-  addPage("Verteilungen, Schutzorgane und Stromkreise");
+  addPage("Messwerte und Plausibilität");
   const circuitRows = allCircuits(protocol);
 
-  if (protocol.circuitDirectoryIncluded) {
-    section("Stromkreisverzeichnis");
-    let number = 0;
-    for (const row of circuitRows) {
-      ensureSpace(26, "Stromkreisverzeichnis · Fortsetzung");
-      number += 1;
-      page.drawRectangle({
-        x: margin,
-        y: y - 16,
-        width: contentWidth,
-        height: 22,
-        color: number % 2 === 0 ? PALE : rgb(1, 1, 1)
-      });
-      drawText(String(number), {
-        x: margin + 4,
-        y: y - 8,
-        size: 7.5,
-        font: bold,
-        color: INK
-      });
-      drawText(`${row.distribution.name || "-"} · ${row.circuit.name || "-"}`.slice(0, 62), {
-        x: margin + 24,
-        y: y - 8,
-        size: 7.5,
-        font: regular,
-        color: INK
-      });
-      drawText(protectionLabel(row.circuit.protectiveDevice).slice(0, 45), {
-        x: 315,
-        y: y - 8,
-        size: 7.5,
-        font: regular,
-        color: INK
-      });
-      drawText([
-        row.circuit.cableType,
-        row.circuit.cores ? `${row.circuit.cores}x` : null,
-        row.circuit.crossSection ? `${row.circuit.crossSection} mm²` : null
-      ].filter(Boolean).join(" ").slice(0, 35), {
-        x: 465,
-        y: y - 8,
-        size: 7.5,
-        font: regular,
-        color: INK
-      });
-      y -= 22;
-    }
-    y -= 5;
-  }
-
-  section("Messwerte und Plausibilität");
+  drawText("Verteilungen, Schutzorgane und zugehörige Messwerte", {
+    x: margin,
+    y,
+    size: 8,
+    font: regular,
+    color: MUTED
+  });
+  y -= 22;
   let circuitNumber = 0;
   for (const distribution of protocol.distributions || []) {
     ensureSpace(46, "Messwerte · Fortsetzung");
@@ -804,6 +761,110 @@ export async function buildVdeInspectionPdf({
         paragraph(`Bemerkung: ${circuit.note}`);
       }
       y -= 5;
+    }
+  }
+
+  if (protocol.circuitDirectoryIncluded) {
+    addPage("Stromkreisverzeichnis");
+    drawText("Übersicht aller im Prüfprotokoll erfassten Stromkreise", {
+      x: margin,
+      y,
+      size: 8,
+      font: regular,
+      color: MUTED
+    });
+    y -= 20;
+    drawText("Nr.", {
+      x: margin + 4,
+      y,
+      size: 6.8,
+      font: bold,
+      color: MUTED
+    });
+    drawText("Verteilung · Stromkreis", {
+      x: margin + 24,
+      y,
+      size: 6.8,
+      font: bold,
+      color: MUTED
+    });
+    drawText("Schutzorgan", {
+      x: 315,
+      y,
+      size: 6.8,
+      font: bold,
+      color: MUTED
+    });
+    drawText("Leitung", {
+      x: 465,
+      y,
+      size: 6.8,
+      font: bold,
+      color: MUTED
+    });
+    y -= 9;
+    page.drawLine({
+      start: { x: margin, y },
+      end: { x: A4[0] - margin, y },
+      thickness: 0.7,
+      color: LINE
+    });
+    y -= 13;
+
+    if (circuitRows.length === 0) {
+      drawText("Keine Stromkreise erfasst.", {
+        x: margin,
+        y,
+        size: 9,
+        font: regular,
+        color: MUTED
+      });
+    }
+
+    let number = 0;
+    for (const row of circuitRows) {
+      ensureSpace(26, "Stromkreisverzeichnis · Fortsetzung");
+      number += 1;
+      page.drawRectangle({
+        x: margin,
+        y: y - 16,
+        width: contentWidth,
+        height: 22,
+        color: number % 2 === 0 ? PALE : rgb(1, 1, 1)
+      });
+      drawText(String(number), {
+        x: margin + 4,
+        y: y - 8,
+        size: 7.5,
+        font: bold,
+        color: INK
+      });
+      drawText(`${row.distribution.name || "-"} · ${row.circuit.name || "-"}`.slice(0, 62), {
+        x: margin + 24,
+        y: y - 8,
+        size: 7.5,
+        font: regular,
+        color: INK
+      });
+      drawText(protectionLabel(row.circuit.protectiveDevice).slice(0, 45), {
+        x: 315,
+        y: y - 8,
+        size: 7.5,
+        font: regular,
+        color: INK
+      });
+      drawText([
+        row.circuit.cableType,
+        row.circuit.cores ? `${row.circuit.cores}x` : null,
+        row.circuit.crossSection ? `${row.circuit.crossSection} mm²` : null
+      ].filter(Boolean).join(" ").slice(0, 35), {
+        x: 465,
+        y: y - 8,
+        size: 7.5,
+        font: regular,
+        color: INK
+      });
+      y -= 22;
     }
   }
 

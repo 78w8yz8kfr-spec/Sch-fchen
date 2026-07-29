@@ -1078,6 +1078,47 @@ select:focus-visible {
   text-decoration: none;
 }
 
+.workspace-section-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 1px 5px;
+  scroll-padding-inline: 1px;
+  scrollbar-width: none;
+}
+
+.workspace-section-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-section-nav--site-dashboard {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.workspace-section-tab {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+
+.workspace-section-tab--active {
+  border-color: var(--brand);
+  color: #fff;
+  background: var(--brand);
+  box-shadow: 0 8px 20px rgba(227, 6, 19, 0.2);
+}
+
 .employee-site-modules {
   display: grid;
   gap: 12px;

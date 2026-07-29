@@ -1,7 +1,7 @@
 # Integriertes VDE-Prüfmodul
 
 Stand: 29.07.2026
-Technischer Stand: V0.39.0
+Technischer Stand: V0.40.0
 
 ## Ziel und Grenze
 
@@ -138,11 +138,12 @@ Die PDF ist A4-Hochformat. Seite eins enthält:
 - Einspeisung, Prüfgerät, Ergebnis, Mängel und Prüferunterschrift;
 - freie Unterschriftslinie für Auftraggeber oder Betreiber.
 
-Verteilungen, Schutzorgane und Stromkreise beginnen bewusst auf Seite zwei.
-Ein Stromkreisverzeichnis erscheint nur bei Auswahl. Detaillierte
-Isolationswerte erscheinen nur bei Auswahl. Das Abschlussdokument wird einmal
-als `inspection` in der zentralen Dokumentablage gespeichert und automatisch
-mit Baustelle sowie ihren übergeordneten Ebenen verknüpft.
+Seite zwei beginnt unmittelbar mit Verteilungen, Schutzorganen und Messwerten.
+Ein Stromkreisverzeichnis erscheint nur bei Auswahl und beginnt nach allen
+Messwertseiten immer auf einer eigenen neuen Seite. Detaillierte Isolationswerte
+erscheinen nur bei Auswahl. Das Abschlussdokument wird einmal als `inspection`
+in der zentralen Dokumentablage gespeichert und automatisch mit Baustelle sowie
+ihren übergeordneten Ebenen verknüpft.
 
 ## V15-Bestandsimport
 

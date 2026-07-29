@@ -103,6 +103,24 @@ assert.match(html, /id="site-dashboard-edit"/);
 assert.match(html, /id="site-dashboard-status"/);
 assert.match(html, /id="site-edit-form"/);
 assert.match(html, /id="site-edit-status"/);
+assert.equal(
+  [...html.matchAll(/data-employee-site-section-button=/g)].length,
+  8,
+  "Die Monteur-Baustellenakte bietet acht getrennte Bereiche"
+);
+assert.equal(
+  [...html.matchAll(/data-site-dashboard-section-button=/g)].length,
+  8,
+  "Das Büro-Dashboard bietet acht getrennte Baustellenbereiche"
+);
+assert.match(html, /data-employee-site-section="reports"[^>]*hidden/);
+assert.match(html, /data-site-dashboard-section="documents"[^>]*hidden/);
+assert.match(app, /function showEmployeeSiteSection/);
+assert.match(app, /function showSiteDashboardSection/);
+assert.match(app, /showSiteDashboardSection\("reports"\)/);
+assert.match(app, /showSiteDashboardSection\("tasks"\)/);
+assert.match(styles, /\.workspace-section-nav/);
+assert.match(styles, /\.workspace-section-tab--active/);
 assert.match(html, /id="document-management-panel"/);
 assert.match(html, /id="document-form"/);
 assert.match(html, /id="document-file-choose"/);
@@ -168,9 +186,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.39\.0/);
-assert.match(html, /app\.js\?v=0\.39\.0/);
-assert.match(html, /version\.js\?v=0\.39\.0/);
+assert.match(html, /styles\.css\?v=0\.40\.0/);
+assert.match(html, /app\.js\?v=0\.40\.0/);
+assert.match(html, /version\.js\?v=0\.40\.0/);
 assert.match(html, /id="electrical-module-admin"/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
@@ -435,12 +453,12 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.39.0"'));
-assert.ok(worker.includes('"./app.js?v=0.39.0"'));
-assert.ok(worker.includes('"./version.js?v=0.39.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.40.0"'));
+assert.ok(worker.includes('"./app.js?v=0.40.0"'));
+assert.ok(worker.includes('"./version.js?v=0.40.0"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.39.0"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.39.0"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.40.0"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.40.0"'));
 assert.match(worker, /requestUrl\.pathname\.includes\("\/vde\/"\)/);
 assert.match(
   styles,
@@ -465,8 +483,8 @@ assert.match(vdeHtml, /id="signature-pad"/);
 assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
 assert.match(vdeHtml, /V15-Bestand importieren/);
 assert.match(vdeHtml, /id="legacy-local-import"/);
-assert.match(vdeHtml, /styles\.css\?v=0\.39\.0/);
-assert.match(vdeHtml, /app\.js\?v=0\.39\.0/);
+assert.match(vdeHtml, /styles\.css\?v=0\.40\.0/);
+assert.match(vdeHtml, /app\.js\?v=0\.40\.0/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
