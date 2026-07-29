@@ -29,6 +29,7 @@ import { buildSiteImportPreview, parseSiteWorkbook } from "./site-import.mjs";
 import { buildFinalReportPdf } from "./report-pdf.mjs";
 import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
+import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -74,6 +75,10 @@ import {
   validateTimeAccountAdjustment,
   validateTimeAccountProfile,
   validateTimeAccountYear,
+  validateVdeInspectionCompletion,
+  validateVdeInspectionCreate,
+  validateVdeInspectionImport,
+  validateVdeInspectionUpdate,
   validateSpontaneousSiteSelection,
   validateFieldConstructionSite,
   validateWorkDayDecision,
@@ -92,6 +97,12 @@ const PLANNER_ROLES = new Set([
 ]);
 const MANAGEMENT_ROLES = new Set(["managing_director", "dispatch_office", "project_manager"]);
 const MANAGEMENT_ASSIGNER_ROLES = new Set(["admin", "managing_director"]);
+const VDE_COMPLETION_ROLES = new Set([
+  "admin",
+  "managing_director",
+  "project_manager",
+  "foreman"
+]);
 const ABSENCE_OFFICE_REVIEW_ROLES = new Set([
   "admin",
   "dispatch_office",
@@ -105,12 +116,14 @@ const ELECTRICAL_MODULES = [
   {
     key: "vde",
     name: "VDE",
-    description: "Prüfungen elektrischer Anlagen und Betriebsmittel"
+    description: "Prüfungen elektrischer Anlagen und Betriebsmittel",
+    integrated: true
   },
   {
     key: "dguv",
     name: "DGUV",
-    description: "Wiederkehrende Prüfungen elektrischer Betriebsmittel"
+    description: "Wiederkehrende Prüfungen elektrischer Betriebsmittel",
+    integrated: false
   }
 ];
 const FEDERAL_STATE_NAMES = new Map([
@@ -1258,7 +1271,8 @@ function companyModuleDto(definition, row) {
     key: definition.key,
     name: definition.name,
     description: definition.description,
-    enabled: Boolean(row?.is_enabled),
+    available: definition.integrated,
+    enabled: definition.integrated && Boolean(row?.is_enabled),
     rowVersion: row ? Number(row.row_version) : 0,
     changedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null,
     changedByName: row?.changed_by_name || null
@@ -1290,6 +1304,16 @@ async function getCompanyModules(client, context) {
 
 async function updateCompanyModule(client, context, input) {
   await requireModuleAdministrator(client, context);
+  const definition = ELECTRICAL_MODULES.find(
+    (module) => module.key === input.moduleKey
+  );
+  if (input.enabled && !definition?.integrated) {
+    throw new InputError(
+      "Dieses Spezialmodul ist noch nicht vollständig fachlich angebunden.",
+      409,
+      "module_not_integrated"
+    );
+  }
   const existing = await client.query(
     `SELECT module_key, is_enabled, row_version
      FROM company_modules
@@ -1342,6 +1366,662 @@ async function updateCompanyModule(client, context, input) {
 
   const modules = await loadCompanyModules(client, context);
   return modules.find((module) => module.key === input.moduleKey);
+}
+
+function vdeInspectionDto(row, includeProtocol = false) {
+  return {
+    id: row.id,
+    clientInspectionId: row.client_inspection_id,
+    constructionSiteId: row.construction_site_id,
+    number: row.inspection_number,
+    name: row.inspection_name,
+    inspectionDate: databaseDate(row.inspection_date),
+    sourceMode: row.source_mode,
+    sourceName: row.source_name || null,
+    status: row.status,
+    inspectorUserId: row.inspector_user_id,
+    inspectorName: row.inspector_name,
+    createdByName: row.created_by_name,
+    updatedByName: row.updated_by_name,
+    originalDocumentId: row.original_document_id || null,
+    finalDocumentId: row.final_document_id || null,
+    completedByName: row.completed_by_name || null,
+    completedAt: row.completed_at
+      ? new Date(row.completed_at).toISOString()
+      : null,
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    ...(includeProtocol ? { protocolData: row.protocol_data } : {})
+  };
+}
+
+const VDE_INSPECTION_SELECT = `
+  SELECT inspection.id, inspection.client_inspection_id,
+         inspection.construction_site_id, inspection.inspection_number,
+         inspection.inspection_name, inspection.inspection_date,
+         inspection.source_mode, inspection.source_name,
+         inspection.protocol_data, inspection.status,
+         inspection.inspector_user_id, inspection.original_document_id,
+         inspection.final_document_id, inspection.completed_at,
+         inspection.row_version, inspection.created_at, inspection.updated_at,
+         inspector.first_name || ' ' || inspector.last_name AS inspector_name,
+         creator.first_name || ' ' || creator.last_name AS created_by_name,
+         updater.first_name || ' ' || updater.last_name AS updated_by_name,
+         CASE WHEN completer.id IS NULL THEN NULL
+              ELSE completer.first_name || ' ' || completer.last_name
+         END AS completed_by_name
+  FROM vde_inspections AS inspection
+  JOIN users AS inspector
+    ON inspector.company_id = inspection.company_id
+   AND inspector.id = inspection.inspector_user_id
+  JOIN users AS creator
+    ON creator.company_id = inspection.company_id
+   AND creator.id = inspection.created_by_user_id
+  JOIN users AS updater
+    ON updater.company_id = inspection.company_id
+   AND updater.id = inspection.updated_by_user_id
+  LEFT JOIN users AS completer
+    ON completer.company_id = inspection.company_id
+   AND completer.id = inspection.completed_by_user_id
+`;
+
+async function requireVdeModuleEnabled(client, context) {
+  const result = await client.query(
+    `SELECT 1
+     FROM company_modules
+     WHERE company_id = $1
+       AND module_key = 'vde'
+       AND is_enabled`,
+    [context.companyId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Das VDE-Modul ist für diese Firma nicht aktiviert.",
+      404,
+      "vde_module_disabled"
+    );
+  }
+}
+
+function vdePermissions(roles, assigned) {
+  const planner = [...roles].some((role) => PLANNER_ROLES.has(role));
+  const fieldRole = roles.has("foreman") || roles.has("installer");
+  return {
+    read: planner || assigned,
+    create: planner || (assigned && fieldRole),
+    edit: planner || (assigned && fieldRole),
+    complete: [...roles].some((role) => VDE_COMPLETION_ROLES.has(role))
+      && (planner || assigned),
+    importLegacy: planner
+  };
+}
+
+async function vdeSiteAccess(
+  client,
+  context,
+  constructionSiteId,
+  accessDate
+) {
+  await requireVdeModuleEnabled(client, context);
+  const roles = await activeRoleKeys(client, context);
+  const planner = [...roles].some((role) => PLANNER_ROLES.has(role));
+  let assigned = false;
+  if (!planner) {
+    const assignment = await client.query(
+      `SELECT 1
+       FROM site_assignments
+       WHERE company_id = $1
+         AND user_id = $2
+         AND construction_site_id = $3
+         AND work_date = $4
+         AND status IN ('released', 'completed')
+       LIMIT 1`,
+      [
+        context.companyId,
+        context.userId,
+        constructionSiteId,
+        accessDate
+      ]
+    );
+    assigned = assignment.rowCount === 1;
+  }
+  const permissions = vdePermissions(roles, assigned);
+  if (!permissions.read) {
+    throw new InputError(
+      "Diese Baustelle ist dir für das VDE-Modul nicht zugewiesen.",
+      403,
+      "vde_site_access_forbidden"
+    );
+  }
+  return { roles, planner, assigned, permissions };
+}
+
+async function getVdeSiteContext(
+  client,
+  context,
+  constructionSiteId,
+  accessDate
+) {
+  const access = await vdeSiteAccess(
+    client,
+    context,
+    constructionSiteId,
+    accessDate
+  );
+  const siteResult = await client.query(
+    `SELECT site.id, site.site_number, site.name AS site_name,
+            project.id AS project_id, project.project_number,
+            project.name AS project_name,
+            customer.id AS customer_id,
+            COALESCE(
+              customer.company_name,
+              customer.first_name || ' ' || customer.last_name
+            ) AS customer_name,
+            location.street AS site_street,
+            location.house_number AS site_house_number,
+            location.postal_code AS site_postal_code,
+            location.city AS site_city,
+            company.legal_name, company.display_name,
+            company.street AS company_street,
+            company.house_number AS company_house_number,
+            company.postal_code AS company_postal_code,
+            company.city AS company_city,
+            company.phone AS company_phone,
+            company.email AS company_email,
+            company.website AS company_website,
+            company.logo_object_key,
+            viewer.first_name || ' ' || viewer.last_name AS viewer_name
+     FROM construction_sites AS site
+     JOIN projects AS project
+       ON project.company_id = site.company_id
+      AND project.id = site.project_id
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id
+      AND customer.id = project.customer_id
+     LEFT JOIN customer_locations AS location
+       ON location.company_id = site.company_id
+      AND location.id = site.customer_location_id
+     JOIN companies AS company ON company.id = site.company_id
+     JOIN users AS viewer
+       ON viewer.company_id = site.company_id
+      AND viewer.id = $3
+     WHERE site.company_id = $1
+       AND site.id = $2
+       AND site.status <> 'cancelled'
+       AND project.status <> 'cancelled'
+       AND customer.status <> 'merged'`,
+    [context.companyId, constructionSiteId, context.userId]
+  );
+  if (siteResult.rowCount !== 1) {
+    throw new InputError(
+      "Die Baustelle wurde nicht gefunden.",
+      404,
+      "site_not_found"
+    );
+  }
+  const row = siteResult.rows[0];
+  const inspectorResult = access.planner
+    ? await client.query(
+      `SELECT id, personnel_number, first_name, last_name
+       FROM users
+       WHERE company_id = $1 AND status = 'active'
+       ORDER BY LOWER(last_name), LOWER(first_name), personnel_number`,
+      [context.companyId]
+    )
+    : await client.query(
+      `SELECT id, personnel_number, first_name, last_name
+       FROM users
+       WHERE company_id = $1 AND id = $2 AND status = 'active'`,
+      [context.companyId, context.userId]
+    );
+  const inspections = await client.query(
+    `${VDE_INSPECTION_SELECT}
+     WHERE inspection.company_id = $1
+       AND inspection.construction_site_id = $2
+     ORDER BY inspection.inspection_date DESC,
+              inspection.created_at DESC,
+              inspection.id`,
+    [context.companyId, constructionSiteId]
+  );
+  const siteAddress = [
+    [row.site_street, row.site_house_number].filter(Boolean).join(" "),
+    [row.site_postal_code, row.site_city].filter(Boolean).join(" ")
+  ].filter(Boolean).join(", ");
+  return {
+    accessDate,
+    permissions: access.permissions,
+    company: {
+      displayName: row.display_name,
+      legalName: row.legal_name,
+      logoUrl: companyLogoUrl(row.logo_object_key)
+    },
+    customer: {
+      id: row.customer_id,
+      name: row.customer_name
+    },
+    project: {
+      id: row.project_id,
+      number: row.project_number,
+      name: row.project_name
+    },
+    site: {
+      id: row.id,
+      number: row.site_number,
+      name: row.site_name,
+      address: siteAddress
+    },
+    viewer: {
+      id: context.userId,
+      name: row.viewer_name
+    },
+    inspectors: inspectorResult.rows.map((inspector) => ({
+      id: inspector.id,
+      personnelNumber: inspector.personnel_number,
+      name: `${inspector.first_name} ${inspector.last_name}`
+    })),
+    inspections: inspections.rows.map((inspection) => (
+      vdeInspectionDto(inspection)
+    )),
+    companySnapshot: {
+      legalName: row.legal_name,
+      displayName: row.display_name,
+      street: row.company_street,
+      houseNumber: row.company_house_number,
+      postalCode: row.company_postal_code,
+      city: row.company_city,
+      phone: row.company_phone,
+      email: row.company_email,
+      website: row.company_website,
+      logoObjectKey: row.logo_object_key
+    }
+  };
+}
+
+function publicVdeSiteContext(siteContext) {
+  return {
+    accessDate: siteContext.accessDate,
+    permissions: siteContext.permissions,
+    company: siteContext.company,
+    customer: siteContext.customer,
+    project: siteContext.project,
+    site: siteContext.site,
+    viewer: siteContext.viewer,
+    inspectors: siteContext.inspectors,
+    inspections: siteContext.inspections
+  };
+}
+
+async function getVdeInspectionRecord(client, context, inspectionId) {
+  const result = await client.query(
+    `${VDE_INSPECTION_SELECT}
+     WHERE inspection.company_id = $1 AND inspection.id = $2`,
+    [context.companyId, inspectionId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Die VDE-Prüfung wurde nicht gefunden.",
+      404,
+      "vde_inspection_not_found"
+    );
+  }
+  return result.rows[0];
+}
+
+function requireVdePermission(permissions, action) {
+  if (!permissions[action]) {
+    const labels = {
+      create: "erstellt",
+      edit: "bearbeitet",
+      complete: "abgeschlossen",
+      importLegacy: "importiert"
+    };
+    throw new InputError(
+      `Die VDE-Prüfung darf mit deiner Rolle nicht ${labels[action] || "verarbeitet"} werden.`,
+      403,
+      "vde_action_forbidden"
+    );
+  }
+}
+
+async function resolveVdeInspector(client, context, access, inspectorUserId) {
+  const selectedId = inspectorUserId || context.userId;
+  if (!access.planner && selectedId !== context.userId) {
+    throw new InputError(
+      "Auf der Baustelle darfst du nur dich selbst als Prüfer auswählen.",
+      403,
+      "vde_inspector_forbidden"
+    );
+  }
+  const result = await client.query(
+    `SELECT id
+     FROM users
+     WHERE company_id = $1 AND id = $2 AND status = 'active'`,
+    [context.companyId, selectedId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Der ausgewählte Prüfer wurde nicht gefunden.",
+      404,
+      "vde_inspector_not_found"
+    );
+  }
+  return selectedId;
+}
+
+async function createVdeInspection(
+  client,
+  context,
+  input,
+  accessDate,
+  originalPdf = null
+) {
+  const siteContext = await getVdeSiteContext(
+    client,
+    context,
+    input.constructionSiteId,
+    accessDate
+  );
+  requireVdePermission(
+    siteContext.permissions,
+    input.sourceMode === "legacy_v15" ? "importLegacy" : "create"
+  );
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`vde-inspection:${context.companyId}:${input.clientInspectionId}`]
+  );
+  const existing = await client.query(
+    `SELECT id
+     FROM vde_inspections
+     WHERE company_id = $1 AND client_inspection_id = $2`,
+    [context.companyId, input.clientInspectionId]
+  );
+  if (existing.rowCount === 1) {
+    return {
+      inspection: vdeInspectionDto(
+        await getVdeInspectionRecord(client, context, existing.rows[0].id),
+        true
+      ),
+      idempotent: true
+    };
+  }
+
+  const inspectorUserId = await resolveVdeInspector(
+    client,
+    context,
+    { planner: siteContext.permissions.importLegacy },
+    input.inspectorUserId
+  );
+  let originalDocumentId = null;
+  if (originalPdf) {
+    const stored = await storeDocument(client, context, {
+      title: `VDE-Original · ${input.inspectionName}`,
+      category: "inspection",
+      fileName: originalPdf.fileName,
+      mimeType: "application/pdf",
+      content: originalPdf.content,
+      customerId: null,
+      projectId: null,
+      constructionSiteId: input.constructionSiteId
+    });
+    originalDocumentId = stored.document.id;
+  }
+
+  const inserted = await client.query(
+    `INSERT INTO vde_inspections (
+       company_id, construction_site_id, client_inspection_id,
+       inspection_number, inspection_name, inspection_date,
+       source_mode, source_name, protocol_data, status,
+       inspector_user_id, created_by_user_id, updated_by_user_id,
+       original_document_id
+     ) VALUES (
+       $1, $2, $3,
+       NULL, $4, $5,
+       $6, $7, $8::JSONB, 'draft',
+       $9, $10, $10,
+       $11
+     )
+     RETURNING id`,
+    [
+      context.companyId,
+      input.constructionSiteId,
+      input.clientInspectionId,
+      input.inspectionName,
+      input.inspectionDate,
+      input.sourceMode,
+      input.sourceName,
+      JSON.stringify(input.protocolData),
+      inspectorUserId,
+      context.userId,
+      originalDocumentId
+    ]
+  );
+  return {
+    inspection: vdeInspectionDto(
+      await getVdeInspectionRecord(client, context, inserted.rows[0].id),
+      true
+    ),
+    idempotent: false
+  };
+}
+
+async function updateVdeInspection(
+  client,
+  context,
+  inspectionId,
+  input,
+  accessDate
+) {
+  const current = await getVdeInspectionRecord(client, context, inspectionId);
+  const siteContext = await getVdeSiteContext(
+    client,
+    context,
+    current.construction_site_id,
+    accessDate
+  );
+  requireVdePermission(siteContext.permissions, "edit");
+  if (current.status !== "draft") {
+    throw new InputError(
+      "Eine abgeschlossene VDE-Prüfung kann nicht mehr geändert werden.",
+      409,
+      "vde_inspection_completed"
+    );
+  }
+  const updated = await client.query(
+    `UPDATE vde_inspections
+     SET inspection_name = $3,
+         inspection_date = $4,
+         protocol_data = $5::JSONB,
+         updated_by_user_id = $6
+     WHERE company_id = $1
+       AND id = $2
+       AND status = 'draft'
+       AND row_version = $7
+     RETURNING id`,
+    [
+      context.companyId,
+      inspectionId,
+      input.inspectionName,
+      input.inspectionDate,
+      JSON.stringify(input.protocolData),
+      context.userId,
+      input.rowVersion
+    ]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Die VDE-Prüfung wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return vdeInspectionDto(
+    await getVdeInspectionRecord(client, context, inspectionId),
+    true
+  );
+}
+
+async function completeVdeInspection(
+  client,
+  context,
+  inspectionId,
+  input,
+  accessDate,
+  staticDirectory
+) {
+  const current = await getVdeInspectionRecord(client, context, inspectionId);
+  const siteContext = await getVdeSiteContext(
+    client,
+    context,
+    current.construction_site_id,
+    accessDate
+  );
+  requireVdePermission(siteContext.permissions, "complete");
+  if (current.inspector_user_id !== context.userId) {
+    throw new InputError(
+      "Die VDE-Prüfung muss vom eingetragenen Prüfer selbst unterschrieben und abgeschlossen werden.",
+      403,
+      "vde_inspector_signature_forbidden"
+    );
+  }
+  if (current.status !== "draft") {
+    throw new InputError(
+      "Nur ein VDE-Entwurf kann abgeschlossen werden.",
+      409,
+      "vde_inspection_state_conflict"
+    );
+  }
+  if (Number(current.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Die VDE-Prüfung wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+
+  const completedAt = new Date().toISOString();
+  const company = siteContext.companySnapshot;
+  const pdf = await buildVdeInspectionPdf({
+    inspection: {
+      id: current.id,
+      number: current.inspection_number,
+      name: input.inspectionName,
+      date: input.inspectionDate
+    },
+    protocol: input.protocolData,
+    company,
+    context: {
+      customerName: siteContext.customer.name,
+      projectNumber: siteContext.project.number,
+      projectName: siteContext.project.name,
+      siteNumber: siteContext.site.number,
+      siteName: siteContext.site.name,
+      siteAddress: siteContext.site.address,
+      inspectorName: current.inspector_name
+    },
+    inspectorSignature: input.inspectorSignatureData,
+    completedAt,
+    companyLogo: await readCompanyLogo(
+      staticDirectory,
+      company.logoObjectKey
+    )
+  });
+  const finalDocument = await storeDocument(client, context, {
+    title: `VDE-Prüfprotokoll ${current.inspection_number}`,
+    category: "inspection",
+    fileName: `${current.inspection_number}-${input.inspectionDate}.pdf`,
+    mimeType: "application/pdf",
+    content: pdf,
+    customerId: null,
+    projectId: null,
+    constructionSiteId: current.construction_site_id
+  });
+  const updated = await client.query(
+    `UPDATE vde_inspections
+     SET inspection_name = $3,
+         inspection_date = $4,
+         protocol_data = $5::JSONB,
+         status = 'completed',
+         completed_by_user_id = $6,
+         completed_at = $7,
+         inspector_signature_data = $8,
+         inspector_signed_at = $7,
+         final_document_id = $9,
+         updated_by_user_id = $6
+     WHERE company_id = $1
+       AND id = $2
+       AND status = 'draft'
+       AND row_version = $10
+     RETURNING id`,
+    [
+      context.companyId,
+      inspectionId,
+      input.inspectionName,
+      input.inspectionDate,
+      JSON.stringify(input.protocolData),
+      context.userId,
+      completedAt,
+      input.inspectorSignatureData,
+      finalDocument.document.id,
+      input.rowVersion
+    ]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Die VDE-Prüfung wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return vdeInspectionDto(
+    await getVdeInspectionRecord(client, context, inspectionId),
+    true
+  );
+}
+
+async function getVdeInspectionPdf(
+  client,
+  context,
+  inspectionId,
+  accessDate
+) {
+  const inspection = await getVdeInspectionRecord(client, context, inspectionId);
+  await vdeSiteAccess(
+    client,
+    context,
+    inspection.construction_site_id,
+    accessDate
+  );
+  if (!inspection.final_document_id) {
+    throw new InputError(
+      "Für diesen VDE-Entwurf gibt es noch keine Abschluss-PDF.",
+      409,
+      "vde_pdf_not_ready"
+    );
+  }
+  const result = await client.query(
+    `SELECT document.original_file_name, document.mime_type, content.content
+     FROM documents AS document
+     JOIN document_contents AS content
+       ON content.company_id = document.company_id
+      AND content.document_id = document.id
+     WHERE document.company_id = $1
+       AND document.id = $2
+       AND document.status = 'active'`,
+    [context.companyId, inspection.final_document_id]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Die VDE-Abschluss-PDF wurde nicht gefunden.",
+      404,
+      "vde_pdf_not_found"
+    );
+  }
+  return {
+    fileName: result.rows[0].original_file_name,
+    mimeType: result.rows[0].mime_type,
+    content: result.rows[0].content
+  };
 }
 
 function siteDto(row) {
@@ -3179,6 +3859,20 @@ async function adminOverview(client, context, date) {
     employeeName: `${row.first_name} ${row.last_name}`,
     siteName: row.site_name
   }));
+  const modules = await loadCompanyModules(client, context);
+  const vdeEnabled = modules.some((module) => (
+    module.key === "vde" && module.enabled
+  ));
+  const vdeInspectionResult = vdeEnabled
+    ? await client.query(
+      `${VDE_INSPECTION_SELECT}
+       WHERE inspection.company_id = $1
+       ORDER BY inspection.inspection_date DESC,
+                inspection.created_at DESC,
+                inspection.id`,
+      [context.companyId]
+    )
+    : { rows: [] };
 
   return {
     date,
@@ -3197,6 +3891,10 @@ async function adminOverview(client, context, date) {
     siteMaterials: materialResult.rows.map(siteMaterialDto),
     siteNotes: noteResult.rows.map(siteNoteDto),
     siteReports: reportResult.rows.map(siteReportDto),
+    modules,
+    vdeInspections: vdeInspectionResult.rows.map((inspection) => (
+      vdeInspectionDto(inspection)
+    )),
     workDays: workDayResult.rows.map(adminWorkDayDto),
     timeCorrections: correctionResult.rows.map(timeEntryCorrectionDto),
     absences: absenceResult.rows.map(absenceRequestDto),
@@ -3395,6 +4093,21 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
       [context.companyId, constructionSiteId, access.canLead]
     )
   ]);
+  const modules = await loadCompanyModules(client, context);
+  const vdeEnabled = modules.some((module) => (
+    module.key === "vde" && module.enabled
+  ));
+  const vdeInspectionResult = vdeEnabled
+    ? await client.query(
+      `${VDE_INSPECTION_SELECT}
+       WHERE inspection.company_id = $1
+         AND inspection.construction_site_id = $2
+       ORDER BY inspection.inspection_date DESC,
+                inspection.created_at DESC,
+                inspection.id`,
+      [context.companyId, constructionSiteId]
+    )
+    : { rows: [] };
 
   return {
     date,
@@ -3420,7 +4133,24 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
     tasks: taskResult.rows.map(siteTaskDto),
     materials: materialResult.rows.map(siteMaterialDto),
     notes: noteResult.rows.map(siteNoteDto),
-    reports: reportResult.rows.map(siteReportDto)
+    reports: reportResult.rows.map(siteReportDto),
+    electricalModules: {
+      vde: {
+        enabled: vdeEnabled,
+        permissions: vdeEnabled
+          ? vdePermissions(access.roles, true)
+          : {
+            read: false,
+            create: false,
+            edit: false,
+            complete: false,
+            importLegacy: false
+          },
+        inspections: vdeInspectionResult.rows.map((inspection) => (
+          vdeInspectionDto(inspection)
+        ))
+      }
+    }
   };
 }
 
@@ -6555,6 +7285,176 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createAbsenceRequest(client, context, input)
         );
         return json(response, 201, { absence });
+      }
+
+      const vdeAccessDate = () => validateWorkDate(
+        url.searchParams.get("date")
+        || localDate(new Date().toISOString(), config.timeZone)
+      );
+
+      if (request.method === "GET" && url.pathname === "/api/v1/vde/context") {
+        const constructionSiteId = validateId(
+          url.searchParams.get("constructionSiteId"),
+          "Baustellen-ID"
+        );
+        const vdeContext = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getVdeSiteContext(
+            client,
+            context,
+            constructionSiteId,
+            vdeAccessDate()
+          )
+        );
+        return json(response, 200, {
+          context: publicVdeSiteContext(vdeContext)
+        });
+      }
+
+      if (
+        request.method === "POST"
+        && url.pathname === "/api/v1/vde/inspections"
+      ) {
+        const input = validateVdeInspectionCreate(
+          await readJson(request, 650_000)
+        );
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createVdeInspection(
+            client,
+            context,
+            input,
+            vdeAccessDate()
+          )
+        );
+        return json(
+          response,
+          result.idempotent ? 200 : 201,
+          result
+        );
+      }
+
+      if (
+        request.method === "POST"
+        && url.pathname === "/api/v1/vde/imports"
+      ) {
+        const input = validateVdeInspectionImport(
+          await readJson(request, 7_500_000)
+        );
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createVdeInspection(
+            client,
+            context,
+            input,
+            vdeAccessDate(),
+            input.originalPdf
+          )
+        );
+        return json(
+          response,
+          result.idempotent ? 200 : 201,
+          result
+        );
+      }
+
+      const vdeCompleteMatch =
+        /^\/api\/v1\/vde\/inspections\/([^/]+)\/complete$/.exec(
+          url.pathname
+        );
+      if (request.method === "POST" && vdeCompleteMatch) {
+        const inspectionId = validateId(
+          vdeCompleteMatch[1],
+          "VDE-Prüfungs-ID"
+        );
+        const input = validateVdeInspectionCompletion(
+          await readJson(request, 1_200_000)
+        );
+        const inspection = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => completeVdeInspection(
+            client,
+            context,
+            inspectionId,
+            input,
+            vdeAccessDate(),
+            config.staticDirectory
+          )
+        );
+        return json(response, 200, { inspection });
+      }
+
+      const vdePdfMatch =
+        /^\/api\/v1\/vde\/inspections\/([^/]+)\/pdf$/.exec(url.pathname);
+      if (request.method === "GET" && vdePdfMatch) {
+        const inspectionId = validateId(
+          vdePdfMatch[1],
+          "VDE-Prüfungs-ID"
+        );
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getVdeInspectionPdf(
+            client,
+            context,
+            inspectionId,
+            vdeAccessDate()
+          )
+        );
+        return attachment(response, document);
+      }
+
+      const vdeInspectionMatch =
+        /^\/api\/v1\/vde\/inspections\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "GET" && vdeInspectionMatch) {
+        const inspectionId = validateId(
+          vdeInspectionMatch[1],
+          "VDE-Prüfungs-ID"
+        );
+        const inspection = await withReadySession(
+          pool,
+          tokenHash,
+          async (client, context) => {
+            const row = await getVdeInspectionRecord(
+              client,
+              context,
+              inspectionId
+            );
+            await vdeSiteAccess(
+              client,
+              context,
+              row.construction_site_id,
+              vdeAccessDate()
+            );
+            return vdeInspectionDto(row, true);
+          }
+        );
+        return json(response, 200, { inspection });
+      }
+      if (request.method === "PATCH" && vdeInspectionMatch) {
+        const inspectionId = validateId(
+          vdeInspectionMatch[1],
+          "VDE-Prüfungs-ID"
+        );
+        const input = validateVdeInspectionUpdate(
+          await readJson(request, 650_000)
+        );
+        const inspection = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateVdeInspection(
+            client,
+            context,
+            inspectionId,
+            input,
+            vdeAccessDate()
+          )
+        );
+        return json(response, 200, { inspection });
       }
 
       const ownAbsenceCancelMatch = /^\/api\/v1\/absences\/([^/]+)\/cancel$/.exec(url.pathname);

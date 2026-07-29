@@ -9,7 +9,7 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate] = await Promise.all([
+const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
   readFrontendFile("app.js"),
@@ -20,7 +20,10 @@ const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, ma
   readFrontendFile("assets/mark.svg"),
   readFile(resolve(frontendDirectory, "assets/company-logos/schaaf-elektro.webp")),
   readFile(resolve(repositoryDirectory, "docs/PHASE1_UI_SPEC.md"), "utf8"),
-  readFile(resolve(frontendDirectory, "assets/baustellen-import-vorlage.xlsx"))
+  readFile(resolve(frontendDirectory, "assets/baustellen-import-vorlage.xlsx")),
+  readFrontendFile("vde/index.html"),
+  readFrontendFile("vde/styles.css"),
+  readFrontendFile("vde/app.js")
 ]);
 
 const manifest = JSON.parse(manifestSource);
@@ -165,9 +168,12 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.38\.0/);
-assert.match(html, /app\.js\?v=0\.38\.0/);
-assert.match(html, /version\.js\?v=0\.38\.0/);
+assert.match(html, /styles\.css\?v=0\.39\.0/);
+assert.match(html, /app\.js\?v=0\.39\.0/);
+assert.match(html, /version\.js\?v=0\.39\.0/);
+assert.match(html, /id="electrical-module-admin"/);
+assert.match(html, /id="site-dashboard-vde-panel"/);
+assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
 assert.match(html, /id="site-choice-dialog"/);
 assert.match(html, /id="field-site-form"/);
@@ -429,9 +435,13 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.38.0"'));
-assert.ok(worker.includes('"./app.js?v=0.38.0"'));
-assert.ok(worker.includes('"./version.js?v=0.38.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.39.0"'));
+assert.ok(worker.includes('"./app.js?v=0.39.0"'));
+assert.ok(worker.includes('"./version.js?v=0.39.0"'));
+assert.ok(worker.includes('"./vde/index.html"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.39.0"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.39.0"'));
+assert.match(worker, /requestUrl\.pathname\.includes\("\/vde\/"\)/);
 assert.match(
   styles,
   /\.login-form input,\s*\.admin-form input,\s*\.admin-form select\s*\{\s*height: 52px;/,
@@ -447,6 +457,30 @@ assert.match(styles, /\.time-account-table/);
 assert.match(styles, /\.time-account-admin-item/);
 assert.match(styles, /\.holiday-calendar-form/);
 assert.match(styles, /\.holiday-closure-list/);
+assert.match(styles, /\.electrical-module-admin/);
+assert.match(vdeHtml, /lang="de"/);
+assert.match(vdeHtml, /id="inspection-form"/);
+assert.match(vdeHtml, /id="distribution-list"/);
+assert.match(vdeHtml, /id="signature-pad"/);
+assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
+assert.match(vdeHtml, /V15-Bestand importieren/);
+assert.match(vdeHtml, /id="legacy-local-import"/);
+assert.match(vdeHtml, /styles\.css\?v=0\.39\.0/);
+assert.match(vdeHtml, /app\.js\?v=0\.39\.0/);
+assert.match(vdeStyles, /\.distribution-card/);
+assert.match(vdeStyles, /\.circuit-evaluation--bad/);
+assert.match(vdeApp, /fuse_nh/);
+assert.match(vdeApp, /fuse_diazed/);
+assert.match(vdeApp, /fuse_neozed/);
+assert.match(vdeApp, /measurements\.rcdTripTime/);
+assert.match(vdeApp, /measurements\.rcdTripCurrent/);
+assert.match(vdeApp, /measurements\.zi/);
+assert.match(vdeApp, /measurements\.zs/);
+assert.match(vdeApp, /measurements\.ik/);
+assert.match(vdeApp, /moveItem\(protocol\.distributions/);
+assert.match(vdeApp, /mapLegacyV15/);
+assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
+assert.match(vdeApp, /originalPdf/);
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 assert.match(worker, /event\.request\.mode === "navigate"/);
 assert.match(worker, /cache: "no-store"/);

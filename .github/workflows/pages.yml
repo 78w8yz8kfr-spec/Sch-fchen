@@ -34,6 +34,7 @@ jobs:
       - name: JavaScript-Syntax prüfen
         run: |
           node --check frontend/app.js
+          node --check frontend/vde/app.js
           node --check frontend/sw.js
 
       - name: PWA-Smoke-Test ausführen

@@ -61,6 +61,13 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(appScript.status, 200);
   assert.match(appScript.headers.get("content-type"), /text\/javascript/);
 
+  const vdeAppShell = await fetch(`${baseUrl}/vde/index.html`);
+  assert.equal(vdeAppShell.status, 200);
+  assert.match(await vdeAppShell.text(), /id="inspection-form"/);
+  const vdeAppScript = await fetch(`${baseUrl}/vde/app.js`);
+  assert.equal(vdeAppScript.status, 200);
+  assert.match(vdeAppScript.headers.get("content-type"), /text\/javascript/);
+
   const siteTemplate = await fetch(`${baseUrl}/assets/baustellen-import-vorlage.xlsx`);
   assert.equal(siteTemplate.status, 200);
   assert.match(siteTemplate.headers.get("content-type"), /spreadsheetml/);
@@ -218,6 +225,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const initialModules = (await initialModulesResponse.json()).modules;
   assert.deepEqual(initialModules.map((module) => module.key), ["vde", "dguv"]);
   assert.ok(initialModules.every((module) => !module.enabled && module.rowVersion === 0));
+  assert.equal(initialModules.find((module) => module.key === "vde").available, true);
+  assert.equal(initialModules.find((module) => module.key === "dguv").available, false);
+
+  const unavailableDguvActivationResponse = await fetch(
+    `${baseUrl}/api/v1/admin/modules/dguv`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ enabled: true, rowVersion: 0 })
+    }
+  );
+  assert.equal(unavailableDguvActivationResponse.status, 409);
+  assert.equal(
+    (await unavailableDguvActivationResponse.json()).error.code,
+    "module_not_integrated"
+  );
 
   const forbiddenModuleAdministration = await fetch(`${baseUrl}/api/v1/admin/modules`, {
     headers: { Cookie: plannerCookie }
@@ -794,6 +817,340 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.match(finalPdfResponse.headers.get("content-type"), /application\/pdf/);
   assert.equal(Buffer.from(await finalPdfResponse.arrayBuffer()).subarray(0, 5).toString("ascii"), "%PDF-");
 
+  const plannerVdeContextResponse = await fetch(
+    `${baseUrl}/api/v1/vde/context?constructionSiteId=${structuredSite.id}&date=${assignmentDate}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(
+    plannerVdeContextResponse.status,
+    200,
+    await plannerVdeContextResponse.clone().text()
+  );
+  const plannerVdeContext = (await plannerVdeContextResponse.json()).context;
+  assert.equal(plannerVdeContext.companySnapshot, undefined);
+  assert.equal(plannerVdeContext.customer.id, customer.id);
+  assert.equal(plannerVdeContext.customer.name, customer.displayName);
+  assert.equal(plannerVdeContext.project.id, project.id);
+  assert.equal(plannerVdeContext.site.id, structuredSite.id);
+  assert.equal(plannerVdeContext.site.address, "Baustellenweg 8, 12345 Teststadt");
+  assert.equal(plannerVdeContext.permissions.create, true);
+  assert.equal(plannerVdeContext.permissions.importLegacy, true);
+  assert.ok(plannerVdeContext.inspectors.some((inspector) => inspector.id === foreman.id));
+
+  const vdeProtocol = {
+    schemaVersion: 1,
+    networkType: "TN-S",
+    nominalVoltage: "230/400 V",
+    inspectionKinds: {
+      initial: true,
+      recurring: false,
+      alteration: false
+    },
+    visualChecks: {
+      electric_shock_protection: "ok",
+      protective_conductor: "ok",
+      equipment_selection: "ok",
+      circuit_labelling: "ok",
+      rcd_test_button: "ok",
+      phase_sequence: "ok",
+      polarity: "ok",
+      disconnection_conditions: "ok"
+    },
+    incomingSupply: {
+      designation: "HAK",
+      location: "Hausanschlussraum",
+      upstreamProtection: "NH 00 63 A",
+      source: "Netz",
+      cableType: "NYY-J",
+      cores: "5",
+      crossSection: "16"
+    },
+    circuitDirectoryIncluded: true,
+    detailedInsulationMeasurement: true,
+    distributions: [{
+      clientId: "uv-hauptverteilung",
+      name: "UV EG",
+      source: "HAK",
+      feedCableType: "NYY-J",
+      feedCores: "5",
+      feedCrossSection: "16",
+      feedProtection: "NH 00 63 A",
+      location: "Technikraum",
+      rcds: [{
+        clientId: "rcd-steckdosen",
+        name: "FI Steckdosen",
+        type: "A",
+        characteristic: "unverzögert",
+        ratedCurrent: "63",
+        ratedResidualCurrent: "30",
+        testButton: true,
+        circuits: [{
+          clientId: "circuit-steckdosen",
+          name: "F1 Steckdosen Küche",
+          cableType: "NYM-J",
+          cores: "3",
+          crossSection: "2.5",
+          protectiveDevice: {
+            type: "mcb",
+            characteristic: "B",
+            ratedCurrent: "16",
+            designation: null,
+            rcdType: null,
+            rcdCharacteristic: null,
+            ratedResidualCurrent: null,
+            testButton: false
+          },
+          measurements: {
+            rpe: "0.18",
+            riso: "200",
+            zi: "0.29",
+            zs: "0.41",
+            ik: "560",
+            rcdTripTime: "24",
+            rcdTripCurrent: "21",
+            risoL1Pe: "200",
+            risoL2Pe: "200",
+            risoL3Pe: "200",
+            risoNPe: "200"
+          },
+          note: "Messung am letzten Verbraucher"
+        }]
+      }],
+      directCircuits: [{
+        clientId: "circuit-waermepumpe",
+        name: "F2 Wärmepumpe",
+        cableType: "NYY-J",
+        cores: "5",
+        crossSection: "10",
+        protectiveDevice: {
+          type: "fuse_nh",
+          characteristic: null,
+          ratedCurrent: "63",
+          designation: "NH 00 gG",
+          rcdType: null,
+          rcdCharacteristic: null,
+          ratedResidualCurrent: null,
+          testButton: false
+        },
+        measurements: {
+          rpe: "0.12",
+          riso: "500",
+          zi: "0.22",
+          zs: "0.31",
+          ik: "740",
+          rcdTripTime: null,
+          rcdTripCurrent: null,
+          risoL1Pe: "500",
+          risoL2Pe: "500",
+          risoL3Pe: "500",
+          risoNPe: "500"
+        },
+        note: ""
+      }]
+    }],
+    testEquipment: {
+      manufacturer: "Benning",
+      type: "IT 200",
+      serialNumber: `VDE-${suffix}`,
+      calibrationValidUntil: assignmentDate
+    },
+    defects: "",
+    result: "ok",
+    nextInspectionDate: nextBusinessDate(assignmentDate)
+  };
+  const vdeClientInspectionId = randomUUID();
+  const vdeCreatePayload = {
+    constructionSiteId: structuredSite.id,
+    clientInspectionId: vdeClientInspectionId,
+    inspectorUserId: foreman.id,
+    inspectionName: "Erstprüfung Haupt- und Unterverteilung",
+    inspectionDate: assignmentDate,
+    protocolData: vdeProtocol
+  };
+  const vdeCreateResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections?date=${assignmentDate}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify(vdeCreatePayload)
+    }
+  );
+  assert.equal(vdeCreateResponse.status, 201, await vdeCreateResponse.clone().text());
+  const vdeInspection = (await vdeCreateResponse.json()).inspection;
+  assert.match(vdeInspection.number, /^SE-VDE-\d{4}-\d{5}$/);
+  assert.equal(vdeInspection.inspectorUserId, foreman.id);
+  assert.equal(vdeInspection.status, "draft");
+  assert.equal(vdeInspection.protocolData.distributions[0].directCircuits[0]
+    .protectiveDevice.type, "fuse_nh");
+  assert.equal(vdeInspection.protocolData.distributions[0].directCircuits[0]
+    .protectiveDevice.ratedCurrent, "63");
+
+  const duplicateVdeCreateResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections?date=${assignmentDate}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify(vdeCreatePayload)
+    }
+  );
+  assert.equal(duplicateVdeCreateResponse.status, 200);
+  const duplicateVdeCreate = await duplicateVdeCreateResponse.json();
+  assert.equal(duplicateVdeCreate.idempotent, true);
+  assert.equal(duplicateVdeCreate.inspection.id, vdeInspection.id);
+
+  const foreignVdeSignatureResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections/${vdeInspection.id}/complete?date=${assignmentDate}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        inspectionName: vdeInspection.name,
+        inspectionDate: assignmentDate,
+        protocolData: vdeProtocol,
+        rowVersion: vdeInspection.rowVersion,
+        inspectorSignatureData: signatureData
+      })
+    }
+  );
+  assert.equal(foreignVdeSignatureResponse.status, 403);
+  assert.equal(
+    (await foreignVdeSignatureResponse.json()).error.code,
+    "vde_inspector_signature_forbidden"
+  );
+
+  const foremanVdeContextResponse = await fetch(
+    `${baseUrl}/api/v1/vde/context?constructionSiteId=${structuredSite.id}&date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(foremanVdeContextResponse.status, 200);
+  const foremanVdeContext = (await foremanVdeContextResponse.json()).context;
+  assert.equal(foremanVdeContext.permissions.create, true);
+  assert.equal(foremanVdeContext.permissions.complete, true);
+  assert.equal(foremanVdeContext.permissions.importLegacy, false);
+  assert.deepEqual(
+    foremanVdeContext.inspectors.map((inspector) => inspector.id),
+    [foreman.id]
+  );
+
+  const unassignedVdeDateResponse = await fetch(
+    `${baseUrl}/api/v1/vde/context?constructionSiteId=${structuredSite.id}&date=${nextBusinessDate(assignmentDate)}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(unassignedVdeDateResponse.status, 403);
+  assert.equal(
+    (await unassignedVdeDateResponse.json()).error.code,
+    "vde_site_access_forbidden"
+  );
+
+  const vdeUpdateProtocol = structuredClone(vdeProtocol);
+  vdeUpdateProtocol.defects = "Beschriftung vor Übergabe ergänzen";
+  vdeUpdateProtocol.result = "operational_with_defects";
+  const vdeUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections/${vdeInspection.id}?date=${assignmentDate}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: foremanCookie },
+      body: JSON.stringify({
+        inspectionName: vdeInspection.name,
+        inspectionDate: assignmentDate,
+        protocolData: vdeUpdateProtocol,
+        rowVersion: vdeInspection.rowVersion
+      })
+    }
+  );
+  assert.equal(vdeUpdateResponse.status, 200, await vdeUpdateResponse.clone().text());
+  const updatedVdeInspection = (await vdeUpdateResponse.json()).inspection;
+  assert.equal(updatedVdeInspection.rowVersion, 2);
+  assert.equal(updatedVdeInspection.protocolData.defects, vdeUpdateProtocol.defects);
+
+  const vdeCompletionResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections/${vdeInspection.id}/complete?date=${assignmentDate}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: foremanCookie },
+      body: JSON.stringify({
+        inspectionName: updatedVdeInspection.name,
+        inspectionDate: assignmentDate,
+        protocolData: vdeUpdateProtocol,
+        rowVersion: updatedVdeInspection.rowVersion,
+        inspectorSignatureData: signatureData
+      })
+    }
+  );
+  assert.equal(
+    vdeCompletionResponse.status,
+    200,
+    await vdeCompletionResponse.clone().text()
+  );
+  const completedVdeInspection = (await vdeCompletionResponse.json()).inspection;
+  assert.equal(completedVdeInspection.status, "completed");
+  assert.equal(completedVdeInspection.rowVersion, 3);
+  assert.ok(completedVdeInspection.finalDocumentId);
+  assert.equal(completedVdeInspection.completedByName, "Vera Vorarbeiterin");
+
+  const vdePdfResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections/${completedVdeInspection.id}/pdf?date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(vdePdfResponse.status, 200);
+  assert.match(vdePdfResponse.headers.get("content-type"), /application\/pdf/);
+  assert.match(
+    vdePdfResponse.headers.get("content-disposition"),
+    new RegExp(completedVdeInspection.number)
+  );
+  assert.equal(
+    Buffer.from(await vdePdfResponse.arrayBuffer()).subarray(0, 5).toString("ascii"),
+    "%PDF-"
+  );
+
+  const completedVdeUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/vde/inspections/${completedVdeInspection.id}?date=${assignmentDate}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: foremanCookie },
+      body: JSON.stringify({
+        inspectionName: "Unzulässige Änderung",
+        inspectionDate: assignmentDate,
+        protocolData: vdeUpdateProtocol,
+        rowVersion: completedVdeInspection.rowVersion
+      })
+    }
+  );
+  assert.equal(completedVdeUpdateResponse.status, 409);
+  assert.equal(
+    (await completedVdeUpdateResponse.json()).error.code,
+    "vde_inspection_completed"
+  );
+
+  const legacyOriginal = Buffer.from("%PDF-1.4\nLegacy V15", "utf8");
+  const legacyVdeImportResponse = await fetch(
+    `${baseUrl}/api/v1/vde/imports?date=${assignmentDate}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        ...vdeCreatePayload,
+        clientInspectionId: randomUUID(),
+        inspectionName: "Importiertes V15-Protokoll",
+        sourceName: `vde-v15-${suffix}.json`,
+        originalPdf: {
+          fileName: `vde-v15-${suffix}.pdf`,
+          contentBase64: legacyOriginal.toString("base64")
+        }
+      })
+    }
+  );
+  assert.equal(
+    legacyVdeImportResponse.status,
+    201,
+    await legacyVdeImportResponse.clone().text()
+  );
+  const importedVdeInspection = (await legacyVdeImportResponse.json()).inspection;
+  assert.equal(importedVdeInspection.sourceMode, "legacy_v15");
+  assert.equal(importedVdeInspection.sourceName, `vde-v15-${suffix}.json`);
+  assert.ok(importedVdeInspection.originalDocumentId);
+  assert.equal(importedVdeInspection.status, "draft");
+
   const foremanSiteDashboardResponse = await fetch(
     `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
     { headers: { Cookie: foremanCookie } }
@@ -818,6 +1175,17 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(foremanSiteDashboard.notes[0].id, adminNote.id);
   assert.ok(foremanSiteDashboard.reports.some((item) => item.id === mobileReport.id));
   assert.ok(foremanSiteDashboard.documents.some((item) => item.id === uploadedDocument.id));
+  assert.equal(foremanSiteDashboard.electricalModules.vde.enabled, true);
+  assert.equal(foremanSiteDashboard.electricalModules.vde.permissions.complete, true);
+  assert.ok(foremanSiteDashboard.electricalModules.vde.inspections.some(
+    (inspection) => (
+      inspection.id === completedVdeInspection.id
+      && inspection.status === "completed"
+    )
+  ));
+  assert.ok(foremanSiteDashboard.documents.some(
+    (document) => document.id === completedVdeInspection.finalDocumentId
+  ));
 
   const sitePhotoContent = Buffer.from(`JPEG-Baustellenfoto-${suffix}`);
   const sitePhotoUploadResponse = await fetch(
@@ -991,6 +1359,83 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.ok(structureOverview.siteNotes.some((item) => item.id === adminNote.id && item.isImportant));
   assert.ok(structureOverview.siteNotes.some((item) => item.id === mobileNote.id));
   assert.ok(structureOverview.siteReports.some((item) => item.id === siteReport.id && item.sourceMode === "photo"));
+  assert.ok(structureOverview.modules.some(
+    (module) => module.key === "vde" && module.enabled
+  ));
+  assert.ok(structureOverview.vdeInspections.some(
+    (inspection) => (
+      inspection.id === completedVdeInspection.id
+      && inspection.status === "completed"
+    )
+  ));
+  assert.ok(structureOverview.vdeInspections.some(
+    (inspection) => (
+      inspection.id === importedVdeInspection.id
+      && inspection.sourceMode === "legacy_v15"
+    )
+  ));
+  const vdeFinalDocument = structureOverview.documents.find(
+    (document) => document.id === completedVdeInspection.finalDocumentId
+  );
+  assert.equal(vdeFinalDocument.category, "inspection");
+  assert.ok(vdeFinalDocument.links.some(
+    (link) => link.constructionSiteId === structuredSite.id
+  ));
+  assert.ok(vdeFinalDocument.links.some((link) => link.projectId === project.id));
+  assert.ok(vdeFinalDocument.links.some((link) => link.customerId === customer.id));
+
+  const vdeDeactivationResponse = await fetch(
+    `${baseUrl}/api/v1/admin/modules/vde`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: directorCookie },
+      body: JSON.stringify({ enabled: false, rowVersion: activatedVde.rowVersion })
+    }
+  );
+  assert.equal(
+    vdeDeactivationResponse.status,
+    200,
+    await vdeDeactivationResponse.clone().text()
+  );
+  const deactivatedVde = (await vdeDeactivationResponse.json()).module;
+  assert.equal(deactivatedVde.enabled, false);
+  assert.equal(deactivatedVde.rowVersion, 2);
+
+  const disabledVdeContextResponse = await fetch(
+    `${baseUrl}/api/v1/vde/context?constructionSiteId=${structuredSite.id}&date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(disabledVdeContextResponse.status, 404);
+  assert.equal(
+    (await disabledVdeContextResponse.json()).error.code,
+    "vde_module_disabled"
+  );
+
+  const coreDashboardWithDisabledVdeResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(coreDashboardWithDisabledVdeResponse.status, 200);
+  const coreDashboardWithDisabledVde =
+    (await coreDashboardWithDisabledVdeResponse.json()).dashboard;
+  assert.equal(coreDashboardWithDisabledVde.electricalModules.vde.enabled, false);
+  assert.ok(coreDashboardWithDisabledVde.tasks.some(
+    (task) => task.id === completedSiteTask.id
+  ));
+  assert.ok(coreDashboardWithDisabledVde.documents.some(
+    (document) => document.id === completedVdeInspection.finalDocumentId
+  ));
+
+  const vdeReactivationResponse = await fetch(
+    `${baseUrl}/api/v1/admin/modules/vde`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: directorCookie },
+      body: JSON.stringify({ enabled: true, rowVersion: deactivatedVde.rowVersion })
+    }
+  );
+  assert.equal(vdeReactivationResponse.status, 200);
+  assert.equal((await vdeReactivationResponse.json()).module.rowVersion, 3);
 
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",

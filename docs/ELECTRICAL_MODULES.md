@@ -1,7 +1,7 @@
 # Optionale Elektro-Spezialmodule
 
-Stand: 26.07.2026
-Technischer Stand: V0.26.1
+Stand: 29.07.2026
+Technischer Stand: V0.39.0
 
 ## Ziel
 
@@ -21,14 +21,36 @@ Ein Modul erzeugt keine parallelen Stammdaten.
 
 ## Sichtbarkeit
 
-Die Modulfreigabe ist zunächst eine technische Grundlage. Ein Modul erscheint
-erst dann in der Oberfläche, wenn seine echte Fachfunktion vollständig
-angebunden und für die jeweilige Firma aktiviert ist. Es werden keine leeren
-Menüpunkte oder funktionslosen Platzhalter angezeigt.
+Ein Modul erscheint erst dann in der Baustellenakte, wenn seine echte
+Fachfunktion vollständig angebunden und für die jeweilige Firma aktiviert ist.
+Es werden keine leeren Menüpunkte oder funktionslosen Platzhalter angezeigt.
+
+VDE ist seit V0.39.0 vollständig angebunden. Administration oder
+Geschäftsführung schalten es unter „Elektro-Spezialmodule“ firmenweit ein.
+Anschließend erscheint der Einstieg ausschließlich an einer konkreten
+Baustelle. DGUV bleibt vorbereitet, aber bis zur eigenen Fachintegration
+unsichtbar und nicht aktivierbar.
+
+## VDE-Anbindung
+
+- Kunde, Projekt, Baustelle, Prüfer, Firma und Firmenlogo stammen aus dem
+  gemeinsamen Schäfchen-Bestand.
+- Gespeichert werden ausschließlich strukturierte VDE-Fachdaten und Referenzen
+  auf diesen Bestand.
+- Entwürfe sind versionsgeschützt; jeder Serverstand wird vollständig
+  historisiert.
+- Der Abschluss erzeugt genau eine unveränderliche PDF der Kategorie
+  `inspection` in der zentralen Baustellenakte.
+- Ein deaktiviertes Modul verschwindet aus der Fachoberfläche. Vorhandene
+  Prüfungen, Historien und Dokumente bleiben erhalten.
+- V15-Bestände können kontrolliert importiert werden; ein mitgeliefertes
+  Original-PDF bleibt unverändert erhalten.
+
+Die vollständigen Fach- und Berechtigungsregeln stehen in
+[`VDE_MODULE.md`](VDE_MODULE.md).
 
 ## Reihenfolge
 
-1. VDE als vorhandene fachliche Quelle kontrolliert anbinden.
-2. Gemeinsame Verknüpfung zu Kunde, Projekt, Baustelle, Mitarbeiter und
-   Dokument herstellen.
-3. Danach DGUV nach demselben Muster ergänzen.
+1. VDE ist kontrolliert mit dem gemeinsamen Bestand verbunden.
+2. Der nächste Fachbaustein ist DGUV nach demselben Aktivierungs-, Referenz-,
+   Historisierungs- und Dokumentprinzip.

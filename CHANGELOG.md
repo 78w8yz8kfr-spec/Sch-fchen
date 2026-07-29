@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.39.0 – Integriertes VDE-Prüfmodul
+
+- die vorhandene V15-Prüfprotokoll-Anwendung ist als erstes vollständig angebundenes, firmenweit aktivierbares Elektro-Spezialmodul direkt aus der Schäfchen-Baustellenakte erreichbar
+- Firma, Logo, Kunde, Projekt, Baustelle und Prüfer werden aus dem gemeinsamen Bestand referenziert; das Fachmodul erzeugt keine parallelen Stammdaten
+- Verteilungen, FI/RCD-Gruppen, direkte Stromkreise, Schutzorgane und Messwerte werden strukturiert gespeichert; die manuelle Reihenfolge bleibt bis in das Abschluss-PDF erhalten
+- RCD-Auslösezeit und -strom liegen am jeweiligen Stromkreis, Zi, Zs und Ik bleiben getrennte Messwerte, und LS, FI/LS, NH, Diazed, Neozed sowie sonstige Schutzorgane zeigen nur ihre passenden Parameter
+- Stromkreisverzeichnis und detaillierte Isolationsmessung sind ausdrücklich optional; die zusätzlichen RISO-Leiterwerte erscheinen nur bei aktivierter Detailmessung
+- der mobile Editor bietet eine unterstützende Plausibilitätsanzeige, lokale Entwurfssicherung ohne Signatur und einen V15-JSON-Import mit optional unverändert bewahrtem Original-PDF
+- der Abschluss verlangt Prüfungsart, Verteilung, benannte Stromkreise und Prüferunterschrift; die serverseitig erzeugte A4-PDF besitzt Firmenlogo und Fußzeile, beginnt die Stromkreise bewusst auf Seite zwei und wird einmal zentral mit der Baustelle verknüpft
+- abgeschlossene Prüfungen und ihre vollständige Versionshistorie sind unveränderlich; Deaktivierung des Moduls löscht weder Fach- noch Dokumentdaten
+- Migration 036, RLS, zusammengesetzte Mandanten-Fremdschlüssel, Idempotenz-UUID, Rollen- und Tageszuweisungsprüfung sowie SQL-, Validierungs-, PDF-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern den Ablauf
+
 ### V0.38.0 – Automatischer Feiertagskalender
 
 - der deutsche Feiertagskalender berechnet nach Rechtsstand 29.07.2026 die neun bundesweiten und die landesweiten Regeln aller 16 Bundesländer einschließlich beweglicher Feiertage reproduzierbar für 2000 bis 2100
