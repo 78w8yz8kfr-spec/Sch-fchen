@@ -1,11 +1,12 @@
 # Sprint 2: Planung und Zeiterfassung
 
 Stand: 29.07.2026
-Technischer Stand: V0.35.0
+Technischer Stand: V0.36.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
-012 sowie 027, 031 und 032. Der Sprint verbindet Wochenplanung, Vorarbeiterverantwortung,
-Offline-Zeitereignisse und den berechneten Stundenzettel.
+012 sowie 027, 031, 032 und 033. Der Sprint verbindet Wochenplanung,
+Vorarbeiterverantwortung, Offline-Zeitereignisse, Abwesenheiten und den
+berechneten Stundenzettel.
 
 Die PWA stellt den berechneten Stundenzettel zusätzlich als vollständige
 Arbeitswoche dar. `GET /api/v1/work-weeks/{montag}` liefert Montag bis Sonntag,
@@ -143,6 +144,27 @@ Originale werden niemals gelöscht. Eine genehmigte Ungültigmarkierung entwerte
 das Original nachvollziehbar; die Rechenregel Version 3 ignoriert ausschließlich
 genehmigte Ungültigmarkierungen und berechnet den Tag reproduzierbar neu.
 
+## 033 `absence_requests`
+
+Mitarbeiter reichen ganze oder halbe Abwesenheitstage selbst ein. Ein Antrag
+ist nach der Einreichung inhaltlich unveränderlich und durchläuft
+`office_review`, anschließend `management_review` und erst danach `approved`.
+Ablehnungen und Stornierungen sind eigene abschließende Zustände. Jede
+Einreichung und Entscheidung wird zusätzlich in `absence_request_events`
+unveränderlich protokolliert.
+
+Büro oder Disposition führt die erste Prüfung aus. Die verbindliche zweite
+Freigabe ist der Geschäftsführung vorbehalten und muss von einem anderen Konto
+stammen. Vor einer ganztägigen Freigabe darf im Zeitraum
+kein aktiver Einsatz bestehen. Freigabe, neue Einsatzplanung und das
+Verschieben eines Einsatzes verwenden dieselbe transaktionale Sperre je
+Mitarbeiter und Kalendertag. So kann auch bei parallelen Vorgängen kein
+freigegebener Volltag mit einer aktiven Einsatzplanung kollidieren.
+
+Freigegebene Abwesenheiten erscheinen in persönlicher Woche, Büro-Plantafel und
+Tageslage. Halbtage bleiben planbar und werden sichtbar gekennzeichnet;
+ganztägig Abwesende zählen in der Disposition nicht als frei verfügbar.
+
 ## Büroprüfung und Excel
 
 Die Wochenprüfung zeigt laufende und abgeschlossene Arbeitstage automatisch,
@@ -183,6 +205,8 @@ Für jede Migration existiert ein eigener SQL-Test. Geprüft werden unter andere
 mehrfache Tagesbaustellen, Reihenfolge, Änderungsbegründung, automatische
 Vorarbeiterübergabe, individuelle Sollzeit, Pausen- und Mehrarbeitsberechnung,
 Client-ID-Dubletten, Korrekturen, Sperren, Löschschutz und Mandantentrennung.
+Migration 033 ergänzt Prüfungen für Statusfolge, Vier-Augen-Regel,
+Abwesenheitshistorie und Planungskonflikte.
 GitHub Actions wendet alle Migrationen zweimal an, prüft Backup und Restore und
 führt anschließend den echten Login-/Session-/Offline-Sync-Ablauf der Node-API
 gegen PostgreSQL aus.

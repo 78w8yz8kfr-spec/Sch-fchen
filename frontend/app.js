@@ -147,6 +147,17 @@
     weekTotalOvertime: document.querySelector("#week-total-overtime"),
     weekMessage: document.querySelector("#week-message"),
     weekTimesheetList: document.querySelector("#week-timesheet-list"),
+    absencePanel: document.querySelector("#absence-panel"),
+    absenceForm: document.querySelector("#absence-form"),
+    absenceType: document.querySelector("#absence-type"),
+    absenceDayPart: document.querySelector("#absence-day-part"),
+    absenceStartDate: document.querySelector("#absence-start-date"),
+    absenceEndDate: document.querySelector("#absence-end-date"),
+    absenceNote: document.querySelector("#absence-note"),
+    absenceSubmit: document.querySelector("#absence-submit"),
+    absenceMessage: document.querySelector("#absence-message"),
+    absenceOpenCount: document.querySelector("#absence-open-count"),
+    absenceList: document.querySelector("#absence-list"),
     employeeTimesheetExportPanel: document.querySelector("#employee-timesheet-export-panel"),
     employeeTimesheetExportSummary: document.querySelector("#employee-timesheet-export-summary"),
     employeeTimesheetExportForm: document.querySelector("#employee-timesheet-export-form"),
@@ -243,6 +254,7 @@
     dispatchSummary: document.querySelector("#dispatch-summary"),
     dispatchSummaryDate: document.querySelector("#dispatch-summary-date"),
     dispatchPlannedCount: document.querySelector("#dispatch-planned-count"),
+    dispatchAbsentCount: document.querySelector("#dispatch-absent-count"),
     dispatchUnassignedCount: document.querySelector("#dispatch-unassigned-count"),
     dispatchActiveCount: document.querySelector("#dispatch-active-count"),
     dispatchReviewCount: document.querySelector("#dispatch-review-count"),
@@ -543,6 +555,9 @@
     timeCorrectionReviewPanel: document.querySelector("#time-correction-review-panel"),
     timeCorrectionReviewCount: document.querySelector("#time-correction-review-count"),
     timeCorrectionReviewList: document.querySelector("#time-correction-review-list"),
+    absenceReviewPanel: document.querySelector("#absence-review-panel"),
+    absenceReviewCount: document.querySelector("#absence-review-count"),
+    absenceReviewList: document.querySelector("#absence-review-list"),
     toast: document.querySelector("#toast")
   };
 
@@ -577,6 +592,7 @@
   let session = null;
   let adminState = null;
   let weekState = null;
+  let absenceState = [];
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
   let correctingTimeEntryId = null;
@@ -828,7 +844,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.35.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.36.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2462,12 +2478,34 @@
       const dayAssignments = adminState.weekAssignments.filter(
         (assignment) => assignment.workDate === workDate
       );
-      if (dayAssignments.length === 0) {
+      const dayAbsences = (adminState.absences || []).filter((absence) => (
+        absence.status === "approved"
+        && absence.startDate <= workDate
+        && absence.endDate >= workDate
+      ));
+      if (dayAssignments.length === 0 && dayAbsences.length === 0) {
         const empty = document.createElement("span");
         empty.className = "admin-week-empty";
         empty.textContent = "Noch kein Einsatz";
         items.append(empty);
       } else {
+        dayAbsences.forEach((absence) => {
+          const card = document.createElement("article");
+          const content = document.createElement("div");
+          const title = document.createElement("strong");
+          const meta = document.createElement("span");
+          const conflict = dayAssignments.some(
+            (assignment) => assignment.employeeId === absence.employeeId
+          );
+          card.className = `week-absence${conflict ? " week-absence--conflict" : ""}`;
+          title.textContent = absence.employeeName;
+          meta.textContent = `${absenceTypeLabel(absence.absenceType)} · ${
+            absenceDayPartLabel(absence.dayPart)
+          }${conflict ? " · Planungskonflikt" : ""}`;
+          content.append(title, meta);
+          card.append(content);
+          items.append(card);
+        });
         dayAssignments.forEach((assignment) => {
           const card = document.createElement("article");
           const content = document.createElement("div");
@@ -2709,6 +2747,145 @@
     });
   }
 
+  function renderAbsenceReviews() {
+    const absences = adminState?.absences || [];
+    const pending = absences.filter((absence) => (
+      ["office_review", "management_review"].includes(absence.status)
+    ));
+    const approved = absences.filter((absence) => absence.status === "approved");
+    const visible = [...pending, ...approved];
+    elements.absenceReviewPanel.hidden = !canPlan();
+    elements.absenceReviewCount.textContent = String(pending.length);
+    elements.absenceReviewList.replaceChildren();
+
+    if (visible.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "absence-list__empty";
+      empty.textContent = "Keine Abwesenheit wartet auf Prüfung.";
+      elements.absenceReviewList.append(empty);
+      return;
+    }
+
+    visible.forEach((absence) => {
+      const item = document.createElement("li");
+      const heading = document.createElement("div");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const status = document.createElement("span");
+      const period = document.createElement("span");
+      const detail = document.createElement("small");
+      item.className = `absence-review-item absence-review-item--${absence.status}`;
+      heading.className = "absence-review-item__heading";
+      title.textContent = `${absence.employeeName} · ${absenceTypeLabel(absence.absenceType)}`;
+      status.className = `absence-status absence-status--${absence.status}`;
+      status.textContent = absenceStatusLabel(absence.status);
+      period.textContent = absencePeriodLabel(absence);
+      const details = [];
+      if (absence.note) details.push(absence.note);
+      if (absence.officeReviewedByName) {
+        details.push(`Büro: ${absence.officeReviewedByName}`);
+      }
+      if (absence.managementReviewedByName) {
+        details.push(`Freigabe: ${absence.managementReviewedByName}`);
+      }
+      if (absence.assignmentConflictCount > 0) {
+        details.push(`${absence.assignmentConflictCount} Einsatz${
+          absence.assignmentConflictCount === 1 ? "" : "e"
+        } im Zeitraum`);
+      }
+      detail.textContent = details.join(" · ");
+      copy.append(title, period, detail);
+      heading.append(copy, status);
+      item.append(heading);
+
+      const canOfficeReview = absence.status === "office_review"
+        && adminState.canReviewAbsenceOffice;
+      const canManagementReview = absence.status === "management_review"
+        && adminState.canApproveAbsenceManagement;
+      const canCancelApproval = absence.status === "approved"
+        && adminState.canApproveAbsenceManagement;
+      if (canOfficeReview || canManagementReview || canCancelApproval) {
+        const controls = document.createElement("div");
+        const comment = document.createElement("input");
+        const actions = document.createElement("div");
+        controls.className = "absence-review-controls";
+        comment.type = "text";
+        comment.maxLength = 500;
+        comment.placeholder = canCancelApproval
+          ? "Begründung zum Aufheben der Freigabe"
+          : "Kommentar (bei Ablehnung erforderlich)";
+        actions.className = "absence-review-actions";
+
+        const submitDecision = async (action) => {
+          const commentValue = comment.value.trim();
+          if (["reject", "cancel"].includes(action) && commentValue.length < 3) {
+            showToast("Bitte eine kurze Begründung eingeben.");
+            comment.focus();
+            return;
+          }
+          if (
+            action === "approve"
+            && canManagementReview
+            && !window.confirm("Abwesenheit verbindlich freigeben und in der Planung sperren?")
+          ) return;
+          if (
+            action === "cancel"
+            && !window.confirm("Verbindliche Freigabe wirklich aufheben?")
+          ) return;
+          actions.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+          try {
+            await requestJson(
+              `./api/v1/admin/absence-requests/${encodeURIComponent(absence.id)}`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  action,
+                  comment: commentValue,
+                  rowVersion: absence.rowVersion
+                })
+              }
+            );
+            showToast(action === "approve"
+              ? (canOfficeReview
+                ? "Büroprüfung abgeschlossen · Geschäftsführung ist als Nächstes dran."
+                : "Abwesenheit verbindlich freigegeben.")
+              : action === "reject"
+                ? "Abwesenheitsantrag abgelehnt · Begründung ist gespeichert."
+                : "Freigabe aufgehoben · Historie bleibt erhalten.");
+            await Promise.all([refreshAdmin(adminState.date), refreshAbsenceData()]);
+          } catch (error) {
+            showToast(error.message);
+            actions.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+          }
+        };
+
+        if (canCancelApproval) {
+          const cancel = document.createElement("button");
+          cancel.type = "button";
+          cancel.className = "text-button text-button--muted";
+          cancel.textContent = "Freigabe aufheben";
+          cancel.addEventListener("click", () => void submitDecision("cancel"));
+          actions.append(cancel);
+        } else {
+          const approve = document.createElement("button");
+          const reject = document.createElement("button");
+          approve.type = "button";
+          approve.className = "text-button";
+          approve.textContent = canOfficeReview ? "Bürofreigabe" : "Verbindlich freigeben";
+          reject.type = "button";
+          reject.className = "text-button text-button--muted";
+          reject.textContent = "Ablehnen";
+          approve.addEventListener("click", () => void submitDecision("approve"));
+          reject.addEventListener("click", () => void submitDecision("reject"));
+          actions.append(approve, reject);
+        }
+        controls.append(comment, actions);
+        item.append(controls);
+      }
+      elements.absenceReviewList.append(item);
+    });
+  }
+
   function renderTimesheetExport() {
     elements.timesheetExportPanel.hidden = !canPlan();
     if (!canPlan() || !adminState) return;
@@ -2770,7 +2947,19 @@
     ));
     const dayAssignments = adminState.assignments.filter((assignment) => assignment.workDate === date);
     const plannedEmployeeIds = new Set(dayAssignments.map((assignment) => assignment.employeeId));
-    const unassigned = fieldEmployees.filter((employee) => !plannedEmployeeIds.has(employee.id));
+    const dayAbsences = (adminState.absences || []).filter((absence) => (
+      absence.status === "approved"
+      && absence.startDate <= date
+      && absence.endDate >= date
+    ));
+    const fullDayAbsentIds = new Set(
+      dayAbsences
+        .filter((absence) => absence.dayPart === "full_day")
+        .map((absence) => absence.employeeId)
+    );
+    const unassigned = fieldEmployees.filter((employee) => (
+      !plannedEmployeeIds.has(employee.id) && !fullDayAbsentIds.has(employee.id)
+    ));
     const dayWorkDays = adminState.workDays.filter((day) => day.workDate === date);
     const active = dayWorkDays.filter((day) => day.workflowStatus === "in_progress");
     const reviews = dayWorkDays.filter((day) => (
@@ -2787,11 +2976,17 @@
       ? `Heute · ${dateLabel}`
       : dateLabel;
     elements.dispatchPlannedCount.textContent = String(plannedFieldCount);
+    elements.dispatchAbsentCount.textContent = String(dayAbsences.length);
     elements.dispatchUnassignedCount.textContent = String(unassigned.length);
     elements.dispatchActiveCount.textContent = String(active.length);
     elements.dispatchReviewCount.textContent = String(reviews.length);
 
     const notes = [];
+    if (dayAbsences.length) {
+      notes.push(`Abwesend: ${dayAbsences.map(
+        (absence) => `${absence.employeeName} (${absenceTypeLabel(absence.absenceType)})`
+      ).join(", ")}`);
+    }
     if (unassigned.length) {
       notes.push(`Ohne Einsatz: ${unassigned.map(
         (employee) => `${employee.firstName} ${employee.lastName}`
@@ -2926,6 +3121,7 @@
     renderDocumentList();
     renderWorkDayReviews();
     renderTimeCorrections();
+    renderAbsenceReviews();
     renderTimesheetExport();
     if (openedSiteId && !elements.siteDashboard.hidden) {
       renderSiteDocuments(openedSiteId);
@@ -4315,6 +4511,135 @@
     });
   }
 
+  function absenceTypeLabel(type) {
+    return {
+      vacation: "Urlaub",
+      unpaid_vacation: "Unbezahlter Urlaub",
+      time_off: "Überstundenabbau",
+      leave: "Freistellung",
+      special_leave: "Sonderurlaub",
+      sick: "Krank",
+      training: "Lehrgang / Weiterbildung",
+      vocational_school: "Berufsschule",
+      other: "Sonstiges"
+    }[type] || type;
+  }
+
+  function absenceDayPartLabel(dayPart) {
+    return {
+      full_day: "ganztägig",
+      first_half: "erste Tageshälfte",
+      second_half: "zweite Tageshälfte"
+    }[dayPart] || dayPart;
+  }
+
+  function absenceStatusLabel(status) {
+    return {
+      office_review: "Büroprüfung",
+      management_review: "Geschäftsführung prüft",
+      approved: "Freigegeben",
+      office_rejected: "Vom Büro abgelehnt",
+      management_rejected: "Von der Geschäftsführung abgelehnt",
+      cancelled: "Zurückgezogen"
+    }[status] || status;
+  }
+
+  function absencePeriodLabel(absence) {
+    const period = absence.startDate === absence.endDate
+      ? shortDate(absence.startDate)
+      : `${shortDate(absence.startDate)} bis ${shortDate(absence.endDate)}`;
+    return `${period} · ${absenceDayPartLabel(absence.dayPart)}`;
+  }
+
+  function approvedAbsenceForDate(workDate, employeeId = session?.user?.id) {
+    const source = employeeId === session?.user?.id
+      ? absenceState
+      : (adminState?.absences || []).filter((absence) => absence.employeeId === employeeId);
+    return source.find((absence) => (
+      absence.status === "approved"
+      && absence.startDate <= workDate
+      && absence.endDate >= workDate
+    )) || null;
+  }
+
+  function renderAbsences() {
+    elements.absenceForm.hidden = demoMode;
+    elements.absenceOpenCount.textContent = `${
+      absenceState.filter((absence) => ["office_review", "management_review"].includes(absence.status)).length
+    } offen`;
+    elements.absenceList.replaceChildren();
+    if (demoMode) {
+      const item = document.createElement("li");
+      item.className = "absence-list__empty";
+      item.textContent = "Abwesenheitsanträge stehen nach der Online-Anmeldung zur Verfügung.";
+      elements.absenceList.append(item);
+      return;
+    }
+    if (absenceState.length === 0) {
+      const item = document.createElement("li");
+      item.className = "absence-list__empty";
+      item.textContent = "Für dieses Jahr liegt noch kein Abwesenheitsantrag vor.";
+      elements.absenceList.append(item);
+      return;
+    }
+
+    absenceState.forEach((absence) => {
+      const item = document.createElement("li");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const badge = document.createElement("span");
+      const period = document.createElement("span");
+      const note = document.createElement("span");
+      const history = document.createElement("small");
+      item.className = `absence-item absence-item--${absence.status}`;
+      heading.className = "absence-item__heading";
+      title.textContent = absenceTypeLabel(absence.absenceType);
+      badge.className = `absence-status absence-status--${absence.status}`;
+      badge.textContent = absenceStatusLabel(absence.status);
+      period.textContent = absencePeriodLabel(absence);
+      note.textContent = absence.note || "";
+      note.hidden = !absence.note;
+      const latest = absence.history?.at(-1);
+      history.textContent = latest
+        ? `Letzter Schritt: ${absenceStatusLabel(latest.status)}${
+          latest.actorName ? ` · ${latest.actorName}` : ""
+        }`
+        : "";
+      heading.append(title, badge);
+      item.append(heading, period, note, history);
+
+      if (["office_review", "management_review"].includes(absence.status)) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "text-button text-button--muted absence-item__cancel";
+        cancel.textContent = "Antrag zurückziehen";
+        cancel.disabled = !navigator.onLine;
+        cancel.addEventListener("click", async () => {
+          const reason = window.prompt("Warum möchtest du den Antrag zurückziehen?");
+          if (!reason || reason.trim().length < 3) return;
+          cancel.disabled = true;
+          try {
+            await requestJson(`./api/v1/absences/${encodeURIComponent(absence.id)}/cancel`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                action: "cancel",
+                comment: reason,
+                rowVersion: absence.rowVersion
+              })
+            });
+            showToast("Abwesenheitsantrag zurückgezogen · Historie bleibt erhalten.");
+            await Promise.all([refreshAbsenceData(), refreshAdmin()]);
+          } catch (error) {
+            showToast(error.message);
+            cancel.disabled = !navigator.onLine;
+          }
+        });
+        item.append(cancel);
+      }
+      elements.absenceList.append(item);
+    });
+  }
+
   function renderWeek() {
     const today = new Date();
     const weekStart = selectedWeekStart;
@@ -4366,13 +4691,17 @@
     elements.weekStrip.replaceChildren();
     elements.weekTimesheetList.replaceChildren();
     renderEmployeeTimesheetExport(visibleWeek);
+    renderAbsences();
 
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
+      const approvedAbsence = approvedAbsenceForDate(workDate);
       const item = document.createElement("button");
       const dayName = shortDayFormatter.format(date).replace(".", "");
       const isToday = workDate === localDateKey(today);
-      item.className = `day-pill${isToday ? " day-pill--today" : ""}`;
+      item.className = `day-pill${isToday ? " day-pill--today" : ""}${
+        approvedAbsence ? " day-pill--absent" : ""
+      }`;
       item.type = "button";
       item.setAttribute("aria-label", `${dayName}, ${date.getDate()}.`);
       const name = document.createElement("span");
@@ -4380,7 +4709,7 @@
       const status = document.createElement("i");
       name.textContent = dayName;
       number.textContent = String(date.getDate());
-      status.textContent = workDay?.entries?.length ? "●" : "";
+      status.textContent = approvedAbsence ? "◆" : workDay?.entries?.length ? "●" : "";
       status.setAttribute("aria-hidden", "true");
       item.append(name, number, status);
       item.addEventListener("click", () => {
@@ -4417,8 +4746,10 @@
             ? "completed"
             : "in_progress"
       );
-      dayStatus.textContent = !workDay
-        ? "Keine Buchung"
+      dayStatus.textContent = approvedAbsence && !workDay
+        ? "Abwesend"
+        : !workDay
+          ? "Keine Buchung"
         : workDay.status === "approved"
           ? "Freigegeben"
           : statusLabels[workflowStatus] || "Erfasst";
@@ -4427,10 +4758,21 @@
       heading.append(headingCopy, total);
       dayCard.append(heading);
 
+      if (approvedAbsence) {
+        const absenceBanner = document.createElement("p");
+        absenceBanner.className = "week-day-absence";
+        absenceBanner.textContent = `${absenceTypeLabel(approvedAbsence.absenceType)} · ${
+          absenceDayPartLabel(approvedAbsence.dayPart)
+        } · verbindlich freigegeben`;
+        dayCard.append(absenceBanner);
+      }
+
       if (!workDay?.entries?.length) {
         const empty = document.createElement("p");
         empty.className = "week-timesheet-day__empty";
-        empty.textContent = "Für diesen Tag sind keine Zeiten erfasst.";
+        empty.textContent = approvedAbsence
+          ? "Für die freigegebene Abwesenheit sind keine Arbeitszeiten erforderlich."
+          : "Für diesen Tag sind keine Zeiten erfasst.";
         dayCard.append(empty);
       } else {
         const metrics = document.createElement("div");
@@ -4561,6 +4903,10 @@
     elements.connectionState.querySelector("span").textContent = label;
     elements.employeeTimesheetExportSubmit.disabled = !online;
     elements.employeeTimesheetExportPdfSubmit.disabled = !online;
+    elements.absenceSubmit.disabled = !online || demoMode;
+    elements.absenceList
+      .querySelectorAll(".absence-item__cancel")
+      .forEach((button) => { button.disabled = !online; });
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
@@ -4677,11 +5023,40 @@
     }
   }
 
+  async function refreshAbsenceData() {
+    if (demoMode) {
+      absenceState = [];
+      renderAbsences();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderAbsences();
+      return;
+    }
+    const requestedYear = selectedWeekStart.slice(0, 4);
+    const from = `${requestedYear}-01-01`;
+    const to = `${requestedYear}-12-31`;
+    try {
+      const body = await requestJson(`./api/v1/absences?from=${from}&to=${to}`);
+      if (requestedYear !== selectedWeekStart.slice(0, 4)) return;
+      absenceState = body.absences || [];
+      elements.absenceMessage.textContent = "";
+      renderWeek();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else {
+        elements.absenceMessage.textContent = error.network
+          ? "Die Abwesenheiten konnten gerade nicht aktualisiert werden."
+          : error.message;
+      }
+    }
+  }
+
   async function selectWeek(weekStart) {
     selectedWeekStart = weekStart;
     weekState = null;
     renderWeek();
-    await refreshWeekData();
+    await Promise.all([refreshWeekData(), refreshAbsenceData()]);
   }
 
   async function refreshLiveData() {
@@ -4720,6 +5095,7 @@
       assignments = [];
       adminState = null;
       weekState = null;
+      absenceState = [];
       employeeSiteState = null;
     }
     session = sessionView;
@@ -4736,7 +5112,12 @@
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
     if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();
-    await Promise.all([refreshLiveData(), refreshWeekData(), refreshAdmin()]);
+    await Promise.all([
+      refreshLiveData(),
+      refreshWeekData(),
+      refreshAbsenceData(),
+      refreshAdmin()
+    ]);
     await syncPendingEntries();
   }
 
@@ -5965,6 +6346,57 @@
     void downloadOwnTimesheet("pdf");
   });
 
+  function syncAbsenceDateFields() {
+    const halfDay = elements.absenceDayPart.value !== "full_day";
+    if (halfDay && elements.absenceStartDate.value) {
+      elements.absenceEndDate.value = elements.absenceStartDate.value;
+    } else if (
+      elements.absenceStartDate.value
+      && (!elements.absenceEndDate.value || elements.absenceEndDate.value < elements.absenceStartDate.value)
+    ) {
+      elements.absenceEndDate.value = elements.absenceStartDate.value;
+    }
+    elements.absenceEndDate.disabled = halfDay;
+  }
+
+  elements.absenceDayPart.addEventListener("change", syncAbsenceDateFields);
+  elements.absenceStartDate.addEventListener("change", syncAbsenceDateFields);
+  elements.absenceForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (demoMode) return;
+    const startDate = elements.absenceStartDate.value;
+    const endDate = elements.absenceDayPart.value === "full_day"
+      ? elements.absenceEndDate.value
+      : startDate;
+    if (!startDate || !endDate || endDate < startDate) {
+      elements.absenceMessage.textContent = "Bitte einen gültigen Zeitraum auswählen.";
+      return;
+    }
+    elements.absenceSubmit.disabled = true;
+    elements.absenceMessage.textContent = "Antrag wird sicher eingereicht …";
+    try {
+      await requestJson("./api/v1/absences", {
+        method: "POST",
+        body: JSON.stringify({
+          absenceType: elements.absenceType.value,
+          startDate,
+          endDate,
+          dayPart: elements.absenceDayPart.value,
+          note: elements.absenceNote.value
+        })
+      });
+      elements.absenceNote.value = "";
+      elements.absenceMessage.textContent = "";
+      showToast("Abwesenheit eingereicht · das Büro prüft zuerst.");
+      await Promise.all([refreshAbsenceData(), refreshAdmin()]);
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.absenceMessage.textContent = error.message;
+    } finally {
+      elements.absenceSubmit.disabled = !navigator.onLine;
+    }
+  });
+
   elements.togglePassword.addEventListener("click", () => {
     const show = elements.passwordInput.type === "password";
     elements.passwordInput.type = show ? "text" : "password";
@@ -5978,6 +6410,7 @@
       await requestJson("./api/v1/session", { method: "DELETE" });
       session = null;
       adminState = null;
+      absenceState = [];
       employeeSiteState = null;
       cachedUserId = null;
       assignments = [];
@@ -6241,7 +6674,7 @@
   });
   elements.navWeek.addEventListener("click", () => {
     showDashboardPane("week");
-    void refreshWeekData();
+    void Promise.all([refreshWeekData(), refreshAbsenceData()]);
   });
   elements.weekPrevious.addEventListener("click", () => {
     void selectWeek(addIsoDays(selectedWeekStart, -7));
@@ -6302,6 +6735,9 @@
   });
   elements.siteStatusFilter.addEventListener("change", renderSiteList);
 
+  elements.absenceStartDate.value = localDateKey();
+  elements.absenceEndDate.value = localDateKey();
+  syncAbsenceDateFields();
   elements.todayLabel.textContent = dateFormatter.format(new Date());
   configureModeCopy();
   updateConnectionState();
@@ -6311,6 +6747,7 @@
     updateConnectionState();
     void syncPendingEntries();
     void refreshLiveData();
+    void refreshAbsenceData();
   });
   window.addEventListener("offline", updateConnectionState);
 

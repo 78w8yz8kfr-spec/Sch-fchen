@@ -1,10 +1,15 @@
 # Projektstatus
 
 Stand: 29.07.2026
-Technischer Stand: V0.35.0
+Technischer Stand: V0.36.0
 
 ## Abgeschlossen
 
+- eigene Abwesenheitsanträge für ganze oder halbe Tage mit Urlaub, Überstundenabbau, Freistellung, Krankheit, Lehrgang, Berufsschule und weiteren Arten
+- zweistufige Prüfung mit Büroentscheidung vor der verbindlichen Freigabe durch die Geschäftsführung sowie technisch erzwungener Vier-Augen-Regel
+- unveränderliche Antrags- und Entscheidungshistorie mit Begründung, Versionskonfliktschutz, RLS, Mandantentrennung und Löschschutz in Migration 033
+- freigegebene Abwesenheiten in persönlicher Woche, Büro-Wochenplanung und Tageslage; ganztägig abwesende Mitarbeiter werden nicht als frei verfügbar geführt
+- konfliktfeste Verbindung von Abwesenheit und Einsatzplanung: bestehende Einsätze sperren die Volltagsfreigabe, freigegebene Volltage sperren neue oder verschobene Einsätze
 - Tageslage für Büro und Disposition mit eingeplanten und freien Feldmitarbeitern, laufenden Arbeitstagen und offenen Zeitprüfungen
 - geplante Einsatzdauer und konkrete Arbeitsanweisung beim Anlegen, Bearbeiten, in der Wochenplanung und im mobilen Arbeitstag
 - Mitarbeiterstammdaten mit optionaler Telefonnummer und E-Mail sowie direkte Kontaktaktionen im mobilen Baustellenteam
@@ -173,6 +178,7 @@ Technischer Stand: V0.35.0
 - Migration 030 begrenzt die Modulplanung verbindlich auf VDE und DGUV; LWL und KNX gehören nicht zum Projektumfang
 - Migration 031 erlaubt nachvollziehbare Zeitkorrekturen an abgerechneten Tagen ohne die Abrechnungssperre für neue Buchungen aufzuweichen
 - Migration 032 vervollständigt die Zeiterfassung um Feldbaustellen, spontane Einsatzwahl, Ergänzungen, Ungültigmarkierungen, automatische Büroprüfung und Rechenregel Version 3
+- Migration 033 ergänzt zweistufig geprüfte Abwesenheiten mit unveränderlicher Historie und konfliktfester Verknüpfung zur Einsatzplanung
 
 ## Noch zu prüfen
 
@@ -184,15 +190,16 @@ Technischer Stand: V0.35.0
 
 ## Nächster Entwicklungsschritt
 
-Nach Abschluss der Zeiterfassung wird die vorhandene VDE-Anwendung als erstes aktivierbares Elektro-Spezialmodul
-kontrolliert an den gemeinsamen Kunden-, Projekt-, Baustellen-, Mitarbeiter-
-und Dokumentenbestand angebunden.
+Als nächstes wird der Plancraft-orientierte Planungsablauf um Arbeitszeitkonten
+und eine kompakte Jahresübersicht für Urlaub und Überstundenabbau ergänzt. Die
+vorhandene VDE-Anwendung bleibt danach das erste aktivierbare
+Elektro-Spezialmodul und wird kontrolliert an den gemeinsamen Kunden-,
+Baustellen-, Mitarbeiter- und Dokumentenbestand angebunden.
 
 Betriebssicherheit mit dauerhafter Datenbank, Backup-Plan,
 Wiederherstellungsprobe, Überwachung und Objektspeicher wurde auf ausdrücklichen
 Wunsch für diesen Schritt übersprungen und bleibt vor echten Betriebsdaten
-verbindlich nachzuholen. Mobile Aufgabenaktionen bleiben gemäß der aktuellen
-Priorisierung ebenfalls zunächst übersprungen.
+verbindlich nachzuholen.
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo
 gekennzeichnet; die echte Anmeldung läuft ausschließlich auf der gemeinsamen

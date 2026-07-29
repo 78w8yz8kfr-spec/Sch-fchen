@@ -1,7 +1,7 @@
 # Plancraft-Featureprüfung für Schäfchen
 
 Stand: 29.07.2026  
-Technischer Stand: V0.35.0
+Technischer Stand: V0.36.0
 
 ## Ziel und Leitplanken
 
@@ -17,7 +17,7 @@ Für jede Übernahme gelten die Schäfchen-Grundsätze:
 
 ## Beobachtete Plancraft-Muster
 
-Die öffentlich dokumentierten Plancraft-Abläufe bündeln Auftragsdaten, Mitarbeiter, Dokumente, Berichte und Zeiterfassung in einer zentralen Projektakte. Aus der Einsatzplanung gelangen mobile Mitarbeiter direkt zu Navigation, Zeiterfassung, Bericht und Projektordner. Zugewiesene Mitarbeiter sehen nur ihre relevanten Projekte. Berichte werden aus Projekt- und Kundendaten vorausgefüllt und können mobil bearbeitet werden.
+Die öffentlich dokumentierten Plancraft-Abläufe bündeln Auftragsdaten, Mitarbeiter, Dokumente, Berichte und Zeiterfassung in einer zentralen Projektakte. Aus der Einsatzplanung gelangen mobile Mitarbeiter direkt zu Navigation, Zeiterfassung, Bericht und Projektordner. Zugewiesene Mitarbeiter sehen nur ihre relevanten Projekte. Berichte werden aus Projekt- und Kundendaten vorausgefüllt und können mobil bearbeitet werden. Abwesenheiten können mobil erfasst werden und erscheinen gemeinsam mit Einsätzen in der Plantafel.
 
 Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt hier jedoch konsequent **Baustelle**. Die intern notwendige Projektebene bleibt verborgen.
 
@@ -34,6 +34,7 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 | Plantafel mit Start, Dauer und Arbeitsauftrag | In V0.35.0 übernehmen | Schäfchen ergänzt die vorhandene Wochenplanung um geplante Dauer und einsatzbezogene Arbeitsanweisung, ohne eine komplexe Ressourcenplanung einzuführen. |
 | Tagesübersicht für die Disposition | In V0.35.0 übernehmen | Eingeplante und freie Feldmitarbeiter, laufende Zeiten und Prüfbedarf werden in einer ruhigen Tageskarte zusammengeführt. |
 | Team und Kontaktdaten am mobilen Einsatz | In V0.35.0 übernehmen | Telefonnummer und E-Mail gehören zu den Mitarbeiterstammdaten und sind aus der tagesbezogenen Baustellenakte erreichbar. |
+| Abwesenheiten mobil erfassen und in der Plantafel anzeigen | In V0.36.0 übernehmen und absichern | Schäfchen ergänzt eigene Anträge, ganze und halbe Tage sowie eine zweistufige Freigabe. Erst danach wirkt die Abwesenheit verbindlich auf die Einsatzplanung. |
 | Frei konfigurierbare Projektstatus | Später prüfen | Die vorhandenen Status reichen für den aktuellen Betriebsablauf. Zusätzliche Status lohnen sich erst mit klaren realen Fällen. |
 | Freigabe einzelner Dokumente für Mobilrollen | Später prüfen | Fachlich sinnvoll, benötigt aber ein eigenes Freigabemodell und eine Datenmigration. |
 | Plan-/Ist-Nachkalkulation | Später prüfen | Erst sinnvoll, wenn Zeit-, Material- und Kostenstammdaten über mehrere reale Aufträge stabil gepflegt werden. |
@@ -70,6 +71,21 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 2. Die Baustellenakte übernimmt dieselben Angaben und zeigt das heute eingeplante Team.
 3. Hinterlegte Telefonnummern oder E-Mail-Adressen sind direkt als Kontaktaktion erreichbar. Der Zugriff bleibt auf die zugewiesene Baustelle und den gewählten Tag begrenzt.
 
+## In V0.36.0 ergänzter Ablauf
+
+### Mitarbeiter
+
+1. In der eigenen Woche werden Art, Zeitraum, ganzer oder halber Tag und ein optionaler Hinweis erfasst.
+2. Der Antrag bleibt mit seinem aktuellen Prüfstatus und dem letzten nachvollziehbaren Schritt sichtbar.
+3. Solange keine verbindliche Freigabe vorliegt, kann der Mitarbeiter den Antrag mit Begründung zurückziehen.
+
+### Büro und Geschäftsführung
+
+1. Büro oder Disposition prüft den Antrag zuerst und dokumentiert Freigabe oder Ablehnung.
+2. Die Geschäftsführung entscheidet anschließend verbindlich; beide Schritte müssen von verschiedenen Konten stammen.
+3. Vor einer ganztägigen Freigabe müssen vorhandene Einsätze verschoben oder storniert werden.
+4. Freigegebene Abwesenheiten erscheinen in Wochenplanung und Tageslage und sperren denselben Mitarbeiter-Tag transaktional gegen neue Einsätze.
+
 ## Öffentliche Referenzen
 
 - [Zeiterfassung im Handwerk](https://plancraft.com/de-de/funktionen/zeiterfassung-handwerk)
@@ -82,4 +98,5 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 - [Berichte erstellen und unterschreiben](https://help.plancraft.com/de/articles/382751-berichte-in-plancraft-erstellen-ausfullen-und-unterschreiben)
 - [Plantafel für Einsatzplanung](https://help.plancraft.com/de/articles/382799-plantafel-fur-projekt-einsatz-und-abwesenheitsplanung)
 - [Plancraft-App und mobiler Aufbau](https://help.plancraft.com/de/articles/382683-plancraft-app-zielgruppe-download-registrierung-und-aufbau)
+- [Arbeitszeiten und Abwesenheiten erfassen](https://help.plancraft.com/de/articles/382797-arbeitszeiten-und-abwesenheiten-erfassen-und-exportieren)
 - [Nachkalkulation](https://help.plancraft.com/de/articles/382735-nachkalkulation-plan-und-ist-kosten-im-projekt-vergleichen)
