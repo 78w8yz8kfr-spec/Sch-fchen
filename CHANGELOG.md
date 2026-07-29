@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.37.0 – Stundenkonten und Jahresübersicht
+
+- jeder Mitarbeiter sieht in der bestehenden Wochenansicht sein fortlaufendes Stundenkonto mit Jahres-Soll, Ist, Abwesenheitsgutschrift, laufendem Stand und zwölf kompakten Monatszeilen
+- Planungsrollen erhalten eine kompakte Jahresübersicht aller aktiven Mitarbeiter mit Saldo, Resturlaub und genehmigtem Überstundenabbau
+- Administration und Geschäftsführung pflegen Aktivierung, Startdatum und kalenderjahrbezogenen Urlaubsanspruch; getrennte Versionsstände verhindern verlorene parallele Änderungen
+- Migration 034 verbindet eingefrorene Tagessollwerte, Wochensoll, Arbeitsminuten und freigegebene Abwesenheiten in einer reproduzierbaren Tagesberechnung
+- Urlaub, Krankheit und neutrale Abwesenheiten schreiben das volle beziehungsweise halbe Soll gut; Überstundenabbau reduziert das Konto um das betroffene Soll
+- manuelle Startsalden, Korrekturen und Auszahlungen besitzen eine Client-UUID, Pflichtbegründung, Löschschutz und unveränderliche Historie; Fehler werden per Gegenbuchung berichtigt
+- Row Level Security, zusammengesetzte Mandanten-Fremdschlüssel sowie SQL-, Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Rollen, Jahre, Abwesenheitswirkung und Mandantentrennung
+
 ### V0.36.0 – Abwesenheiten und Urlaubsfreigabe
 
 - Mitarbeiter beantragen Urlaub, Überstundenabbau, Freistellung, Krankheit, Lehrgang, Berufsschule und weitere Abwesenheiten selbst in ihrer Wochenansicht; ganze und halbe Tage werden unterstützt

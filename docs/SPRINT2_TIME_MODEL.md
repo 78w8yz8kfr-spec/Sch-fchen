@@ -1,7 +1,7 @@
 # Sprint 2: Planung und Zeiterfassung
 
 Stand: 29.07.2026
-Technischer Stand: V0.36.0
+Technischer Stand: V0.37.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
 012 sowie 027, 031, 032 und 033. Der Sprint verbindet Wochenplanung,
@@ -165,6 +165,29 @@ Freigegebene Abwesenheiten erscheinen in persönlicher Woche, Büro-Plantafel un
 Tageslage. Halbtage bleiben planbar und werden sichtbar gekennzeichnet;
 ganztägig Abwesende zählen in der Disposition nicht als frei verfügbar.
 
+## 034 Stundenkonten
+
+`time_account_profiles` legt fest, ob und ab welchem Datum ein Mitarbeiter am
+fortlaufenden Stundenkonto teilnimmt.
+`time_account_vacation_entitlements` speichert den Anspruch getrennt je
+Kalenderjahr in ganzen oder halben Tagen.
+`time_account_adjustments` bewahrt Startsalden, Korrekturen und Auszahlungen als
+unveränderliche, begründete Buchungen mit idempotenter Client-UUID.
+
+`time_account_daily_balances(...)` berechnet jeden abgeschlossenen Tag ab dem
+Kontostart reproduzierbar. Ein vorhandener Arbeitstag liefert sein
+eingefrorenes Soll und seine berechneten Arbeitsminuten. Ohne Arbeitstag gilt
+das aktuelle Wochensoll. Genehmigte Abwesenheiten schreiben das volle oder
+halbe Soll gut; Überstundenabbau erhält keine beziehungsweise nur die halbe
+Gutschrift und reduziert dadurch den Saldo. Heute und zukünftige Tage bleiben
+außerhalb der Berechnung.
+
+Mitarbeiter lesen ausschließlich das eigene Konto. Planungsrollen dürfen die
+Jahresübersicht aller aktiven Mitarbeiter lesen. Nur Administrator und
+Geschäftsführung ändern Profil, Jahresurlaubsanspruch oder buchen eine
+Korrektur. Profil und Anspruch verwenden getrennte Versionsstände; Buchungen
+werden niemals überschrieben oder gelöscht.
+
 ## Büroprüfung und Excel
 
 Die Wochenprüfung zeigt laufende und abgeschlossene Arbeitstage automatisch,
@@ -206,7 +229,9 @@ mehrfache Tagesbaustellen, Reihenfolge, Änderungsbegründung, automatische
 Vorarbeiterübergabe, individuelle Sollzeit, Pausen- und Mehrarbeitsberechnung,
 Client-ID-Dubletten, Korrekturen, Sperren, Löschschutz und Mandantentrennung.
 Migration 033 ergänzt Prüfungen für Statusfolge, Vier-Augen-Regel,
-Abwesenheitshistorie und Planungskonflikte.
+Abwesenheitshistorie und Planungskonflikte. Migration 034 prüft Tages- und
+Abwesenheitsberechnung, jahresbezogenen Urlaubsanspruch, unveränderliche
+Korrekturen, API-Rolle und Mandantentrennung.
 GitHub Actions wendet alle Migrationen zweimal an, prüft Backup und Restore und
 führt anschließend den echten Login-/Session-/Offline-Sync-Ablauf der Node-API
 gegen PostgreSQL aus.

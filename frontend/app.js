@@ -147,6 +147,32 @@
     weekTotalOvertime: document.querySelector("#week-total-overtime"),
     weekMessage: document.querySelector("#week-message"),
     weekTimesheetList: document.querySelector("#week-timesheet-list"),
+    timeAccountPanel: document.querySelector("#time-account-panel"),
+    timeAccountBalance: document.querySelector("#time-account-balance"),
+    timeAccountStatus: document.querySelector("#time-account-status"),
+    timeAccountTargetWork: document.querySelector("#time-account-target-work"),
+    timeAccountVacationRemaining: document.querySelector("#time-account-vacation-remaining"),
+    timeAccountVacationPending: document.querySelector("#time-account-vacation-pending"),
+    timeAccountTimeOff: document.querySelector("#time-account-time-off"),
+    timeAccountMonths: document.querySelector("#time-account-months"),
+    timeAccountMessage: document.querySelector("#time-account-message"),
+    timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
+    timeAccountAdminYear: document.querySelector("#time-account-admin-year"),
+    timeAccountAdminList: document.querySelector("#time-account-admin-list"),
+    timeAccountAdminMessage: document.querySelector("#time-account-admin-message"),
+    timeAccountProfileForm: document.querySelector("#time-account-profile-form"),
+    timeAccountProfileTitle: document.querySelector("#time-account-profile-title"),
+    timeAccountProfileEnabled: document.querySelector("#time-account-profile-enabled"),
+    timeAccountProfileStart: document.querySelector("#time-account-profile-start"),
+    timeAccountProfileVacation: document.querySelector("#time-account-profile-vacation"),
+    timeAccountProfileSave: document.querySelector("#time-account-profile-save"),
+    timeAccountProfileCancel: document.querySelector("#time-account-profile-cancel"),
+    timeAccountProfileMessage: document.querySelector("#time-account-profile-message"),
+    timeAccountAdjustmentDate: document.querySelector("#time-account-adjustment-date"),
+    timeAccountAdjustmentHours: document.querySelector("#time-account-adjustment-hours"),
+    timeAccountAdjustmentType: document.querySelector("#time-account-adjustment-type"),
+    timeAccountAdjustmentNote: document.querySelector("#time-account-adjustment-note"),
+    timeAccountAdjustmentSubmit: document.querySelector("#time-account-adjustment-submit"),
     absencePanel: document.querySelector("#absence-panel"),
     absenceForm: document.querySelector("#absence-form"),
     absenceType: document.querySelector("#absence-type"),
@@ -593,6 +619,8 @@
   let adminState = null;
   let weekState = null;
   let absenceState = [];
+  let timeAccountState = null;
+  let timeAccountsState = null;
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
   let correctingTimeEntryId = null;
@@ -612,6 +640,7 @@
   let reportPhotoFile = null;
   let finalizingReportId = null;
   let editingEmployeeId = null;
+  let editingTimeAccountId = null;
   let speechRecognition = null;
   let cachedUserId = null;
   let employeeSiteState = null;
@@ -844,7 +873,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.36.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.37.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2852,7 +2881,12 @@
               : action === "reject"
                 ? "Abwesenheitsantrag abgelehnt · Begründung ist gespeichert."
                 : "Freigabe aufgehoben · Historie bleibt erhalten.");
-            await Promise.all([refreshAdmin(adminState.date), refreshAbsenceData()]);
+            await Promise.all([
+              refreshAdmin(adminState.date),
+              refreshAbsenceData(),
+              refreshTimeAccountData(),
+              refreshAdminTimeAccounts()
+            ]);
           } catch (error) {
             showToast(error.message);
             actions.querySelectorAll("button").forEach((button) => { button.disabled = false; });
@@ -3123,6 +3157,7 @@
     renderTimeCorrections();
     renderAbsenceReviews();
     renderTimesheetExport();
+    renderAdminTimeAccounts();
     if (openedSiteId && !elements.siteDashboard.hidden) {
       renderSiteDocuments(openedSiteId);
       renderSiteTasks(openedSiteId);
@@ -4303,6 +4338,15 @@
     return `${String(Math.floor(safeMinutes / 60)).padStart(2, "0")}:${String(safeMinutes % 60).padStart(2, "0")}`;
   }
 
+  function formatSignedMinutes(minutes) {
+    const safeMinutes = Number.isFinite(Number(minutes)) ? Math.trunc(Number(minutes)) : 0;
+    const sign = safeMinutes > 0 ? "+" : safeMinutes < 0 ? "−" : "±";
+    const absolute = Math.abs(safeMinutes);
+    return `${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${
+      String(absolute % 60).padStart(2, "0")
+    }`;
+  }
+
   function calculatedTimes() {
     const now = new Date();
     const clockIn = state.events.find((entry) => entry.type === "clock_in");
@@ -4628,7 +4672,12 @@
               })
             });
             showToast("Abwesenheitsantrag zurückgezogen · Historie bleibt erhalten.");
-            await Promise.all([refreshAbsenceData(), refreshAdmin()]);
+            await Promise.all([
+              refreshAbsenceData(),
+              refreshAdmin(),
+              refreshTimeAccountData(),
+              refreshAdminTimeAccounts()
+            ]);
           } catch (error) {
             showToast(error.message);
             cancel.disabled = !navigator.onLine;
@@ -4637,6 +4686,159 @@
         item.append(cancel);
       }
       elements.absenceList.append(item);
+    });
+  }
+
+  function formatDayCount(days) {
+    const value = Number(days || 0);
+    return `${new Intl.NumberFormat("de-DE", {
+      minimumFractionDigits: Number.isInteger(value) ? 0 : 1,
+      maximumFractionDigits: 1
+    }).format(value)} ${value === 1 ? "Tag" : "Tage"}`;
+  }
+
+  function renderTimeAccount() {
+    elements.timeAccountPanel.hidden = demoMode;
+    if (demoMode) return;
+    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const account = timeAccountState?.year === requestedYear ? timeAccountState : null;
+    elements.timeAccountMonths.replaceChildren();
+    if (!account) {
+      elements.timeAccountBalance.textContent = "±00:00";
+      elements.timeAccountBalance.className = "time-account-balance";
+      elements.timeAccountStatus.textContent = navigator.onLine
+        ? "Jahreskonto wird geladen …"
+        : "Das Jahreskonto ist offline gerade nicht verfügbar.";
+      elements.timeAccountTargetWork.textContent = "00:00 / 00:00";
+      elements.timeAccountVacationRemaining.textContent = "0 Tage";
+      elements.timeAccountVacationPending.textContent = "0 Tage";
+      elements.timeAccountTimeOff.textContent = "0 Tage";
+      return;
+    }
+    if (!account.enabled) {
+      elements.timeAccountBalance.textContent = "Deaktiviert";
+      elements.timeAccountBalance.className = "time-account-balance";
+      elements.timeAccountStatus.textContent =
+        `Das Stundenkonto ist deaktiviert. Hinterlegter Start: ${shortDate(account.accountStartDate)}. Urlaubsstände bleiben sichtbar.`;
+    } else {
+      elements.timeAccountBalance.textContent = formatSignedMinutes(account.totals.balanceMinutes);
+      elements.timeAccountBalance.className = `time-account-balance${
+        account.totals.balanceMinutes > 0
+          ? " time-account-balance--positive"
+          : account.totals.balanceMinutes < 0
+            ? " time-account-balance--negative"
+            : ""
+      }`;
+      elements.timeAccountStatus.textContent =
+        `${account.year} · Arbeitszeit bis ${shortDate(addIsoDays(account.asOfDate, -1))} · Buchungen bis ${shortDate(account.asOfDate)} · Start ${shortDate(account.accountStartDate)}`;
+    }
+    elements.timeAccountTargetWork.textContent =
+      `${formatMinutes(account.totals.targetMinutes)} / ${formatMinutes(account.totals.workedMinutes)}`;
+    elements.timeAccountVacationRemaining.textContent =
+      formatDayCount(account.vacation.remainingDays);
+    elements.timeAccountVacationPending.textContent =
+      formatDayCount(account.vacation.pendingDays);
+    elements.timeAccountTimeOff.textContent =
+      formatDayCount(account.timeOff.approvedDays);
+
+    const monthNames = [
+      "Januar", "Februar", "März", "April", "Mai", "Juni",
+      "Juli", "August", "September", "Oktober", "November", "Dezember"
+    ];
+    account.months.forEach((month) => {
+      const row = document.createElement("tr");
+      [
+        monthNames[month.month - 1],
+        formatMinutes(month.targetMinutes),
+        formatMinutes(month.workedMinutes),
+        formatMinutes(month.absenceCreditMinutes),
+        formatSignedMinutes(month.changeMinutes),
+        formatSignedMinutes(month.closingBalanceMinutes)
+      ].forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.append(cell);
+      });
+      elements.timeAccountMonths.append(row);
+    });
+  }
+
+  function closeTimeAccountEditor() {
+    editingTimeAccountId = null;
+    elements.timeAccountProfileForm.hidden = true;
+    elements.timeAccountProfileForm.reset();
+    elements.timeAccountProfileMessage.textContent = "";
+  }
+
+  function openTimeAccountEditor(account) {
+    if (!adminState?.canCreateManagementRoles) return;
+    editingTimeAccountId = account.employeeId;
+    elements.timeAccountProfileTitle.textContent = account.employeeName;
+    elements.timeAccountProfileEnabled.checked = account.enabled;
+    elements.timeAccountProfileStart.value = account.accountStartDate;
+    elements.timeAccountProfileVacation.value = String(account.annualVacationDays);
+    elements.timeAccountAdjustmentDate.value = localDateKey();
+    elements.timeAccountAdjustmentHours.value = "";
+    elements.timeAccountAdjustmentType.value = "correction";
+    elements.timeAccountAdjustmentNote.value = "";
+    elements.timeAccountProfileMessage.textContent = "";
+    elements.timeAccountProfileForm.hidden = false;
+    elements.timeAccountProfileForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function renderAdminTimeAccounts() {
+    const visible = canPlan();
+    elements.timeAccountAdminPanel.hidden = !visible;
+    if (!visible) return;
+    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const overview = timeAccountsState?.year === requestedYear ? timeAccountsState : null;
+    elements.timeAccountAdminYear.textContent = String(requestedYear);
+    elements.timeAccountAdminList.replaceChildren();
+    if (!overview) {
+      const empty = document.createElement("li");
+      empty.className = "absence-list__empty";
+      empty.textContent = navigator.onLine
+        ? "Jahreskonten werden geladen …"
+        : "Die Jahreskonten sind offline gerade nicht verfügbar.";
+      elements.timeAccountAdminList.append(empty);
+      return;
+    }
+    if (overview.accounts.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "absence-list__empty";
+      empty.textContent = "Noch keine aktiven Mitarbeiter vorhanden.";
+      elements.timeAccountAdminList.append(empty);
+      return;
+    }
+    overview.accounts.forEach((account) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      const balance = document.createElement("strong");
+      item.className = "time-account-admin-item";
+      title.textContent = account.employeeName;
+      meta.textContent = account.enabled
+        ? `${account.personnelNumber} · Urlaub ${formatDayCount(account.vacation.remainingDays)} übrig · Abbau ${formatDayCount(account.timeOff.approvedDays)}`
+        : `${account.personnelNumber} · Stundenkonto deaktiviert · Urlaub ${formatDayCount(account.vacation.remainingDays)} übrig`;
+      balance.className = "time-account-admin-item__balance";
+      balance.textContent = account.enabled
+        ? formatSignedMinutes(account.totals.balanceMinutes)
+        : "Deaktiviert";
+      actions.className = "time-account-admin-item__actions";
+      actions.append(balance);
+      if (adminState?.canCreateManagementRoles) {
+        const manage = document.createElement("button");
+        manage.type = "button";
+        manage.className = "text-button";
+        manage.textContent = "Verwalten";
+        manage.addEventListener("click", () => openTimeAccountEditor(account));
+        actions.append(manage);
+      }
+      copy.append(title, meta);
+      item.append(copy, actions);
+      elements.timeAccountAdminList.append(item);
     });
   }
 
@@ -4692,6 +4894,8 @@
     elements.weekTimesheetList.replaceChildren();
     renderEmployeeTimesheetExport(visibleWeek);
     renderAbsences();
+    renderTimeAccount();
+    renderAdminTimeAccounts();
 
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
@@ -4907,6 +5111,8 @@
     elements.absenceList
       .querySelectorAll(".absence-item__cancel")
       .forEach((button) => { button.disabled = !online; });
+    elements.timeAccountProfileSave.disabled = !online;
+    elements.timeAccountAdjustmentSubmit.disabled = !online;
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
@@ -5052,11 +5258,73 @@
     }
   }
 
+  async function refreshTimeAccountData() {
+    if (demoMode) {
+      timeAccountState = null;
+      renderTimeAccount();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderTimeAccount();
+      return;
+    }
+    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    try {
+      const body = await requestJson(`./api/v1/time-account?year=${requestedYear}`);
+      if (requestedYear !== Number(selectedWeekStart.slice(0, 4))) return;
+      timeAccountState = body.timeAccount;
+      elements.timeAccountMessage.textContent = "";
+      renderTimeAccount();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else {
+        elements.timeAccountMessage.textContent = error.network
+          ? "Das Stundenkonto konnte gerade nicht aktualisiert werden."
+          : error.message;
+      }
+    }
+  }
+
+  async function refreshAdminTimeAccounts() {
+    if (!canPlan()) {
+      timeAccountsState = null;
+      renderAdminTimeAccounts();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderAdminTimeAccounts();
+      return;
+    }
+    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    try {
+      const body = await requestJson(`./api/v1/admin/time-accounts?year=${requestedYear}`);
+      if (requestedYear !== Number(selectedWeekStart.slice(0, 4))) return;
+      timeAccountsState = body.timeAccounts;
+      elements.timeAccountAdminMessage.textContent = "";
+      renderAdminTimeAccounts();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else {
+        elements.timeAccountAdminMessage.textContent = error.network
+          ? "Die Jahreskonten konnten gerade nicht aktualisiert werden."
+          : error.message;
+      }
+    }
+  }
+
   async function selectWeek(weekStart) {
     selectedWeekStart = weekStart;
     weekState = null;
+    timeAccountState = null;
+    timeAccountsState = null;
+    closeTimeAccountEditor();
     renderWeek();
-    await Promise.all([refreshWeekData(), refreshAbsenceData()]);
+    await Promise.all([
+      refreshWeekData(),
+      refreshAbsenceData(),
+      refreshTimeAccountData(),
+      refreshAdminTimeAccounts()
+    ]);
   }
 
   async function refreshLiveData() {
@@ -5096,6 +5364,8 @@
       adminState = null;
       weekState = null;
       absenceState = [];
+      timeAccountState = null;
+      timeAccountsState = null;
       employeeSiteState = null;
     }
     session = sessionView;
@@ -5116,6 +5386,8 @@
       refreshLiveData(),
       refreshWeekData(),
       refreshAbsenceData(),
+      refreshTimeAccountData(),
+      refreshAdminTimeAccounts(),
       refreshAdmin()
     ]);
     await syncPendingEntries();
@@ -5242,7 +5514,7 @@
     );
     if (!saved) return;
     elements.employeeForm.reset();
-    await refreshAdmin();
+    await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
   });
 
   elements.employeeEditForm.addEventListener("submit", async (event) => {
@@ -5270,7 +5542,11 @@
       });
       closeEmployeeEditor();
       showToast("Mitarbeiter und Rolle wurden aktualisiert.");
-      await Promise.all([refreshAdmin(), refreshLiveData()]);
+      await Promise.all([
+        refreshAdmin(),
+        refreshLiveData(),
+        refreshAdminTimeAccounts()
+      ]);
     } catch (error) {
       elements.employeeEditMessage.textContent = error.message;
     } finally {
@@ -5279,6 +5555,111 @@
     }
   });
   elements.employeeEditCancel.addEventListener("click", closeEmployeeEditor);
+
+  elements.timeAccountProfileForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const account = timeAccountsState?.accounts.find(
+      (item) => item.employeeId === editingTimeAccountId
+    );
+    if (!account) {
+      elements.timeAccountProfileMessage.textContent =
+        "Das Stundenkonto wurde nicht gefunden. Bitte neu laden.";
+      return;
+    }
+    elements.timeAccountProfileSave.disabled = true;
+    elements.timeAccountProfileCancel.disabled = true;
+    elements.timeAccountAdjustmentSubmit.disabled = true;
+    elements.timeAccountProfileMessage.textContent =
+      "Einstellungen werden sicher gespeichert …";
+    try {
+      await requestJson(
+        `./api/v1/admin/time-accounts/${encodeURIComponent(account.employeeId)}/profile`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            year: account.year,
+            enabled: elements.timeAccountProfileEnabled.checked,
+            accountStartDate: elements.timeAccountProfileStart.value,
+            annualVacationDays: Number(elements.timeAccountProfileVacation.value),
+            profileRowVersion: account.profileRowVersion,
+            vacationRowVersion: account.vacationRowVersion
+          })
+        }
+      );
+      closeTimeAccountEditor();
+      showToast("Stundenkonto-Einstellungen gespeichert.");
+      await Promise.all([refreshAdminTimeAccounts(), refreshTimeAccountData()]);
+    } catch (error) {
+      elements.timeAccountProfileMessage.textContent = error.message;
+    } finally {
+      elements.timeAccountProfileSave.disabled = false;
+      elements.timeAccountProfileCancel.disabled = false;
+      elements.timeAccountAdjustmentSubmit.disabled = !navigator.onLine;
+    }
+  });
+  elements.timeAccountProfileCancel.addEventListener("click", closeTimeAccountEditor);
+  elements.timeAccountAdjustmentSubmit.addEventListener("click", async () => {
+    const account = timeAccountsState?.accounts.find(
+      (item) => item.employeeId === editingTimeAccountId
+    );
+    const hours = Number(elements.timeAccountAdjustmentHours.value);
+    const adjustmentMinutes = hours * 60;
+    if (!account) {
+      elements.timeAccountProfileMessage.textContent =
+        "Das Stundenkonto wurde nicht gefunden. Bitte neu laden.";
+      return;
+    }
+    if (
+      !Number.isFinite(hours)
+      || hours === 0
+      || !Number.isSafeInteger(adjustmentMinutes)
+      || !Number.isInteger(hours * 4)
+    ) {
+      elements.timeAccountProfileMessage.textContent =
+        "Bitte Stunden in Viertelstunden eingeben, zum Beispiel 1,5 oder −0,75.";
+      return;
+    }
+    if (
+      !elements.timeAccountAdjustmentDate.value
+      || elements.timeAccountAdjustmentDate.value > localDateKey()
+    ) {
+      elements.timeAccountProfileMessage.textContent =
+        "Bitte ein heutiges oder vergangenes Buchungsdatum wählen.";
+      return;
+    }
+    if (elements.timeAccountAdjustmentNote.value.trim().length < 3) {
+      elements.timeAccountProfileMessage.textContent =
+        "Bitte einen kurzen, nachvollziehbaren Korrekturgrund eingeben.";
+      return;
+    }
+    elements.timeAccountAdjustmentSubmit.disabled = true;
+    elements.timeAccountProfileSave.disabled = true;
+    elements.timeAccountProfileMessage.textContent =
+      "Korrektur wird unveränderlich gebucht …";
+    try {
+      await requestJson("./api/v1/admin/time-account-adjustments", {
+        method: "POST",
+        body: JSON.stringify({
+          employeeId: account.employeeId,
+          clientAdjustmentId: crypto.randomUUID(),
+          adjustmentDate: elements.timeAccountAdjustmentDate.value,
+          adjustmentMinutes,
+          adjustmentType: elements.timeAccountAdjustmentType.value,
+          note: elements.timeAccountAdjustmentNote.value
+        })
+      });
+      elements.timeAccountAdjustmentHours.value = "";
+      elements.timeAccountAdjustmentNote.value = "";
+      elements.timeAccountProfileMessage.textContent = "";
+      showToast("Korrektur gebucht · die Historie bleibt unverändert erhalten.");
+      await Promise.all([refreshAdminTimeAccounts(), refreshTimeAccountData()]);
+    } catch (error) {
+      elements.timeAccountProfileMessage.textContent = error.message;
+    } finally {
+      elements.timeAccountAdjustmentSubmit.disabled = !navigator.onLine;
+      elements.timeAccountProfileSave.disabled = false;
+    }
+  });
 
   function updateCustomerTypeFields() {
     const privateCustomer = elements.customerType.value === "private";
@@ -6388,7 +6769,12 @@
       elements.absenceNote.value = "";
       elements.absenceMessage.textContent = "";
       showToast("Abwesenheit eingereicht · das Büro prüft zuerst.");
-      await Promise.all([refreshAbsenceData(), refreshAdmin()]);
+      await Promise.all([
+        refreshAbsenceData(),
+        refreshAdmin(),
+        refreshTimeAccountData(),
+        refreshAdminTimeAccounts()
+      ]);
     } catch (error) {
       if (error.status === 401) showLogin();
       else elements.absenceMessage.textContent = error.message;
@@ -6411,6 +6797,9 @@
       session = null;
       adminState = null;
       absenceState = [];
+      timeAccountState = null;
+      timeAccountsState = null;
+      closeTimeAccountEditor();
       employeeSiteState = null;
       cachedUserId = null;
       assignments = [];

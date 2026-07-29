@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 29.07.2026
-Technischer Stand: V0.36.0
+Technischer Stand: V0.37.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -83,6 +83,9 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/construction-sites/:id/photos?date=JJJJ-MM-TT` | Foto für eine an diesem Tag zugewiesene Baustelle zentral speichern |
 | `GET` | `/api/v1/construction-sites/:id/documents/:documentId/content?date=JJJJ-MM-TT` | mit Baustellenzuweisung verknüpften Dateiinhalt geschützt lesen |
 | `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter samt optionalen Kontaktdaten, Kunden, Projekte, Baustellen, Arbeitsmodule, Abwesenheiten, Tageslage und Wochenplanung Montag bis Freitag |
+| `GET` | `/api/v1/admin/time-accounts?year=JJJJ` | Jahresübersicht aller aktiven Mitarbeiter nach serverseitiger Planungsrollenprüfung |
+| `PATCH` | `/api/v1/admin/time-accounts/:employeeId/profile` | Aktivierung, Startdatum und kalenderjahrbezogenen Urlaubsanspruch mit getrenntem Versionsschutz ändern; nur Administration oder Geschäftsführung |
+| `POST` | `/api/v1/admin/time-account-adjustments` | Begründete Stundenkonto-Buchung mit Client-UUID unveränderlich und idempotent anlegen; nur Administration oder Geschäftsführung |
 | `PATCH` | `/api/v1/admin/absence-requests/:id` | Büroprüfung, Geschäftsführungsentscheidung oder begründetes Aufheben einer verbindlichen Abwesenheit |
 | `POST` | `/api/v1/admin/site-notes` | Notiz für eine aktive Baustelle anlegen |
 | `POST` | `/api/v1/admin/site-tasks` | Aufgabe für eine aktive Baustelle anlegen |
@@ -116,6 +119,7 @@ API setzt beide Werte ausschließlich selbst.
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
 | `GET` | `/api/v1/work-days/:date` | Eigenen berechneten Arbeitstag und Ereignisse lesen |
 | `GET` | `/api/v1/work-weeks/:monday` | Eigene sieben Kalendertage mit wirksamen Buchungen und Summen lesen |
+| `GET` | `/api/v1/time-account?year=JJJJ` | Ausschließlich eigenes fortlaufendes Stundenkonto mit Monatswerten, Jahresurlaub und Buchungshistorie lesen |
 | `GET` | `/api/v1/absences?from=JJJJ-MM-TT&to=JJJJ-MM-TT` | Ausschließlich eigene Abwesenheitsanträge und ihre Historie im Zeitraum lesen |
 | `POST` | `/api/v1/absences` | Eigenen unveränderlichen Abwesenheitsantrag für ganze oder halbe Tage einreichen |
 | `PATCH` | `/api/v1/absences/:id/cancel` | Eigenen noch nicht verbindlich freigegebenen Antrag begründet zurückziehen |
@@ -174,6 +178,16 @@ betroffenen Einsätze aufgelöst sein. Freigabe und Einsatzanlage verwenden
 dieselben transaktionalen Mitarbeiter-Tag-Sperren, damit kein paralleler
 Vorgang einen Planungskonflikt erzeugt. Jeder Statuswechsel landet in einer
 unveränderlichen, mandantengetrennten Ereignishistorie.
+
+Stundenkonten trennen Lesen und Ändern ebenfalls strikt. Jeder angemeldete
+Mitarbeiter kann nur das eigene Konto abrufen. Planungsrollen dürfen die
+kompakte Firmenübersicht lesen. Aktivierung, Startdatum, Jahresurlaubsanspruch
+und manuelle Buchungen bleiben Administrator und Geschäftsführung
+vorbehalten. Profil und Anspruch des gewählten Kalenderjahrs besitzen
+getrennte Versionsstände. Korrekturen übernehmen die Firma nie aus dem Client,
+werden dem angemeldeten Buchenden zugeordnet und sind nach dem Speichern
+unveränderlich. Eine mandantenweit eindeutige Client-UUID verhindert doppelte
+Buchungen bei wiederholter Übertragung.
 
 Die mobile Baustellenakte besitzt eine zusätzliche fachliche Zugriffskontrolle:
 Ohne Planungsrolle muss für Benutzer, Baustelle und Datum ein freigegebener oder

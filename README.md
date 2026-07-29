@@ -26,7 +26,7 @@ Aktuell enthalten:
 - Migration `015_add_organization_roles.sql` für die gleichberechtigten Organisationsrollen
 - Migration `016_add_business_roles.sql` für die sichtbaren Betriebsrollen und kompatible Bestandskonten
 - Migrationen `017_create_documents.sql` bis `026_automatic_site_foreman.sql` für zentrale Dokumente, Baustellenarbeit, strukturierte Berichte und Vorarbeiterverantwortung
-- Migrationen `027_allow_multiple_work_blocks.sql` bis `033_create_absence_requests.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule und Abwesenheiten
+- Migrationen `027_allow_multiple_work_blocks.sql` bis `034_create_time_accounts.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule, Abwesenheiten und Stundenkonten
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -45,6 +45,8 @@ Aktuell enthalten:
 - Tageslage für die Disposition mit Planung, freien Feldmitarbeitern, laufenden Arbeitstagen und Zeitprüfungen
 - eigene Urlaubs- und Abwesenheitsanträge mit Büroprüfung, Vier-Augen-Freigabe und unveränderlicher Historie
 - freigegebene Abwesenheiten in Wochenplanung und Tageslage mit konfliktfester Sperre ganztägiger Einsätze
+- eigenes fortlaufendes Stundenkonto und kompakte Büro-Jahresübersicht für Saldo, Urlaub und Überstundenabbau
+- kalenderjahrbezogene Urlaubsansprüche sowie unveränderliche, idempotente Stundenkonto-Korrekturen
 - geplante Einsatzdauer und Arbeitsanweisung in Wochenplanung, Tageseinsatz und mobiler Baustellenakte
 - direkt erreichbare Telefon- und E-Mail-Kontakte des tagesbezogenen Baustellenteams
 - automatische Vorarbeiter- und Berichtsfunktion für den einzigen Mitarbeiter einer Baustelle
@@ -137,6 +139,8 @@ make frontend-serve # PWA unter http://localhost:4173 öffnen
 Die technische Struktur und der aktuelle Umsetzungsstand stehen unter
 [`docs/`](docs/). Das Sprint-2-Modell ist in
 [`docs/SPRINT2_TIME_MODEL.md`](docs/SPRINT2_TIME_MODEL.md) beschrieben. Die
+Berechnungs- und Rollenregeln der Jahreskonten stehen in
+[`docs/TIME_ACCOUNTS.md`](docs/TIME_ACCOUNTS.md). Die
 Sicherheitsgrenze und die Endpunkte der API stehen in
 [`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die verbindliche fachliche
 Grundlage steht in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).

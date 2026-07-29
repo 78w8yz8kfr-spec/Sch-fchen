@@ -38,9 +38,63 @@ import {
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
   validateTimeEntryInvalidation,
+  validateTimeAccountAdjustment,
+  validateTimeAccountProfile,
+  validateTimeAccountYear,
   validateWorkDayDecision,
   validateWorkDate
 } from "../src/validation.mjs";
+
+test("Stundenkonten prüfen Jahr Profil und unveränderliche Korrekturen", () => {
+  assert.equal(validateTimeAccountYear("2026"), 2026);
+  assert.throws(() => validateTimeAccountYear("1999"), /Jahr/);
+  assert.deepEqual(validateTimeAccountProfile({
+    year: 2026,
+    enabled: true,
+    accountStartDate: "2026-01-01",
+    annualVacationDays: 30.5,
+    profileRowVersion: 2,
+    vacationRowVersion: 3
+  }), {
+    year: 2026,
+    enabled: true,
+    accountStartDate: "2026-01-01",
+    annualVacationDays: 30.5,
+    profileRowVersion: 2,
+    vacationRowVersion: 3
+  });
+  assert.throws(() => validateTimeAccountProfile({
+    year: 2026,
+    enabled: true,
+    accountStartDate: "2026-01-01",
+    annualVacationDays: 30.25,
+    profileRowVersion: 2,
+    vacationRowVersion: 3
+  }), /halben Tagen/);
+  assert.deepEqual(validateTimeAccountAdjustment({
+    employeeId: "11111111-1111-4111-8111-111111111111",
+    clientAdjustmentId: "22222222-2222-4222-8222-222222222222",
+    adjustmentDate: "2026-07-28",
+    adjustmentMinutes: -90,
+    adjustmentType: "correction",
+    note: "  Fehlbuchung ausgeglichen  "
+  }), {
+    employeeId: "11111111-1111-4111-8111-111111111111",
+    clientAdjustmentId: "22222222-2222-4222-8222-222222222222",
+    adjustmentDate: "2026-07-28",
+    adjustmentMinutes: -90,
+    adjustmentType: "correction",
+    note: "Fehlbuchung ausgeglichen"
+  });
+  assert.throws(() => validateTimeAccountAdjustment({
+    employeeId: "11111111-1111-4111-8111-111111111111",
+    clientAdjustmentId: "22222222-2222-4222-8222-222222222222",
+    adjustmentDate: "2026-07-28",
+    adjustmentMinutes: 0,
+    adjustmentType: "correction",
+    note: "Ohne Wirkung"
+  }), /Minutenzahl/);
+});
 
 test("Abwesenheiten prüfen Art Zeitraum Halbtage und Entscheidungen", () => {
   assert.deepEqual(validateAbsenceRequest({

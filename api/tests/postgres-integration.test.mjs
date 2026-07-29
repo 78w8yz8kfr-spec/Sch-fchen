@@ -1221,6 +1221,178 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(changedPassword.status, 200);
   assert.equal((await changedPassword.json()).session.user.mustChangePassword, false);
 
+  const timeAccountYear = Number(assignmentDate.slice(0, 4));
+  const ownTimeAccountResponse = await fetch(
+    `${baseUrl}/api/v1/time-account?year=${timeAccountYear}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(
+    ownTimeAccountResponse.status,
+    200,
+    await ownTimeAccountResponse.clone().text()
+  );
+  const ownTimeAccount = (await ownTimeAccountResponse.json()).timeAccount;
+  assert.equal(ownTimeAccount.employeeId, employee.id);
+  assert.equal(ownTimeAccount.enabled, true);
+  assert.equal(ownTimeAccount.annualVacationDays, 30);
+  assert.equal(ownTimeAccount.months.length, 12);
+
+  const forbiddenEmployeeTimeAccountOverview = await fetch(
+    `${baseUrl}/api/v1/admin/time-accounts?year=${timeAccountYear}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(forbiddenEmployeeTimeAccountOverview.status, 403);
+
+  const plannerTimeAccountsResponse = await fetch(
+    `${baseUrl}/api/v1/admin/time-accounts?year=${timeAccountYear}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(
+    plannerTimeAccountsResponse.status,
+    200,
+    await plannerTimeAccountsResponse.clone().text()
+  );
+  const plannerTimeAccounts = (await plannerTimeAccountsResponse.json()).timeAccounts;
+  const employeeTimeAccount = plannerTimeAccounts.accounts.find(
+    (account) => account.employeeId === employee.id
+  );
+  assert.ok(employeeTimeAccount);
+
+  const forbiddenPlannerTimeAccountChange = await fetch(
+    `${baseUrl}/api/v1/admin/time-accounts/${employee.id}/profile`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        enabled: true,
+        accountStartDate: `${timeAccountYear}-01-01`,
+        annualVacationDays: 28.5,
+        profileRowVersion: employeeTimeAccount.profileRowVersion,
+        vacationRowVersion: employeeTimeAccount.vacationRowVersion
+      })
+    }
+  );
+  assert.equal(forbiddenPlannerTimeAccountChange.status, 403);
+  assert.equal(
+    (await forbiddenPlannerTimeAccountChange.json()).error.code,
+    "time_account_administration_forbidden"
+  );
+
+  const timeAccountProfileResponse = await fetch(
+    `${baseUrl}/api/v1/admin/time-accounts/${employee.id}/profile`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        enabled: true,
+        accountStartDate: `${timeAccountYear}-01-01`,
+        annualVacationDays: 28.5,
+        profileRowVersion: employeeTimeAccount.profileRowVersion,
+        vacationRowVersion: employeeTimeAccount.vacationRowVersion
+      })
+    }
+  );
+  assert.equal(
+    timeAccountProfileResponse.status,
+    200,
+    await timeAccountProfileResponse.clone().text()
+  );
+  const updatedTimeAccountProfile = (await timeAccountProfileResponse.json()).profile;
+  assert.equal(updatedTimeAccountProfile.annualVacationDays, 28.5);
+  assert.ok(
+    updatedTimeAccountProfile.profileRowVersion > employeeTimeAccount.profileRowVersion
+  );
+  assert.ok(
+    updatedTimeAccountProfile.vacationRowVersion > employeeTimeAccount.vacationRowVersion
+  );
+
+  const staleTimeAccountProfileResponse = await fetch(
+    `${baseUrl}/api/v1/admin/time-accounts/${employee.id}/profile`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        enabled: false,
+        accountStartDate: `${timeAccountYear}-01-01`,
+        annualVacationDays: 28.5,
+        profileRowVersion: employeeTimeAccount.profileRowVersion,
+        vacationRowVersion: employeeTimeAccount.vacationRowVersion
+      })
+    }
+  );
+  assert.equal(staleTimeAccountProfileResponse.status, 409);
+  assert.equal(
+    (await staleTimeAccountProfileResponse.json()).error.code,
+    "row_version_conflict"
+  );
+
+  const adjustmentClientId = randomUUID();
+  const timeAccountAdjustmentPayload = {
+    employeeId: employee.id,
+    clientAdjustmentId: adjustmentClientId,
+    adjustmentDate: `${timeAccountYear}-01-02`,
+    adjustmentMinutes: 90,
+    adjustmentType: "opening_balance",
+    note: "Geprüfter Startsaldo"
+  };
+  const timeAccountAdjustmentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/time-account-adjustments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify(timeAccountAdjustmentPayload)
+    }
+  );
+  assert.equal(
+    timeAccountAdjustmentResponse.status,
+    201,
+    await timeAccountAdjustmentResponse.clone().text()
+  );
+  assert.equal(
+    (await timeAccountAdjustmentResponse.json()).adjustment.adjustmentMinutes,
+    90
+  );
+
+  const repeatedTimeAccountAdjustmentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/time-account-adjustments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify(timeAccountAdjustmentPayload)
+    }
+  );
+  assert.equal(repeatedTimeAccountAdjustmentResponse.status, 200);
+  assert.equal(
+    (await repeatedTimeAccountAdjustmentResponse.json()).idempotent,
+    true
+  );
+
+  const forbiddenEmployeeAdjustment = await fetch(
+    `${baseUrl}/api/v1/admin/time-account-adjustments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({
+        ...timeAccountAdjustmentPayload,
+        clientAdjustmentId: randomUUID()
+      })
+    }
+  );
+  assert.equal(forbiddenEmployeeAdjustment.status, 403);
+
+  const adjustedOwnTimeAccountResponse = await fetch(
+    `${baseUrl}/api/v1/time-account?year=${timeAccountYear}`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(adjustedOwnTimeAccountResponse.status, 200);
+  const adjustedOwnTimeAccount = (await adjustedOwnTimeAccountResponse.json()).timeAccount;
+  assert.equal(adjustedOwnTimeAccount.annualVacationDays, 28.5);
+  assert.equal(adjustedOwnTimeAccount.totals.adjustmentMinutes, 90);
+  assert.equal(adjustedOwnTimeAccount.adjustments.length, 1);
+
   const absenceStart = "2027-08-10";
   const absenceEnd = "2027-08-14";
   const absenceResponse = await fetch(`${baseUrl}/api/v1/absences`, {
@@ -1385,6 +1557,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(approvedAbsence.status, "approved");
   assert.equal(approvedAbsence.rowVersion, 3);
   assert.equal(approvedAbsence.history.length, 3);
+
+  const approvedVacationTimeAccountResponse = await fetch(
+    `${baseUrl}/api/v1/time-account?year=2027`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(
+    approvedVacationTimeAccountResponse.status,
+    200,
+    await approvedVacationTimeAccountResponse.clone().text()
+  );
+  const approvedVacationTimeAccount =
+    (await approvedVacationTimeAccountResponse.json()).timeAccount;
+  assert.equal(approvedVacationTimeAccount.annualVacationDays, 30);
+  assert.equal(approvedVacationTimeAccount.vacation.approvedDays, 4);
+  assert.equal(approvedVacationTimeAccount.vacation.pendingDays, 0);
+  assert.equal(approvedVacationTimeAccount.vacation.remainingDays, 26);
 
   const blockedAbsenceAssignmentResponse = await fetch(
     `${baseUrl}/api/v1/admin/assignments`,

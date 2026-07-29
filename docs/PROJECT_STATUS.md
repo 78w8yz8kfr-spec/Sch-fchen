@@ -1,10 +1,16 @@
 # Projektstatus
 
 Stand: 29.07.2026
-Technischer Stand: V0.36.0
+Technischer Stand: V0.37.0
 
 ## Abgeschlossen
 
+- eigenes fortlaufendes Stundenkonto in der bestehenden Wochenansicht mit aktuellem Saldo, Jahres-Soll und -Ist, Abwesenheitsgutschriften und zwölf Monatszeilen
+- kompakte Büro-Jahresübersicht aller aktiven Mitarbeiter mit Kontostand, Resturlaub, offenen Urlaubsanträgen und genehmigtem Überstundenabbau
+- jahresbezogener Urlaubsanspruch in ganzen oder halben Tagen sowie getrennte Versionsprüfung für Stundenkonto-Profil und Kalenderjahr
+- unveränderliche, idempotente Startsaldo-, Korrektur- und Auszahlungsbuchungen mit Pflichtbegründung und Gegenbuchungsprinzip
+- reproduzierbare Tagesberechnung bis einschließlich gestern: Arbeit plus freigegebene Abwesenheitsgutschrift minus eingefrorenes oder konfiguriertes Soll
+- Rollen- und Mandantenschutz: eigenes Konto für jeden, Gesamtübersicht für Planungsrollen, Änderungen ausschließlich durch Administration oder Geschäftsführung
 - eigene Abwesenheitsanträge für ganze oder halbe Tage mit Urlaub, Überstundenabbau, Freistellung, Krankheit, Lehrgang, Berufsschule und weiteren Arten
 - zweistufige Prüfung mit Büroentscheidung vor der verbindlichen Freigabe durch die Geschäftsführung sowie technisch erzwungener Vier-Augen-Regel
 - unveränderliche Antrags- und Entscheidungshistorie mit Begründung, Versionskonfliktschutz, RLS, Mandantentrennung und Löschschutz in Migration 033
@@ -179,6 +185,7 @@ Technischer Stand: V0.36.0
 - Migration 031 erlaubt nachvollziehbare Zeitkorrekturen an abgerechneten Tagen ohne die Abrechnungssperre für neue Buchungen aufzuweichen
 - Migration 032 vervollständigt die Zeiterfassung um Feldbaustellen, spontane Einsatzwahl, Ergänzungen, Ungültigmarkierungen, automatische Büroprüfung und Rechenregel Version 3
 - Migration 033 ergänzt zweistufig geprüfte Abwesenheiten mit unveränderlicher Historie und konfliktfester Verknüpfung zur Einsatzplanung
+- Migration 034 ergänzt Stundenkonto-Profile, kalenderjahrbezogene Urlaubsansprüche, unveränderliche Korrekturbuchungen und die mandantengeschützte Tagesberechnung
 
 ## Noch zu prüfen
 
@@ -187,14 +194,15 @@ Technischer Stand: V0.36.0
 - genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden bewusst keine Daten erfunden
 - Render-Blueprint einmalig mit dem GitHub-Konto bereitstellen und Online-Adresse abnehmen
 - vor echten Betriebsdaten dauerhafte Tarife, Backups und Aufbewahrungskonzept festlegen
+- vor produktiver Nutzung des Stundenkontos den betrieblichen gesetzlichen und regionalen Feiertagskalender festlegen; V0.37.0 automatisiert Feiertage noch nicht
 
 ## Nächster Entwicklungsschritt
 
-Als nächstes wird der Plancraft-orientierte Planungsablauf um Arbeitszeitkonten
-und eine kompakte Jahresübersicht für Urlaub und Überstundenabbau ergänzt. Die
-vorhandene VDE-Anwendung bleibt danach das erste aktivierbare
-Elektro-Spezialmodul und wird kontrolliert an den gemeinsamen Kunden-,
-Baustellen-, Mitarbeiter- und Dokumentenbestand angebunden.
+Als nächstes wird die vorhandene VDE-Anwendung als erstes aktivierbares
+Elektro-Spezialmodul kontrolliert an den gemeinsamen Kunden-, Baustellen-,
+Mitarbeiter- und Dokumentenbestand angebunden. Vor einer betrieblichen Nutzung
+des neuen Stundenkontos wird außerdem der für den Standort geltende
+Feiertagskalender als verbindliche Rechenvoraussetzung ergänzt.
 
 Betriebssicherheit mit dauerhafter Datenbank, Backup-Plan,
 Wiederherstellungsprobe, Überwachung und Objektspeicher wurde auf ausdrücklichen

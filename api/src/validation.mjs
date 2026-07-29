@@ -59,6 +59,7 @@ const ABSENCE_TYPES = new Set([
 ]);
 const ABSENCE_DAY_PARTS = new Set(["full_day", "first_half", "second_half"]);
 const ABSENCE_DECISIONS = new Set(["approve", "reject", "cancel"]);
+const TIME_ACCOUNT_ADJUSTMENT_TYPES = new Set(["opening_balance", "correction", "payout"]);
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 
 export class InputError extends Error {
@@ -465,6 +466,77 @@ export function validateAbsenceDecision(body) {
     throw new InputError("Die Antragsversion ist ungültig.");
   }
   return { action, comment, rowVersion };
+}
+
+export function validateTimeAccountYear(value) {
+  const year = Number(value);
+  if (!Number.isSafeInteger(year) || year < 2000 || year > 2100) {
+    throw new InputError("Das Stundenkonto-Jahr ist ungültig.");
+  }
+  return year;
+}
+
+export function validateTimeAccountProfile(body) {
+  rejectTenantFields(body);
+  if (typeof body.enabled !== "boolean") {
+    throw new InputError("Der Status des Stundenkontos ist ungültig.");
+  }
+  const annualVacationDays = Number(body.annualVacationDays);
+  if (
+    !Number.isFinite(annualVacationDays)
+    || annualVacationDays < 0
+    || annualVacationDays > 60
+    || !Number.isInteger(annualVacationDays * 2)
+  ) {
+    throw new InputError("Der Jahresurlaub muss zwischen 0 und 60 Tagen in halben Tagen liegen.");
+  }
+  const profileRowVersion = Number(body.profileRowVersion);
+  if (!Number.isSafeInteger(profileRowVersion) || profileRowVersion < 0) {
+    throw new InputError("Die Stundenkonto-Version ist ungültig.");
+  }
+  const vacationRowVersion = Number(body.vacationRowVersion);
+  if (!Number.isSafeInteger(vacationRowVersion) || vacationRowVersion < 0) {
+    throw new InputError("Die Urlaubsanspruch-Version ist ungültig.");
+  }
+  return {
+    year: validateTimeAccountYear(body.year),
+    enabled: body.enabled,
+    accountStartDate: validateWorkDate(body.accountStartDate),
+    annualVacationDays,
+    profileRowVersion,
+    vacationRowVersion
+  };
+}
+
+export function validateTimeAccountAdjustment(body) {
+  rejectTenantFields(body);
+  const adjustmentMinutes = Number(body.adjustmentMinutes);
+  if (
+    !Number.isSafeInteger(adjustmentMinutes)
+    || adjustmentMinutes === 0
+    || Math.abs(adjustmentMinutes) > 600000
+  ) {
+    throw new InputError(
+      "Die Stundenkonto-Korrektur muss eine ganze, von null verschiedene Minutenzahl sein."
+    );
+  }
+  const adjustmentType = text(
+    body.adjustmentType,
+    "Korrekturart",
+    3,
+    30
+  ).toLowerCase();
+  if (!TIME_ACCOUNT_ADJUSTMENT_TYPES.has(adjustmentType)) {
+    throw new InputError("Die Korrekturart ist ungültig.");
+  }
+  return {
+    employeeId: uuid(body.employeeId, "Mitarbeiter"),
+    clientAdjustmentId: uuid(body.clientAdjustmentId, "Buchungs-ID"),
+    adjustmentDate: validateWorkDate(body.adjustmentDate),
+    adjustmentMinutes,
+    adjustmentType,
+    note: text(body.note, "Korrekturgrund", 3, 500)
+  };
 }
 
 export function validateId(value, label = "ID") {
