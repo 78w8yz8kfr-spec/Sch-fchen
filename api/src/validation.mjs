@@ -60,6 +60,10 @@ const ABSENCE_TYPES = new Set([
 const ABSENCE_DAY_PARTS = new Set(["full_day", "first_half", "second_half"]);
 const ABSENCE_DECISIONS = new Set(["approve", "reject", "cancel"]);
 const TIME_ACCOUNT_ADJUSTMENT_TYPES = new Set(["opening_balance", "correction", "payout"]);
+const HOLIDAY_FEDERAL_STATES = new Set([
+  "BW", "BY", "BE", "BB", "HB", "HH", "HE", "MV",
+  "NI", "NW", "RP", "SL", "SN", "ST", "SH", "TH"
+]);
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 
 export class InputError extends Error {
@@ -474,6 +478,60 @@ export function validateTimeAccountYear(value) {
     throw new InputError("Das Stundenkonto-Jahr ist ungültig.");
   }
   return year;
+}
+
+export function validateHolidayCalendar(body) {
+  rejectTenantFields(body);
+  const countryCode = text(body.countryCode, "Land", 2, 2).toUpperCase();
+  if (countryCode !== "DE") {
+    throw new InputError("Der automatische Feiertagskalender unterstützt derzeit Deutschland.");
+  }
+  const federalStateCode = text(
+    body.federalStateCode,
+    "Bundesland",
+    2,
+    2
+  ).toUpperCase();
+  if (!HOLIDAY_FEDERAL_STATES.has(federalStateCode)) {
+    throw new InputError("Das Bundesland des Feiertagskalenders ist ungültig.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {
+    throw new InputError("Die Feiertagskalender-Version ist ungültig.");
+  }
+  return {
+    year: validateTimeAccountYear(body.year),
+    countryCode,
+    federalStateCode,
+    rowVersion
+  };
+}
+
+export function validateHolidayClosure(body) {
+  rejectTenantFields(body);
+  const holidayDate = validateWorkDate(body.holidayDate);
+  const holidayYear = Number(holidayDate.slice(0, 4));
+  if (holidayYear < 2000 || holidayYear > 2100) {
+    throw new InputError("Das Jahr des freien Tages muss zwischen 2000 und 2100 liegen.");
+  }
+  return {
+    clientClosureId: uuid(body.clientClosureId, "Freier-Tag-ID"),
+    holidayDate,
+    name: text(body.name, "Bezeichnung des freien Tages", 2, 120),
+    note: text(body.note, "Grund des freien Tages", 3, 500)
+  };
+}
+
+export function validateHolidayClosureCancellation(body) {
+  rejectTenantFields(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Version des freien Tages ist ungültig.");
+  }
+  return {
+    rowVersion,
+    cancellationNote: text(body.cancellationNote, "Aufhebungsgrund", 3, 500)
+  };
 }
 
 export function validateTimeAccountProfile(body) {

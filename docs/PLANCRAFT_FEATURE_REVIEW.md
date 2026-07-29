@@ -1,7 +1,7 @@
 # Plancraft-Featureprüfung für Schäfchen
 
 Stand: 29.07.2026  
-Technischer Stand: V0.37.0
+Technischer Stand: V0.38.0
 
 ## Ziel und Leitplanken
 
@@ -101,6 +101,14 @@ Diese Muster passen grundsätzlich zu Schäfchen. Die sichtbare Einheit heißt h
 2. Nur Administration oder Geschäftsführung ändern Startdatum, Aktivierung oder den Anspruch des gewählten Kalenderjahres.
 3. Startsaldo und spätere Korrekturen benötigen Datum, Vorzeichen und Begründung. Eine gespeicherte Buchung bleibt unverändert; Fehler werden gegengebucht.
 4. Heute und Zukunft erzeugen noch kein Minus. Vergangene fehlende Arbeitstage werden ab Kontostart gegen das Wochensoll gerechnet.
+
+## In V0.38.0 ergänzte Rechengrundlage
+
+1. Die Firma legt ihr Bundesland einmal versionsgeschützt fest.
+2. Gesetzliche Feiertage werden im gewählten Kalenderjahr automatisch aus bundesweiten und landesweiten Regeln berechnet.
+3. Bestätigte örtliche Sonderfälle oder Betriebsschließtage werden mit Pflichtgrund ergänzt.
+4. Ein berücksichtigter Feiertag setzt das Tagessoll auf null; geleistete Arbeitszeit bleibt als positive Kontobewegung sichtbar.
+5. Fehlerhafte freie Tage werden begründet aufgehoben und bleiben in der Historie.
 
 ## Öffentliche Referenzen
 

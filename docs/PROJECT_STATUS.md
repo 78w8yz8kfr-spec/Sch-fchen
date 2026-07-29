@@ -1,10 +1,15 @@
 # Projektstatus
 
 Stand: 29.07.2026
-Technischer Stand: V0.37.0
+Technischer Stand: V0.38.0
 
 ## Abgeschlossen
 
+- automatischer deutscher Feiertagskalender mit bundesweiten und landesweiten Regeln aller 16 Bundesländer sowie reproduzierbarer Osterberechnung
+- bestehender Schaaf-Mandant auf Sachsen vorkonfiguriert; das Bundesland ist versionsgeschützt durch Administration oder Geschäftsführung änderbar
+- Feiertage setzen das Tagessoll vor der Stundenkontoberechnung auf null; tatsächliche Feiertagsarbeit bleibt als positive Kontobewegung sichtbar
+- örtliche und betriebliche freie Tage mit Pflichtgrund, idempotenter Client-UUID, unveränderlicher Anlage und begründeter Aufhebungshistorie
+- eigener Jahreskalender im Mitarbeiter-Stundenkonto und gemeinsame Kalenderverwaltung in der Büro-Jahresübersicht
 - eigenes fortlaufendes Stundenkonto in der bestehenden Wochenansicht mit aktuellem Saldo, Jahres-Soll und -Ist, Abwesenheitsgutschriften und zwölf Monatszeilen
 - kompakte Büro-Jahresübersicht aller aktiven Mitarbeiter mit Kontostand, Resturlaub, offenen Urlaubsanträgen und genehmigtem Überstundenabbau
 - jahresbezogener Urlaubsanspruch in ganzen oder halben Tagen sowie getrennte Versionsprüfung für Stundenkonto-Profil und Kalenderjahr
@@ -186,6 +191,7 @@ Technischer Stand: V0.37.0
 - Migration 032 vervollständigt die Zeiterfassung um Feldbaustellen, spontane Einsatzwahl, Ergänzungen, Ungültigmarkierungen, automatische Büroprüfung und Rechenregel Version 3
 - Migration 033 ergänzt zweistufig geprüfte Abwesenheiten mit unveränderlicher Historie und konfliktfester Verknüpfung zur Einsatzplanung
 - Migration 034 ergänzt Stundenkonto-Profile, kalenderjahrbezogene Urlaubsansprüche, unveränderliche Korrekturbuchungen und die mandantengeschützte Tagesberechnung
+- Migration 035 ergänzt Mandantenkalender, gesetzliche Feiertagsregeln, betriebliche freie Tage und ihre verbindliche Wirkung auf die Tagesberechnung
 
 ## Noch zu prüfen
 
@@ -194,15 +200,12 @@ Technischer Stand: V0.37.0
 - genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden bewusst keine Daten erfunden
 - Render-Blueprint einmalig mit dem GitHub-Konto bereitstellen und Online-Adresse abnehmen
 - vor echten Betriebsdaten dauerhafte Tarife, Backups und Aufbewahrungskonzept festlegen
-- vor produktiver Nutzung des Stundenkontos den betrieblichen gesetzlichen und regionalen Feiertagskalender festlegen; V0.37.0 automatisiert Feiertage noch nicht
 
 ## Nächster Entwicklungsschritt
 
 Als nächstes wird die vorhandene VDE-Anwendung als erstes aktivierbares
 Elektro-Spezialmodul kontrolliert an den gemeinsamen Kunden-, Baustellen-,
-Mitarbeiter- und Dokumentenbestand angebunden. Vor einer betrieblichen Nutzung
-des neuen Stundenkontos wird außerdem der für den Standort geltende
-Feiertagskalender als verbindliche Rechenvoraussetzung ergänzt.
+Mitarbeiter- und Dokumentenbestand angebunden.
 
 Betriebssicherheit mit dauerhafter Datenbank, Backup-Plan,
 Wiederherstellungsprobe, Überwachung und Objektspeicher wurde auf ausdrücklichen

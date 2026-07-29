@@ -51,6 +51,9 @@ import {
   validateId,
   validateInitialPasswordChange,
   validateInitialSetup,
+  validateHolidayCalendar,
+  validateHolidayClosure,
+  validateHolidayClosureCancellation,
   validateLogin,
   validateProject,
   validateProjectUpdate,
@@ -110,6 +113,24 @@ const ELECTRICAL_MODULES = [
     description: "Wiederkehrende Prüfungen elektrischer Betriebsmittel"
   }
 ];
+const FEDERAL_STATE_NAMES = new Map([
+  ["BW", "Baden-Württemberg"],
+  ["BY", "Bayern"],
+  ["BE", "Berlin"],
+  ["BB", "Brandenburg"],
+  ["HB", "Bremen"],
+  ["HH", "Hamburg"],
+  ["HE", "Hessen"],
+  ["MV", "Mecklenburg-Vorpommern"],
+  ["NI", "Niedersachsen"],
+  ["NW", "Nordrhein-Westfalen"],
+  ["RP", "Rheinland-Pfalz"],
+  ["SL", "Saarland"],
+  ["SN", "Sachsen"],
+  ["ST", "Sachsen-Anhalt"],
+  ["SH", "Schleswig-Holstein"],
+  ["TH", "Thüringen"]
+]);
 
 function json(response, status, body, headers = {}) {
   const encoded = JSON.stringify(body);
@@ -2044,6 +2065,292 @@ async function assertNoApprovedFullDayAbsence(client, context, employeeId, workD
   }
 }
 
+function holidayClosureDto(row) {
+  return {
+    id: row.id,
+    clientClosureId: row.client_closure_id,
+    holidayDate: databaseDate(row.holiday_date),
+    name: row.name,
+    note: row.note,
+    status: row.status,
+    createdByName: row.created_by_name,
+    createdAt: new Date(row.created_at).toISOString(),
+    cancelledByName: row.cancelled_by_name || null,
+    cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
+    cancellationNote: row.cancellation_note || null,
+    rowVersion: Number(row.row_version)
+  };
+}
+
+async function getHolidayCalendar(client, context, year, includeClosureHistory = false) {
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const settingResult = await client.query(
+    `SELECT company.country_code AS company_country_code,
+            calendar.country_code, calendar.federal_state_code,
+            calendar.configured_at, calendar.updated_at, calendar.row_version,
+            updater.first_name || ' ' || updater.last_name AS updated_by_name
+     FROM companies AS company
+     LEFT JOIN company_holiday_calendars AS calendar
+       ON calendar.company_id = company.id
+     LEFT JOIN users AS updater
+       ON updater.company_id = calendar.company_id
+      AND updater.id = calendar.updated_by_user_id
+     WHERE company.id = $1`,
+    [context.companyId]
+  );
+  if (settingResult.rowCount !== 1) {
+    throw new InputError("Die Firma wurde nicht gefunden.", 404, "company_not_found");
+  }
+  const setting = settingResult.rows[0];
+  const countryCode = setting.country_code || setting.company_country_code;
+  const federalStateCode = setting.federal_state_code?.trim() || null;
+  const holidayResult = await client.query(
+    `SELECT holiday_date, holiday_name, holiday_source
+     FROM company_holiday_dates($1, $2, $3)
+     ORDER BY holiday_date, holiday_name`,
+    [context.companyId, yearStart, yearEnd]
+  );
+  let closures = [];
+  if (includeClosureHistory) {
+    const closureResult = await client.query(
+      `SELECT closure.id, closure.client_closure_id, closure.holiday_date,
+              closure.name, closure.note, closure.status, closure.created_at,
+              closure.cancelled_at, closure.cancellation_note, closure.row_version,
+              creator.first_name || ' ' || creator.last_name AS created_by_name,
+              canceller.first_name || ' ' || canceller.last_name AS cancelled_by_name
+       FROM company_holiday_closures AS closure
+       JOIN users AS creator
+         ON creator.company_id = closure.company_id
+        AND creator.id = closure.created_by_user_id
+       LEFT JOIN users AS canceller
+         ON canceller.company_id = closure.company_id
+        AND canceller.id = closure.cancelled_by_user_id
+       WHERE closure.company_id = $1
+         AND closure.holiday_date BETWEEN $2 AND $3
+       ORDER BY closure.holiday_date, closure.created_at, closure.id`,
+      [context.companyId, yearStart, yearEnd]
+    );
+    closures = closureResult.rows.map(holidayClosureDto);
+  }
+  return {
+    year,
+    configured: Boolean(federalStateCode),
+    countryCode,
+    federalStateCode,
+    federalStateName: FEDERAL_STATE_NAMES.get(federalStateCode) || null,
+    configuredAt: setting.configured_at
+      ? new Date(setting.configured_at).toISOString()
+      : null,
+    updatedAt: setting.updated_at
+      ? new Date(setting.updated_at).toISOString()
+      : null,
+    updatedByName: setting.updated_by_name || null,
+    rowVersion: Number(setting.row_version || 0),
+    holidays: holidayResult.rows.map((holiday) => ({
+      date: databaseDate(holiday.holiday_date),
+      name: holiday.holiday_name,
+      source: holiday.holiday_source
+    })),
+    closures
+  };
+}
+
+async function updateHolidayCalendar(client, context, input) {
+  await requireTimeAccountAdministrator(client, context);
+  const existing = await client.query(
+    `SELECT country_code, federal_state_code, row_version
+     FROM company_holiday_calendars
+     WHERE company_id = $1
+     FOR UPDATE`,
+    [context.companyId]
+  );
+  if (existing.rowCount === 0) {
+    if (input.rowVersion !== 0) {
+      throw new InputError(
+        "Der Feiertagskalender wurde zwischenzeitlich angelegt. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+    const inserted = await client.query(
+      `INSERT INTO company_holiday_calendars (
+         company_id, country_code, federal_state_code, updated_by_user_id
+       ) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (company_id) DO NOTHING
+       RETURNING company_id`,
+      [
+        context.companyId,
+        input.countryCode,
+        input.federalStateCode,
+        context.userId
+      ]
+    );
+    if (inserted.rowCount !== 1) {
+      throw new InputError(
+        "Der Feiertagskalender wurde gleichzeitig angelegt. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+  } else {
+    const current = existing.rows[0];
+    if (Number(current.row_version) !== input.rowVersion) {
+      throw new InputError(
+        "Der Feiertagskalender wurde zwischenzeitlich geändert. Bitte neu laden.",
+        409,
+        "row_version_conflict"
+      );
+    }
+    if (
+      current.country_code.trim() !== input.countryCode
+      || current.federal_state_code?.trim() !== input.federalStateCode
+    ) {
+      await client.query(
+        `UPDATE company_holiday_calendars
+         SET country_code = $2,
+             federal_state_code = $3,
+             updated_by_user_id = $4
+         WHERE company_id = $1`,
+        [
+          context.companyId,
+          input.countryCode,
+          input.federalStateCode,
+          context.userId
+        ]
+      );
+    }
+  }
+  return getHolidayCalendar(client, context, input.year, true);
+}
+
+async function createHolidayClosure(client, context, input) {
+  await requireTimeAccountAdministrator(client, context);
+  const inserted = await client.query(
+    `INSERT INTO company_holiday_closures (
+       company_id, client_closure_id, holiday_date,
+       name, note, created_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    [
+      context.companyId,
+      input.clientClosureId,
+      input.holidayDate,
+      input.name,
+      input.note,
+      context.userId
+    ]
+  );
+  const result = await client.query(
+    `SELECT closure.id, closure.client_closure_id, closure.holiday_date,
+            closure.name, closure.note, closure.status, closure.created_at,
+            closure.cancelled_at, closure.cancellation_note, closure.row_version,
+            creator.first_name || ' ' || creator.last_name AS created_by_name,
+            canceller.first_name || ' ' || canceller.last_name AS cancelled_by_name
+     FROM company_holiday_closures AS closure
+     JOIN users AS creator
+       ON creator.company_id = closure.company_id
+      AND creator.id = closure.created_by_user_id
+     LEFT JOIN users AS canceller
+       ON canceller.company_id = closure.company_id
+      AND canceller.id = closure.cancelled_by_user_id
+     WHERE closure.company_id = $1
+       AND (
+         closure.client_closure_id = $2
+         OR (closure.holiday_date = $3 AND closure.status = 'active')
+       )
+     ORDER BY (closure.client_closure_id = $2) DESC
+     LIMIT 1`,
+    [context.companyId, input.clientClosureId, input.holidayDate]
+  );
+  const closure = result.rowCount ? holidayClosureDto(result.rows[0]) : null;
+  if (!closure) {
+    throw new InputError(
+      "Der betriebliche freie Tag konnte nicht angelegt werden.",
+      409,
+      "holiday_closure_conflict"
+    );
+  }
+  if (closure.clientClosureId !== input.clientClosureId) {
+    throw new InputError(
+      "Für dieses Datum besteht bereits ein betrieblicher freier Tag.",
+      409,
+      "holiday_closure_date_conflict"
+    );
+  }
+  if (
+    closure.holidayDate !== input.holidayDate
+    || closure.name !== input.name
+    || (closure.note || null) !== (input.note || null)
+  ) {
+    throw new InputError(
+      "Diese ID für einen freien Tag wurde bereits für andere Angaben verwendet.",
+      409,
+      "holiday_closure_id_conflict"
+    );
+  }
+  return { closure, idempotent: inserted.rowCount === 0 };
+}
+
+async function cancelHolidayClosure(client, context, closureId, input) {
+  await requireTimeAccountAdministrator(client, context);
+  const currentResult = await client.query(
+    `SELECT status, row_version
+     FROM company_holiday_closures
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, closureId]
+  );
+  if (currentResult.rowCount !== 1) {
+    throw new InputError(
+      "Der betriebliche freie Tag wurde nicht gefunden.",
+      404,
+      "holiday_closure_not_found"
+    );
+  }
+  const current = currentResult.rows[0];
+  if (Number(current.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der betriebliche freie Tag wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  if (current.status === "cancelled") {
+    throw new InputError(
+      "Der betriebliche freie Tag wurde bereits aufgehoben.",
+      409,
+      "holiday_closure_cancelled"
+    );
+  }
+  await client.query(
+    `UPDATE company_holiday_closures
+     SET status = 'cancelled',
+         cancelled_by_user_id = $3,
+         cancellation_note = $4
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, closureId, context.userId, input.cancellationNote]
+  );
+  const result = await client.query(
+    `SELECT closure.id, closure.client_closure_id, closure.holiday_date,
+            closure.name, closure.note, closure.status, closure.created_at,
+            closure.cancelled_at, closure.cancellation_note, closure.row_version,
+            creator.first_name || ' ' || creator.last_name AS created_by_name,
+            canceller.first_name || ' ' || canceller.last_name AS cancelled_by_name
+     FROM company_holiday_closures AS closure
+     JOIN users AS creator
+       ON creator.company_id = closure.company_id
+      AND creator.id = closure.created_by_user_id
+     LEFT JOIN users AS canceller
+       ON canceller.company_id = closure.company_id
+      AND canceller.id = closure.cancelled_by_user_id
+     WHERE closure.company_id = $1 AND closure.id = $2`,
+    [context.companyId, closureId]
+  );
+  return holidayClosureDto(result.rows[0]);
+}
+
 function timeAccountAdjustmentDto(row) {
   return {
     id: row.id,
@@ -2291,7 +2598,9 @@ async function getTimeAccount(client, context, employeeId, year, asOfDate) {
 }
 
 async function getOwnTimeAccount(client, context, year, asOfDate) {
-  return getTimeAccount(client, context, context.userId, year, asOfDate);
+  const account = await getTimeAccount(client, context, context.userId, year, asOfDate);
+  const holidayCalendar = await getHolidayCalendar(client, context, year);
+  return { ...account, holidayCalendar };
 }
 
 async function getAdminTimeAccounts(client, context, year, asOfDate) {
@@ -2309,7 +2618,8 @@ async function getAdminTimeAccounts(client, context, year, asOfDate) {
     const { adjustments: _adjustments, ...overviewAccount } = account;
     accounts.push(overviewAccount);
   }
-  return { year, asOfDate, accounts };
+  const holidayCalendar = await getHolidayCalendar(client, context, year, true);
+  return { year, asOfDate, holidayCalendar, accounts };
 }
 
 async function updateTimeAccountProfile(client, context, employeeId, input) {
@@ -6367,6 +6677,68 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/holiday-calendar") {
+        const asOfDate = localDate(new Date().toISOString(), config.timeZone);
+        const year = validateTimeAccountYear(
+          url.searchParams.get("year") || asOfDate.slice(0, 4)
+        );
+        const holidayCalendar = await withReadySession(
+          pool,
+          tokenHash,
+          async (client, context) => {
+            await requirePlanner(client, context);
+            return getHolidayCalendar(client, context, year, true);
+          }
+        );
+        return json(response, 200, { holidayCalendar });
+      }
+
+      if (request.method === "PATCH" && url.pathname === "/api/v1/admin/holiday-calendar") {
+        const input = validateHolidayCalendar(await readJson(request));
+        const holidayCalendar = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateHolidayCalendar(client, context, input)
+        );
+        return json(response, 200, { holidayCalendar });
+      }
+
+      if (
+        request.method === "POST"
+        && url.pathname === "/api/v1/admin/holiday-calendar/closures"
+      ) {
+        const input = validateHolidayClosure(await readJson(request));
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createHolidayClosure(client, context, input)
+        );
+        return json(response, result.idempotent ? 200 : 201, result);
+      }
+
+      const holidayClosureCancelMatch =
+        /^\/api\/v1\/admin\/holiday-calendar\/closures\/([^/]+)\/cancel$/.exec(
+          url.pathname
+        );
+      if (request.method === "PATCH" && holidayClosureCancelMatch) {
+        const closureId = validateId(
+          holidayClosureCancelMatch[1],
+          "Betrieblicher-freier-Tag-ID"
+        );
+        const input = validateHolidayClosureCancellation(await readJson(request));
+        const closure = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => cancelHolidayClosure(
+            client,
+            context,
+            closureId,
+            input
+          )
+        );
+        return json(response, 200, { closure });
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/admin/time-accounts") {

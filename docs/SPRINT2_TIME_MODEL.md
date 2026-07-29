@@ -1,12 +1,12 @@
 # Sprint 2: Planung und Zeiterfassung
 
 Stand: 29.07.2026
-Technischer Stand: V0.37.0
+Technischer Stand: V0.38.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
-012 sowie 027, 031, 032 und 033. Der Sprint verbindet Wochenplanung,
-Vorarbeiterverantwortung, Offline-Zeitereignisse, Abwesenheiten und den
-berechneten Stundenzettel.
+012 sowie 027, 031, 032, 033, 034 und 035. Der Sprint verbindet Wochenplanung,
+Vorarbeiterverantwortung, Offline-Zeitereignisse, Abwesenheiten, Stundenkonto,
+Feiertagskalender und den berechneten Stundenzettel.
 
 Die PWA stellt den berechneten Stundenzettel zusätzlich als vollständige
 Arbeitswoche dar. `GET /api/v1/work-weeks/{montag}` liefert Montag bis Sonntag,
@@ -188,6 +188,23 @@ Geschäftsführung ändern Profil, Jahresurlaubsanspruch oder buchen eine
 Korrektur. Profil und Anspruch verwenden getrennte Versionsstände; Buchungen
 werden niemals überschrieben oder gelöscht.
 
+## 035 Feiertagskalender
+
+`company_holiday_calendars` verbindet jeden Mandanten mit Land und Bundesland.
+`german_public_holidays(...)` berechnet nach Rechtsstand 29.07.2026 die
+bundesweiten und landesweiten deutschen Regeln für 2000 bis 2100; bewegliche
+Tage leiten sich von der gregorianischen Osterberechnung ab.
+
+`company_holiday_closures` ergänzt bestätigte örtliche oder betriebliche freie
+Tage. Jede Anlage benötigt eine Client-UUID, Bezeichnung und einen Grund. Sie
+bleibt unveränderlich; eine fehlerhafte Anlage wird begründet aufgehoben.
+
+`time_account_daily_balances(...)` setzt das ermittelte Soll eines gesetzlichen
+oder betrieblichen Feiertags auf null. Vorhandene Arbeitsminuten bleiben
+erhalten und werden dadurch als positive Kontobewegung sichtbar. Mitarbeiter
+sehen den eigenen Jahreskalender, Planungsrollen die Firmenbasis; nur
+Administration oder Geschäftsführung ändern Bundesland und freie Tage.
+
 ## Büroprüfung und Excel
 
 Die Wochenprüfung zeigt laufende und abgeschlossene Arbeitstage automatisch,
@@ -231,7 +248,9 @@ Client-ID-Dubletten, Korrekturen, Sperren, Löschschutz und Mandantentrennung.
 Migration 033 ergänzt Prüfungen für Statusfolge, Vier-Augen-Regel,
 Abwesenheitshistorie und Planungskonflikte. Migration 034 prüft Tages- und
 Abwesenheitsberechnung, jahresbezogenen Urlaubsanspruch, unveränderliche
-Korrekturen, API-Rolle und Mandantentrennung.
+Korrekturen, API-Rolle und Mandantentrennung. Migration 035 prüft
+Osterberechnung, Bundeslandregeln, Sollzeitwirkung, betriebliche freie Tage,
+Aufhebungshistorie, Versionsstände, API-Rolle und Mandantentrennung.
 GitHub Actions wendet alle Migrationen zweimal an, prüft Backup und Restore und
 führt anschließend den echten Login-/Session-/Offline-Sync-Ablauf der Node-API
 gegen PostgreSQL aus.

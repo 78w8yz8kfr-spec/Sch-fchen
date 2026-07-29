@@ -1236,6 +1236,13 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(ownTimeAccount.enabled, true);
   assert.equal(ownTimeAccount.annualVacationDays, 30);
   assert.equal(ownTimeAccount.months.length, 12);
+  assert.equal(ownTimeAccount.holidayCalendar.configured, true);
+  assert.equal(ownTimeAccount.holidayCalendar.federalStateCode, "SN");
+  assert.ok(
+    ownTimeAccount.holidayCalendar.holidays.some(
+      (holiday) => holiday.name === "Buß- und Bettag"
+    )
+  );
 
   const forbiddenEmployeeTimeAccountOverview = await fetch(
     `${baseUrl}/api/v1/admin/time-accounts?year=${timeAccountYear}`,
@@ -1257,6 +1264,161 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     (account) => account.employeeId === employee.id
   );
   assert.ok(employeeTimeAccount);
+  assert.equal(plannerTimeAccounts.holidayCalendar.federalStateCode, "SN");
+
+  const plannerHolidayCalendarResponse = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar?year=${timeAccountYear}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(plannerHolidayCalendarResponse.status, 200);
+  const initialHolidayCalendar =
+    (await plannerHolidayCalendarResponse.json()).holidayCalendar;
+  assert.equal(initialHolidayCalendar.federalStateCode, "SN");
+
+  const forbiddenPlannerHolidayCalendarChange = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        countryCode: "DE",
+        federalStateCode: "BE",
+        rowVersion: initialHolidayCalendar.rowVersion
+      })
+    }
+  );
+  assert.equal(forbiddenPlannerHolidayCalendarChange.status, 403);
+  assert.equal(
+    (await forbiddenPlannerHolidayCalendarChange.json()).error.code,
+    "time_account_administration_forbidden"
+  );
+
+  const holidayCalendarChange = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        countryCode: "DE",
+        federalStateCode: "BE",
+        rowVersion: initialHolidayCalendar.rowVersion
+      })
+    }
+  );
+  assert.equal(
+    holidayCalendarChange.status,
+    200,
+    await holidayCalendarChange.clone().text()
+  );
+  const berlinHolidayCalendar = (await holidayCalendarChange.json()).holidayCalendar;
+  assert.equal(berlinHolidayCalendar.federalStateCode, "BE");
+  assert.ok(berlinHolidayCalendar.rowVersion > initialHolidayCalendar.rowVersion);
+  assert.ok(berlinHolidayCalendar.updatedAt);
+  assert.ok(berlinHolidayCalendar.updatedByName);
+
+  const staleHolidayCalendarChange = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        countryCode: "DE",
+        federalStateCode: "SN",
+        rowVersion: initialHolidayCalendar.rowVersion
+      })
+    }
+  );
+  assert.equal(staleHolidayCalendarChange.status, 409);
+  assert.equal(
+    (await staleHolidayCalendarChange.json()).error.code,
+    "row_version_conflict"
+  );
+
+  const holidayCalendarRestore = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        year: timeAccountYear,
+        countryCode: "DE",
+        federalStateCode: "SN",
+        rowVersion: berlinHolidayCalendar.rowVersion
+      })
+    }
+  );
+  assert.equal(holidayCalendarRestore.status, 200);
+  const restoredHolidayCalendar = (await holidayCalendarRestore.json()).holidayCalendar;
+  assert.equal(restoredHolidayCalendar.federalStateCode, "SN");
+
+  const holidayClosurePayload = {
+    clientClosureId: randomUUID(),
+    holidayDate: `${timeAccountYear}-12-24`,
+    name: "Betriebliche Weihnachtsruhe",
+    note: "Geprüfte Betriebsvereinbarung"
+  };
+  const holidayClosureResponse = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar/closures`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify(holidayClosurePayload)
+    }
+  );
+  assert.equal(
+    holidayClosureResponse.status,
+    201,
+    await holidayClosureResponse.clone().text()
+  );
+  const holidayClosure = (await holidayClosureResponse.json()).closure;
+  assert.equal(holidayClosure.status, "active");
+  assert.equal(holidayClosure.holidayDate, `${timeAccountYear}-12-24`);
+
+  const repeatedHolidayClosureResponse = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar/closures`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify(holidayClosurePayload)
+    }
+  );
+  assert.equal(repeatedHolidayClosureResponse.status, 200);
+  assert.equal((await repeatedHolidayClosureResponse.json()).idempotent, true);
+
+  const duplicateHolidayClosureResponse = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar/closures`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        ...holidayClosurePayload,
+        clientClosureId: randomUUID(),
+        name: "Doppelte Anlage"
+      })
+    }
+  );
+  assert.equal(duplicateHolidayClosureResponse.status, 409);
+  assert.equal(
+    (await duplicateHolidayClosureResponse.json()).error.code,
+    "holiday_closure_date_conflict"
+  );
+
+  const holidayClosureCancellation = await fetch(
+    `${baseUrl}/api/v1/admin/holiday-calendar/closures/${holidayClosure.id}/cancel`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        rowVersion: holidayClosure.rowVersion,
+        cancellationNote: "Nur für den Integrationstest angelegt"
+      })
+    }
+  );
+  assert.equal(holidayClosureCancellation.status, 200);
+  assert.equal((await holidayClosureCancellation.json()).closure.status, "cancelled");
 
   const forbiddenPlannerTimeAccountChange = await fetch(
     `${baseUrl}/api/v1/admin/time-accounts/${employee.id}/profile`,

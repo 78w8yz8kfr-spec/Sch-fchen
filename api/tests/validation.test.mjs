@@ -18,6 +18,9 @@ import {
   validateEmployee,
   validateEmployeeUpdate,
   validateFieldConstructionSite,
+  validateHolidayCalendar,
+  validateHolidayClosure,
+  validateHolidayClosureCancellation,
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
@@ -44,6 +47,66 @@ import {
   validateWorkDayDecision,
   validateWorkDate
 } from "../src/validation.mjs";
+
+test("Feiertagskalender prüft Bundesland und betriebliche freie Tage", () => {
+  assert.deepEqual(validateHolidayCalendar({
+    year: 2026,
+    countryCode: "de",
+    federalStateCode: "sn",
+    rowVersion: 2
+  }), {
+    year: 2026,
+    countryCode: "DE",
+    federalStateCode: "SN",
+    rowVersion: 2
+  });
+  assert.throws(() => validateHolidayCalendar({
+    year: 2026,
+    countryCode: "DE",
+    federalStateCode: "XX",
+    rowVersion: 2
+  }), /Bundesland/);
+  assert.throws(() => validateHolidayCalendar({
+    year: 2026,
+    countryCode: "AT",
+    federalStateCode: "SN",
+    rowVersion: 2
+  }), /Deutschland/);
+  assert.deepEqual(validateHolidayClosure({
+    clientClosureId: "11111111-1111-4111-8111-111111111111",
+    holidayDate: "2026-12-24",
+    name: "  Betriebsruhe  ",
+    note: "  Betriebsvereinbarung  "
+  }), {
+    clientClosureId: "11111111-1111-4111-8111-111111111111",
+    holidayDate: "2026-12-24",
+    name: "Betriebsruhe",
+    note: "Betriebsvereinbarung"
+  });
+  assert.deepEqual(validateHolidayClosureCancellation({
+    rowVersion: 1,
+    cancellationNote: "  Falsch angelegt  "
+  }), {
+    rowVersion: 1,
+    cancellationNote: "Falsch angelegt"
+  });
+  assert.throws(() => validateHolidayClosure({
+    clientClosureId: "11111111-1111-4111-8111-111111111111",
+    holidayDate: "2026-12-24",
+    name: "Betriebsruhe",
+    note: ""
+  }), /Grund/);
+  assert.throws(() => validateHolidayClosure({
+    clientClosureId: "11111111-1111-4111-8111-111111111111",
+    holidayDate: "2101-01-01",
+    name: "Betriebsruhe",
+    note: "Außerhalb des Zeitraums"
+  }), /zwischen 2000 und 2100/);
+  assert.throws(() => validateHolidayClosureCancellation({
+    rowVersion: 0,
+    cancellationNote: "Fehler"
+  }), /Version/);
+});
 
 test("Stundenkonten prüfen Jahr Profil und unveränderliche Korrekturen", () => {
   assert.equal(validateTimeAccountYear("2026"), 2026);

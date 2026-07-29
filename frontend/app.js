@@ -154,6 +154,9 @@
     timeAccountVacationRemaining: document.querySelector("#time-account-vacation-remaining"),
     timeAccountVacationPending: document.querySelector("#time-account-vacation-pending"),
     timeAccountTimeOff: document.querySelector("#time-account-time-off"),
+    timeAccountHolidayCount: document.querySelector("#time-account-holiday-count"),
+    timeAccountHolidayStatus: document.querySelector("#time-account-holiday-status"),
+    timeAccountHolidayList: document.querySelector("#time-account-holiday-list"),
     timeAccountMonths: document.querySelector("#time-account-months"),
     timeAccountMessage: document.querySelector("#time-account-message"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
@@ -173,6 +176,22 @@
     timeAccountAdjustmentType: document.querySelector("#time-account-adjustment-type"),
     timeAccountAdjustmentNote: document.querySelector("#time-account-adjustment-note"),
     timeAccountAdjustmentSubmit: document.querySelector("#time-account-adjustment-submit"),
+    holidayCalendarAdmin: document.querySelector("#holiday-calendar-admin"),
+    holidayCalendarYear: document.querySelector("#holiday-calendar-year"),
+    holidayCalendarStatus: document.querySelector("#holiday-calendar-status"),
+    holidayCalendarForm: document.querySelector("#holiday-calendar-form"),
+    holidayCalendarCountry: document.querySelector("#holiday-calendar-country"),
+    holidayCalendarState: document.querySelector("#holiday-calendar-state"),
+    holidayCalendarSave: document.querySelector("#holiday-calendar-save"),
+    holidayCalendarList: document.querySelector("#holiday-calendar-list"),
+    holidayClosurePanel: document.querySelector("#holiday-closure-panel"),
+    holidayClosureForm: document.querySelector("#holiday-closure-form"),
+    holidayClosureDate: document.querySelector("#holiday-closure-date"),
+    holidayClosureName: document.querySelector("#holiday-closure-name"),
+    holidayClosureNote: document.querySelector("#holiday-closure-note"),
+    holidayClosureSubmit: document.querySelector("#holiday-closure-submit"),
+    holidayClosureList: document.querySelector("#holiday-closure-list"),
+    holidayCalendarMessage: document.querySelector("#holiday-calendar-message"),
     absencePanel: document.querySelector("#absence-panel"),
     absenceForm: document.querySelector("#absence-form"),
     absenceType: document.querySelector("#absence-type"),
@@ -873,7 +892,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.37.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.38.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -4697,12 +4716,40 @@
     }).format(value)} ${value === 1 ? "Tag" : "Tage"}`;
   }
 
+  function renderHolidayItems(container, holidays, emptyText) {
+    container.replaceChildren();
+    if (!holidays?.length) {
+      const empty = document.createElement("li");
+      empty.className = "holiday-list__empty";
+      empty.textContent = emptyText;
+      container.append(empty);
+      return;
+    }
+    holidays.forEach((holiday) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const date = document.createElement("span");
+      const source = document.createElement("span");
+      title.textContent = holiday.name;
+      date.textContent = shortDate(holiday.date);
+      source.className = `holiday-list__source${
+        holiday.source === "company" ? " holiday-list__source--company" : ""
+      }`;
+      source.textContent = holiday.source === "company" ? "Betrieblich" : "Gesetzlich";
+      copy.append(title, date);
+      item.append(copy, source);
+      container.append(item);
+    });
+  }
+
   function renderTimeAccount() {
     elements.timeAccountPanel.hidden = demoMode;
     if (demoMode) return;
     const requestedYear = Number(selectedWeekStart.slice(0, 4));
     const account = timeAccountState?.year === requestedYear ? timeAccountState : null;
     elements.timeAccountMonths.replaceChildren();
+    elements.timeAccountHolidayList.replaceChildren();
     if (!account) {
       elements.timeAccountBalance.textContent = "±00:00";
       elements.timeAccountBalance.className = "time-account-balance";
@@ -4713,8 +4760,16 @@
       elements.timeAccountVacationRemaining.textContent = "0 Tage";
       elements.timeAccountVacationPending.textContent = "0 Tage";
       elements.timeAccountTimeOff.textContent = "0 Tage";
+      elements.timeAccountHolidayCount.textContent = "0 berücksichtigt";
+      elements.timeAccountHolidayStatus.textContent = navigator.onLine
+        ? "Feiertagskalender wird geladen …"
+        : "Der Feiertagskalender ist offline gerade nicht verfügbar.";
       return;
     }
+    const holidayCalendar = account.holidayCalendar || {
+      configured: false,
+      holidays: []
+    };
     if (!account.enabled) {
       elements.timeAccountBalance.textContent = "Deaktiviert";
       elements.timeAccountBalance.className = "time-account-balance";
@@ -4740,6 +4795,16 @@
       formatDayCount(account.vacation.pendingDays);
     elements.timeAccountTimeOff.textContent =
       formatDayCount(account.timeOff.approvedDays);
+    elements.timeAccountHolidayCount.textContent =
+      `${holidayCalendar.holidays.length} berücksichtigt`;
+    elements.timeAccountHolidayStatus.textContent = holidayCalendar.configured
+      ? `${holidayCalendar.year} · ${holidayCalendar.federalStateName} · Feiertage setzen das Tagessoll automatisch auf null.`
+      : "Bundesweite Feiertage sind aktiv. Das Büro muss für die regionalen Feiertage noch das Bundesland festlegen.";
+    renderHolidayItems(
+      elements.timeAccountHolidayList,
+      holidayCalendar.holidays,
+      "Für dieses Jahr sind keine Feiertage hinterlegt."
+    );
 
     const monthNames = [
       "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -4761,6 +4826,109 @@
       });
       elements.timeAccountMonths.append(row);
     });
+  }
+
+  function renderHolidayCalendarAdmin(calendar, requestedYear) {
+    elements.holidayCalendarYear.textContent = String(requestedYear);
+    elements.holidayCalendarList.replaceChildren();
+    elements.holidayClosureList.replaceChildren();
+    const canManage = Boolean(adminState?.canCreateManagementRoles);
+    elements.holidayCalendarForm.hidden = !canManage;
+    elements.holidayClosurePanel.hidden = !canManage;
+    if (!calendar) {
+      elements.holidayCalendarStatus.textContent = navigator.onLine
+        ? "Feiertagskalender wird geladen …"
+        : "Der Feiertagskalender ist offline gerade nicht verfügbar.";
+      renderHolidayItems(
+        elements.holidayCalendarList,
+        [],
+        "Feiertage werden geladen …"
+      );
+      return;
+    }
+    const updateDetails = calendar.updatedByName
+      ? ` Zuletzt geändert durch ${calendar.updatedByName}.`
+      : "";
+    elements.holidayCalendarStatus.textContent = calendar.configured
+      ? `${calendar.federalStateName} · ${calendar.holidays.length} gesetzliche und betriebliche freie Tage werden im Jahr ${requestedYear} berücksichtigt.${updateDetails}`
+      : "Nur die bundesweiten Feiertage sind aktiv. Für eine verbindliche regionale Berechnung muss das Bundesland gespeichert werden.";
+    if (canManage) {
+      elements.holidayCalendarCountry.value = calendar.countryCode || "DE";
+      elements.holidayCalendarState.value = calendar.federalStateCode || "SN";
+      const initialClosureDate = localDateKey().startsWith(`${requestedYear}-`)
+        ? localDateKey()
+        : `${requestedYear}-01-01`;
+      if (!elements.holidayClosureDate.value.startsWith(`${requestedYear}-`)) {
+        elements.holidayClosureDate.value = initialClosureDate;
+      }
+      elements.holidayClosureDate.min = `${requestedYear}-01-01`;
+      elements.holidayClosureDate.max = `${requestedYear}-12-31`;
+    }
+    renderHolidayItems(
+      elements.holidayCalendarList,
+      calendar.holidays,
+      "Für dieses Jahr sind keine Feiertage hinterlegt."
+    );
+    (calendar.closures || []).forEach((closure) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      item.dataset.status = closure.status;
+      title.textContent = closure.name;
+      meta.textContent = closure.status === "cancelled"
+        ? `${shortDate(closure.holidayDate)} · aufgehoben durch ${closure.cancelledByName} · ${closure.cancellationNote}`
+        : `${shortDate(closure.holidayDate)} · angelegt durch ${closure.createdByName}${
+          closure.note ? ` · ${closure.note}` : ""
+        }`;
+      actions.className = "holiday-closure-list__actions";
+      if (closure.status === "cancelled") {
+        const status = document.createElement("span");
+        status.textContent = "Aufgehoben";
+        actions.append(status);
+      } else if (canManage) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "text-button text-button--muted";
+        cancel.textContent = "Aufheben";
+        cancel.disabled = !navigator.onLine;
+        cancel.addEventListener("click", async () => {
+          const reason = window.prompt(
+            "Warum soll dieser betriebliche freie Tag aufgehoben werden?"
+          );
+          if (!reason || reason.trim().length < 3) return;
+          cancel.disabled = true;
+          try {
+            await requestJson(
+              `./api/v1/admin/holiday-calendar/closures/${encodeURIComponent(closure.id)}/cancel`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  rowVersion: closure.rowVersion,
+                  cancellationNote: reason
+                })
+              }
+            );
+            showToast("Freier Tag aufgehoben · Historie bleibt erhalten.");
+            await Promise.all([refreshAdminTimeAccounts(), refreshTimeAccountData()]);
+          } catch (error) {
+            elements.holidayCalendarMessage.textContent = error.message;
+            cancel.disabled = !navigator.onLine;
+          }
+        });
+        actions.append(cancel);
+      }
+      copy.append(title, meta);
+      item.append(copy, actions);
+      elements.holidayClosureList.append(item);
+    });
+    if (!(calendar.closures || []).length) {
+      const empty = document.createElement("li");
+      empty.className = "holiday-list__empty";
+      empty.textContent = "Noch keine zusätzlichen freien Tage angelegt.";
+      elements.holidayClosureList.append(empty);
+    }
   }
 
   function closeTimeAccountEditor() {
@@ -4794,6 +4962,7 @@
     const overview = timeAccountsState?.year === requestedYear ? timeAccountsState : null;
     elements.timeAccountAdminYear.textContent = String(requestedYear);
     elements.timeAccountAdminList.replaceChildren();
+    renderHolidayCalendarAdmin(overview?.holidayCalendar || null, requestedYear);
     if (!overview) {
       const empty = document.createElement("li");
       empty.className = "absence-list__empty";
@@ -4808,38 +4977,38 @@
       empty.className = "absence-list__empty";
       empty.textContent = "Noch keine aktiven Mitarbeiter vorhanden.";
       elements.timeAccountAdminList.append(empty);
-      return;
+    } else {
+      overview.accounts.forEach((account) => {
+        const item = document.createElement("li");
+        const copy = document.createElement("div");
+        const title = document.createElement("strong");
+        const meta = document.createElement("span");
+        const actions = document.createElement("div");
+        const balance = document.createElement("strong");
+        item.className = "time-account-admin-item";
+        title.textContent = account.employeeName;
+        meta.textContent = account.enabled
+          ? `${account.personnelNumber} · Urlaub ${formatDayCount(account.vacation.remainingDays)} übrig · Abbau ${formatDayCount(account.timeOff.approvedDays)}`
+          : `${account.personnelNumber} · Stundenkonto deaktiviert · Urlaub ${formatDayCount(account.vacation.remainingDays)} übrig`;
+        balance.className = "time-account-admin-item__balance";
+        balance.textContent = account.enabled
+          ? formatSignedMinutes(account.totals.balanceMinutes)
+          : "Deaktiviert";
+        actions.className = "time-account-admin-item__actions";
+        actions.append(balance);
+        if (adminState?.canCreateManagementRoles) {
+          const manage = document.createElement("button");
+          manage.type = "button";
+          manage.className = "text-button";
+          manage.textContent = "Verwalten";
+          manage.addEventListener("click", () => openTimeAccountEditor(account));
+          actions.append(manage);
+        }
+        copy.append(title, meta);
+        item.append(copy, actions);
+        elements.timeAccountAdminList.append(item);
+      });
     }
-    overview.accounts.forEach((account) => {
-      const item = document.createElement("li");
-      const copy = document.createElement("div");
-      const title = document.createElement("strong");
-      const meta = document.createElement("span");
-      const actions = document.createElement("div");
-      const balance = document.createElement("strong");
-      item.className = "time-account-admin-item";
-      title.textContent = account.employeeName;
-      meta.textContent = account.enabled
-        ? `${account.personnelNumber} · Urlaub ${formatDayCount(account.vacation.remainingDays)} übrig · Abbau ${formatDayCount(account.timeOff.approvedDays)}`
-        : `${account.personnelNumber} · Stundenkonto deaktiviert · Urlaub ${formatDayCount(account.vacation.remainingDays)} übrig`;
-      balance.className = "time-account-admin-item__balance";
-      balance.textContent = account.enabled
-        ? formatSignedMinutes(account.totals.balanceMinutes)
-        : "Deaktiviert";
-      actions.className = "time-account-admin-item__actions";
-      actions.append(balance);
-      if (adminState?.canCreateManagementRoles) {
-        const manage = document.createElement("button");
-        manage.type = "button";
-        manage.className = "text-button";
-        manage.textContent = "Verwalten";
-        manage.addEventListener("click", () => openTimeAccountEditor(account));
-        actions.append(manage);
-      }
-      copy.append(title, meta);
-      item.append(copy, actions);
-      elements.timeAccountAdminList.append(item);
-    });
   }
 
   function renderWeek() {
@@ -5113,6 +5282,11 @@
       .forEach((button) => { button.disabled = !online; });
     elements.timeAccountProfileSave.disabled = !online;
     elements.timeAccountAdjustmentSubmit.disabled = !online;
+    elements.holidayCalendarSave.disabled = !online;
+    elements.holidayClosureSubmit.disabled = !online;
+    elements.holidayClosureList
+      .querySelectorAll("button")
+      .forEach((button) => { button.disabled = !online; });
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
@@ -5658,6 +5832,90 @@
     } finally {
       elements.timeAccountAdjustmentSubmit.disabled = !navigator.onLine;
       elements.timeAccountProfileSave.disabled = false;
+    }
+  });
+
+  elements.holidayCalendarForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const calendar = timeAccountsState?.year === requestedYear
+      ? timeAccountsState.holidayCalendar
+      : null;
+    if (!calendar) {
+      elements.holidayCalendarMessage.textContent =
+        "Der Feiertagskalender wurde nicht gefunden. Bitte neu laden.";
+      return;
+    }
+    elements.holidayCalendarSave.disabled = true;
+    elements.holidayClosureSubmit.disabled = true;
+    elements.holidayCalendarMessage.textContent =
+      "Feiertagskalender wird sicher gespeichert …";
+    try {
+      await requestJson("./api/v1/admin/holiday-calendar", {
+        method: "PATCH",
+        body: JSON.stringify({
+          year: requestedYear,
+          countryCode: elements.holidayCalendarCountry.value,
+          federalStateCode: elements.holidayCalendarState.value,
+          rowVersion: calendar.rowVersion
+        })
+      });
+      elements.holidayCalendarMessage.textContent = "";
+      showToast("Bundesland gespeichert · Jahreskonten wurden neu berechnet.");
+      await Promise.all([refreshAdminTimeAccounts(), refreshTimeAccountData()]);
+    } catch (error) {
+      elements.holidayCalendarMessage.textContent = error.message;
+    } finally {
+      elements.holidayCalendarSave.disabled = !navigator.onLine;
+      elements.holidayClosureSubmit.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.holidayClosureForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const requestedYear = selectedWeekStart.slice(0, 4);
+    const holidayDate = elements.holidayClosureDate.value;
+    const name = elements.holidayClosureName.value.trim();
+    const note = elements.holidayClosureNote.value.trim();
+    if (!holidayDate || !holidayDate.startsWith(`${requestedYear}-`)) {
+      elements.holidayCalendarMessage.textContent =
+        `Bitte ein Datum im angezeigten Jahr ${requestedYear} wählen.`;
+      return;
+    }
+    if (name.length < 2) {
+      elements.holidayCalendarMessage.textContent =
+        "Bitte eine eindeutige Bezeichnung für den freien Tag eingeben.";
+      return;
+    }
+    if (note.length < 3) {
+      elements.holidayCalendarMessage.textContent =
+        "Bitte die örtliche Regelung oder Betriebsvereinbarung als Grund angeben.";
+      return;
+    }
+    elements.holidayClosureSubmit.disabled = true;
+    elements.holidayCalendarSave.disabled = true;
+    elements.holidayCalendarMessage.textContent =
+      "Betrieblicher freier Tag wird nachvollziehbar gespeichert …";
+    try {
+      await requestJson("./api/v1/admin/holiday-calendar/closures", {
+        method: "POST",
+        body: JSON.stringify({
+          clientClosureId: crypto.randomUUID(),
+          holidayDate,
+          name,
+          note
+        })
+      });
+      elements.holidayClosureName.value = "";
+      elements.holidayClosureNote.value = "";
+      elements.holidayCalendarMessage.textContent = "";
+      showToast("Freier Tag ergänzt · das Tagessoll wird automatisch neu berechnet.");
+      await Promise.all([refreshAdminTimeAccounts(), refreshTimeAccountData()]);
+    } catch (error) {
+      elements.holidayCalendarMessage.textContent = error.message;
+    } finally {
+      elements.holidayClosureSubmit.disabled = !navigator.onLine;
+      elements.holidayCalendarSave.disabled = !navigator.onLine;
     }
   });
 
