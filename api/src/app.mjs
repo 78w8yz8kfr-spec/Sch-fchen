@@ -34,6 +34,8 @@ import {
   InputError,
   localDate,
   readJson,
+  validateAbsenceDecision,
+  validateAbsenceRequest,
   validateAssignment,
   validateAssignmentCancellation,
   validateAssignmentUpdate,
@@ -84,6 +86,15 @@ const PLANNER_ROLES = new Set([
 ]);
 const MANAGEMENT_ROLES = new Set(["managing_director", "dispatch_office", "project_manager"]);
 const MANAGEMENT_ASSIGNER_ROLES = new Set(["admin", "managing_director"]);
+const ABSENCE_OFFICE_REVIEW_ROLES = new Set([
+  "admin",
+  "dispatch_office",
+  "office",
+  "planner",
+  "project_manager",
+  "executive_assistant"
+]);
+const ABSENCE_MANAGEMENT_APPROVAL_ROLES = new Set(["managing_director"]);
 const ELECTRICAL_MODULES = [
   {
     key: "vde",
@@ -1045,6 +1056,30 @@ async function requirePlanner(client, context) {
   return roles;
 }
 
+async function requireAbsenceOfficeReviewer(client, context) {
+  const roles = await activeRoleKeys(client, context);
+  if (![...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role))) {
+    throw new InputError(
+      "Die erste Abwesenheitsprüfung ist nur für Büro und Planung freigeschaltet.",
+      403,
+      "absence_office_review_forbidden"
+    );
+  }
+  return roles;
+}
+
+async function requireAbsenceManagementApprover(client, context) {
+  const roles = await activeRoleKeys(client, context);
+  if (![...roles].some((role) => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role))) {
+    throw new InputError(
+      "Die verbindliche Abwesenheitsfreigabe ist nur für die Geschäftsführung freigeschaltet.",
+      403,
+      "absence_management_approval_forbidden"
+    );
+  }
+  return roles;
+}
+
 async function requireModuleAdministrator(client, context) {
   const roles = await activeRoleKeys(client, context);
   if (![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
@@ -1088,6 +1123,97 @@ function employeeDto(row) {
     roles: row.roles,
     mustChangePassword: row.must_change_password,
     rowVersion: Number(row.row_version || 1)
+  };
+}
+
+const ABSENCE_REQUEST_SELECT = `
+  SELECT request.id, request.user_id, request.absence_type,
+         request.start_date, request.end_date, request.day_part,
+         request.note, request.status, request.row_version,
+         request.created_at, request.updated_at,
+         request.office_reviewed_at, request.office_comment,
+         request.management_reviewed_at, request.management_comment,
+         request.cancelled_at, request.cancellation_reason,
+         employee.first_name || ' ' || employee.last_name AS employee_name,
+         employee.personnel_number,
+         office.first_name || ' ' || office.last_name AS office_reviewed_by_name,
+         management.first_name || ' ' || management.last_name AS management_reviewed_by_name,
+         canceller.first_name || ' ' || canceller.last_name AS cancelled_by_name,
+         (
+           SELECT COUNT(*)::INTEGER
+           FROM site_assignments AS assignment
+           WHERE assignment.company_id = request.company_id
+             AND assignment.user_id = request.user_id
+             AND assignment.work_date BETWEEN request.start_date AND request.end_date
+             AND assignment.status IN ('draft', 'released')
+         ) AS assignment_conflict_count,
+         COALESCE(
+           (
+             SELECT jsonb_agg(
+               jsonb_build_object(
+                 'action', event.action,
+                 'status', event.status,
+                 'actorName', actor.first_name || ' ' || actor.last_name,
+                 'comment', event.comment,
+                 'rowVersion', event.request_row_version,
+                 'createdAt', event.created_at
+               )
+               ORDER BY event.request_row_version, event.created_at, event.id
+             )
+             FROM absence_request_events AS event
+             JOIN users AS actor
+               ON actor.company_id = event.company_id
+              AND actor.id = event.actor_user_id
+             WHERE event.company_id = request.company_id
+               AND event.absence_request_id = request.id
+           ),
+           '[]'::jsonb
+         ) AS history
+  FROM absence_requests AS request
+  JOIN users AS employee
+    ON employee.company_id = request.company_id
+   AND employee.id = request.user_id
+  LEFT JOIN users AS office
+    ON office.company_id = request.company_id
+   AND office.id = request.office_reviewed_by_user_id
+  LEFT JOIN users AS management
+    ON management.company_id = request.company_id
+   AND management.id = request.management_reviewed_by_user_id
+  LEFT JOIN users AS canceller
+    ON canceller.company_id = request.company_id
+   AND canceller.id = request.cancelled_by_user_id
+`;
+
+function absenceRequestDto(row) {
+  return {
+    id: row.id,
+    employeeId: row.user_id,
+    employeeName: row.employee_name,
+    personnelNumber: row.personnel_number,
+    absenceType: row.absence_type,
+    startDate: databaseDate(row.start_date),
+    endDate: databaseDate(row.end_date),
+    dayPart: row.day_part,
+    note: row.note,
+    status: row.status,
+    officeReviewedByName: row.office_reviewed_by_name || null,
+    officeReviewedAt: row.office_reviewed_at
+      ? new Date(row.office_reviewed_at).toISOString()
+      : null,
+    officeComment: row.office_comment || null,
+    managementReviewedByName: row.management_reviewed_by_name || null,
+    managementReviewedAt: row.management_reviewed_at
+      ? new Date(row.management_reviewed_at).toISOString()
+      : null,
+    managementComment: row.management_comment || null,
+    cancelledByName: row.cancelled_by_name || null,
+    cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
+    cancellationReason: row.cancellation_reason || null,
+    assignmentConflictCount: Number(row.assignment_conflict_count || 0),
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    history: Array.isArray(row.history) ? row.history : []
   };
 }
 
@@ -1619,6 +1745,290 @@ async function exportTimesheets(
   };
 }
 
+async function loadAbsenceRequest(client, context, requestId) {
+  const result = await client.query(
+    `${ABSENCE_REQUEST_SELECT}
+     WHERE request.company_id = $1 AND request.id = $2`,
+    [context.companyId, requestId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Der Abwesenheitsantrag wurde nicht gefunden.",
+      404,
+      "absence_request_not_found"
+    );
+  }
+  return absenceRequestDto(result.rows[0]);
+}
+
+async function listOwnAbsenceRequests(client, context, { from, to }) {
+  const result = await client.query(
+    `${ABSENCE_REQUEST_SELECT}
+     WHERE request.company_id = $1
+       AND request.user_id = $2
+       AND request.start_date <= $4
+       AND request.end_date >= $3
+     ORDER BY request.start_date DESC, request.created_at DESC, request.id`,
+    [context.companyId, context.userId, from, to]
+  );
+  return result.rows.map(absenceRequestDto);
+}
+
+async function createAbsenceRequest(client, context, input) {
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`absence:${context.companyId}:${context.userId}`]
+  );
+  const overlap = await client.query(
+    `SELECT 1
+     FROM absence_requests
+     WHERE company_id = $1
+       AND user_id = $2
+       AND status IN ('office_review', 'management_review', 'approved')
+       AND start_date <= $4
+       AND end_date >= $3
+     LIMIT 1`,
+    [context.companyId, context.userId, input.startDate, input.endDate]
+  );
+  if (overlap.rowCount) {
+    throw new InputError(
+      "Für diesen Zeitraum besteht bereits ein offener oder freigegebener Abwesenheitsantrag.",
+      409,
+      "absence_request_overlap"
+    );
+  }
+
+  const inserted = await client.query(
+    `INSERT INTO absence_requests (
+       company_id,
+       user_id,
+       absence_type,
+       start_date,
+       end_date,
+       day_part,
+       note,
+       requested_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $2)
+     RETURNING id`,
+    [
+      context.companyId,
+      context.userId,
+      input.absenceType,
+      input.startDate,
+      input.endDate,
+      input.dayPart,
+      input.note
+    ]
+  );
+  return loadAbsenceRequest(client, context, inserted.rows[0].id);
+}
+
+async function cancelOwnAbsenceRequest(client, context, requestId, input) {
+  if (input.action !== "cancel") {
+    throw new InputError("Für diesen Zugriff ist nur Zurückziehen zulässig.");
+  }
+  const current = await client.query(
+    `SELECT id, user_id, status, row_version
+     FROM absence_requests
+     WHERE company_id = $1 AND id = $2 AND user_id = $3
+     FOR UPDATE`,
+    [context.companyId, requestId, context.userId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError(
+      "Der eigene Abwesenheitsantrag wurde nicht gefunden.",
+      404,
+      "absence_request_not_found"
+    );
+  }
+  const request = current.rows[0];
+  if (!["office_review", "management_review"].includes(request.status)) {
+    throw new InputError(
+      "Nur ein noch nicht verbindlich freigegebener Antrag kann selbst zurückgezogen werden.",
+      409,
+      "absence_request_locked"
+    );
+  }
+  if (Number(request.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der Abwesenheitsantrag wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "absence_request_version_conflict"
+    );
+  }
+  await client.query(
+    `UPDATE absence_requests
+     SET status = 'cancelled',
+         cancelled_by_user_id = $3,
+         cancelled_at = CURRENT_TIMESTAMP,
+         cancellation_reason = $4
+     WHERE company_id = $1 AND id = $2 AND row_version = $5`,
+    [context.companyId, requestId, context.userId, input.comment, input.rowVersion]
+  );
+  return loadAbsenceRequest(client, context, requestId);
+}
+
+async function reviewAbsenceRequest(client, context, requestId, input) {
+  const current = await client.query(
+    `SELECT id, user_id, start_date, end_date, day_part,
+            status, row_version, office_reviewed_by_user_id
+     FROM absence_requests
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, requestId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError(
+      "Der Abwesenheitsantrag wurde nicht gefunden.",
+      404,
+      "absence_request_not_found"
+    );
+  }
+  const request = current.rows[0];
+  if (Number(request.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der Abwesenheitsantrag wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "absence_request_version_conflict"
+    );
+  }
+
+  if (request.status === "office_review") {
+    await requireAbsenceOfficeReviewer(client, context);
+    if (input.action === "cancel") {
+      throw new InputError("Offene eigene Anträge werden vom Mitarbeiter zurückgezogen.");
+    }
+    const status = input.action === "approve" ? "management_review" : "office_rejected";
+    await client.query(
+      `UPDATE absence_requests
+       SET status = $3,
+           office_reviewed_by_user_id = $4,
+           office_reviewed_at = CURRENT_TIMESTAMP,
+           office_comment = $5
+       WHERE company_id = $1 AND id = $2 AND row_version = $6`,
+      [context.companyId, requestId, status, context.userId, input.comment, input.rowVersion]
+    );
+    return loadAbsenceRequest(client, context, requestId);
+  }
+
+  if (request.status === "management_review") {
+    await requireAbsenceManagementApprover(client, context);
+    if (request.office_reviewed_by_user_id === context.userId) {
+      throw new InputError(
+        "Büroprüfung und verbindliche Freigabe müssen von zwei verschiedenen Konten erfolgen.",
+        403,
+        "absence_two_person_rule"
+      );
+    }
+    if (input.action === "cancel") {
+      throw new InputError("Ein Antrag in Geschäftsführungsprüfung wird genehmigt oder abgelehnt.");
+    }
+    if (input.action === "approve" && request.day_part === "full_day") {
+      await lockAssignmentAvailability(
+        client,
+        context,
+        request.user_id,
+        databaseDate(request.start_date),
+        databaseDate(request.end_date)
+      );
+      const conflicts = await client.query(
+        `SELECT COUNT(*)::INTEGER AS count
+         FROM site_assignments
+         WHERE company_id = $1
+           AND user_id = $2
+           AND work_date BETWEEN $3 AND $4
+           AND status IN ('draft', 'released')`,
+        [
+          context.companyId,
+          request.user_id,
+          databaseDate(request.start_date),
+          databaseDate(request.end_date)
+        ]
+      );
+      if (conflicts.rows[0].count > 0) {
+        throw new InputError(
+          `Vor der verbindlichen Freigabe müssen ${conflicts.rows[0].count} vorhandene Einsätze verschoben oder storniert werden.`,
+          409,
+          "absence_assignment_conflict"
+        );
+      }
+    }
+    const status = input.action === "approve" ? "approved" : "management_rejected";
+    await client.query(
+      `UPDATE absence_requests
+       SET status = $3,
+           management_reviewed_by_user_id = $4,
+           management_reviewed_at = CURRENT_TIMESTAMP,
+           management_comment = $5
+       WHERE company_id = $1 AND id = $2 AND row_version = $6`,
+      [context.companyId, requestId, status, context.userId, input.comment, input.rowVersion]
+    );
+    return loadAbsenceRequest(client, context, requestId);
+  }
+
+  if (request.status === "approved" && input.action === "cancel") {
+    await requireAbsenceManagementApprover(client, context);
+    await client.query(
+      `UPDATE absence_requests
+       SET status = 'cancelled',
+           cancelled_by_user_id = $3,
+           cancelled_at = CURRENT_TIMESTAMP,
+           cancellation_reason = $4
+       WHERE company_id = $1 AND id = $2 AND row_version = $5`,
+      [context.companyId, requestId, context.userId, input.comment, input.rowVersion]
+    );
+    return loadAbsenceRequest(client, context, requestId);
+  }
+
+  throw new InputError(
+    "Dieser Abwesenheitsantrag ist bereits abschließend bearbeitet.",
+    409,
+    "absence_request_locked"
+  );
+}
+
+async function lockAssignmentAvailability(
+  client,
+  context,
+  employeeId,
+  startDate,
+  endDate = startDate
+) {
+  await client.query(
+    `SELECT pg_advisory_xact_lock(
+       hashtextextended(
+         'assignment:' || $1::UUID::TEXT || ':' || $2::UUID::TEXT || ':'
+           || TO_CHAR(day.work_date, 'YYYY-MM-DD'),
+         0
+       )
+     )
+     FROM generate_series($3::DATE, $4::DATE, INTERVAL '1 day') AS day(work_date)
+     ORDER BY day.work_date`,
+    [context.companyId, employeeId, startDate, endDate]
+  );
+}
+
+async function assertNoApprovedFullDayAbsence(client, context, employeeId, workDate) {
+  const result = await client.query(
+    `SELECT absence_type
+     FROM absence_requests
+     WHERE company_id = $1
+       AND user_id = $2
+       AND status = 'approved'
+       AND day_part = 'full_day'
+       AND $3::DATE BETWEEN start_date AND end_date
+     LIMIT 1`,
+    [context.companyId, employeeId, workDate]
+  );
+  if (result.rowCount) {
+    throw new InputError(
+      "Der Mitarbeiter ist an diesem Tag verbindlich abwesend und kann nicht eingeplant werden.",
+      409,
+      "employee_absent"
+    );
+  }
+}
+
 async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
   const weekStart = mondayFor(date);
@@ -1636,7 +2046,8 @@ async function adminOverview(client, context, date) {
     noteResult,
     reportResult,
     workDayResult,
-    correctionResult
+    correctionResult,
+    absenceResult
   ] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
@@ -1922,6 +2333,29 @@ async function adminOverview(client, context, date) {
        WHERE correction.company_id = $1
        ORDER BY correction.work_date DESC, correction.requested_at, correction.id`,
       [context.companyId]
+    ),
+    client.query(
+      `${ABSENCE_REQUEST_SELECT}
+       WHERE request.company_id = $1
+         AND (
+           request.status IN ('office_review', 'management_review')
+           OR (
+             request.start_date <= $3
+             AND request.end_date >= $2
+           )
+         )
+       ORDER BY
+         CASE request.status
+           WHEN 'office_review' THEN 1
+           WHEN 'management_review' THEN 2
+           WHEN 'approved' THEN 3
+           ELSE 4
+         END,
+         request.start_date,
+         LOWER(employee.last_name),
+         LOWER(employee.first_name),
+         request.created_at`,
+      [context.companyId, weekStart, reviewWeekEnd]
     )
   ]);
 
@@ -1946,6 +2380,10 @@ async function adminOverview(client, context, date) {
     date,
     weekStart,
     canCreateManagementRoles: [...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role)),
+    canReviewAbsenceOffice: [...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role)),
+    canApproveAbsenceManagement: [...roles].some(
+      (role) => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role)
+    ),
     employees: employeeResult.rows.map(employeeDto),
     customers: customerResult.rows.map(customerDto),
     projects: projectResult.rows.map(projectDto),
@@ -1957,6 +2395,7 @@ async function adminOverview(client, context, date) {
     siteReports: reportResult.rows.map(siteReportDto),
     workDays: workDayResult.rows.map(adminWorkDayDto),
     timeCorrections: correctionResult.rows.map(timeEntryCorrectionDto),
+    absences: absenceResult.rows.map(absenceRequestDto),
     assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
     weekAssignments
   };
@@ -4197,6 +4636,8 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
 
 async function createAssignment(client, context, input) {
   await requirePlanner(client, context);
+  await lockAssignmentAvailability(client, context, input.employeeId, input.workDate);
+  await assertNoApprovedFullDayAbsence(client, context, input.employeeId, input.workDate);
   const [employee, site] = await Promise.all([
     client.query(
       "SELECT is_foreman FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
@@ -4256,10 +4697,6 @@ async function createAssignment(client, context, input) {
     }
   }
 
-  await client.query(
-    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-    [`assignment:${context.companyId}:${input.employeeId}:${input.workDate}`]
-  );
   const sequence = await client.query(
     `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_sequence
      FROM site_assignments
@@ -4342,6 +4779,13 @@ async function updateAssignment(client, context, assignmentId, input) {
   if (!["draft", "released"].includes(assignment.status)) {
     throw new InputError("Dieser Einsatz kann nicht mehr geändert werden.", 409, "assignment_locked");
   }
+  await lockAssignmentAvailability(client, context, assignment.user_id, input.workDate);
+  await assertNoApprovedFullDayAbsence(
+    client,
+    context,
+    assignment.user_id,
+    input.workDate
+  );
 
   const plannedDurationMinutes = input.plannedDurationMinutes === undefined
     ? assignment.planned_duration_minutes
@@ -4428,10 +4872,6 @@ async function updateAssignment(client, context, assignmentId, input) {
 
   let sequenceNumber = assignment.sequence_number;
   if (databaseDate(assignment.work_date) !== input.workDate) {
-    await client.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      [`assignment:${context.companyId}:${assignment.user_id}:${input.workDate}`]
-    );
     const sequence = await client.query(
       `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_sequence
        FROM site_assignments
@@ -5275,6 +5715,38 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { changed: true, session: view });
       }
 
+      if (request.method === "GET" && url.pathname === "/api/v1/absences") {
+        const range = timesheetExportRange(url);
+        const absences = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => listOwnAbsenceRequests(client, context, range)
+        );
+        return json(response, 200, { absences });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/absences") {
+        const input = validateAbsenceRequest(await readJson(request));
+        const absence = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createAbsenceRequest(client, context, input)
+        );
+        return json(response, 201, { absence });
+      }
+
+      const ownAbsenceCancelMatch = /^\/api\/v1\/absences\/([^/]+)\/cancel$/.exec(url.pathname);
+      if (request.method === "PATCH" && ownAbsenceCancelMatch) {
+        const absenceId = validateId(ownAbsenceCancelMatch[1], "Abwesenheits-ID");
+        const input = validateAbsenceDecision(await readJson(request));
+        const absence = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => cancelOwnAbsenceRequest(client, context, absenceId, input)
+        );
+        return json(response, 200, { absence });
+      }
+
       const siteWorkspaceMatch = /^\/api\/v1\/construction-sites\/([^/]+)\/dashboard$/.exec(url.pathname);
       if (request.method === "GET" && siteWorkspaceMatch) {
         const constructionSiteId = validateId(siteWorkspaceMatch[1], "Baustellen-ID");
@@ -5383,6 +5855,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      const adminAbsenceMatch = /^\/api\/v1\/admin\/absence-requests\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminAbsenceMatch) {
+        const absenceId = validateId(adminAbsenceMatch[1], "Abwesenheits-ID");
+        const input = validateAbsenceDecision(await readJson(request));
+        const absence = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => reviewAbsenceRequest(client, context, absenceId, input)
+        );
+        return json(response, 200, { absence });
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/admin/modules") {

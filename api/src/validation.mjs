@@ -46,6 +46,19 @@ const SITE_REPORT_SOURCES = new Set(["digital", "photo", "speech"]);
 const ELECTRICAL_MODULE_KEYS = new Set(["vde", "dguv"]);
 const TIME_CORRECTION_DECISIONS = new Set(["approved", "rejected"]);
 const WORK_DAY_DECISIONS = new Set(["approved", "locked"]);
+const ABSENCE_TYPES = new Set([
+  "vacation",
+  "unpaid_vacation",
+  "time_off",
+  "leave",
+  "special_leave",
+  "sick",
+  "training",
+  "vocational_school",
+  "other"
+]);
+const ABSENCE_DAY_PARTS = new Set(["full_day", "first_half", "second_half"]);
+const ABSENCE_DECISIONS = new Set(["approve", "reject", "cancel"]);
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 
 export class InputError extends Error {
@@ -403,6 +416,55 @@ export function validateAssignmentCancellation(body) {
     throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
   }
   return { changeReason: text(body.changeReason, "Stornogrund", 3, 500) };
+}
+
+export function validateAbsenceRequest(body) {
+  rejectTenantFields(body);
+  const absenceType = text(body.absenceType, "Abwesenheitsart", 3, 30).toLowerCase();
+  if (!ABSENCE_TYPES.has(absenceType)) {
+    throw new InputError("Die Abwesenheitsart ist ungültig.");
+  }
+  const startDate = validateWorkDate(body.startDate);
+  const endDate = validateWorkDate(body.endDate);
+  if (endDate < startDate) {
+    throw new InputError("Das Enddatum darf nicht vor dem Startdatum liegen.");
+  }
+  const maximumEnd = new Date(`${startDate}T12:00:00Z`);
+  maximumEnd.setUTCDate(maximumEnd.getUTCDate() + 366);
+  if (endDate > maximumEnd.toISOString().slice(0, 10)) {
+    throw new InputError("Ein Abwesenheitsantrag darf höchstens 367 Kalendertage umfassen.");
+  }
+  const dayPart = (body.dayPart === undefined || body.dayPart === null || body.dayPart === "")
+    ? "full_day"
+    : text(body.dayPart, "Tagesdauer", 3, 20).toLowerCase();
+  if (!ABSENCE_DAY_PARTS.has(dayPart)) {
+    throw new InputError("Die Tagesdauer ist ungültig.");
+  }
+  if (dayPart !== "full_day" && startDate !== endDate) {
+    throw new InputError("Ein halber Tag kann nur für ein einzelnes Datum beantragt werden.");
+  }
+  const note = optionalText(body.note, "Hinweis", 500);
+  if (absenceType === "other" && !note) {
+    throw new InputError("Für Sonstiges ist ein kurzer Hinweis erforderlich.");
+  }
+  return { absenceType, startDate, endDate, dayPart, note };
+}
+
+export function validateAbsenceDecision(body) {
+  rejectTenantFields(body);
+  const action = text(body.action, "Entscheidung", 3, 20).toLowerCase();
+  if (!ABSENCE_DECISIONS.has(action)) {
+    throw new InputError("Die Abwesenheitsentscheidung ist ungültig.");
+  }
+  const comment = optionalText(body.comment, "Kommentar", 500);
+  if (["reject", "cancel"].includes(action) && (!comment || comment.length < 3)) {
+    throw new InputError("Ablehnung oder Stornierung benötigt eine kurze Begründung.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Antragsversion ist ungültig.");
+  }
+  return { action, comment, rowVersion };
 }
 
 export function validateId(value, label = "ID") {

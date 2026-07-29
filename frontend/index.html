@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.35.0">
-    <script src="./app.js?v=0.35.0" defer></script>
-    <script src="./version.js?v=0.35.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.36.0">
+    <script src="./app.js?v=0.36.0" defer></script>
+    <script src="./version.js?v=0.36.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.35.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.36.0</p>
         </div>
       </section>
 
@@ -473,6 +473,60 @@
             </div>
             <p id="week-message" class="form-message week-message" aria-live="polite"></p>
 
+            <section id="absence-panel" class="week-review-panel absence-panel" aria-labelledby="absence-title">
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Urlaub und Abwesenheit</p>
+                  <h3 id="absence-title">Abwesenheit beantragen</h3>
+                </div>
+                <span id="absence-open-count" class="site-list-summary" aria-live="polite">0 offen</span>
+              </div>
+              <form id="absence-form" class="absence-form" novalidate>
+                <div class="setup-grid">
+                  <div>
+                    <label for="absence-type">Art</label>
+                    <select id="absence-type" required>
+                      <option value="vacation">Urlaub</option>
+                      <option value="unpaid_vacation">Unbezahlter Urlaub</option>
+                      <option value="time_off">Überstundenabbau</option>
+                      <option value="leave">Freistellung</option>
+                      <option value="special_leave">Sonderurlaub</option>
+                      <option value="sick">Krank</option>
+                      <option value="training">Lehrgang / Weiterbildung</option>
+                      <option value="vocational_school">Berufsschule</option>
+                      <option value="other">Sonstiges</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="absence-day-part">Dauer</label>
+                    <select id="absence-day-part" required>
+                      <option value="full_day">Ganzer Tag</option>
+                      <option value="first_half">Erste Tageshälfte</option>
+                      <option value="second_half">Zweite Tageshälfte</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="absence-start-date">Von</label>
+                    <input id="absence-start-date" type="date" required>
+                  </div>
+                  <div>
+                    <label for="absence-end-date">Bis</label>
+                    <input id="absence-end-date" type="date" required>
+                  </div>
+                </div>
+                <label for="absence-note">Hinweis <span>(optional, bei Sonstiges erforderlich)</span></label>
+                <textarea id="absence-note" maxlength="500" rows="2" placeholder="Kurzer Hinweis für die Prüfung"></textarea>
+                <button id="absence-submit" class="button button--primary" type="submit">
+                  Antrag einreichen
+                </button>
+              </form>
+              <p id="absence-message" class="form-message" aria-live="polite"></p>
+              <p class="absence-flow-note">
+                Erst nach Büroprüfung und Freigabe durch die Geschäftsführung ist die Abwesenheit verbindlich eingeplant.
+              </p>
+              <ul id="absence-list" class="absence-list" aria-label="Eigene Abwesenheitsanträge"></ul>
+            </section>
+
             <section id="employee-timesheet-export-panel" class="week-review-panel employee-timesheet-export-panel" aria-labelledby="employee-timesheet-export-title" hidden>
               <div class="site-management-panel__heading">
                 <div>
@@ -557,6 +611,21 @@
                 <span id="time-correction-review-count" class="site-list-summary" aria-live="polite">0</span>
               </div>
               <ul id="time-correction-review-list" class="admin-list time-correction-review-list" aria-label="Offene Zeitkorrekturen"></ul>
+            </section>
+
+            <section id="absence-review-panel" class="week-review-panel absence-review-panel" aria-labelledby="absence-review-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Zweistufige Freigabe</p>
+                  <h3 id="absence-review-title">Abwesenheiten prüfen</h3>
+                </div>
+                <span id="absence-review-count" class="site-list-summary" aria-live="polite">0</span>
+              </div>
+              <p class="absence-flow-note">
+                Büro prüft zuerst. Anschließend erteilt die Geschäftsführung die verbindliche Freigabe.
+                Beide Schritte müssen von verschiedenen Konten stammen.
+              </p>
+              <ul id="absence-review-list" class="absence-review-list" aria-label="Zu prüfende Abwesenheiten"></ul>
             </section>
           </section>
 
@@ -717,6 +786,7 @@
               </div>
               <div class="dispatch-summary__grid">
                 <div><strong id="dispatch-planned-count">0</strong><span>Eingeplant</span></div>
+                <div><strong id="dispatch-absent-count">0</strong><span>Abwesend</span></div>
                 <div><strong id="dispatch-unassigned-count">0</strong><span>Ohne Einsatz</span></div>
                 <div><strong id="dispatch-active-count">0</strong><span>Laufend</span></div>
                 <div><strong id="dispatch-review-count">0</strong><span>Zeitprüfung</span></div>

@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   expectedNextTypes,
   localDate,
+  validateAbsenceDecision,
+  validateAbsenceRequest,
   validateAssignment,
   validateAssignmentCancellation,
   validateAssignmentUpdate,
@@ -39,6 +41,59 @@ import {
   validateWorkDayDecision,
   validateWorkDate
 } from "../src/validation.mjs";
+
+test("Abwesenheiten prüfen Art Zeitraum Halbtage und Entscheidungen", () => {
+  assert.deepEqual(validateAbsenceRequest({
+    absenceType: "vacation",
+    startDate: "2026-08-10",
+    endDate: "2026-08-14",
+    dayPart: "full_day",
+    note: " Familienurlaub "
+  }), {
+    absenceType: "vacation",
+    startDate: "2026-08-10",
+    endDate: "2026-08-14",
+    dayPart: "full_day",
+    note: "Familienurlaub"
+  });
+  assert.deepEqual(validateAbsenceRequest({
+    absenceType: "time_off",
+    startDate: "2026-08-21",
+    endDate: "2026-08-21",
+    dayPart: "second_half"
+  }), {
+    absenceType: "time_off",
+    startDate: "2026-08-21",
+    endDate: "2026-08-21",
+    dayPart: "second_half",
+    note: null
+  });
+  assert.throws(() => validateAbsenceRequest({
+    absenceType: "vacation",
+    startDate: "2026-08-14",
+    endDate: "2026-08-10"
+  }), /Enddatum/);
+  assert.throws(() => validateAbsenceRequest({
+    absenceType: "time_off",
+    startDate: "2026-08-20",
+    endDate: "2026-08-21",
+    dayPart: "first_half"
+  }), /halber Tag/);
+  assert.throws(() => validateAbsenceRequest({
+    absenceType: "other",
+    startDate: "2026-08-20",
+    endDate: "2026-08-20"
+  }), /Hinweis/);
+  assert.deepEqual(validateAbsenceDecision({
+    action: "approve",
+    rowVersion: 2
+  }), { action: "approve", comment: null, rowVersion: 2 });
+  assert.throws(() => validateAbsenceDecision({
+    action: "reject",
+    comment: "",
+    rowVersion: 2
+  }), /Begründung/);
+});
 
 test("Elektro-Module verlangen bekannten Schlüssel Status und Versionsstand", () => {
   assert.deepEqual(

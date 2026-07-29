@@ -26,6 +26,7 @@ Aktuell enthalten:
 - Migration `015_add_organization_roles.sql` für die gleichberechtigten Organisationsrollen
 - Migration `016_add_business_roles.sql` für die sichtbaren Betriebsrollen und kompatible Bestandskonten
 - Migrationen `017_create_documents.sql` bis `026_automatic_site_foreman.sql` für zentrale Dokumente, Baustellenarbeit, strukturierte Berichte und Vorarbeiterverantwortung
+- Migrationen `027_allow_multiple_work_blocks.sql` bis `033_create_absence_requests.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule und Abwesenheiten
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -42,6 +43,8 @@ Aktuell enthalten:
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
 - geschützte Bearbeitung von Mitarbeiterstammdaten, Kontaktdaten und Betriebsrollen
 - Tageslage für die Disposition mit Planung, freien Feldmitarbeitern, laufenden Arbeitstagen und Zeitprüfungen
+- eigene Urlaubs- und Abwesenheitsanträge mit Büroprüfung, Vier-Augen-Freigabe und unveränderlicher Historie
+- freigegebene Abwesenheiten in Wochenplanung und Tageslage mit konfliktfester Sperre ganztägiger Einsätze
 - geplante Einsatzdauer und Arbeitsanweisung in Wochenplanung, Tageseinsatz und mobiler Baustellenakte
 - direkt erreichbare Telefon- und E-Mail-Kontakte des tagesbezogenen Baustellenteams
 - automatische Vorarbeiter- und Berichtsfunktion für den einzigen Mitarbeiter einer Baustelle

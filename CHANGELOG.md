@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.36.0 – Abwesenheiten und Urlaubsfreigabe
+
+- Mitarbeiter beantragen Urlaub, Überstundenabbau, Freistellung, Krankheit, Lehrgang, Berufsschule und weitere Abwesenheiten selbst in ihrer Wochenansicht; ganze und halbe Tage werden unterstützt
+- jeder Antrag durchläuft zuerst die Büroprüfung und anschließend die verbindliche Freigabe durch die Geschäftsführung
+- Büroprüfung und Geschäftsführungsfreigabe müssen von zwei verschiedenen Konten erfolgen; Ablehnungen, Zurückziehen und Aufheben einer Freigabe benötigen eine Begründung
+- freigegebene Abwesenheiten erscheinen in persönlicher Woche, Büro-Wochenplanung und Tageslage; ganztägig abwesende Mitarbeiter zählen nicht als frei verfügbar
+- vorhandene Einsätze blockieren die verbindliche Volltagsfreigabe, bis sie verschoben oder storniert wurden; danach verhindert eine gemeinsame transaktionale Sperre neue Planungskonflikte
+- Migration 033 speichert Anträge und ihre unveränderliche Ereignishistorie mandantengetrennt, versionsgeschützt und ohne fachliches Hartlöschen
+- Validierungs-, SQL-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Rollenfolge, Vier-Augen-Regel, Planungskonflikte, Historie und Mandantentrennung
+
 ### V0.35.0 – Einsatzdetails und Tagesdisposition
 
 - Einsätze erhalten eine optionale geplante Dauer und eine konkrete Arbeitsanweisung; beides kann beim Anlegen und bei einer historisierten Änderung gepflegt werden

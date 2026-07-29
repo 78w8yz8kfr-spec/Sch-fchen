@@ -253,7 +253,9 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     { headers: { Cookie: directorCookie } }
   );
   assert.equal(directorOverview.status, 200);
-  assert.equal((await directorOverview.json()).overview.canCreateManagementRoles, true);
+  const directorOverviewBody = (await directorOverview.json()).overview;
+  assert.equal(directorOverviewBody.canCreateManagementRoles, true);
+  assert.equal(directorOverviewBody.canApproveAbsenceManagement, true);
 
   const directorCreatesProjectManager = await fetch(`${baseUrl}/api/v1/admin/employees`, {
     method: "POST",
@@ -1218,6 +1220,188 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
   assert.equal(changedPassword.status, 200);
   assert.equal((await changedPassword.json()).session.user.mustChangePassword, false);
+
+  const absenceStart = "2027-08-10";
+  const absenceEnd = "2027-08-14";
+  const absenceResponse = await fetch(`${baseUrl}/api/v1/absences`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+    body: JSON.stringify({
+      absenceType: "vacation",
+      startDate: absenceStart,
+      endDate: absenceEnd,
+      dayPart: "full_day",
+      note: "Familienurlaub"
+    })
+  });
+  assert.equal(absenceResponse.status, 201, await absenceResponse.clone().text());
+  const submittedAbsence = (await absenceResponse.json()).absence;
+  assert.equal(submittedAbsence.status, "office_review");
+  assert.equal(submittedAbsence.rowVersion, 1);
+  assert.equal(submittedAbsence.history.length, 1);
+
+  const ownAbsencesResponse = await fetch(
+    `${baseUrl}/api/v1/absences?from=2027-01-01&to=2027-12-31`,
+    { headers: { Cookie: employeeCookie } }
+  );
+  assert.equal(ownAbsencesResponse.status, 200);
+  assert.equal((await ownAbsencesResponse.json()).absences[0].id, submittedAbsence.id);
+
+  const absencePlannerOverviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(absencePlannerOverviewResponse.status, 200);
+  const absencePlannerOverview = (await absencePlannerOverviewResponse.json()).overview;
+  assert.equal(absencePlannerOverview.canReviewAbsenceOffice, true);
+  assert.equal(absencePlannerOverview.canApproveAbsenceManagement, false);
+  assert.ok(absencePlannerOverview.absences.some((item) => item.id === submittedAbsence.id));
+
+  const forbiddenDirectorOfficeReview = await fetch(
+    `${baseUrl}/api/v1/admin/absence-requests/${submittedAbsence.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: directorCookie },
+      body: JSON.stringify({
+        action: "approve",
+        rowVersion: submittedAbsence.rowVersion
+      })
+    }
+  );
+  assert.equal(forbiddenDirectorOfficeReview.status, 403);
+  assert.equal(
+    (await forbiddenDirectorOfficeReview.json()).error.code,
+    "absence_office_review_forbidden"
+  );
+
+  const officeApprovedAbsenceResponse = await fetch(
+    `${baseUrl}/api/v1/admin/absence-requests/${submittedAbsence.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        action: "approve",
+        comment: "Einsatzplanung geprüft",
+        rowVersion: submittedAbsence.rowVersion
+      })
+    }
+  );
+  assert.equal(
+    officeApprovedAbsenceResponse.status,
+    200,
+    await officeApprovedAbsenceResponse.clone().text()
+  );
+  const officeApprovedAbsence = (await officeApprovedAbsenceResponse.json()).absence;
+  assert.equal(officeApprovedAbsence.status, "management_review");
+  assert.equal(officeApprovedAbsence.rowVersion, 2);
+
+  const forbiddenPlannerManagementReview = await fetch(
+    `${baseUrl}/api/v1/admin/absence-requests/${submittedAbsence.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        action: "approve",
+        rowVersion: officeApprovedAbsence.rowVersion
+      })
+    }
+  );
+  assert.equal(forbiddenPlannerManagementReview.status, 403);
+  assert.equal(
+    (await forbiddenPlannerManagementReview.json()).error.code,
+    "absence_management_approval_forbidden"
+  );
+
+  const conflictingAbsenceAssignmentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/assignments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: employee.id,
+        constructionSiteId: site.id,
+        workDate: absenceStart,
+        plannedStartTime: "07:00",
+        reportResponsible: false
+      })
+    }
+  );
+  assert.equal(
+    conflictingAbsenceAssignmentResponse.status,
+    201,
+    await conflictingAbsenceAssignmentResponse.clone().text()
+  );
+  const conflictingAbsenceAssignment = (await conflictingAbsenceAssignmentResponse.json()).assignment;
+
+  const conflictedManagementReviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/absence-requests/${submittedAbsence.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: directorCookie },
+      body: JSON.stringify({
+        action: "approve",
+        rowVersion: officeApprovedAbsence.rowVersion
+      })
+    }
+  );
+  assert.equal(conflictedManagementReviewResponse.status, 409);
+  assert.equal(
+    (await conflictedManagementReviewResponse.json()).error.code,
+    "absence_assignment_conflict"
+  );
+
+  const resolvedAbsenceAssignmentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/assignments/${conflictingAbsenceAssignment.id}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ changeReason: "Urlaubsfreigabe hat Vorrang" })
+    }
+  );
+  assert.equal(
+    resolvedAbsenceAssignmentResponse.status,
+    200,
+    await resolvedAbsenceAssignmentResponse.clone().text()
+  );
+
+  const managementApprovedAbsenceResponse = await fetch(
+    `${baseUrl}/api/v1/admin/absence-requests/${submittedAbsence.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: directorCookie },
+      body: JSON.stringify({
+        action: "approve",
+        comment: "Verbindlich freigegeben",
+        rowVersion: officeApprovedAbsence.rowVersion
+      })
+    }
+  );
+  assert.equal(
+    managementApprovedAbsenceResponse.status,
+    200,
+    await managementApprovedAbsenceResponse.clone().text()
+  );
+  const approvedAbsence = (await managementApprovedAbsenceResponse.json()).absence;
+  assert.equal(approvedAbsence.status, "approved");
+  assert.equal(approvedAbsence.rowVersion, 3);
+  assert.equal(approvedAbsence.history.length, 3);
+
+  const blockedAbsenceAssignmentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/assignments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: employee.id,
+        constructionSiteId: site.id,
+        workDate: absenceStart,
+        plannedStartTime: "07:00",
+        reportResponsible: false
+      })
+    }
+  );
+  assert.equal(blockedAbsenceAssignmentResponse.status, 409);
+  assert.equal((await blockedAbsenceAssignmentResponse.json()).error.code, "employee_absent");
 
   const employeeAssignments = await fetch(
     `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,

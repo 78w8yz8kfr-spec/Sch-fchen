@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 29.07.2026
-Technischer Stand: V0.35.0
+Technischer Stand: V0.36.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -82,7 +82,8 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/construction-sites/:id/notes?date=JJJJ-MM-TT` | Notiz idempotent für eine an diesem Tag zugewiesene Baustelle speichern |
 | `POST` | `/api/v1/construction-sites/:id/photos?date=JJJJ-MM-TT` | Foto für eine an diesem Tag zugewiesene Baustelle zentral speichern |
 | `GET` | `/api/v1/construction-sites/:id/documents/:documentId/content?date=JJJJ-MM-TT` | mit Baustellenzuweisung verknüpften Dateiinhalt geschützt lesen |
-| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter samt optionalen Kontaktdaten, Kunden, Projekte, Baustellen, Arbeitsmodule, Tageslage und Wochenplanung Montag bis Freitag |
+| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter samt optionalen Kontaktdaten, Kunden, Projekte, Baustellen, Arbeitsmodule, Abwesenheiten, Tageslage und Wochenplanung Montag bis Freitag |
+| `PATCH` | `/api/v1/admin/absence-requests/:id` | Büroprüfung, Geschäftsführungsentscheidung oder begründetes Aufheben einer verbindlichen Abwesenheit |
 | `POST` | `/api/v1/admin/site-notes` | Notiz für eine aktive Baustelle anlegen |
 | `POST` | `/api/v1/admin/site-tasks` | Aufgabe für eine aktive Baustelle anlegen |
 | `PATCH` | `/api/v1/admin/site-tasks/:id` | Aufgabenstatus versionsgeschützt ändern |
@@ -115,6 +116,9 @@ API setzt beide Werte ausschließlich selbst.
 | `DELETE` | `/api/v1/session` | Aktuelle Sitzung widerrufen |
 | `GET` | `/api/v1/work-days/:date` | Eigenen berechneten Arbeitstag und Ereignisse lesen |
 | `GET` | `/api/v1/work-weeks/:monday` | Eigene sieben Kalendertage mit wirksamen Buchungen und Summen lesen |
+| `GET` | `/api/v1/absences?from=JJJJ-MM-TT&to=JJJJ-MM-TT` | Ausschließlich eigene Abwesenheitsanträge und ihre Historie im Zeitraum lesen |
+| `POST` | `/api/v1/absences` | Eigenen unveränderlichen Abwesenheitsantrag für ganze oder halbe Tage einreichen |
+| `PATCH` | `/api/v1/absences/:id/cancel` | Eigenen noch nicht verbindlich freigegebenen Antrag begründet zurückziehen |
 | `GET` | `/api/v1/timesheets.xlsx` | Ausschließlich eigene freigegebene oder abgerechnete Stundenzettel exportieren; Mitarbeiter-ID stammt aus der Sitzung |
 | `GET` | `/api/v1/timesheets.pdf` | Eigenen freigegebenen oder abgerechneten A4-Stundenzettel mit Tages- und Gesamtsummen exportieren |
 | `GET` | `/api/v1/site-assignments/:date` | Eigene freigegebene Tageseinsätze lesen |
@@ -159,6 +163,17 @@ Geschäftsführer vergeben. Bestehende Konten mit `office`, `planner` oder
 neu angeboten. Monteur und Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum
 persönlichen Wechsel des Startpassworts sind Fach- und Verwaltungsendpunkte für
 das neue Konto gesperrt.
+
+Abwesenheiten besitzen eine eigene zweistufige Berechtigungsgrenze. Büro,
+Disposition oder Projektleitung führen die erste Prüfung aus; die
+Geschäftsführung erteilt die verbindliche zweite Freigabe. Beide Schritte
+müssen von verschiedenen Konten stammen. Der Client sendet ausschließlich
+Entscheidung, Kommentar und aktuellen Versionsstand. Firma, Mitarbeiter und
+Prüfer stammen aus Sitzung und Datenbank. Vor der Volltagsfreigabe müssen alle
+betroffenen Einsätze aufgelöst sein. Freigabe und Einsatzanlage verwenden
+dieselben transaktionalen Mitarbeiter-Tag-Sperren, damit kein paralleler
+Vorgang einen Planungskonflikt erzeugt. Jeder Statuswechsel landet in einer
+unveränderlichen, mandantengetrennten Ereignishistorie.
 
 Die mobile Baustellenakte besitzt eine zusätzliche fachliche Zugriffskontrolle:
 Ohne Planungsrolle muss für Benutzer, Baustelle und Datum ein freigegebener oder
@@ -258,6 +273,7 @@ privilegierten, Render-ähnlichen Datenbankeigentümer geprüft. Danach folgt de
 echte PostgreSQL-Ablauf: ersten Admin anlegen, PWA ausliefern, anmelden,
 Büro/Disposition und Monteur anlegen, Excel-Import vorschauen und doppelt geschützt
 ausführen, Einsatz freigeben, Startpasswort persönlich ändern,
-Rollenverbot prüfen, Einsatz historisiert verschieben und stornieren, Zeiten
-idempotent übertragen, Arbeitstag lesen, abmelden und den widerrufenen Cookie
-zurückweisen.
+Rollenverbot prüfen, Abwesenheit zweistufig freigeben, Planungskonflikte
+auflösen und anschließend sperren, Einsatz historisiert verschieben und
+stornieren, Zeiten idempotent übertragen, Arbeitstag lesen, abmelden und den
+widerrufenen Cookie zurückweisen.
