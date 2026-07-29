@@ -111,6 +111,9 @@
     employeeSiteOrder: document.querySelector("#employee-site-order"),
     employeeSiteContext: document.querySelector("#employee-site-context"),
     employeeSiteNavigation: document.querySelector("#employee-site-navigation"),
+    employeeSiteSectionButtons: [...document.querySelectorAll("[data-employee-site-section-button]")],
+    employeeSiteSections: [...document.querySelectorAll("[data-employee-site-section]")],
+    employeeSiteVdeTab: document.querySelector("#employee-site-vde-tab"),
     employeeSiteTeamCount: document.querySelector("#employee-site-team-count"),
     employeeSiteTeam: document.querySelector("#employee-site-team"),
     employeeSiteTaskCount: document.querySelector("#employee-site-task-count"),
@@ -421,6 +424,9 @@
     siteMaterialCancel: document.querySelector("#site-material-cancel"),
     siteMaterialMessage: document.querySelector("#site-material-message"),
     siteDashboardVdePanel: document.querySelector("#site-dashboard-vde-panel"),
+    siteDashboardSectionButtons: [...document.querySelectorAll("[data-site-dashboard-section-button]")],
+    siteDashboardSections: [...document.querySelectorAll("[data-site-dashboard-section]")],
+    siteDashboardVdeTab: document.querySelector("#site-dashboard-vde-tab"),
     siteDashboardVdeCount: document.querySelector("#site-dashboard-vde-count"),
     siteDashboardVdeStart: document.querySelector("#site-dashboard-vde-start"),
     siteDashboardVdeInspections: document.querySelector("#site-dashboard-vde-inspections"),
@@ -674,6 +680,8 @@
   let speechRecognition = null;
   let cachedUserId = null;
   let employeeSiteState = null;
+  let employeeSiteSection = "overview";
+  let siteDashboardSection = "overview";
   let mobileReportLeavesSite = true;
   let assignments = demoMode ? demoAssignments : [];
   let state = loadState();
@@ -903,7 +911,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.39.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.40.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1847,6 +1855,63 @@
     return `./api/v1/vde/inspections/${encodeURIComponent(inspectionId)}/pdf?${search.toString()}`;
   }
 
+  function selectWorkspaceSection({
+    requestedSection,
+    buttons,
+    sections,
+    buttonAttribute,
+    sectionAttribute,
+    scroll = false
+  }) {
+    const requestedButton = buttons.find(
+      (button) => button.dataset[buttonAttribute] === requestedSection && !button.hidden
+    );
+    const section = requestedButton ? requestedSection : "overview";
+
+    buttons.forEach((button) => {
+      const active = button.dataset[buttonAttribute] === section;
+      button.classList.toggle("workspace-section-tab--active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+
+    let selectedPanel = null;
+    sections.forEach((panel) => {
+      const active = panel.dataset[sectionAttribute] === section;
+      panel.hidden = !active;
+      if (active) {
+        selectedPanel = panel;
+        if (panel instanceof HTMLDetailsElement) panel.open = true;
+      }
+    });
+
+    if (scroll && selectedPanel) {
+      selectedPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    return section;
+  }
+
+  function showEmployeeSiteSection(section, scroll = false) {
+    employeeSiteSection = selectWorkspaceSection({
+      requestedSection: section,
+      buttons: elements.employeeSiteSectionButtons,
+      sections: elements.employeeSiteSections,
+      buttonAttribute: "employeeSiteSectionButton",
+      sectionAttribute: "employeeSiteSection",
+      scroll
+    });
+  }
+
+  function showSiteDashboardSection(section, scroll = false) {
+    siteDashboardSection = selectWorkspaceSection({
+      requestedSection: section,
+      buttons: elements.siteDashboardSectionButtons,
+      sections: elements.siteDashboardSections,
+      buttonAttribute: "siteDashboardSectionButton",
+      sectionAttribute: "siteDashboardSection",
+      scroll
+    });
+  }
+
   function appendVdeInspection(list, inspection, siteId, date) {
     const item = document.createElement("li");
     const content = document.createElement("div");
@@ -1886,10 +1951,11 @@
 
   function renderSiteVdeInspections(siteId) {
     const enabled = vdeModuleEnabled();
-    elements.siteDashboardVdePanel.hidden = !enabled;
+    elements.siteDashboardVdeTab.hidden = !enabled;
     elements.siteDashboardVdeInspections.replaceChildren();
     if (!enabled) {
       elements.siteDashboardVdeCount.textContent = "0";
+      showSiteDashboardSection(siteDashboardSection);
       return;
     }
     const inspections = (adminState?.vdeInspections || []).filter(
@@ -1901,6 +1967,7 @@
         elements.siteDashboardVdeInspections,
         "Noch keine VDE-Prüfung für diese Baustelle."
       );
+      showSiteDashboardSection(siteDashboardSection);
       return;
     }
     inspections.forEach((inspection) => {
@@ -1911,6 +1978,7 @@
         adminState.date
       );
     });
+    showSiteDashboardSection(siteDashboardSection);
   }
 
   function renderElectricalModuleAdministration() {
@@ -2421,6 +2489,7 @@
       });
 
     openedSiteId = site.id;
+    siteDashboardSection = "overview";
     resetDeliveryNoteCapture();
     resetSiteTaskForm();
     resetSiteNoteForm();
@@ -2461,6 +2530,7 @@
     elements.siteEditMessage.textContent = "";
     elements.siteDashboardEdit.hidden = false;
     elements.siteDashboard.hidden = false;
+    showSiteDashboardSection("overview");
     elements.siteDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -2490,18 +2560,23 @@
 
   function openReportForSite() {
     if (!openedSiteId) return;
-    elements.siteDashboardReportsPanel.open = true;
+    showSiteDashboardSection("reports");
     openSiteReportForm("digital");
     elements.siteReportForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function openTaskForSite() {
     if (!openedSiteId) return;
-    elements.siteDashboardTasksPanel.open = true;
+    showSiteDashboardSection("tasks");
     resetSiteTaskForm();
     elements.siteTaskForm.hidden = false;
     elements.siteTaskForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
     elements.siteTaskTitle.focus({ preventScroll: true });
+  }
+
+  function openDocumentsForSite() {
+    if (!openedSiteId) return;
+    showSiteDashboardSection("documents", true);
   }
 
   function openSiteEditor() {
@@ -3730,7 +3805,7 @@
 
     const vdeModule = dashboard.electricalModules?.vde;
     const vdeEnabled = Boolean(vdeModule?.enabled);
-    elements.employeeSiteVdeModule.hidden = !vdeEnabled;
+    elements.employeeSiteVdeTab.hidden = !vdeEnabled;
     elements.employeeSiteVdeInspections.replaceChildren();
     if (vdeEnabled) {
       const inspections = vdeModule.inspections || [];
@@ -3782,6 +3857,7 @@
       elements.employeeSiteNoteMessage.textContent =
         "Neue Notizen können wieder gespeichert werden, sobald eine Verbindung besteht.";
     }
+    showEmployeeSiteSection(employeeSiteSection);
   }
 
   async function openEmployeeSiteWorkspace() {
@@ -3794,6 +3870,7 @@
     }
 
     resetEmployeeSiteNoteForm();
+    employeeSiteSection = "overview";
     const cached = employeeSiteState
       && employeeSiteState.site?.id === assignment.constructionSite.id
       && employeeSiteState.date === state.workDate;
@@ -7377,6 +7454,11 @@
     }
   });
   elements.employeeSiteBack.addEventListener("click", () => showDashboardPane("start"));
+  elements.employeeSiteSectionButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      showEmployeeSiteSection(button.dataset.employeeSiteSectionButton, true);
+    });
+  });
   elements.employeeSiteVdeStart.addEventListener("click", () => {
     if (!employeeSiteState?.site?.id || !navigator.onLine) {
       showToast("Die VDE-Prüfung kann mit Verbindung gestartet werden.");
@@ -7596,9 +7678,14 @@
     elements.siteEditForm.hidden = true;
     elements.siteDashboard.hidden = true;
   });
+  elements.siteDashboardSectionButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      showSiteDashboardSection(button.dataset.siteDashboardSectionButton, true);
+    });
+  });
   elements.siteDashboardPlanAssignment.addEventListener("click", openAssignmentPlanningForSite);
   elements.siteDashboardCreateReport.addEventListener("click", openReportForSite);
-  elements.siteDashboardAddDocumentShortcut.addEventListener("click", openDocumentUploadForSite);
+  elements.siteDashboardAddDocumentShortcut.addEventListener("click", openDocumentsForSite);
   elements.siteDashboardCreateTask.addEventListener("click", openTaskForSite);
   elements.siteDashboardVdeStart.addEventListener("click", () => {
     if (!openedSiteId) return;

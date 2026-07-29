@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.39.0">
-    <script src="./app.js?v=0.39.0" defer></script>
-    <script src="./version.js?v=0.39.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.40.0">
+    <script src="./app.js?v=0.40.0" defer></script>
+    <script src="./version.js?v=0.40.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.39.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.40.0</p>
         </div>
       </section>
 
@@ -293,8 +293,19 @@
               </a>
             </article>
 
+            <nav class="workspace-section-nav" aria-label="Bereiche dieser Baustelle">
+              <button class="workspace-section-tab workspace-section-tab--active" type="button" data-employee-site-section-button="overview" aria-pressed="true">Übersicht</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="tasks" aria-pressed="false">Aufgaben</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="notes" aria-pressed="false">Notizen</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="reports" aria-pressed="false">Berichte</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="documents" aria-pressed="false">Dokumente</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="photos" aria-pressed="false">Fotos</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="materials" aria-pressed="false">Material</button>
+              <button id="employee-site-vde-tab" class="workspace-section-tab" type="button" data-employee-site-section-button="vde" aria-pressed="false" hidden>VDE</button>
+            </nav>
+
             <div class="employee-site-modules">
-              <section class="employee-site-module" aria-labelledby="employee-site-team-title">
+              <section class="employee-site-module" data-employee-site-section="overview" aria-labelledby="employee-site-team-title">
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">●●</span>
@@ -305,7 +316,7 @@
                 <ul id="employee-site-team" class="employee-site-list"></ul>
               </section>
 
-              <section class="employee-site-module" aria-labelledby="employee-site-tasks-title">
+              <section class="employee-site-module" data-employee-site-section="tasks" aria-labelledby="employee-site-tasks-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">✓</span>
@@ -316,7 +327,7 @@
                 <ul id="employee-site-tasks" class="employee-site-list"></ul>
               </section>
 
-              <section class="employee-site-module" aria-labelledby="employee-site-notes-title">
+              <section class="employee-site-module" data-employee-site-section="notes" aria-labelledby="employee-site-notes-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">✎</span>
@@ -341,7 +352,7 @@
                 <ul id="employee-site-notes" class="employee-site-list"></ul>
               </section>
 
-              <section class="employee-site-module" aria-labelledby="employee-site-reports-title">
+              <section class="employee-site-module" data-employee-site-section="reports" aria-labelledby="employee-site-reports-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">▤</span>
@@ -352,7 +363,7 @@
                 <ul id="employee-site-reports" class="employee-site-list"></ul>
               </section>
 
-              <section class="employee-site-module" aria-labelledby="employee-site-documents-title">
+              <section class="employee-site-module" data-employee-site-section="documents" aria-labelledby="employee-site-documents-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">▧</span>
@@ -363,7 +374,7 @@
                 <ul id="employee-site-documents" class="employee-site-list"></ul>
               </section>
 
-              <section class="employee-site-module employee-site-module--photos" aria-labelledby="employee-site-photos-title">
+              <section class="employee-site-module employee-site-module--photos" data-employee-site-section="photos" aria-labelledby="employee-site-photos-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">▣</span>
@@ -383,7 +394,7 @@
                 <ul id="employee-site-photos" class="employee-site-photo-grid"></ul>
               </section>
 
-              <section class="employee-site-module" aria-labelledby="employee-site-materials-title">
+              <section class="employee-site-module" data-employee-site-section="materials" aria-labelledby="employee-site-materials-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">□</span>
@@ -394,7 +405,7 @@
                 <ul id="employee-site-materials" class="employee-site-list"></ul>
               </section>
 
-              <section id="employee-site-vde-module" class="employee-site-module employee-site-module--vde" aria-labelledby="employee-site-vde-title" hidden>
+              <section id="employee-site-vde-module" class="employee-site-module employee-site-module--vde" data-employee-site-section="vde" aria-labelledby="employee-site-vde-title" hidden>
                 <div class="employee-site-module__heading">
                   <div>
                     <span class="employee-site-module__icon" aria-hidden="true">V</span>
@@ -1058,6 +1069,16 @@
                   <strong>Aufgabe</strong>
                 </button>
               </nav>
+              <nav class="workspace-section-nav workspace-section-nav--site-dashboard" aria-label="Baustellenakte">
+                <button class="workspace-section-tab workspace-section-tab--active" type="button" data-site-dashboard-section-button="overview" aria-pressed="true">Übersicht</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="team" aria-pressed="false">Mitarbeiter</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="reports" aria-pressed="false">Berichte</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="documents" aria-pressed="false">Dokumente</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="tasks" aria-pressed="false">Aufgaben</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="notes" aria-pressed="false">Notizen</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="materials" aria-pressed="false">Material</button>
+                <button id="site-dashboard-vde-tab" class="workspace-section-tab" type="button" data-site-dashboard-section-button="vde" aria-pressed="false" hidden>VDE</button>
+              </nav>
               <form id="site-edit-form" class="admin-form site-edit-form" novalidate hidden>
                 <div class="site-edit-form__heading">
                   <div>
@@ -1102,7 +1123,7 @@
                 </div>
                 <p id="site-edit-message" class="form-message" aria-live="polite"></p>
               </form>
-              <details open>
+              <details data-site-dashboard-section="overview" open>
                 <summary>Überblick</summary>
                 <dl class="site-facts">
                   <div><dt>Status</dt><dd id="site-dashboard-status">Aktiv</dd></div>
@@ -1112,11 +1133,11 @@
                 </dl>
                 <a id="site-dashboard-navigation" class="download-link" target="_blank" rel="noopener">Navigation öffnen</a>
               </details>
-              <details>
+              <details data-site-dashboard-section="team" hidden>
                 <summary>Mitarbeiter</summary>
                 <ul id="site-dashboard-employees" class="admin-list"></ul>
               </details>
-              <details id="site-dashboard-reports-panel">
+              <details id="site-dashboard-reports-panel" data-site-dashboard-section="reports" hidden>
                 <summary>Berichte <span id="site-dashboard-report-count" class="module-count">0</span></summary>
                 <div class="site-work-module">
                   <div class="report-entry-actions" aria-label="Bericht erfassen">
@@ -1207,7 +1228,7 @@
                   </form>
                 </div>
               </details>
-              <details id="site-dashboard-documents-panel">
+              <details id="site-dashboard-documents-panel" data-site-dashboard-section="documents" hidden>
                 <summary>Dokumente <span id="site-dashboard-document-count" class="module-count">0</span></summary>
                 <div class="site-document-module">
                   <button id="site-dashboard-capture-delivery-note" class="button button--primary" type="button">Lieferschein fotografieren</button>
@@ -1234,7 +1255,7 @@
                   <ul id="site-dashboard-documents" class="document-compact-list" aria-label="Dokumente dieser Baustelle"></ul>
                 </div>
               </details>
-              <details id="site-dashboard-tasks-panel">
+              <details id="site-dashboard-tasks-panel" data-site-dashboard-section="tasks" hidden>
                 <summary>Aufgaben <span id="site-dashboard-task-count" class="module-count">0</span></summary>
                 <div class="site-work-module">
                   <button id="site-task-add" class="button button--primary" type="button">Aufgabe hinzufügen</button>
@@ -1268,7 +1289,7 @@
                   <ul id="site-dashboard-tasks" class="site-module-list" aria-label="Aufgaben dieser Baustelle"></ul>
                 </div>
               </details>
-              <details id="site-dashboard-notes-panel">
+              <details id="site-dashboard-notes-panel" data-site-dashboard-section="notes" hidden>
                 <summary>Notizen <span id="site-dashboard-note-count" class="module-count">0</span></summary>
                 <div class="site-work-module">
                   <button id="site-note-add" class="button button--primary" type="button">Notiz hinzufügen</button>
@@ -1288,7 +1309,7 @@
                   <ul id="site-dashboard-notes" class="site-module-list" aria-label="Notizen dieser Baustelle"></ul>
                 </div>
               </details>
-              <details id="site-dashboard-materials-panel">
+              <details id="site-dashboard-materials-panel" data-site-dashboard-section="materials" hidden>
                 <summary>Material <span id="site-dashboard-material-count" class="module-count">0</span></summary>
                 <div class="site-work-module">
                   <button id="site-material-add" class="button button--primary" type="button">Material hinzufügen</button>
@@ -1322,7 +1343,7 @@
                   <ul id="site-dashboard-materials" class="site-module-list" aria-label="Material dieser Baustelle"></ul>
                 </div>
               </details>
-              <details id="site-dashboard-vde-panel" class="site-dashboard-vde-panel" hidden>
+              <details id="site-dashboard-vde-panel" class="site-dashboard-vde-panel" data-site-dashboard-section="vde" hidden>
                 <summary>VDE-Prüfungen <span id="site-dashboard-vde-count" class="module-count">0</span></summary>
                 <div class="site-work-module">
                   <button id="site-dashboard-vde-start" class="button button--primary" type="button">VDE-Prüfung starten</button>

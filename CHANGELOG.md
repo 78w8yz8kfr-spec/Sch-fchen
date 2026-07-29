@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+### V0.40.0 – Klare Baustellenbereiche und VDE-PDF-Seiten
+
+- die mobile Baustellenakte zeigt Übersicht, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und das optional aktivierte VDE-Modul als einzeln wählbare Arbeitsbereiche statt als lange Folge gleichzeitig sichtbarer Karten
+- das Büro-Baustellendashboard verwendet dieselbe Bereichsnavigation für Übersicht, Mitarbeiter, Berichte, Dokumente, Aufgaben, Notizen, Material und VDE
+- Schnellaktionen für Bericht, Dokument und Aufgabe öffnen direkt den zugehörigen Baustellenbereich
+- die VDE-Abschluss-PDF beginnt auf Seite zwei unmittelbar mit Verteilungen, Schutzorganen und Messwerten
+- das optionale Stromkreisverzeichnis beginnt nach den Messwertseiten immer auf einer eigenen neuen Seite und besitzt eine klare Tabellenüberschrift
+- PDF-, API- und PWA-Smoke-Tests sichern die neue Seitenfolge, A4-Ausgabe und getrennte Bereichsnavigation; eine Datenbankmigration ist nicht erforderlich
+
 ### V0.39.0 – Integriertes VDE-Prüfmodul
 
 - die vorhandene V15-Prüfprotokoll-Anwendung ist als erstes vollständig angebundenes, firmenweit aktivierbares Elektro-Spezialmodul direkt aus der Schäfchen-Baustellenakte erreichbar

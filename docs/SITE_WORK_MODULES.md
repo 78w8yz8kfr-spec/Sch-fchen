@@ -1,14 +1,14 @@
 # Baustellenarbeit: Aufgaben, Notizen, Material und Berichte
 
 Stand: 29.07.2026
-Technischer Stand: V0.39.0
+Technischer Stand: V0.40.0
 
 ## Bedienkonzept
 
-Die Baustelle bleibt der Arbeitsort. Aufgaben, Notizen, Material und Berichte erscheinen
-deshalb ausschließlich als ruhige, aufklappbare Themenbereiche im
-Baustellen-Dashboard. Es gibt keine globale Aktivitätschronik und keine
-zusätzlichen Hauptmenüpunkte.
+Die Baustelle bleibt der Arbeitsort. Aufgaben, Notizen, Material und Berichte
+erscheinen deshalb ausschließlich als einzeln wählbare Themenbereiche im
+Baustellen-Dashboard. Pro Auswahl ist nur der zugehörige Arbeitsbereich sichtbar.
+Es gibt keine globale Aktivitätschronik und keine zusätzlichen Hauptmenüpunkte.
 
 Die Oberfläche folgt den festgelegten Gestaltungsregeln:
 
@@ -25,10 +25,10 @@ Die Oberfläche folgt den festgelegten Gestaltungsregeln:
 Navigation und Baustellenakte sind direkt am aktuellen Tageseinsatz erreichbar.
 Die Baustellenakte öffnet die Baustelle als eigenen Arbeitsbereich.
 Die einsatzbezogene Arbeitsanweisung, geplante Startzeit und Dauer sowie die
-Navigation stehen zuerst; darunter folgen
-sichtbare, getrennte Karten für Mitarbeiter, Aufgaben, Notizen, Berichte, Dokumente,
-Fotos und Material. Die Ansicht ist keine chronologische Pinnwand und erzeugt
-keinen zusätzlichen Hauptmenüpunkt.
+Navigation stehen zuerst; darunter wählt der Mitarbeiter gezielt Übersicht,
+Aufgaben, Notizen, Berichte, Dokumente, Fotos oder Material. Schäfchen zeigt
+anschließend nur diesen Bereich. Die Ansicht ist keine chronologische Pinnwand
+und erzeugt keinen zusätzlichen Hauptmenüpunkt.
 
 Ist das VDE-Spezialmodul für die Firma aktiviert, folgt als weitere Themenkarte
 die Liste der VDE-Prüfungen dieser Baustelle. Der Editor öffnet einen eigenen
