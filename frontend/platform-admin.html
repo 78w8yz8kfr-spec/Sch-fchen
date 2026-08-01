@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#171a18">
+    <meta name="description" content="Schäfchen Plattformverwaltung">
+    <title>Plattformverwaltung · Schäfchen</title>
+    <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./platform-admin.css?v=0.42.0">
+    <script src="./platform-admin.js?v=0.42.0" defer></script>
+  </head>
+  <body>
+    <section id="platform-auth" class="platform-auth" aria-labelledby="platform-auth-title">
+      <div class="platform-auth__card">
+        <a class="platform-brand" href="./">
+          <img src="./assets/mark.svg" width="48" height="48" alt="">
+          <span><strong>Schäfchen</strong><small>Plattformverwaltung</small></span>
+        </a>
+        <div>
+          <p class="platform-eyebrow">Getrennter Plattformzugang</p>
+          <h1 id="platform-auth-title">Administrator anmelden</h1>
+          <p class="platform-muted">Dieses Konto gehört keiner Firma und besitzt keine Personalnummer oder Zeiterfassung.</p>
+        </div>
+        <form id="platform-login-form" class="platform-form" novalidate>
+          <label>E-Mail-Adresse<input id="platform-login-email" type="email" autocomplete="username" required></label>
+          <label>Passwort<input id="platform-login-password" type="password" autocomplete="current-password" required></label>
+          <button class="platform-button platform-button--primary" type="submit">Sicher anmelden</button>
+        </form>
+        <form id="platform-setup-form" class="platform-form" novalidate hidden>
+          <p class="platform-notice">Einmalige Einrichtung des ersten Superadministrators</p>
+          <div class="platform-form__grid">
+            <label>Vorname<input id="platform-setup-first-name" maxlength="100" required></label>
+            <label>Nachname<input id="platform-setup-last-name" maxlength="100" required></label>
+          </div>
+          <label>E-Mail-Adresse<input id="platform-setup-email" type="email" autocomplete="username" required></label>
+          <label>Passwort<input id="platform-setup-password" type="password" autocomplete="new-password" minlength="12" required></label>
+          <label>Einrichtungsschlüssel<input id="platform-setup-token" type="password" autocomplete="off" minlength="24" required></label>
+          <button class="platform-button platform-button--primary" type="submit">Superadministrator anlegen</button>
+        </form>
+        <p id="platform-auth-message" class="platform-message" aria-live="polite"></p>
+        <a class="platform-back" href="./">Zur Firmenanmeldung</a>
+      </div>
+    </section>
+
+    <div id="platform-shell" class="platform-shell" hidden>
+      <aside class="platform-sidebar">
+        <div class="platform-brand platform-brand--sidebar">
+          <img src="./assets/mark.svg" width="40" height="40" alt="">
+          <span><strong>Schäfchen</strong><small>Plattform</small></span>
+        </div>
+        <nav id="platform-navigation" class="platform-navigation" aria-label="Plattformverwaltung">
+          <button data-platform-view="overview" class="is-active">Übersicht</button>
+          <button data-platform-view="companies">Firmen</button>
+          <button data-platform-view="accounts">Benutzer</button>
+          <button data-platform-view="plans">Lizenzen und Tarife</button>
+          <button data-platform-view="modules">Module</button>
+          <button data-platform-view="support">Support</button>
+          <button data-platform-view="health">Systemstatus</button>
+          <button data-platform-view="errors">Fehler</button>
+          <button data-platform-view="versions">Versionen</button>
+          <button data-platform-view="announcements">Mitteilungen</button>
+          <button data-platform-view="backups">Backups</button>
+          <button data-platform-view="privacy">Datenschutz</button>
+          <button data-platform-view="audit">Audit-Log</button>
+          <button data-platform-view="settings">Einstellungen</button>
+        </nav>
+        <div class="platform-sidebar__account">
+          <strong id="platform-user-name">Administrator</strong>
+          <span id="platform-user-roles"></span>
+          <button id="platform-logout" type="button">Abmelden</button>
+        </div>
+      </aside>
+
+      <main class="platform-main">
+        <div id="support-mode-banner" class="support-mode-banner" hidden>
+          <div><strong id="support-mode-company">Administratoransicht</strong><span id="support-mode-reason"></span></div>
+          <button id="support-mode-end" type="button">Supportmodus beenden</button>
+        </div>
+        <header class="platform-topbar">
+          <button id="platform-menu-toggle" class="platform-menu-toggle" type="button" aria-label="Navigation öffnen">☰</button>
+          <div>
+            <p class="platform-eyebrow">Plattformverwaltung</p>
+            <h1 id="platform-view-title">Übersicht</h1>
+          </div>
+          <button id="platform-refresh" class="platform-button platform-button--quiet" type="button">Aktualisieren</button>
+        </header>
+
+        <section id="platform-overview" class="platform-view" data-view-panel="overview">
+          <div id="platform-metrics" class="platform-metrics" aria-label="Plattformkennzahlen"></div>
+        </section>
+
+        <section id="platform-resource" class="platform-view" data-view-panel="resource" hidden>
+          <div id="platform-toolbar" class="platform-toolbar">
+            <label class="platform-search">Suchen<input id="platform-search" type="search" placeholder="Name, Nummer oder E-Mail"></label>
+            <select id="platform-filter" aria-label="Statusfilter"></select>
+            <button id="platform-create" class="platform-button platform-button--primary" type="button" hidden>Neu anlegen</button>
+          </div>
+          <p id="platform-resource-summary" class="platform-muted"></p>
+          <div id="platform-table-wrap" class="platform-table-wrap"></div>
+          <div id="platform-pagination" class="platform-pagination" hidden>
+            <button id="platform-page-previous" type="button">Zurück</button>
+            <span id="platform-page-label"></span>
+            <button id="platform-page-next" type="button">Weiter</button>
+          </div>
+        </section>
+        <p id="platform-message" class="platform-message" aria-live="polite"></p>
+      </main>
+    </div>
+
+    <dialog id="company-dialog" class="platform-dialog" aria-labelledby="company-dialog-title">
+      <form id="company-form" class="platform-form platform-dialog__body" novalidate>
+        <header>
+          <div><p class="platform-eyebrow">Firmendetail</p><h2 id="company-dialog-title">Firma</h2></div>
+          <button id="company-dialog-close" class="platform-dialog__close" type="button" aria-label="Schließen">×</button>
+        </header>
+        <input id="company-id" type="hidden">
+        <input id="company-row-version" type="hidden">
+        <p id="company-activity" class="platform-muted"></p>
+        <div class="platform-form__grid">
+          <label>Rechtlicher Name<input id="company-legal-name" maxlength="200" required></label>
+          <label>Anzeigename<input id="company-display-name" maxlength="120" required></label>
+          <label>Ansprechpartner<input id="company-contact-name" maxlength="200"></label>
+          <label>E-Mail<input id="company-contact-email" type="email" maxlength="254"></label>
+          <label>Telefon<input id="company-phone" maxlength="50"></label>
+          <label>Straße<input id="company-street" maxlength="150"></label>
+          <label>Hausnummer<input id="company-house-number" maxlength="30"></label>
+          <label>Postleitzahl<input id="company-postal-code" maxlength="20"></label>
+          <label>Ort<input id="company-city" maxlength="120"></label>
+          <label>Status<select id="company-status"></select></label>
+          <label>Tarif<input id="company-license-plan" maxlength="80"></label>
+          <label>Benutzerlimit<input id="company-user-limit" type="number" min="1"></label>
+          <label>Speicherlimit (Bytes)<input id="company-storage-limit" type="number" min="0"></label>
+          <label>Testphase bis<input id="company-trial-ends" type="datetime-local"></label>
+          <label>Lizenz gültig bis<input id="company-license-valid-until" type="datetime-local"></label>
+          <label>Vertrag bis<input id="company-contract-ends" type="datetime-local"></label>
+          <label>Kündigung hinterlegt am<input id="company-cancellation-recorded" type="datetime-local"></label>
+          <label>Löschung vorbereitet für<input id="company-deletion-scheduled" type="datetime-local"></label>
+        </div>
+        <label>Begründung<textarea id="company-reason" maxlength="1000" rows="2" required></textarea></label>
+        <button class="platform-button platform-button--primary" type="submit">Stammdaten speichern</button>
+        <section id="company-modules" class="company-modules" hidden>
+          <div><p class="platform-eyebrow">Nur Plattformverwaltung</p><h3>Firmenweite Module</h3></div>
+          <div id="company-module-list"></div>
+        </section>
+        <section id="company-contract" class="company-support-access" hidden>
+          <div><p class="platform-eyebrow">Unveränderbarer Preisstand</p><h3>Tarifversion zuweisen</h3></div>
+          <div class="platform-form__grid">
+            <label>Tarifversion<select id="company-contract-version"></select></label>
+            <label>Status<select id="company-contract-status"><option value="trial">Testphase</option><option value="active">Aktiv</option><option value="payment_due">Zahlung offen</option><option value="suspended">Gesperrt</option></select></label>
+            <label>Abrechnungszyklus<select id="company-contract-cycle"><option value="monthly">Monatlich</option><option value="annual">Jährlich</option><option value="custom">Individuell</option></select></label>
+            <label>Rabatt in Prozent<input id="company-contract-discount" type="number" min="0" max="100" step="0.01" value="0"></label>
+            <label>Beginn<input id="company-contract-starts" type="datetime-local"></label>
+            <label>Ende<input id="company-contract-new-ends" type="datetime-local"></label>
+            <label>Testphase bis<input id="company-contract-trial-ends" type="datetime-local"></label>
+            <label>Kulanz bis<input id="company-contract-goodwill" type="datetime-local"></label>
+            <label>Monatspreis (Cent)<input id="company-contract-monthly-price" type="number" min="0" placeholder="aus Tarif"></label>
+            <label>Jahrespreis (Cent)<input id="company-contract-annual-price" type="number" min="0" placeholder="aus Tarif"></label>
+            <label>Benutzerlimit<input id="company-contract-user-limit" type="number" min="1" placeholder="aus Tarif"></label>
+            <label>Speicherlimit (Bytes)<input id="company-contract-storage-limit" type="number" min="0" placeholder="aus Tarif"></label>
+            <label>Kündigungsfrist (Tage)<input id="company-contract-notice-days" type="number" min="0" placeholder="aus Tarif"></label>
+            <label>Mindestlaufzeit (Monate)<input id="company-contract-minimum-term" type="number" min="0" placeholder="aus Tarif"></label>
+          </div>
+          <label>Enthaltene Module (kommagetrennt)<input id="company-contract-modules" placeholder="aus Tarif"></label>
+          <label>Sonderkonditionen<textarea id="company-contract-terms" maxlength="10000" rows="2"></textarea></label>
+          <button id="company-contract-assign" class="platform-button platform-button--warning" type="button">Neue Vertragsversion zuweisen</button>
+        </section>
+        <section id="company-support-access" class="company-support-access" hidden>
+          <h3>Protokollierten Supportmodus starten</h3>
+          <div class="platform-form__grid">
+            <label>Grund<select id="support-access-reason"></select></label>
+            <label>Supportfall (optional)<input id="support-access-ticket" placeholder="UUID"></label>
+          </div>
+          <label>Begründung<textarea id="support-access-detail" maxlength="1000" rows="2"></textarea></label>
+          <button id="support-access-start" class="platform-button platform-button--warning" type="button">Supportmodus starten</button>
+        </section>
+        <section class="company-support-access">
+          <div><p class="platform-eyebrow">Firmenbezogener Verlauf</p><h3>Supportfälle</h3></div>
+          <div id="company-support-cases" class="company-support-cases"></div>
+        </section>
+        <p id="company-dialog-message" class="platform-message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
+    <dialog id="platform-action-dialog" class="platform-dialog" aria-labelledby="platform-action-title">
+      <form id="platform-action-form" class="platform-form platform-dialog__body" novalidate>
+        <header><h2 id="platform-action-title">Aktion</h2><button id="platform-action-close" class="platform-dialog__close" type="button">×</button></header>
+        <div id="platform-action-fields"></div>
+        <label>Begründung<textarea id="platform-action-reason" maxlength="1000" rows="3" required></textarea></label>
+        <button class="platform-button platform-button--primary" type="submit">Bestätigen</button>
+        <p id="platform-action-message" class="platform-message" aria-live="polite"></p>
+      </form>
+    </dialog>
+  </body>
+</html>

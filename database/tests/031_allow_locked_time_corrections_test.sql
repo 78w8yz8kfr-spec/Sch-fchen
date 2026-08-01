@@ -44,9 +44,11 @@ BEGIN
     UPDATE work_days
     SET status = 'approved', approved_by_user_id = employee_id
     WHERE id = work_day_id;
+    PERFORM set_config('app.controlled_time_correction', 'on', TRUE);
     UPDATE work_days
     SET status = 'locked', locked_by_user_id = employee_id
     WHERE id = work_day_id;
+    PERFORM set_config('app.controlled_time_correction', '', TRUE);
 
     INSERT INTO time_entries (
         company_id, user_id, work_day_id, entry_type, recorded_at,

@@ -142,7 +142,7 @@ BEGIN
 
     IF NOT EXISTS (
         SELECT 1 FROM work_days
-        WHERE id = work_day_id AND calculation_version = 3
+        WHERE id = work_day_id AND calculation_version = 4
     ) THEN
         RAISE EXCEPTION 'Neue Zeitberechnung wurde nicht angewendet';
     END IF;

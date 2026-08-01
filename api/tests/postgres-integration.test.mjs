@@ -33,6 +33,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     cookieSecure: false,
     initialCompanyNumber: "F-000001",
     initialSetupToken: "CI-SETUP-TOKEN-2026-ONLY-TEST",
+    platformSetupToken: "CI-PLATFORM-SETUP-2026-ONLY-TEST",
     staticDirectory: frontendDirectory,
     database: {
       host: process.env.POSTGRES_HOST,
@@ -113,6 +114,251 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   const session = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });
   assert.equal(session.status, 200);
+
+  const platformShell = await fetch(`${baseUrl}/platform-admin.html`);
+  assert.equal(platformShell.status, 200);
+  assert.match(await platformShell.text(), /id="platform-navigation"/);
+  const platformSetup = await fetch(`${baseUrl}/api/v1/platform/setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      setupToken: config.platformSetupToken,
+      firstName: "Sina",
+      lastName: "System",
+      email: `platform-${suffix.toLowerCase()}@example.test`,
+      password: "Plattform-Integration-2026!"
+    })
+  });
+  assert.equal(platformSetup.status, 201, await platformSetup.clone().text());
+  const platformLogin = await fetch(`${baseUrl}/api/v1/platform/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: `platform-${suffix.toLowerCase()}@example.test`,
+      password: "Plattform-Integration-2026!"
+    })
+  });
+  assert.equal(platformLogin.status, 201, await platformLogin.clone().text());
+  const platformCookie = platformLogin.headers.get("set-cookie").split(";", 1)[0];
+  const platformSession = (await platformLogin.json()).session;
+  assert.deepEqual(platformSession.platformUser.roles, ["superadmin"]);
+  assert.equal(Object.hasOwn(platformSession.platformUser, "company"), false);
+
+  const platformOverviewResponse = await fetch(`${baseUrl}/api/v1/platform/overview`, {
+    headers: { Cookie: platformCookie }
+  });
+  assert.equal(platformOverviewResponse.status, 200);
+  const platformOverview = (await platformOverviewResponse.json()).overview;
+  assert.ok(platformOverview.companiesTotal >= 1);
+  assert.equal(Object.hasOwn(platformOverview, "runningConstructionSites"), false);
+  assert.equal(Object.hasOwn(platformOverview, "workMinutes"), false);
+
+  const platformCompaniesResponse = await fetch(
+    `${baseUrl}/api/v1/platform/companies?search=F-000001`,
+    { headers: { Cookie: platformCookie } }
+  );
+  assert.equal(platformCompaniesResponse.status, 200);
+  const tenantCompany = (await platformCompaniesResponse.json()).companies.items
+    .find((company) => company.companyNumber === "F-000001");
+  assert.ok(tenantCompany);
+
+  const registrationResponse = await fetch(`${baseUrl}/api/v1/platform/registrations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: platformCookie },
+    body: JSON.stringify({
+      legalName: `Einladung ${suffix} GmbH`,
+      displayName: `Einladung ${suffix}`,
+      contactName: "Rita Registrierung",
+      contactEmail: `registrierung-${suffix.toLowerCase()}@example.test`,
+      planKey: "standard",
+      expiresInDays: 7,
+      reason: "Registrierungseinladung und sichere Token-Ausgabe prüfen"
+    })
+  });
+  assert.equal(registrationResponse.status, 201, await registrationResponse.clone().text());
+  const registrationBody = await registrationResponse.json();
+  assert.ok(registrationBody.invitationToken);
+  assert.equal(Object.hasOwn(registrationBody.registration, "invitationTokenHash"), false);
+
+  const integrationPlanResponse = await fetch(`${baseUrl}/api/v1/platform/plans`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: platformCookie },
+    body: JSON.stringify({
+      key: `integration_${suffix.toLowerCase()}`,
+      name: "Integrationstarif",
+      status: "draft",
+      description: "Unveränderbarer Tarifstand für den Integrationstest",
+      reason: "Tarifverwaltung im PostgreSQL-Integrationstest prüfen"
+    })
+  });
+  assert.equal(integrationPlanResponse.status, 201, await integrationPlanResponse.clone().text());
+  const integrationPlan = (await integrationPlanResponse.json()).plan;
+  const updatePlanResponse = await fetch(
+    `${baseUrl}/api/v1/platform/plans/${integrationPlan.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        name: "Integrationstarif aktualisiert",
+        status: "active",
+        description: "Aktualisierte Stammdaten ohne Änderung bestehender Verträge",
+        rowVersion: integrationPlan.rowVersion,
+        reason: "Tarif-Stammdaten im Integrationstest ändern"
+      })
+    }
+  );
+  assert.equal(updatePlanResponse.status, 200, await updatePlanResponse.clone().text());
+  assert.equal((await updatePlanResponse.json()).plan.status, "active");
+
+  const supportTicketResponse = await fetch(
+    `${baseUrl}/api/v1/platform/support/tickets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        companyId: tenantCompany.id,
+        contactName: "API Integration",
+        contactEmail: "integration@example.test",
+        category: "technical",
+        priority: "high",
+        subject: "Supportmodus prüfen",
+        description: "Zeitlich begrenzten, protokollierten Supportzugriff testen.",
+        reason: "Supportfall im PostgreSQL-Integrationstest anlegen"
+      })
+    }
+  );
+  assert.equal(supportTicketResponse.status, 201, await supportTicketResponse.clone().text());
+  const supportTicket = (await supportTicketResponse.json()).ticket;
+  const supportAccessResponse = await fetch(`${baseUrl}/api/v1/platform/support-access`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: platformCookie },
+    body: JSON.stringify({
+      companyId: tenantCompany.id,
+      supportTicketId: supportTicket.id,
+      reasonCode: "technical_analysis",
+      reasonDetail: "Technische Fehleranalyse im PostgreSQL-Integrationstest"
+    })
+  });
+  assert.equal(supportAccessResponse.status, 201, await supportAccessResponse.clone().text());
+  const supportAccess = (await supportAccessResponse.json()).supportAccess;
+  const supportContextResponse = await fetch(
+    `${baseUrl}/api/v1/platform/support-access/${supportAccess.id}/context`,
+    { headers: { Cookie: platformCookie, "X-Support-Access-Id": supportAccess.id } }
+  );
+  assert.equal(supportContextResponse.status, 200, await supportContextResponse.clone().text());
+  const supportContext = await supportContextResponse.json();
+  assert.equal(supportContext.company.id, tenantCompany.id);
+  assert.equal(Object.hasOwn(supportContext, "timeEntries"), false);
+  const supportEndResponse = await fetch(
+    `${baseUrl}/api/v1/platform/support-access/${supportAccess.id}/end`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: platformCookie,
+        "X-Support-Access-Id": supportAccess.id
+      },
+      body: JSON.stringify({ reason: "Supportmodus im Integrationstest bewusst beenden" })
+    }
+  );
+  assert.equal(supportEndResponse.status, 200, await supportEndResponse.clone().text());
+  const endedSupportContext = await fetch(
+    `${baseUrl}/api/v1/platform/support-access/${supportAccess.id}/context`,
+    { headers: { Cookie: platformCookie, "X-Support-Access-Id": supportAccess.id } }
+  );
+  assert.equal(endedSupportContext.status, 409);
+  assert.equal((await endedSupportContext.json()).error.code, "support_access_inactive");
+
+  const versionListResponse = await fetch(`${baseUrl}/api/v1/platform/versions`, {
+    headers: { Cookie: platformCookie }
+  });
+  assert.equal(versionListResponse.status, 200, await versionListResponse.clone().text());
+  const productionVersion = (await versionListResponse.json()).versions
+    .find((version) => version.releaseStatus === "production");
+  assert.equal(productionVersion.version, "0.42.0");
+  const requireUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/platform/versions/${productionVersion.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        mandatoryUpdate: true,
+        confirmation: productionVersion.version,
+        reason: "Pflichtupdate im PostgreSQL-Integrationstest einschalten"
+      })
+    }
+  );
+  assert.equal(requireUpdateResponse.status, 200, await requireUpdateResponse.clone().text());
+  await new Promise((resolve) => setTimeout(resolve, 2100));
+  const outdatedSessionResponse = await fetch(`${baseUrl}/api/v1/session`, {
+    headers: { Cookie: cookie, "X-Schaefchen-Version": "0.41.0" }
+  });
+  assert.equal(outdatedSessionResponse.status, 426);
+  assert.equal((await outdatedSessionResponse.json()).error.code, "mandatory_update");
+  const currentSessionResponse = await fetch(`${baseUrl}/api/v1/session`, {
+    headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.0" }
+  });
+  assert.equal(currentSessionResponse.status, 200);
+  const releaseUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/platform/versions/${productionVersion.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        mandatoryUpdate: false,
+        confirmation: productionVersion.version,
+        reason: "Pflichtupdate nach dem PostgreSQL-Integrationstest ausschalten"
+      })
+    }
+  );
+  assert.equal(releaseUpdateResponse.status, 200, await releaseUpdateResponse.clone().text());
+  await new Promise((resolve) => setTimeout(resolve, 2100));
+
+  const maintenanceOnResponse = await fetch(
+    `${baseUrl}/api/v1/platform/settings/maintenance.enabled`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        value: true,
+        reason: "Wartungsmodus im PostgreSQL-Integrationstest einschalten"
+      })
+    }
+  );
+  assert.equal(maintenanceOnResponse.status, 200, await maintenanceOnResponse.clone().text());
+  await new Promise((resolve) => setTimeout(resolve, 2100));
+  const maintenanceBlockedResponse = await fetch(`${baseUrl}/api/v1/session`, {
+    headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.0" }
+  });
+  assert.equal(maintenanceBlockedResponse.status, 503);
+  assert.equal((await maintenanceBlockedResponse.json()).error.code, "maintenance_mode");
+  const platformDuringMaintenanceResponse = await fetch(
+    `${baseUrl}/api/v1/platform/overview`,
+    { headers: { Cookie: platformCookie } }
+  );
+  assert.equal(platformDuringMaintenanceResponse.status, 200);
+  const maintenanceOffResponse = await fetch(
+    `${baseUrl}/api/v1/platform/settings/maintenance.enabled`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        value: false,
+        reason: "Wartungsmodus nach dem PostgreSQL-Integrationstest ausschalten"
+      })
+    }
+  );
+  assert.equal(maintenanceOffResponse.status, 200, await maintenanceOffResponse.clone().text());
+  await new Promise((resolve) => setTimeout(resolve, 2100));
+
+  const platformAuditResponse = await fetch(`${baseUrl}/api/v1/platform/audit`, {
+    headers: { Cookie: platformCookie }
+  });
+  assert.equal(platformAuditResponse.status, 200, await platformAuditResponse.clone().text());
+  const platformAudit = (await platformAuditResponse.json()).audit;
+  assert.ok(platformAudit.some((entry) => entry.action === "support.access_start"));
+  assert.ok(platformAudit.some((entry) => entry.action === "support.access_end"));
+  assert.ok(platformAudit.some((entry) => entry.action === "setting.update"));
 
   const assignmentDate = localDate(new Date().toISOString(), config.timeZone);
   const employeePersonnelNumber = `MON-${suffix}`;
@@ -227,11 +473,11 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(initialModulesResponse.status, 200);
   const initialModules = (await initialModulesResponse.json()).modules;
   assert.deepEqual(initialModules.map((module) => module.key), ["vde", "dguv"]);
-  assert.ok(initialModules.every((module) => !module.enabled && module.rowVersion === 0));
+  assert.ok(initialModules.every((module) => !module.enabled));
   assert.equal(initialModules.find((module) => module.key === "vde").available, true);
   assert.equal(initialModules.find((module) => module.key === "dguv").available, false);
 
-  const unavailableDguvActivationResponse = await fetch(
+  const forbiddenDguvActivationResponse = await fetch(
     `${baseUrl}/api/v1/admin/modules/dguv`,
     {
       method: "PATCH",
@@ -239,10 +485,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       body: JSON.stringify({ enabled: true, rowVersion: 0 })
     }
   );
-  assert.equal(unavailableDguvActivationResponse.status, 409);
+  assert.equal(forbiddenDguvActivationResponse.status, 403);
   assert.equal(
-    (await unavailableDguvActivationResponse.json()).error.code,
-    "module_not_integrated"
+    (await forbiddenDguvActivationResponse.json()).error.code,
+    "platform_module_administration_required"
   );
 
   const forbiddenModuleAdministration = await fetch(`${baseUrl}/api/v1/admin/modules`, {
@@ -259,20 +505,49 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     headers: { "Content-Type": "application/json", Cookie: directorCookie },
     body: JSON.stringify({ enabled: true, rowVersion: 0 })
   });
-  assert.equal(vdeActivationResponse.status, 200, await vdeActivationResponse.clone().text());
-  const activatedVde = (await vdeActivationResponse.json()).module;
-  assert.equal(activatedVde.key, "vde");
-  assert.equal(activatedVde.enabled, true);
-  assert.equal(activatedVde.rowVersion, 1);
-  assert.equal(activatedVde.changedByName, "Gesa Geschäftsführung");
+  assert.equal(vdeActivationResponse.status, 403, await vdeActivationResponse.clone().text());
+  assert.equal(
+    (await vdeActivationResponse.json()).error.code,
+    "platform_module_administration_required"
+  );
 
   const staleVdeActivationResponse = await fetch(`${baseUrl}/api/v1/admin/modules/vde`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ enabled: false, rowVersion: 0 })
   });
-  assert.equal(staleVdeActivationResponse.status, 409);
-  assert.equal((await staleVdeActivationResponse.json()).error.code, "row_version_conflict");
+  assert.equal(staleVdeActivationResponse.status, 403);
+  assert.equal(
+    (await staleVdeActivationResponse.json()).error.code,
+    "platform_module_administration_required"
+  );
+
+  const platformVdeActivation = await fetch(
+    `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/vde`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "permanent",
+        includedInPlan: false,
+        separatelyBilled: true,
+        featureScope: {},
+        reason: "VDE für den PostgreSQL-Integrationstest freischalten"
+      })
+    }
+  );
+  assert.equal(platformVdeActivation.status, 200, await platformVdeActivation.clone().text());
+  const activatedVde = (await platformVdeActivation.json()).entitlement;
+  assert.equal(activatedVde.entitlementStatus, "permanent");
+
+  const activatedModulesResponse = await fetch(`${baseUrl}/api/v1/admin/modules`, {
+    headers: { Cookie: cookie }
+  });
+  assert.equal(activatedModulesResponse.status, 200);
+  assert.equal(
+    (await activatedModulesResponse.json()).modules.find((module) => module.key === "vde").enabled,
+    true
+  );
 
   const directorOverview = await fetch(
     `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
@@ -1654,11 +1929,15 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.ok(vdeFinalDocument.links.some((link) => link.customerId === customer.id));
 
   const vdeDeactivationResponse = await fetch(
-    `${baseUrl}/api/v1/admin/modules/vde`,
+    `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/vde`,
     {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Cookie: directorCookie },
-      body: JSON.stringify({ enabled: false, rowVersion: activatedVde.rowVersion })
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "inactive",
+        rowVersion: activatedVde.rowVersion,
+        reason: "VDE im PostgreSQL-Integrationstest durch die Plattform deaktivieren"
+      })
     }
   );
   assert.equal(
@@ -1666,8 +1945,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     200,
     await vdeDeactivationResponse.clone().text()
   );
-  const deactivatedVde = (await vdeDeactivationResponse.json()).module;
-  assert.equal(deactivatedVde.enabled, false);
+  const deactivatedVde = (await vdeDeactivationResponse.json()).entitlement;
+  assert.equal(deactivatedVde.entitlementStatus, "inactive");
   assert.equal(deactivatedVde.rowVersion, 2);
 
   const disabledVdeContextResponse = await fetch(
@@ -1696,15 +1975,19 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   ));
 
   const vdeReactivationResponse = await fetch(
-    `${baseUrl}/api/v1/admin/modules/vde`,
+    `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/vde`,
     {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Cookie: directorCookie },
-      body: JSON.stringify({ enabled: true, rowVersion: deactivatedVde.rowVersion })
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "permanent",
+        rowVersion: deactivatedVde.rowVersion,
+        reason: "VDE im PostgreSQL-Integrationstest durch die Plattform reaktivieren"
+      })
     }
   );
   assert.equal(vdeReactivationResponse.status, 200);
-  assert.equal((await vdeReactivationResponse.json()).module.rowVersion, 3);
+  assert.equal((await vdeReactivationResponse.json()).entitlement.rowVersion, 3);
 
   const siteResponse = await fetch(`${baseUrl}/api/v1/admin/sites`, {
     method: "POST",
@@ -2996,8 +3279,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(fieldBundle.projectName, "Baustellen");
   assert.equal(fieldBundle.fieldReviewStatus, "pending");
 
-  const clockInAt = new Date(Date.now() - 5000).toISOString();
-  const clockOutAt = new Date(Date.now() - 4000).toISOString();
+  const clockInAt = new Date(Date.now() - 8000).toISOString();
+  const firstSiteArrivalAt = new Date(Date.now() - 7000).toISOString();
+  const firstSiteDepartureAt = new Date(Date.now() - 6000).toISOString();
+  const clockOutAt = new Date(Date.now() - 5000).toISOString();
   const clockIn = {
     clientEntryId: randomUUID(),
     entryType: "clock_in",
@@ -3009,7 +3294,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify(clockIn)
   });
-  assert.equal(first.status, 201, await first.text());
+  assert.equal(first.status, 201, await first.clone().text());
+  const firstClockInEntry = (await first.json()).timeEntry;
 
   const duplicate = await fetch(`${baseUrl}/api/v1/time-entries`, {
     method: "POST",
@@ -3018,6 +3304,33 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
   assert.equal(duplicate.status, 200);
   assert.equal((await duplicate.json()).timeEntry.idempotent, true);
+
+  const firstSiteArrivalResponse = await fetch(`${baseUrl}/api/v1/time-entries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      clientEntryId: randomUUID(),
+      entryType: "site_arrival",
+      constructionSiteId: structuredSite.id,
+      recordedAt: firstSiteArrivalAt,
+      clientCreatedAt: firstSiteArrivalAt
+    })
+  });
+  assert.equal(firstSiteArrivalResponse.status, 201, await firstSiteArrivalResponse.clone().text());
+  const firstSiteArrival = (await firstSiteArrivalResponse.json()).timeEntry;
+
+  const firstSiteDepartureResponse = await fetch(`${baseUrl}/api/v1/time-entries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      clientEntryId: randomUUID(),
+      entryType: "site_departure",
+      constructionSiteId: structuredSite.id,
+      recordedAt: firstSiteDepartureAt,
+      clientCreatedAt: firstSiteDepartureAt
+    })
+  });
+  assert.equal(firstSiteDepartureResponse.status, 201, await firstSiteDepartureResponse.clone().text());
 
   const clockOut = await fetch(`${baseUrl}/api/v1/time-entries`, {
     method: "POST",
@@ -3029,7 +3342,85 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       clientCreatedAt: clockOutAt
     })
   });
-  assert.equal(clockOut.status, 201, await clockOut.text());
+  assert.equal(clockOut.status, 201, await clockOut.clone().text());
+  const firstClockOutEntry = (await clockOut.json()).timeEntry;
+
+  const siteMoveResponse = await fetch(
+    `${baseUrl}/api/v1/time-entries/${firstSiteArrival.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        clientChangeId: randomUUID(),
+        expectedRecordedAt: firstSiteArrival.recordedAt,
+        recordedAt: firstSiteArrival.recordedAt,
+        workDate: localDate(firstSiteArrival.recordedAt, config.timeZone),
+        constructionSiteId: fieldSite.id,
+        activityNote: "Falsche Baustellenwahl im Integrationstest berichtigt",
+        reason: "Versehentlich auf der falschen Baustelle angemeldet"
+      })
+    }
+  );
+  assert.equal(siteMoveResponse.status, 200, await siteMoveResponse.clone().text());
+  const siteMove = (await siteMoveResponse.json()).operation;
+  assert.equal(siteMove.action, "move_site");
+  assert.equal(siteMove.status, "applied");
+  assert.equal(siteMove.changes.filter((change) => change.action === "replace").length, 2);
+
+  const movedSiteWorkDayResponse = await fetch(
+    `${baseUrl}/api/v1/work-days/${localDate(clockInAt, config.timeZone)}`,
+    { headers: { Cookie: cookie } }
+  );
+  assert.equal(movedSiteWorkDayResponse.status, 200);
+  const movedSiteEntries = (await movedSiteWorkDayResponse.json()).workDay.entries;
+  assert.equal(movedSiteEntries.length, 4);
+  assert.equal(movedSiteEntries.filter((entry) => (
+    ["site_arrival", "site_departure"].includes(entry.entryType)
+      && entry.constructionSiteId === fieldSite.id
+  )).length, 2);
+  assert.equal(movedSiteEntries.some((entry) => (
+    entry.constructionSiteId === structuredSite.id
+  )), false);
+
+  const editedFirstClockOutAt = new Date(new Date(clockOutAt).valueOf() + 100).toISOString();
+  const editChangeId = randomUUID();
+  const firstClockOutEditPayload = {
+    clientChangeId: editChangeId,
+    expectedRecordedAt: firstClockOutEntry.recordedAt,
+    recordedAt: editedFirstClockOutAt,
+    workDate: localDate(editedFirstClockOutAt, config.timeZone),
+    constructionSiteId: null,
+    activityNote: "Integrationstest der direkten Zeitbearbeitung",
+    breakMinutes: 0,
+    reason: "Ersten Feierabend und Pause im Integrationstest korrigieren"
+  };
+  const editedFirstClockOutResponse = await fetch(
+    `${baseUrl}/api/v1/time-entries/${firstClockOutEntry.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify(firstClockOutEditPayload)
+    }
+  );
+  assert.equal(
+    editedFirstClockOutResponse.status,
+    200,
+    await editedFirstClockOutResponse.clone().text()
+  );
+  const editedFirstClockOut = (await editedFirstClockOutResponse.json()).operation;
+  assert.equal(editedFirstClockOut.status, "applied");
+  assert.ok(editedFirstClockOut.changes.some((change) => change.action === "break_override"));
+
+  const idempotentFirstClockOutEdit = await fetch(
+    `${baseUrl}/api/v1/time-entries/${firstClockOutEntry.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify(firstClockOutEditPayload)
+    }
+  );
+  assert.equal(idempotentFirstClockOutEdit.status, 200);
+  assert.equal((await idempotentFirstClockOutEdit.json()).idempotent, true);
 
   const secondClockInAt = new Date(Date.now() - 2000).toISOString();
   const secondClockOutAt = new Date(Date.now() - 1000).toISOString();
@@ -3055,7 +3446,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   );
   assert.equal(pendingAdditionWorkDayResponse.status, 200);
   const pendingAdditionWorkDay = (await pendingAdditionWorkDayResponse.json()).workDay;
-  assert.equal(pendingAdditionWorkDay.entries.length, 2);
+  assert.equal(pendingAdditionWorkDay.entries.length, 4);
   assert.equal(pendingAdditionWorkDay.hasPendingCorrection, true);
 
   const approveAdditionResponse = await fetch(
@@ -3084,7 +3475,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   const workDay = await fetch(`${baseUrl}/api/v1/work-days/${workDate}`, { headers: { Cookie: cookie } });
   assert.equal(workDay.status, 200);
-  assert.equal((await workDay.json()).workDay.entries.length, 4);
+  assert.equal((await workDay.json()).workDay.entries.length, 6);
 
   const workDateValue = new Date(`${workDate}T00:00:00Z`);
   const weekday = workDateValue.getUTCDay() || 7;
@@ -3097,7 +3488,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const workWeek = (await workWeekResponse.json()).week;
   assert.equal(workWeek.weekStart, weekStart);
   assert.equal(workWeek.days.length, 7);
-  assert.ok(workWeek.days.some((day) => day.workDate === workDate && day.workDay.entries.length === 4));
+  assert.ok(workWeek.days.some((day) => day.workDate === workDate && day.workDay.entries.length === 6));
   assert.ok(workWeek.totals.workMinutes >= 0);
 
   const correctedClockOutAt = new Date(Date.now() - 500).toISOString();
@@ -3154,7 +3545,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
   assert.equal(correctedWorkDayResponse.status, 200);
   const correctedWorkDay = (await correctedWorkDayResponse.json()).workDay;
-  assert.equal(correctedWorkDay.entries.length, 4);
+  assert.equal(correctedWorkDay.entries.length, 6);
   assert.equal(correctedWorkDay.entries.at(-1).recordedAt, correctedClockOutAt);
   assert.equal(correctedWorkDay.entries.at(-1).pendingCorrection, null);
 
@@ -3313,6 +3704,115 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     finalLockedWorkDay.entries[0].recordedAt,
     new Date(new Date(clockInAt).valueOf() + 100).toISOString()
   );
+
+  const deleteLockedBlockResponse = await fetch(
+    `${baseUrl}/api/v1/time-entries/${finalLockedWorkDay.entries[0].id}`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        clientChangeId: randomUUID(),
+        expectedRecordedAt: finalLockedWorkDay.entries[0].recordedAt,
+        reason: "Ersten Arbeitsblock im Integrationstest kontrolliert vollständig entfernen"
+      })
+    }
+  );
+  assert.equal(
+    deleteLockedBlockResponse.status,
+    200,
+    await deleteLockedBlockResponse.clone().text()
+  );
+  const deleteOperation = (await deleteLockedBlockResponse.json()).operation;
+  assert.equal(deleteOperation.status, "pending");
+  assert.ok(deleteOperation.changes.length >= 2);
+
+  const approveDeleteOperation = await fetch(
+    `${baseUrl}/api/v1/admin/time-change-operations/${deleteOperation.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ decision: "approved" })
+    }
+  );
+  assert.equal(
+    approveDeleteOperation.status,
+    200,
+    await approveDeleteOperation.clone().text()
+  );
+  assert.equal((await approveDeleteOperation.json()).operation.status, "approved");
+  const workDayAfterDelete = await fetch(`${baseUrl}/api/v1/work-days/${workDate}`, {
+    headers: { Cookie: cookie }
+  });
+  assert.equal(workDayAfterDelete.status, 200);
+  const finalEntries = (await workDayAfterDelete.json()).workDay.entries;
+  assert.equal(finalEntries.length, 2);
+  assert.equal(finalEntries[0].entryType, "clock_in");
+  assert.equal(finalEntries[1].entryType, "clock_out");
+
+  const archiveEmployeeResponse = await fetch(
+    `${baseUrl}/api/v1/admin/employees/${updatedEditableEmployee.id}`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        rowVersion: updatedEditableEmployee.rowVersion,
+        reason: "Historischen Mitarbeiter im Integrationstest archivieren"
+      })
+    }
+  );
+  assert.equal(
+    archiveEmployeeResponse.status,
+    200,
+    await archiveEmployeeResponse.clone().text()
+  );
+  const archivedEmployee = await archiveEmployeeResponse.json();
+  assert.equal(archivedEmployee.mode, "archived");
+  assert.equal(archivedEmployee.employee.status, "archived");
+
+  const reactivateEmployeeResponse = await fetch(
+    `${baseUrl}/api/v1/admin/employees/${updatedEditableEmployee.id}/reactivate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        rowVersion: archivedEmployee.employee.rowVersion,
+        reason: "Archivierten Mitarbeiter im Integrationstest reaktivieren"
+      })
+    }
+  );
+  assert.equal(
+    reactivateEmployeeResponse.status,
+    200,
+    await reactivateEmployeeResponse.clone().text()
+  );
+  assert.equal((await reactivateEmployeeResponse.json()).employee.status, "active");
+
+  const disposableEmployeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      personnelNumber: `DEL-${suffix}`,
+      firstName: "Ohne",
+      lastName: "Historie",
+      role: "installer",
+      temporaryPassword: "Loeschbar-Integration-2026!"
+    })
+  });
+  assert.equal(disposableEmployeeResponse.status, 201);
+  const disposableEmployee = (await disposableEmployeeResponse.json()).employee;
+  const deleteEmployeeResponse = await fetch(
+    `${baseUrl}/api/v1/admin/employees/${disposableEmployee.id}`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        rowVersion: disposableEmployee.rowVersion,
+        reason: "Mitarbeiter ohne historische Daten im Integrationstest löschen"
+      })
+    }
+  );
+  assert.equal(deleteEmployeeResponse.status, 200, await deleteEmployeeResponse.clone().text());
+  assert.equal((await deleteEmployeeResponse.json()).mode, "deleted");
 
   const logout = await fetch(`${baseUrl}/api/v1/session`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(logout.status, 200);

@@ -1,15 +1,18 @@
-const CACHE_NAME = "schaefchen-online-v41";
-const DOCUMENT_CACHE_VERSION = "v41";
+const CACHE_NAME = "schaefchen-online-v42";
+const DOCUMENT_CACHE_VERSION = "v42";
 const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=0.41.0",
-  "./app.js?v=0.41.0",
-  "./version.js?v=0.41.0",
+  "./styles.css?v=0.42.0",
+  "./app.js?v=0.42.0",
+  "./version.js?v=0.42.0",
+  "./platform-admin.html",
+  "./platform-admin.css?v=0.42.0",
+  "./platform-admin.js?v=0.42.0",
   "./vde/index.html",
-  "./vde/styles.css?v=0.41.0",
-  "./vde/app.js?v=0.41.0",
+  "./vde/styles.css?v=0.42.0",
+  "./vde/app.js?v=0.42.0",
   "./manifest.webmanifest",
   "./assets/mark.svg",
   "./assets/company-logos/schaaf-elektro.webp",
@@ -77,7 +80,9 @@ self.addEventListener("fetch", (event) => {
   if (event.request.mode === "navigate" || requestUrl.pathname === "/" || requestUrl.pathname.endsWith(".html")) {
     const fallbackDocument = requestUrl.pathname.includes("/vde/")
       ? "./vde/index.html"
-      : "./index.html";
+      : requestUrl.pathname.endsWith("/platform-admin.html")
+        ? "./platform-admin.html"
+        : "./index.html";
     event.respondWith(
       fetch(event.request, { cache: "no-store" })
         .then((response) => {

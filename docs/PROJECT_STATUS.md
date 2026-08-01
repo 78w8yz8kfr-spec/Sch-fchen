@@ -1,10 +1,62 @@
 # Projektstatus
 
 Stand: 01.08.2026
-Technischer Stand: V0.41.0
+Technischer Stand: V0.42.0
 
 ## Abgeschlossen
 
+- Migration 039 trennt Plattformkonten, Plattformrollen, Sitzungen und Audit
+  physisch von Firmenbenutzern; der Systemadministrator besitzt keine Firma,
+  Mitarbeiterrolle, Einsatz- oder Zeitdaten
+- eigene responsive Plattformoberfläche mit Übersicht, Firmen, Benutzern,
+  Tarifen, Modulen, Support, Systemstatus, Fehlern, Versionen, Mitteilungen,
+  Backups, Datenschutz, Audit und Einstellungen statt der normalen
+  Betriebsnavigation
+- granular konfigurierbare Plattformrollen für Superadministration, Support,
+  Technik, Vertrieb, Buchhaltung und Datenschutz mit serverseitiger Prüfung an
+  jedem Endpunkt
+- zentrale such-, filter-, sortier- und paginierbare Firmenverwaltung mit
+  Detailseite, Lebenszyklusstatus, Kontakt, Limits, Vertragssnapshots und
+  letzter Aktivität
+- unveränderliche Tarifpreisversionen und Firmenverträge; spätere
+  Standardtarifänderungen verändern bestehende individuelle Konditionen nicht
+- Plattformkatalog und historisierte Firmenfreigaben für Kern-, Spezial-,
+  Integrations- und Exportmodule; Firmenkonten können Module sehen, aber nicht
+  selbst aktivieren
+- firmenübergreifende Kontoverwaltung ohne Arbeitszeiten oder operative
+  Mitarbeiterdaten sowie getrennte Plattformadministrator- und Rollenpflege
+- Einladungen, Registrierungskontrolle und erster Firmenadministrator ohne
+  Vergabe von Plattformrechten
+- zentrale Supportfälle und auf 60 Minuten begrenzter, begründungspflichtiger
+  Supportmodus ohne Firmenmitgliedschaft mit dauerhaftem Banner, Bereichs- und
+  Änderungsprotokoll
+- Plattformstatus, gruppierte und bereinigte Fehler, Versions- und
+  Rolloutverwaltung, zielgerichtete Mitteilungen sowie serverseitiger
+  Wartungsmodus und verpflichtende App-Updates
+- protokollierte Backupaufträge, abgesicherte Wiederherstellungs- und
+  Datenschutzabläufe mit Vier-Augen-Prüfung und expliziter Bestätigung
+- unveränderliches Plattform-Audit mit Akteur, Ziel, Zeitpunkt,
+  Vorher-/Nachher-Stand, Begründung, Sitzung/IP und Ergebnis
+- Migration 042 und ein vollständiger Zeitbearbeitungsdialog für Baustelle,
+  Beginn, Ende, Pause, Tätigkeit, Fahrtzeit, Arbeitstag und begründetes Löschen
+  des Arbeitsblocks
+- unveränderliche Ersatzbuchungen, Advisory Lock, Versions- und
+  Idempotenzprüfung, Zeitachsenvalidierung und gemeinsame Neuberechnung nach
+  Regelversion 4 verhindern Dubletten, Überschneidungen und verlorene
+  parallele Änderungen
+- kontrollierter Korrekturantrag statt stiller Änderung bei freigegebenen oder
+  abgerechneten Tagen
+- Migration 043 entscheidet anhand sämtlicher historischer Referenzen zwischen
+  sicherer Hartlöschung und Archivierung, widerruft Sitzungen und künftige
+  Planung und ermöglicht protokollierte Reaktivierung
+- eigene Ansicht für archivierte Mitarbeiter; aktive Planung und Anmeldung
+  lösen ausschließlich aktive Konten auf
+- ruhige, neu geordnete Wochenansicht mit vier primären Kontowerten,
+  aufklappbaren Details, nächstem Einsatz, relevanten Arbeitstagen und offenen
+  Aktionen; vollständige Feiertage bleiben standardmäßig eingeklappt
+- mobile Baustellenanlage mit `100dvh`, internem Scrollbereich, Safe Areas,
+  sticky Speichern-Aktion, Fokus-Scroll und feldnaher Validierung ohne Verlust
+  der Eingaben
 - zentrale Berichtszentrale mit Statuskennzahlen, fehlenden Pflichtberichten,
   Suche, Sortierung und Filtern nach Mitarbeiter, Baustelle, Datum, Art und Status
 - kontrollierte Berichtsrückgabe mit Pflichtkommentar, erneute Einreichung ohne
@@ -33,7 +85,7 @@ Technischer Stand: V0.41.0
 - getrennt wählbare Baustellenbereiche für Übersicht, Team, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und optional VDE in der mobilen sowie der Büroansicht
 - direkte Zuordnung der Baustellen-Schnellaktionen zum jeweils passenden Arbeitsbereich ohne lange Sammelansicht
 - VDE-Messwerte beginnen auf Seite zwei; das optionale Stromkreisverzeichnis startet nach allen Messwertseiten auf einer eigenen Folgeseite
-- vorhandene V15-Anwendung als erstes vollständig integriertes, firmenweit aktivierbares VDE-Spezialmodul aus der Schäfchen-Baustellenakte
+- vorhandene V15-Anwendung als erstes vollständig integriertes, ausschließlich plattformseitig freischaltbares VDE-Spezialmodul aus der Schäfchen-Baustellenakte
 - gemeinsame Referenzen für Firma, Logo, Kunde, Projekt, Baustelle und Prüfer statt paralleler oder kopierter Stammdaten
 - strukturierte, reihenfolgetreue Verteilungen, FI/RCD-Gruppen und Stromkreise mit LS, FI/LS, NH, Diazed, Neozed und sonstigen Schutzorganen
 - getrennte Messwerte RPE, RISO, Zi, Zs und Ik sowie RCD-Auslösezeit und -strom am betroffenen Stromkreis
@@ -221,8 +273,9 @@ Technischer Stand: V0.41.0
 - Büro und berechtigt eingeplante Mitarbeiter sehen denselben thematischen Notizbestand direkt in der Baustellenakte
 - wichtige Hinweise werden hervorgehoben; Verfasser und Erstellungszeitpunkt bleiben nachvollziehbar
 - eine Client-UUID verhindert doppelte Notizen bei wiederholtem mobilen Absenden
-- Migration 029 schafft mandantengetrennte Freigaben für optionale Elektro-Module
-- nur Administration und Geschäftsführung dürfen Spezialmodule aktivieren; jede Änderung besitzt Versionsschutz und unveränderliche Historie
+- Migration 029 schafft die historische Ausgangsbasis für optionale Elektro-Module
+- Migration 040 überführt alle Firmenmodule in die ausschließlich durch
+  Plattformrollen änderbare, versionsgeschützte Entitlement-Historie
 - deaktivierte oder noch nicht vollständig angebundene Module erzeugen keine leeren Menüpunkte
 - Migration 030 begrenzt die Modulplanung verbindlich auf VDE und DGUV; LWL und KNX gehören nicht zum Projektumfang
 - Migration 031 erlaubt nachvollziehbare Zeitkorrekturen an abgerechneten Tagen ohne die Abrechnungssperre für neue Buchungen aufzuweichen
@@ -236,8 +289,8 @@ Technischer Stand: V0.41.0
 
 ## Noch zu prüfen
 
-- grüne GitHub-CI des exakten V0.41.0-Commits einschließlich Migrationen 037/038,
-  SQL-Tests und PostgreSQL-Integration
+- grüne GitHub-CI des exakten V0.42.0-Commits einschließlich Migrationen
+  039–044, SQL-Tests und PostgreSQL-Integration
 - reale iPhone-, Android-, Chrome-, Edge- und vollständige Offline-Abnahme
 - Last- und Datenmengentest mit 10.000 Mitarbeitern und mehrjährigen Buchungen
 - freigegebene Zielplattform, getrennte Staging-/Produktionsumgebungen,
@@ -257,7 +310,7 @@ solange der reale Nachweis fehlt.
 
 ## Nächster Entwicklungsschritt
 
-Nach grüner V0.41.0-CI folgt der Fahrplan-Schritt V0.50. Die VDE-Integration ist
+Nach grüner V0.42.0-CI folgt der Fahrplan-Schritt V0.50. Die VDE-Integration ist
 bereits technisch vorhanden; deshalb wird V0.50 als formale
 Integrationsabnahme genutzt: gemeinsamer Vertrag, Rollen- und
 Deaktivierungsgrenzen, V15-Migration, Messdatenhistorie und zentrale

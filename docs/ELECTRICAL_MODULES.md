@@ -1,7 +1,7 @@
 # Optionale Elektro-Spezialmodule
 
 Stand: 01.08.2026
-Technischer Stand: V0.41.0
+Technischer Stand: V0.42.0
 
 ## Ziel
 
@@ -12,9 +12,9 @@ Ein Modul erzeugt keine parallelen Stammdaten.
 ## Freigabeprinzip
 
 - Ein fehlender Freigabedatensatz bedeutet sicher „deaktiviert“.
-- Nur Administrator und Geschäftsführung dürfen Module firmenweit aktivieren
-  oder deaktivieren.
-- Jede Statusänderung erhöht den Versionsstand und wird mit Benutzer und
+- Nur eine berechtigte Plattformrolle darf Module für eine Firma aktivieren
+  oder deaktivieren; Firmenrollen können eine Freigabe lediglich anfragen.
+- Jede Statusänderung erhöht den Versionsstand und wird mit Plattformkonto und
   Zeitpunkt unveränderlich historisiert.
 - Mandantenfilter werden serverseitig erzwungen.
 - Deaktivierung entfernt keine Fachdaten.
@@ -25,11 +25,11 @@ Ein Modul erscheint erst dann in der Baustellenakte, wenn seine echte
 Fachfunktion vollständig angebunden und für die jeweilige Firma aktiviert ist.
 Es werden keine leeren Menüpunkte oder funktionslosen Platzhalter angezeigt.
 
-VDE ist seit V0.39.0 vollständig angebunden. Administration oder
-Geschäftsführung schalten es unter „Elektro-Spezialmodule“ firmenweit ein.
-Anschließend erscheint der Einstieg ausschließlich an einer konkreten
-Baustelle. DGUV bleibt vorbereitet, aber bis zur eigenen Fachintegration
-unsichtbar und nicht aktivierbar.
+VDE ist seit V0.39.0 vollständig angebunden. Eine berechtigte Plattformrolle
+schaltet es in der Firmendetailseite mit Gültigkeit, Tarifbezug, Limits und
+Funktionsumfang frei. Anschließend erscheint der Einstieg ausschließlich an
+einer konkreten Baustelle. DGUV bleibt vorbereitet, aber bis zur eigenen
+Fachintegration unsichtbar und nicht durch Firmenkonten aktivierbar.
 
 ## VDE-Anbindung
 

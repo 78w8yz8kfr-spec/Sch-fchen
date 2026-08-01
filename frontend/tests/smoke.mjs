@@ -9,7 +9,7 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp] = await Promise.all([
+const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp, platformHtml, platformStyles, platformApp] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
   readFrontendFile("app.js"),
@@ -23,7 +23,10 @@ const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, ma
   readFile(resolve(frontendDirectory, "assets/baustellen-import-vorlage.xlsx")),
   readFrontendFile("vde/index.html"),
   readFrontendFile("vde/styles.css"),
-  readFrontendFile("vde/app.js")
+  readFrontendFile("vde/app.js"),
+  readFrontendFile("platform-admin.html"),
+  readFrontendFile("platform-admin.css"),
+  readFrontendFile("platform-admin.js")
 ]);
 
 const manifest = JSON.parse(manifestSource);
@@ -218,9 +221,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.41\.0/);
-assert.match(html, /app\.js\?v=0\.41\.0/);
-assert.match(html, /version\.js\?v=0\.41\.0/);
+assert.match(html, /styles\.css\?v=0\.42\.0/);
+assert.match(html, /app\.js\?v=0\.42\.0/);
+assert.match(html, /version\.js\?v=0\.42\.0/);
 assert.match(html, /id="electrical-module-admin"/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
@@ -230,6 +233,10 @@ assert.match(html, /id="field-site-form"/);
 assert.match(html, /id="field-site-customer"/);
 assert.match(html, /id="field-site-customer-name"/);
 assert.match(html, /id="field-site-project-name"/);
+assert.match(html, /id="field-site-customer-error"[^>]*aria-live="polite"/);
+assert.match(html, /id="field-site-name-error"[^>]*aria-live="polite"/);
+assert.match(html, /id="field-site-street-error"[^>]*aria-live="polite"/);
+assert.match(html, /id="field-site-city-error"[^>]*aria-live="polite"/);
 assert.match(html, /id="time-addition-dialog"/);
 assert.match(html, /id="timesheet-export-form"/);
 assert.match(html, /id="employee-timesheet-export-pdf-submit"/);
@@ -461,9 +468,8 @@ assert.match(app, /liveDuration\.textContent = formatMinutes\(times\.work\)/);
 assert.match(app, /\.\/api\/v1\/work-weeks\//);
 assert.doesNotMatch(app, /work-days\/\$\{encodeURIComponent\(workDate\)\}\/submit/);
 assert.match(app, /\.\/api\/v1\/admin\/work-days\//);
-assert.match(app, /\.\/api\/v1\/time-entry-corrections/);
 assert.match(app, /\.\/api\/v1\/time-entry-additions/);
-assert.match(app, /\.\/api\/v1\/time-entry-invalidations/);
+assert.match(app, /method: "DELETE"/);
 assert.match(app, /\.\/api\/v1\/time-tracking\/site-selection/);
 assert.match(app, /\.\/api\/v1\/time-tracking\/sites/);
 assert.match(app, /\.\/api\/v1\/admin\/timesheets\.\$\{format\}/);
@@ -508,12 +514,15 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.41.0"'));
-assert.ok(worker.includes('"./app.js?v=0.41.0"'));
-assert.ok(worker.includes('"./version.js?v=0.41.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.0"'));
+assert.ok(worker.includes('"./app.js?v=0.42.0"'));
+assert.ok(worker.includes('"./version.js?v=0.42.0"'));
+assert.ok(worker.includes('"./platform-admin.html"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.0"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.0"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.41.0"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.41.0"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.0"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.0"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -551,8 +560,8 @@ assert.match(vdeHtml, /id="signature-pad"/);
 assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
 assert.match(vdeHtml, /V15-Bestand importieren/);
 assert.match(vdeHtml, /id="legacy-local-import"/);
-assert.match(vdeHtml, /styles\.css\?v=0\.41\.0/);
-assert.match(vdeHtml, /app\.js\?v=0\.41\.0/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.0/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.0/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -567,6 +576,41 @@ assert.match(vdeApp, /moveItem\(protocol\.distributions/);
 assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
+assert.match(platformHtml, /id="platform-navigation"/);
+assert.equal(
+  [...platformHtml.matchAll(/data-platform-view=/g)].length,
+  14,
+  "Die Plattformverwaltung besitzt genau ihre vierzehn getrennten Hauptbereiche"
+);
+assert.match(platformHtml, /data-platform-view="overview"/);
+assert.match(platformHtml, /data-platform-view="settings"/);
+assert.doesNotMatch(platformHtml, />Woche</);
+assert.doesNotMatch(platformHtml, />Einsätze</);
+assert.match(platformHtml, /id="support-mode-banner"/);
+assert.match(platformStyles, /env\(safe-area-inset-bottom\)/);
+assert.match(styles, /\.site-choice-dialog[\s\S]*var\(--site-choice-viewport-height, 100dvh\)/);
+assert.match(styles, /\.time-correction-form[\s\S]*overflow-y: auto/);
+assert.match(styles, /\.site-choice-new-form > \.button[\s\S]*position: sticky/);
+assert.match(styles, /scroll-padding-block: 92px calc\(110px \+ env\(safe-area-inset-bottom\)\)/);
+assert.match(platformApp, /\/api\/v1\/platform\//);
+assert.doesNotMatch(
+  platformApp,
+  /Laufende Baustellen|Arbeitszeiten|Bautagesberichte|Montageberichte|Einsatzpläne|Urlaubsstände|Projektkennzahlen/,
+  "Das Plattformdashboard darf keine operativen Firmenkennzahlen definieren"
+);
+assert.match(platformApp, /X-Support-Access-Id/);
+assert.match(platformApp, /Administratoransicht – Firma:/);
+assert.match(platformApp, /platform_module_administration_required|modules\/\$\{encodeURIComponent/);
+assert.match(html, /id="next-holiday-card"/);
+assert.match(html, /Alle Feiertage anzeigen/);
+assert.match(html, /id="archived-employee-panel"/);
+assert.match(app, /breakMinutesOverride/);
+assert.match(app, /window\.visualViewport/);
+assert.match(app, /Deine Eingaben bleiben erhalten/);
+assert.match(app, /firstInvalid\.scrollIntoView/);
+assert.match(app, /siteChoiceDialog\.addEventListener\("focusin"/);
+assert.match(app, /correctingTimeEntryAdministrator \? "admin\/" : ""/);
+assert.match(app, /\/api\/v1\/admin\/work-days\/\$\{encodeURIComponent\(day\.id\)\}/);
 assert.match(worker, /requestUrl\.pathname\.startsWith\("\/api\/"\)/);
 assert.match(worker, /event\.request\.mode === "navigate"/);
 assert.match(worker, /cache: "no-store"/);

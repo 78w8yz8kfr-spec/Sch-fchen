@@ -30,6 +30,8 @@ services:
         value: F-000001
       - key: INITIAL_SETUP_TOKEN
         sync: false
+      - key: PLATFORM_SETUP_TOKEN
+        sync: false
       - key: SESSION_TTL_SECONDS
         value: "28800"
       - key: APP_TIME_ZONE

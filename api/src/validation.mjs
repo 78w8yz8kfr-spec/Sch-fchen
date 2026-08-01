@@ -1839,6 +1839,48 @@ export function validateTimeEntryInvalidation(body) {
   };
 }
 
+function timeChangeMinutes(value, label) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const minutes = Number(value);
+  if (!Number.isSafeInteger(minutes) || minutes < 0 || minutes > 1440) {
+    throw new InputError(`${label} muss zwischen 0 und 1440 Minuten liegen.`);
+  }
+  return minutes;
+}
+
+function zonedInstant(value, label) {
+  const instant = text(value, label, 20, 35);
+  if (Number.isNaN(new Date(instant).valueOf()) || !/[zZ]|[+-]\d{2}:\d{2}$/.test(instant)) {
+    throw new InputError(`${label} benötigt Datum, Uhrzeit und Zeitzone.`);
+  }
+  return instant;
+}
+
+export function validateTimeEntryEdit(body) {
+  rejectTenantFields(body);
+  return {
+    clientChangeId: uuid(body.clientChangeId, "Änderungs-ID"),
+    expectedRecordedAt: zonedInstant(body.expectedRecordedAt, "Bisheriger Zeitpunkt"),
+    recordedAt: zonedInstant(body.recordedAt, "Neuer Zeitpunkt"),
+    workDate: validateWorkDate(body.workDate),
+    constructionSiteId: optionalUuid(body.constructionSiteId, "Baustelle"),
+    activityNote: optionalText(body.activityNote, "Tätigkeit", 500),
+    travelMinutes: timeChangeMinutes(body.travelMinutes, "Fahrzeit"),
+    breakMinutes: timeChangeMinutes(body.breakMinutes, "Pausenzeit"),
+    reason: text(body.reason, "Änderungsgrund", 3, 500)
+  };
+}
+
+export function validateTimeEntryDelete(body) {
+  rejectTenantFields(body);
+  return {
+    clientChangeId: uuid(body.clientChangeId, "Änderungs-ID"),
+    expectedRecordedAt: zonedInstant(body.expectedRecordedAt, "Bisheriger Zeitpunkt"),
+    reason: text(body.reason, "Löschgrund", 3, 500)
+  };
+}
+
 export function validateSpontaneousSiteSelection(body) {
   rejectTenantFields(body);
   if (body.newOccurrence !== undefined && typeof body.newOccurrence !== "boolean") {

@@ -6,6 +6,61 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 - keine noch nicht zugeordnete Produktänderung
 
+## [0.42.0] – Plattformverwaltung, sichere Zeitkorrekturen und ruhige Woche
+
+- der Systemadministrator ist als eigenes Plattformkonto mit eigener Sitzung,
+  Datenbankrolle, Anmeldung und Navigation vollständig von Firmenbenutzern und
+  Mitarbeitern getrennt; er erhält keine Firma, Betriebsrolle, Einsatz- oder
+  Zeitdaten
+- eine rollenbasierte Plattformverwaltung bündelt Übersicht, Firmen, Konten,
+  Tarife, Module, Registrierungen, Support, Systemstatus, gruppierte Fehler,
+  Versionen, Mitteilungen, Backups, Datenschutz, Audit und globale
+  Einstellungen; Superadministration, Support, Technik, Vertrieb, Buchhaltung
+  und Datenschutz besitzen getrennte, granular änderbare Rechte
+- Firmenliste und Firmendetail unterstützen Suche, Statusfilter, Sortierung,
+  Pagination, Verträge, Limits und ausschließlich plattformseitig steuerbare
+  Modulfreigaben; Vertragsstände und Tarifpreise bleiben als unveränderliche
+  Versionen beziehungsweise Snapshots erhalten
+- ein zeitlich begrenzter, begründungspflichtiger Supportmodus öffnet eine
+  sichere Firmenkontextansicht ohne Mitgliedschaft; Banner, Ablauf, geöffnete
+  Bereiche, Änderungen und Beendigung werden protokolliert
+- Wiederherstellungen und endgültige Datenschutzmaßnahmen verwenden
+  Zwei-Personen-Freigaben und explizite Bestätigungstexte; Plattform-Audit-
+  Einträge sind unveränderlich, enthalten Vorher-/Nachher-Stand und werden vor
+  unnötigen Geheimnissen geschützt
+- Wartungsmodus und verpflichtende App-Versionen werden serverseitig
+  durchgesetzt; veraltete Clients wechseln auf eine cachefreie
+  Aktualisierungsseite, während die getrennte Plattformverwaltung erreichbar
+  bleibt
+- wirksame Zeiteinträge lassen sich bis zur Freigabe im Dialog an Baustelle,
+  Arbeitsbeginn, Arbeitsende, Pause, Tätigkeit, Fahrtzeit und Arbeitstag
+  berichtigen oder als vollständiger Arbeitsblock begründet löschen, ohne einen
+  zweiten konkurrierenden Datensatz anzulegen
+- jede Zeitänderung erzeugt unveränderliche Ersatzbuchungen, Auditstände und
+  eine Neuberechnung nach Regelversion 4; Advisory Locks, Versionsprüfung,
+  Idempotenz, Eindeutigkeit und Zeitachsenprüfung verhindern Dubletten,
+  Überschneidungen und verlorene parallele Änderungen
+- freigegebene oder abgerechnete Tage werden nicht still verändert, sondern
+  durch einen berechtigten, protokollierten Korrekturantrag und eine getrennte
+  Freigabe berichtigt
+- Mitarbeiter ohne historische Abhängigkeiten können nach Bestätigung hart
+  gelöscht werden; andernfalls werden Konto und künftige Planung atomar
+  archiviert, Sitzungen widerrufen und historische Referenzen erhalten;
+  archivierte Mitarbeiter besitzen eine eigene Ansicht und können reaktiviert
+  werden
+- die mobile Baustellenanlage verwendet einen tastaturfreundlichen,
+  vollständig scrollbaren Dialog mit Safe-Area-Abständen, sichtbarer
+  Speichern-Aktion, Fokus-Scroll und feldnahen Validierungsfehlern ohne
+  Datenverlust
+- die Wochenansicht zeigt Kalenderwoche, Wochenleistung, Soll, Differenz,
+  Zeitkonto, nächsten Einsatz, relevante Arbeitstage und offene Aktionen in
+  klarer Hierarchie; Details und die vollständige zukünftige Feiertagsliste
+  bleiben bis zum Aufklappen verborgen
+- Migrationen 039 bis 044, eigene SQL-Abnahmetests, erweiterte
+  PostgreSQL-Integration, API-Unit-Tests und PWA-Smoke-Tests sichern
+  Plattformgrenze, Mandantenschutz, Zeitkorrektur, Mitarbeiter-Lebenszyklus,
+  Modulhoheit, Versionsdurchsetzung und unveränderliche Historien
+
 ## [0.41.0] – Fahrplan-Abgleich, Berichtszentrale und vollständige Baustellenakte
 
 - zentrale Berichtszentrale mit Suche, Sortierung und Filtern nach Status, Art,
@@ -49,7 +104,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   Pilotabnahmen; DGUV bleibt gemäß Fahrplan ausdrücklich nach V1.0
 - die offenen Freigabesperren sind als öffentliche GitHub-Issues #11 bis #23
   mit Abschlussnachweis angelegt; ein idempotenter Workflow stellt die
-  P0-P3-/Kategorie-Labels sowie die belegten Tags und Releases V0.35 bis V0.41
+  P0-P3-/Kategorie-Labels sowie die belegten Tags und Releases V0.35 bis V0.42
   bereit
 
 ## [0.40.0] – Klare Baustellenbereiche und VDE-PDF-Seiten

@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: 21.07.2026
+Stand: 01.08.2026
 
 ## Zielbild
 
@@ -15,7 +15,8 @@ steht in [`PRODUCT_VISION.md`](PRODUCT_VISION.md).
 
 | Komponente | Aufgabe |
 | --- | --- |
-| PWA | Einfache Bedienoberfläche für Monteure, Vorarbeiter, Organisationsrollen und Admin |
+| Firmen-PWA | Einfache Bedienoberfläche für Monteure, Vorarbeiter und Firmenrollen |
+| Plattform-PWA | Getrennte Bedienoberfläche für Plattformrollen ohne Betriebsnavigation |
 | API | Authentifizierung, Berechtigungen, Fachlogik und Mandantenschutz |
 | PostgreSQL | Strukturierte Geschäfts-, Zeit-, Berichts- und VDE-Daten |
 | MinIO | S3-kompatible Ablage für Fotos, Logos, Unterschriften und PDF-Versionen |
@@ -81,9 +82,45 @@ API-Transaktion setzt anschließend `app.current_company_id` und
 `app.current_user_id` aus der serverseitig aufgelösten Sitzung. Übermittelte
 Mandanten- oder Benutzer-IDs werden abgewiesen.
 
+Dateiabrufe, Exporte, PDFs, Suchen, Caches und Hintergrundaufträge übernehmen
+dieselbe `company_id`-Grenze. Der Browsercache ist zusätzlich an Benutzer und
+App-Version gebunden; Abmeldung oder Kontowechsel entfernen private
+Dokumentcaches. Direkte Objekt- oder URL-IDs ersetzen nie die serverseitige
+Sitzungs- und Rollenprüfung.
+
+## Getrennte Plattformverwaltung
+
+Migrationen 039 bis 041 führen eine zweite, nicht mandantenbezogene
+Sicherheitsdomäne ein. `platform_users`, `platform_roles` und
+`platform_sessions` haben weder Fremdschlüssel auf `companies` noch Spiegelzeilen
+in `users`. Die Datenbankrolle `schaefchen_platform_api` erhält ausschließlich
+Rechte auf Plattformkataloge und aggregierte Kontometadaten; operative
+Firmendaten gehören nicht zu ihrem Dashboard.
+
+Der Plattformpfad `/api/v1/platform/*` verwendet ein eigenes Cookie, einen
+eigenen Transaktionswrapper und granulare Plattformrechte. Die Oberfläche
+`platform-admin.html` lädt keine normale Navigation. Temporärer Firmenzugriff
+ist nur über eine aktive `support_access_session` möglich, verlangt Grund und
+optional passenden Supportfall und endet spätestens nach 60 Minuten. Er
+erzeugt keine Firmenrolle und keinen Mitarbeiter.
+
+Tarifpreisstände und Firmenverträge werden als Version beziehungsweise Snapshot
+gespeichert. Modulfreigaben liegen in `company_module_entitlements` und dürfen
+nur von der Plattformdomäne geändert werden. Damit kann ein Firmenkonto ein
+nicht freigeschaltetes Modul höchstens als „auf Anfrage“ sehen, es aber weder
+durch die Oberfläche noch durch einen direkten API-Aufruf aktivieren.
+
+Die vollständige Grenze, Rechteverteilung und Betriebsabläufe stehen in
+[`PLATFORM_ADMINISTRATION.md`](PLATFORM_ADMINISTRATION.md).
+
 ## Datenhistorie
 
-Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht. Zeitkorrekturen, PDF-Versionen und spätere relevante Änderungen erhalten eine nachvollziehbare Historie. `row_version` bereitet die Konflikterkennung bei konkurrierenden Änderungen vor.
+Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht.
+Eine Ausnahme ist ein technisch neuer Mitarbeiter ohne irgendeine historische
+Referenz; nur dieser kann nach Sicherheitsabfrage hart gelöscht werden.
+Zeitkorrekturen, PDF-Versionen und spätere relevante Änderungen erhalten eine
+nachvollziehbare Historie. `row_version`, erwartete Änderungszeitpunkte und
+transaktionale Sperren verhindern verlorene konkurrierende Änderungen.
 
 ## Entwicklungsreihenfolge
 
@@ -98,8 +135,10 @@ Fachliche Datensätze werden deaktiviert oder archiviert, nicht hart gelöscht. 
 ## Sprint 1: Benutzer und Rollen
 
 `users` gehört verpflichtend zu genau einer Firma. Die Personalnummer ist nur
-innerhalb dieser Firma eindeutig. E-Mail und Telefon bleiben optional;
-ausgeschiedene Mitarbeiter werden deaktiviert und nicht gelöscht.
+innerhalb dieser Firma eindeutig. E-Mail und Telefon bleiben optional.
+Ausgeschiedene Mitarbeiter mit Historie werden archiviert; ihre Sitzungen und
+künftige Planung enden, historische Referenzen bleiben bestehen. Archivierte
+Konten können berechtigt reaktiviert werden.
 
 `roles` enthält pro Firma anpassbare Rollen und Rechte. Die unveränderlichen
 Systemschlüssel der sichtbaren Standardrollen lauten `admin`,
@@ -149,9 +188,13 @@ Berichtsverantwortung nachvollziehbar.
 `work_days` enthält ausschließlich den berechneten Tagesstand und das am Tag
 eingefrorene individuelle Soll. Die unveränderlichen Ereignisse stehen in
 `time_entries`. Eine vom Endgerät erzeugte `client_entry_id` macht wiederholte
-Offline-Übertragungen idempotent. Korrekturen werden als referenzierender neuer
-Eintrag genehmigt oder abgelehnt; das Original bleibt erhalten. Für die
-Zeiterfassung wird kein GPS gespeichert.
+Offline-Übertragungen idempotent. Migration 042 erweitert dieses Prinzip auf
+Baustelle, Anfang, Ende, Pause, Tätigkeit, Fahrt, Arbeitstag und vollständige
+Block-Ungültigmarkierung. Korrekturen werden als referenzierender neuer Eintrag
+sofort wirksam oder – bei freigegebenen beziehungsweise abgerechneten Tagen –
+getrennt genehmigt oder abgelehnt; das Original und das Audit bleiben erhalten.
+Regelversion 4 berechnet Quell- und Zieltag atomar neu. Für die Zeiterfassung
+wird kein GPS gespeichert.
 
 Die öffentliche PWA-Demo verwendet keine API. Sie schreibt gekennzeichnete
 Demodaten in den lokalen Browserspeicher und bildet dort denselben

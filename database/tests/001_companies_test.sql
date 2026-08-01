@@ -65,14 +65,14 @@ BEGIN
     END IF;
 
     UPDATE companies
-    SET status = 'inactive'
+    SET status = 'suspended'
     WHERE id = test_company_id;
 
     IF NOT EXISTS (
         SELECT 1
         FROM companies
         WHERE id = test_company_id
-          AND status = 'inactive'
+          AND status = 'suspended'
           AND deactivated_at IS NOT NULL
     ) THEN
         RAISE EXCEPTION 'Deaktivierung setzt deactivated_at nicht korrekt';

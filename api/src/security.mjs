@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const SESSION_COOKIE = "schaefchen_session";
+export const PLATFORM_SESSION_COOKIE = "schaefchen_platform_session";
 
 export function createSessionToken() {
   return randomBytes(32).toString("base64url");
@@ -36,16 +37,29 @@ export function parseCookies(header = "") {
   return result;
 }
 
-export function sessionCookie(token, { secure, maxAge }) {
+function namedSessionCookie(name, path, token, { secure, maxAge }) {
   const attributes = [
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
-    "Path=/api/v1",
+    `${name}=${encodeURIComponent(token)}`,
+    `Path=${path}`,
     "HttpOnly",
     "SameSite=Strict",
     `Max-Age=${Math.max(0, Math.floor(maxAge))}`
   ];
   if (secure) attributes.push("Secure");
   return attributes.join("; ");
+}
+
+export function sessionCookie(token, options) {
+  return namedSessionCookie(SESSION_COOKIE, "/api/v1", token, options);
+}
+
+export function platformSessionCookie(token, options) {
+  return namedSessionCookie(
+    PLATFORM_SESSION_COOKIE,
+    "/api/v1/platform",
+    token,
+    options
+  );
 }
 
 export class LoginRateLimiter {

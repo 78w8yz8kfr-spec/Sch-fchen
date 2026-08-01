@@ -39,6 +39,10 @@ export function loadConfig() {
   if (setupToken && setupToken.length < 24) {
     throw new Error("INITIAL_SETUP_TOKEN muss mindestens 24 Zeichen lang sein.");
   }
+  const platformSetupToken = process.env.PLATFORM_SETUP_TOKEN?.trim() || null;
+  if (platformSetupToken && platformSetupToken.length < 24) {
+    throw new Error("PLATFORM_SETUP_TOKEN muss mindestens 24 Zeichen lang sein.");
+  }
 
   return Object.freeze({
     port: integer("API_PORT", 3000, 1, 65535),
@@ -48,6 +52,7 @@ export function loadConfig() {
     cookieSecure: production || process.env.API_COOKIE_SECURE === "true",
     initialCompanyNumber: process.env.INITIAL_COMPANY_NUMBER || "F-000001",
     initialSetupToken: setupToken,
+    platformSetupToken,
     staticDirectory: process.env.STATIC_DIRECTORY || null,
     database: {
       host: databaseUrl?.hostname || process.env.POSTGRES_HOST,

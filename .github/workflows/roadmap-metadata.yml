@@ -79,7 +79,7 @@ jobs:
           label_issue 22 P2 Infrastruktur Release-Gate
           label_issue 23 P2 API Datenbank Release-Gate
 
-      - name: Historische Versionsstände und V0.41 veröffentlichen
+      - name: Historische Versionsstände und V0.42 veröffentlichen
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -117,6 +117,9 @@ jobs:
           ensure_release "v0.40.0" "c626f8da65ab3e07dd541c638e225d7cd85eebf0" \
             "Schäfchen V0.40.0" \
             "Getrennte Baustellenbereiche und überarbeitete VDE-PDF."
-          ensure_release "v0.41.0" "$GITHUB_SHA" \
+          ensure_release "v0.41.0" "869b8b05ae8370c9974bb9392b682af04944a4a1" \
             "Schäfchen V0.41.0" \
             "Funktionsstand zur Fahrplanbereinigung, Desktop-Plantafel, Berichtszentrale und Baustellenakte 2.0. Externe Produktions-, Geräte-, Last-, Rechts- und Pilot-Gates bleiben ausdrücklich offen."
+          ensure_release "v0.42.0" "$GITHUB_SHA" \
+            "Schäfchen V0.42.0" \
+            "Getrennte Plattformverwaltung, vollständige Zeitkorrekturen, Mitarbeiter-Lebenszyklus und überarbeitete mobile Wochenansicht. Externe Produktions-, Geräte-, Last-, Rechts- und Pilot-Gates bleiben ausdrücklich offen."

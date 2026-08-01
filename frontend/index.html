@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.41.0">
-    <script src="./app.js?v=0.41.0" defer></script>
-    <script src="./version.js?v=0.41.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.0">
+    <script src="./app.js?v=0.42.0" defer></script>
+    <script src="./version.js?v=0.42.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,9 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.41.0</p>
+          <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
+
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.0</p>
         </div>
       </section>
 
@@ -173,6 +175,10 @@
             <button id="close-preview" class="avatar-button" type="button" aria-label="Vorschau beenden">D</button>
           </div>
         </header>
+
+        <section id="platform-announcements" class="platform-announcements" aria-label="Plattformmitteilungen" hidden>
+          <div id="platform-announcement-list" class="platform-announcement-list"></div>
+        </section>
 
         <div class="dashboard-content">
           <div class="welcome-row" data-dashboard-pane="start">
@@ -487,8 +493,8 @@
           <section id="week-section" class="section" data-dashboard-pane="week" aria-labelledby="week-title" hidden>
             <div class="section-heading week-heading">
               <div>
-                <p class="eyebrow">Deine erfassten Zeiten</p>
-                <h2 id="week-title">Stundenzettel</h2>
+                <p class="eyebrow">Persönliche Übersicht</p>
+                <h2 id="week-title">Woche</h2>
               </div>
               <div class="week-heading__controls">
                 <strong id="week-period" class="week-period">Diese Woche</strong>
@@ -500,32 +506,38 @@
               </div>
             </div>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
-            <div class="week-totals" aria-label="Wochensummen">
-              <div><span>Arbeit</span><strong id="week-total-work">00:00</strong></div>
-              <div><span>Pause</span><strong id="week-total-break">00:00</strong></div>
-              <div><span>Fahrt</span><strong id="week-total-travel">00:00</strong></div>
-              <div><span>Mehrzeit</span><strong id="week-total-overtime">00:00</strong></div>
+            <div class="week-totals week-totals--primary" aria-label="Persönliche Wochenübersicht">
+              <div><span>Geleistet</span><strong id="week-total-work">00:00</strong></div>
+              <div><span>Sollzeit</span><strong id="week-total-target">00:00</strong></div>
+              <div><span>Differenz</span><strong id="week-total-difference">±00:00</strong></div>
+              <div><span>Zeitkonto</span><strong id="time-account-balance" class="time-account-balance" aria-live="polite">±00:00</strong></div>
             </div>
+            <span id="week-total-break" hidden>00:00</span>
+            <span id="week-total-travel" hidden>00:00</span>
+            <span id="week-total-overtime" hidden>00:00</span>
             <p id="week-message" class="form-message week-message" aria-live="polite"></p>
 
             <section id="time-account-panel" class="week-review-panel time-account-panel" aria-labelledby="time-account-title">
               <div class="site-management-panel__heading">
                 <div>
-                  <p class="eyebrow">Dein Jahresblick</p>
-                  <h3 id="time-account-title">Stundenkonto</h3>
+                  <p class="eyebrow">Kompakte Zusammenfassung</p>
+                  <h3 id="time-account-title">Arbeitskonto</h3>
                 </div>
-                <strong id="time-account-balance" class="time-account-balance" aria-live="polite">±00:00</strong>
               </div>
               <p id="time-account-status" class="time-account-status">Wird geladen …</p>
-              <div class="time-account-metrics" aria-label="Jahressummen des Stundenkontos">
-                <div><span>Soll / Ist</span><strong id="time-account-target-work">00:00 / 00:00</strong></div>
-                <div><span>Urlaub übrig</span><strong id="time-account-vacation-remaining">0 Tage</strong></div>
-                <div><span>Urlaub offen</span><strong id="time-account-vacation-pending">0 Tage</strong></div>
-                <div><span>Abbau genehmigt</span><strong id="time-account-time-off">0 Tage</strong></div>
-                <div><span>Feiertage</span><strong id="time-account-holiday-count">0 berücksichtigt</strong></div>
-              </div>
-              <details class="time-account-months-panel">
-                <summary>Monate anzeigen</summary>
+              <details class="time-account-months-panel time-account-details">
+                <summary>Weitere Kontodetails anzeigen</summary>
+                <div class="time-account-metrics" aria-label="Weitere Werte des Arbeitskontos">
+                  <div><span>Pause diese Woche</span><strong id="time-account-week-break">00:00</strong></div>
+                  <div><span>Fahrt diese Woche</span><strong id="time-account-week-travel">00:00</strong></div>
+                  <div><span>Mehrzeit diese Woche</span><strong id="time-account-week-overtime">00:00</strong></div>
+                  <div><span>Soll / Ist im Jahr</span><strong id="time-account-target-work">00:00 / 00:00</strong></div>
+                  <div><span>Urlaub übrig</span><strong id="time-account-vacation-remaining">0 Tage</strong></div>
+                  <div><span>Urlaub offen</span><strong id="time-account-vacation-pending">0 Tage</strong></div>
+                  <div><span>Abbau genehmigt</span><strong id="time-account-time-off">0 Tage</strong></div>
+                  <div><span>Feiertage</span><strong id="time-account-holiday-count">0 berücksichtigt</strong></div>
+                </div>
+                <h4>Monatswerte</h4>
                 <div class="time-account-table-wrap">
                   <table class="time-account-table">
                     <thead>
@@ -542,16 +554,47 @@
                   </table>
                 </div>
               </details>
-              <details class="time-account-months-panel holiday-calendar-details">
-                <summary>Berücksichtigte Feiertage anzeigen</summary>
-                <p id="time-account-holiday-status" class="time-account-status">
-                  Feiertagskalender wird geladen …
-                </p>
-                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
-              </details>
               <p id="time-account-message" class="form-message" aria-live="polite"></p>
             </section>
 
+            <section id="week-next-assignment" class="week-focus-card" aria-labelledby="week-next-assignment-title" hidden>
+              <p class="eyebrow">Heute oder als Nächstes</p>
+              <h3 id="week-next-assignment-title">Nächster Einsatz</h3>
+              <strong id="week-next-assignment-name"></strong>
+              <p id="week-next-assignment-meta"></p>
+            </section>
+
+            <section id="week-days-section" class="week-content-section" aria-labelledby="week-days-title">
+              <div class="week-section-title">
+                <div>
+                  <p class="eyebrow">Erfasste Arbeitstage</p>
+                  <h3 id="week-days-title">Diese Woche</h3>
+                </div>
+              </div>
+              <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
+            </section>
+
+            <section id="week-open-actions" class="week-focus-card week-open-actions" aria-labelledby="week-open-actions-title" hidden>
+              <p class="eyebrow">Noch zu erledigen</p>
+              <h3 id="week-open-actions-title">Offene Hinweise</h3>
+              <ul id="week-open-actions-list"></ul>
+            </section>
+
+            <section id="next-holiday-card" class="week-focus-card next-holiday-card" aria-labelledby="next-holiday-title" hidden>
+              <p class="eyebrow">Sollzeit im Blick</p>
+              <h3 id="next-holiday-title">Nächster Feiertag</h3>
+              <div id="next-holiday-summary" class="next-holiday-summary"></div>
+              <p id="time-account-holiday-status" class="time-account-status">
+                Feiertagskalender wird geladen …
+              </p>
+              <details class="time-account-months-panel holiday-calendar-details">
+                <summary>Alle Feiertage anzeigen</summary>
+                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
+              </details>
+            </section>
+
+            <details class="week-advanced-panel week-advanced-panel--admin">
+              <summary>Erweiterte Bürobereiche</summary>
             <section id="time-account-admin-panel" class="week-review-panel time-account-admin-panel" aria-labelledby="time-account-admin-title" hidden>
               <div class="site-management-panel__heading">
                 <div>
@@ -681,7 +724,10 @@
               </section>
               <p id="time-account-admin-message" class="form-message" aria-live="polite"></p>
             </section>
+            </details>
 
+            <details class="week-advanced-panel">
+              <summary>Abwesenheit und Urlaub</summary>
             <section id="absence-panel" class="week-review-panel absence-panel" aria-labelledby="absence-title">
               <div class="site-management-panel__heading">
                 <div>
@@ -735,6 +781,7 @@
               </p>
               <ul id="absence-list" class="absence-list" aria-label="Eigene Abwesenheitsanträge"></ul>
             </section>
+            </details>
 
             <section id="employee-timesheet-export-panel" class="week-review-panel employee-timesheet-export-panel" aria-labelledby="employee-timesheet-export-title" hidden>
               <div class="site-management-panel__heading">
@@ -762,8 +809,6 @@
               </form>
               <p id="employee-timesheet-export-message" class="form-message" aria-live="polite"></p>
             </section>
-
-            <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
 
             <section id="timesheet-export-panel" class="week-review-panel timesheet-export-panel" aria-labelledby="timesheet-export-title" hidden>
               <div class="site-management-panel__heading">
@@ -843,13 +888,40 @@
               <div class="time-correction-form__heading">
                 <div>
                   <p class="eyebrow">Zeitbuchung ändern</p>
-                  <h2 id="time-correction-title">Uhrzeit korrigieren</h2>
+                  <h2 id="time-correction-title">Zeiteintrag bearbeiten</h2>
                   <p id="time-correction-original" class="time-correction-original"></p>
                 </div>
                 <button id="time-correction-cancel" class="dialog-close" type="button" aria-label="Korrektur schließen">×</button>
               </div>
-              <label for="time-correction-at">Korrigierte Uhrzeit</label>
-              <input id="time-correction-at" type="datetime-local" step="60" required>
+              <div class="setup-grid">
+                <div>
+                  <label for="time-correction-date">Arbeitstag</label>
+                  <input id="time-correction-date" type="date" required>
+                  <small id="time-correction-date-error" class="field-error" aria-live="polite"></small>
+                </div>
+                <div>
+                  <label for="time-correction-at">Uhrzeit</label>
+                  <input id="time-correction-at" type="time" step="60" required>
+                  <small id="time-correction-at-error" class="field-error" aria-live="polite"></small>
+                </div>
+              </div>
+              <div id="time-correction-site-field">
+                <label for="time-correction-site">Baustelle</label>
+                <select id="time-correction-site"></select>
+                <small id="time-correction-site-error" class="field-error" aria-live="polite"></small>
+              </div>
+              <label for="time-correction-activity">Tätigkeit <span>(optional)</span></label>
+              <textarea id="time-correction-activity" maxlength="500" rows="2" placeholder="Ausgeführte Tätigkeit"></textarea>
+              <div class="setup-grid">
+                <div id="time-correction-travel-field">
+                  <label for="time-correction-travel">Fahrzeit in Minuten</label>
+                  <input id="time-correction-travel" type="number" min="0" max="1440" step="1" inputmode="numeric">
+                </div>
+                <div>
+                  <label for="time-correction-break">Pause des Tages in Minuten</label>
+                  <input id="time-correction-break" type="number" min="0" max="1440" step="1" inputmode="numeric">
+                </div>
+              </div>
               <label for="time-correction-reason">Warum wird die Zeit geändert?</label>
               <textarea
                 id="time-correction-reason"
@@ -858,13 +930,14 @@
                 placeholder="Kurze Begründung"
                 required
               ></textarea>
+              <small id="time-correction-reason-error" class="field-error" aria-live="polite"></small>
               <button id="time-correction-submit" class="button button--primary" type="submit">
-                Änderung einreichen
+                Änderungen speichern
               </button>
               <button id="time-invalidation-submit" class="button button--quiet" type="button">
-                Buchung als ungültig markieren
+                Vollständigen Arbeitsblock löschen
               </button>
-              <p class="time-correction-note">Die bisherige Zeit bleibt sichtbar, bis das Büro die Änderung geprüft hat.</p>
+              <p class="time-correction-note">Offene Zeiten werden sofort neu berechnet. Endgültig freigegebene oder abgerechnete Tage gehen in den kontrollierten Korrekturprozess.</p>
               <p id="time-correction-message" class="form-message" aria-live="polite"></p>
             </form>
           </dialog>
@@ -922,15 +995,17 @@
               </form>
               <details class="site-choice-new">
                 <summary>Kunde oder Baustelle nicht vorhanden? Neu anlegen</summary>
-                <form id="field-site-form" class="site-choice-new-form">
+                <form id="field-site-form" class="site-choice-new-form" novalidate>
                   <p class="site-choice-new-form__intro">
                     Lege die Baustelle direkt an. Vorhandene Kunden werden weiterverwendet.
                   </p>
                   <label for="field-site-customer">Kunde</label>
                   <select id="field-site-customer" required></select>
+                  <small id="field-site-customer-error" class="field-error" aria-live="polite"></small>
                   <div id="field-site-new-customer" class="site-choice-dependent-field" hidden>
                     <label for="field-site-customer-name">Neuer Kunde</label>
                     <input id="field-site-customer-name" maxlength="200" placeholder="Firmen- oder Kundenname">
+                    <small id="field-site-customer-name-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div hidden aria-hidden="true">
                     <label for="field-site-project">Interne Zuordnung</label>
@@ -941,20 +1016,25 @@
                   </div>
                   <label for="field-site-name">Baustellenname</label>
                   <input id="field-site-name" maxlength="200" required>
+                  <small id="field-site-name-error" class="field-error" aria-live="polite"></small>
                   <label for="field-site-short-text">Aufgabe <span>(optional)</span></label>
                   <input id="field-site-short-text" maxlength="300">
                   <div class="form-grid form-grid--two">
                     <label for="field-site-street">Straße
                       <input id="field-site-street" maxlength="150" required>
+                      <small id="field-site-street-error" class="field-error" aria-live="polite"></small>
                     </label>
                     <label for="field-site-house-number">Hausnummer
                       <input id="field-site-house-number" maxlength="20" required>
+                      <small id="field-site-house-number-error" class="field-error" aria-live="polite"></small>
                     </label>
                     <label for="field-site-postal-code">PLZ
                       <input id="field-site-postal-code" maxlength="12" required>
+                      <small id="field-site-postal-code-error" class="field-error" aria-live="polite"></small>
                     </label>
                     <label for="field-site-city">Ort
                       <input id="field-site-city" maxlength="100" required>
+                      <small id="field-site-city-error" class="field-error" aria-live="polite"></small>
                     </label>
                   </div>
                   <button id="field-site-submit" class="button button--secondary" type="submit">
@@ -1672,6 +1752,14 @@
                 <p id="employee-message" class="form-message" aria-live="polite"></p>
               </form>
               <ul id="employee-list" class="admin-list" aria-label="Aktive Mitarbeiter"></ul>
+              <details id="archived-employee-panel" class="archived-employee-panel">
+                <summary>
+                  Archivierte Mitarbeiter
+                  <span id="archived-employee-count">0</span>
+                </summary>
+                <p class="field-help">Archivierte Konten können sich nicht anmelden und nicht eingeplant werden. Historische Nachweise bleiben erhalten.</p>
+                <ul id="archived-employee-list" class="admin-list" aria-label="Archivierte Mitarbeiter"></ul>
+              </details>
               <form id="employee-edit-form" class="admin-form admin-edit-form" novalidate hidden>
                 <div class="admin-edit-heading">
                   <div>
@@ -1714,6 +1802,9 @@
                   <button id="employee-edit-save" class="button button--primary" type="submit">Änderungen speichern</button>
                   <button id="employee-edit-cancel" class="button button--secondary" type="button">Abbrechen</button>
                 </div>
+                <button id="employee-edit-remove" class="button button--danger" type="button">
+                  Mitarbeiter entfernen oder archivieren
+                </button>
                 <p id="employee-edit-message" class="form-message" aria-live="polite"></p>
               </form>
             </details>

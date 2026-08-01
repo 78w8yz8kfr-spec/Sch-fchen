@@ -427,32 +427,78 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE VIEW pending_time_entry_corrections_v2
-WITH (security_invoker = TRUE)
-AS
-SELECT
-    entry.id,
-    entry.company_id,
-    entry.user_id,
-    entry.work_day_id,
-    day.work_date,
-    entry.original_entry_id,
-    entry.entry_type,
-    entry.recorded_at AS requested_recorded_at,
-    original.recorded_at AS original_recorded_at,
-    entry.correction_reason,
-    entry.created_at AS requested_at,
-    entry.correction_kind
-FROM time_entries AS entry
-LEFT JOIN time_entries AS original
-  ON original.company_id = entry.company_id
- AND original.user_id = entry.user_id
- AND original.id = entry.original_entry_id
-JOIN work_days AS day
-  ON day.company_id = entry.company_id
- AND day.user_id = entry.user_id
- AND day.id = entry.work_day_id
-WHERE entry.correction_status = 'pending';
+-- Beim idempotenten Gesamtdurchlauf darf diese historische Migration die von
+-- Migration 042 ergänzte Spalte nicht wieder aus dem View-Vertrag entfernen.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'time_entries'
+          AND column_name = 'edit_operation_id'
+    ) THEN
+        EXECUTE $view$
+            CREATE OR REPLACE VIEW pending_time_entry_corrections_v2
+            WITH (security_invoker = TRUE)
+            AS
+            SELECT
+                entry.id,
+                entry.company_id,
+                entry.user_id,
+                entry.work_day_id,
+                day.work_date,
+                entry.original_entry_id,
+                entry.entry_type,
+                entry.recorded_at AS requested_recorded_at,
+                original.recorded_at AS original_recorded_at,
+                entry.correction_reason,
+                entry.created_at AS requested_at,
+                entry.correction_kind,
+                entry.edit_operation_id
+            FROM time_entries AS entry
+            LEFT JOIN time_entries AS original
+              ON original.company_id = entry.company_id
+             AND original.user_id = entry.user_id
+             AND original.id = entry.original_entry_id
+            JOIN work_days AS day
+              ON day.company_id = entry.company_id
+             AND day.user_id = entry.user_id
+             AND day.id = entry.work_day_id
+            WHERE entry.correction_status = 'pending'
+        $view$;
+    ELSE
+        EXECUTE $view$
+            CREATE OR REPLACE VIEW pending_time_entry_corrections_v2
+            WITH (security_invoker = TRUE)
+            AS
+            SELECT
+                entry.id,
+                entry.company_id,
+                entry.user_id,
+                entry.work_day_id,
+                day.work_date,
+                entry.original_entry_id,
+                entry.entry_type,
+                entry.recorded_at AS requested_recorded_at,
+                original.recorded_at AS original_recorded_at,
+                entry.correction_reason,
+                entry.created_at AS requested_at,
+                entry.correction_kind
+            FROM time_entries AS entry
+            LEFT JOIN time_entries AS original
+              ON original.company_id = entry.company_id
+             AND original.user_id = entry.user_id
+             AND original.id = entry.original_entry_id
+            JOIN work_days AS day
+              ON day.company_id = entry.company_id
+             AND day.user_id = entry.user_id
+             AND day.id = entry.work_day_id
+            WHERE entry.correction_status = 'pending'
+        $view$;
+    END IF;
+END;
+$$;
 
 GRANT SELECT ON pending_time_entry_corrections_v2 TO schaefchen_api;
 

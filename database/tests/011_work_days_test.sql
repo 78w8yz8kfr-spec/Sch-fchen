@@ -60,9 +60,11 @@ BEGIN
     SET status = 'approved', approved_by_user_id = employee_id
     WHERE id = friday_id;
 
+    PERFORM set_config('app.controlled_time_correction', 'on', TRUE);
     UPDATE work_days
     SET status = 'locked', locked_by_user_id = employee_id
     WHERE id = friday_id;
+    PERFORM set_config('app.controlled_time_correction', '', TRUE);
 
     IF NOT EXISTS (
         SELECT 1 FROM work_days
