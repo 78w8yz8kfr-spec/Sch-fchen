@@ -127,6 +127,9 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const directorPersonnelNumber = `GF-${suffix}`;
   const directorTemporaryPassword = "Leitung-Start-2026!";
   const directorPassword = "Leitung-Eigen-2026!";
+  const projectManagerPersonnelNumber = `PL-${suffix}`;
+  const projectManagerTemporaryPassword = "Projektleitung-Start-2026!";
+  const projectManagerPassword = "Projektleitung-Eigen-2026!";
 
   const initialOverview = await fetch(
     `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
@@ -284,14 +287,36 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: directorCookie },
     body: JSON.stringify({
-      personnelNumber: `PL-${suffix}`,
+      personnelNumber: projectManagerPersonnelNumber,
       firstName: "Petra",
       lastName: "Projektleitung",
       role: "project_manager",
-      temporaryPassword: "Projektleitung-2026!"
+      temporaryPassword: projectManagerTemporaryPassword
     })
   });
   assert.equal(directorCreatesProjectManager.status, 201, await directorCreatesProjectManager.clone().text());
+  const projectManager = (await directorCreatesProjectManager.json()).employee;
+
+  const projectManagerLogin = await fetch(`${baseUrl}/api/v1/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+    body: JSON.stringify({
+      companyNumber: "F-000001",
+      personnelNumber: projectManagerPersonnelNumber,
+      password: projectManagerTemporaryPassword
+    })
+  });
+  assert.equal(projectManagerLogin.status, 201);
+  const projectManagerCookie = projectManagerLogin.headers.get("set-cookie").split(";", 1)[0];
+  const projectManagerPasswordChange = await fetch(
+    `${baseUrl}/api/v1/account/initial-password`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: projectManagerCookie },
+      body: JSON.stringify({ newPassword: projectManagerPassword })
+    }
+  );
+  assert.equal(projectManagerPasswordChange.status, 200);
 
   const employeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
     method: "POST",
@@ -438,7 +463,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     body: JSON.stringify({
       customerId: customer.id,
       name: `Struktur Projekt ${suffix}`,
-      installerShortText: "Elektroinstallation"
+      installerShortText: "Elektroinstallation",
+      projectManagerId: projectManager.id
     })
   });
   assert.equal(projectResponse.status, 201, await projectResponse.clone().text());
@@ -446,6 +472,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(project.customerId, customer.id);
   assert.match(project.number, /^SE-\d{4}-\d{4}$/);
   assert.equal(project.rowVersion, 1);
+  assert.equal(project.projectManagerId, projectManager.id);
+  assert.equal(project.projectManagerName, "Petra Projektleitung");
 
   const projectUpdateResponse = await fetch(
     `${baseUrl}/api/v1/admin/projects/${project.id}`,
@@ -482,6 +510,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const structuredSite = (await structuredSiteResponse.json()).site;
   assert.equal(structuredSite.projectId, project.id);
   assert.equal(structuredSite.customerId, customer.id);
+  assert.deepEqual(structuredSite.projectManagerIds, [projectManager.id]);
   assert.equal(structuredSite.status, "active");
   assert.equal(structuredSite.rowVersion, 1);
 
@@ -503,6 +532,62 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(directSite.customerId, customer.id);
   assert.equal(directSite.projectName, "Baustellen");
   assert.notEqual(directSite.projectId, project.id);
+
+  const projectManagerOverviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: projectManagerCookie } }
+  );
+  assert.equal(
+    projectManagerOverviewResponse.status,
+    200,
+    await projectManagerOverviewResponse.clone().text()
+  );
+  const projectManagerOverview = (await projectManagerOverviewResponse.json()).overview;
+  assert.equal(projectManagerOverview.projectScopeRestricted, true);
+  assert.deepEqual(projectManagerOverview.projects.map((entry) => entry.id), [project.id]);
+  assert.deepEqual(projectManagerOverview.sites.map((entry) => entry.id), [structuredSite.id]);
+  assert.deepEqual(projectManagerOverview.customers.map((entry) => entry.id), [customer.id]);
+  assert.equal(projectManagerOverview.canReviewAbsenceOffice, false);
+  assert.deepEqual(projectManagerOverview.workDays, []);
+  assert.deepEqual(projectManagerOverview.timeCorrections, []);
+  assert.deepEqual(projectManagerOverview.absences, []);
+
+  const forbiddenProjectManagerEmployeeCreate = await fetch(
+    `${baseUrl}/api/v1/admin/employees`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: projectManagerCookie },
+      body: JSON.stringify({
+        personnelNumber: `PM-FORBIDDEN-${suffix}`,
+        firstName: "Nicht",
+        lastName: "Anlegbar",
+        role: "installer",
+        temporaryPassword: "Nicht-Anlegbar-2026!"
+      })
+    }
+  );
+  assert.equal(forbiddenProjectManagerEmployeeCreate.status, 403);
+  assert.equal(
+    (await forbiddenProjectManagerEmployeeCreate.json()).error.code,
+    "global_planning_forbidden"
+  );
+
+  const forbiddenProjectManagerQr = await fetch(
+    `${baseUrl}/api/v1/admin/construction-sites/${directSite.id}/qr`,
+    { headers: { Cookie: projectManagerCookie } }
+  );
+  assert.equal(forbiddenProjectManagerQr.status, 403);
+  assert.equal(
+    (await forbiddenProjectManagerQr.json()).error.code,
+    "site_project_access_forbidden"
+  );
+
+  const assignedProjectManagerQr = await fetch(
+    `${baseUrl}/api/v1/admin/construction-sites/${structuredSite.id}/qr`,
+    { headers: { Cookie: projectManagerCookie } }
+  );
+  assert.equal(assignedProjectManagerQr.status, 200);
+  assert.match(assignedProjectManagerQr.headers.get("content-type"), /image\/svg\+xml/);
 
   const editedForemanAssignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
     method: "POST",
@@ -627,6 +712,87 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
   assert.equal(duplicateMobileReportResponse.status, 200);
   assert.equal((await duplicateMobileReportResponse.json()).siteReport.id, mobileReport.id);
+
+  const reportPreviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/site-reports/${mobileReport.id}/preview`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(reportPreviewResponse.status, 200, await reportPreviewResponse.clone().text());
+  assert.match(reportPreviewResponse.headers.get("content-type"), /application\/pdf/);
+  assert.equal(
+    Buffer.from(await reportPreviewResponse.arrayBuffer()).subarray(0, 5).toString("ascii"),
+    "%PDF-"
+  );
+
+  const returnedMobileReportResponse = await fetch(
+    `${baseUrl}/api/v1/admin/site-reports/${mobileReport.id}/return`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        rowVersion: mobileReport.rowVersion,
+        comment: "Bitte offene Punkte und Material genauer ergänzen."
+      })
+    }
+  );
+  assert.equal(
+    returnedMobileReportResponse.status,
+    200,
+    await returnedMobileReportResponse.clone().text()
+  );
+  const returnedMobileReport = (await returnedMobileReportResponse.json()).siteReport;
+  assert.equal(returnedMobileReport.status, "returned");
+  assert.equal(returnedMobileReport.returnCount, 1);
+  assert.equal(
+    returnedMobileReport.returnComment,
+    "Bitte offene Punkte und Material genauer ergänzen."
+  );
+
+  const returnedAssignmentsResponse = await fetch(
+    `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(returnedAssignmentsResponse.status, 200);
+  const returnedAssignment = (await returnedAssignmentsResponse.json()).assignments[0];
+  assert.equal(returnedAssignment.mobileReport.status, "returned");
+  assert.equal(
+    returnedAssignment.mobileReport.returnComment,
+    "Bitte offene Punkte und Material genauer ergänzen."
+  );
+
+  const revisedMobileReportResponse = await fetch(
+    `${baseUrl}/api/v1/site-reports/${mobileReport.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: foremanCookie },
+      body: JSON.stringify({
+        constructionSiteId: structuredSite.id,
+        reportType: "daily",
+        workDate: assignmentDate,
+        sourceMode: "digital",
+        summary: "Tagesfortschritt aus dem Integrationstest",
+        details: "Leitungswege vorbereitet, Material und offene Punkte ergänzt",
+        workPerformed: "Leitungswege vorbereitet und Unterverteilung montiert",
+        obstructions: "Material kam 30 Minuten später",
+        openItems: "Beschriftung am Folgetag fertigstellen",
+        materialsAndEquipment: "NYM-J 3x1,5 und Arbeitsbühne",
+        personnel: [{ userId: foreman.id, minutes: 450 }],
+        rowVersion: returnedMobileReport.rowVersion
+      })
+    }
+  );
+  assert.equal(
+    revisedMobileReportResponse.status,
+    200,
+    await revisedMobileReportResponse.clone().text()
+  );
+  const revisedMobileReport = (await revisedMobileReportResponse.json()).siteReport;
+  assert.equal(revisedMobileReport.status, "submitted");
+  assert.equal(revisedMobileReport.returnCount, 1);
+  assert.equal(
+    revisedMobileReport.structuredData.materialsAndEquipment,
+    "NYM-J 3x1,5 und Arbeitsbühne"
+  );
   assert.equal((await postForemanEntry("site_departure", 4_000, structuredSite.id)).status, 201);
 
   const siteTaskResponse = await fetch(`${baseUrl}/api/v1/admin/site-tasks`, {
@@ -754,6 +920,80 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.ok(uploadedDocument.links.some((link) => link.customerId === customer.id));
   assert.ok(uploadedDocument.links.some((link) => link.projectId === project.id));
   assert.ok(uploadedDocument.links.some((link) => link.constructionSiteId === structuredSite.id));
+  assert.equal(uploadedDocument.mobileVisible, true);
+  assert.equal(uploadedDocument.offlinePriority, false);
+
+  const offlineDocumentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/documents/${uploadedDocument.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        offlinePriority: true,
+        rowVersion: uploadedDocument.rowVersion
+      })
+    }
+  );
+  assert.equal(offlineDocumentResponse.status, 200, await offlineDocumentResponse.clone().text());
+  const offlineDocument = (await offlineDocumentResponse.json()).document;
+  assert.equal(offlineDocument.mobileVisible, true);
+  assert.equal(offlineDocument.offlinePriority, true);
+
+  const workspaceWithOfflineDocumentResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(workspaceWithOfflineDocumentResponse.status, 200);
+  const workspaceWithOfflineDocument =
+    (await workspaceWithOfflineDocumentResponse.json()).dashboard;
+  assert.ok(workspaceWithOfflineDocument.site.qrCode);
+  assert.equal(
+    workspaceWithOfflineDocument.documents.find(
+      (document) => document.id === uploadedDocument.id
+    ).offlinePriority,
+    true
+  );
+
+  const hiddenDocumentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/documents/${uploadedDocument.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        mobileVisible: false,
+        rowVersion: offlineDocument.rowVersion
+      })
+    }
+  );
+  assert.equal(hiddenDocumentResponse.status, 200, await hiddenDocumentResponse.clone().text());
+  const hiddenDocument = (await hiddenDocumentResponse.json()).document;
+  assert.equal(hiddenDocument.mobileVisible, false);
+  assert.equal(hiddenDocument.offlinePriority, false);
+
+  const workspaceWithoutHiddenDocumentResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(workspaceWithoutHiddenDocumentResponse.status, 200);
+  assert.equal(
+    (await workspaceWithoutHiddenDocumentResponse.json()).dashboard.documents.some(
+      (document) => document.id === uploadedDocument.id
+    ),
+    false
+  );
+  const hiddenDocumentContentResponse = await fetch(
+    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/documents/${uploadedDocument.id}/content?date=${assignmentDate}`,
+    { headers: { Cookie: foremanCookie } }
+  );
+  assert.equal(hiddenDocumentContentResponse.status, 404);
+
+  const siteQrResponse = await fetch(
+    `${baseUrl}/api/v1/admin/construction-sites/${structuredSite.id}/qr`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(siteQrResponse.status, 200, await siteQrResponse.clone().text());
+  assert.match(siteQrResponse.headers.get("content-type"), /image\/svg\+xml/);
+  assert.match(await siteQrResponse.text(), /<svg/);
 
   const reportPhotoResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
     method: "POST",
@@ -770,6 +1010,21 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(reportPhotoResponse.status, 201, await reportPhotoResponse.clone().text());
   const reportPhoto = (await reportPhotoResponse.json()).document;
 
+  const sitePhotoResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      title: `Unterverteilung ${suffix}`,
+      category: "photo",
+      fileName: `Unterverteilung-${suffix}.png`,
+      mimeType: "image/png",
+      contentBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      constructionSiteId: structuredSite.id
+    })
+  });
+  assert.equal(sitePhotoResponse.status, 201, await sitePhotoResponse.clone().text());
+  const sitePhoto = (await sitePhotoResponse.json()).document;
+
   const siteReportResponse = await fetch(`${baseUrl}/api/v1/admin/site-reports`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },
@@ -780,13 +1035,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       sourceMode: "photo",
       summary: "Montagefortschritt",
       details: "Unterverteilung gesetzt und beschriftet",
-      sourceDocumentId: reportPhoto.id
+      sourceDocumentId: reportPhoto.id,
+      photos: [{
+        documentId: sitePhoto.id,
+        caption: "Unterverteilung nach Abschluss der Montage"
+      }]
     })
   });
   assert.equal(siteReportResponse.status, 201, await siteReportResponse.clone().text());
   const siteReport = (await siteReportResponse.json()).siteReport;
   assert.match(siteReport.number, /^SE-R-\d{4}-\d{5}$/);
   assert.equal(siteReport.sourceDocumentId, reportPhoto.id);
+  assert.equal(siteReport.structuredData.photos[0].documentId, sitePhoto.id);
+  assert.equal(
+    siteReport.structuredData.photos[0].caption,
+    "Unterverteilung nach Abschluss der Montage"
+  );
   assert.equal(siteReport.status, "submitted");
 
   const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -1174,7 +1438,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.ok(foremanSiteDashboard.notes.some((item) => item.id === mobileNote.id));
   assert.equal(foremanSiteDashboard.notes[0].id, adminNote.id);
   assert.ok(foremanSiteDashboard.reports.some((item) => item.id === mobileReport.id));
-  assert.ok(foremanSiteDashboard.documents.some((item) => item.id === uploadedDocument.id));
+  assert.equal(
+    foremanSiteDashboard.documents.some((item) => item.id === uploadedDocument.id),
+    false
+  );
   assert.equal(foremanSiteDashboard.electricalModules.vde.enabled, true);
   assert.equal(foremanSiteDashboard.electricalModules.vde.permissions.complete, true);
   assert.ok(foremanSiteDashboard.electricalModules.vde.inspections.some(
@@ -1202,12 +1469,12 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     }
   );
   assert.equal(sitePhotoUploadResponse.status, 201, await sitePhotoUploadResponse.clone().text());
-  const sitePhoto = (await sitePhotoUploadResponse.json()).document;
-  assert.equal(sitePhoto.category, "photo");
-  assert.ok(sitePhoto.links.some((link) => link.constructionSiteId === structuredSite.id));
+  const fieldSitePhoto = (await sitePhotoUploadResponse.json()).document;
+  assert.equal(fieldSitePhoto.category, "photo");
+  assert.ok(fieldSitePhoto.links.some((link) => link.constructionSiteId === structuredSite.id));
 
   const sitePhotoDownloadResponse = await fetch(
-    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/documents/${sitePhoto.id}/content?date=${assignmentDate}`,
+    `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/documents/${fieldSitePhoto.id}/content?date=${assignmentDate}`,
     { headers: { Cookie: foremanCookie } }
   );
   assert.equal(sitePhotoDownloadResponse.status, 200);
@@ -1244,13 +1511,13 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-      body: JSON.stringify({ status: "archived", rowVersion: uploadedDocument.rowVersion })
+      body: JSON.stringify({ status: "archived", rowVersion: hiddenDocument.rowVersion })
     }
   );
   assert.equal(archiveDocumentResponse.status, 200, await archiveDocumentResponse.clone().text());
   const archivedDocument = (await archiveDocumentResponse.json()).document;
   assert.equal(archivedDocument.status, "archived");
-  assert.equal(archivedDocument.rowVersion, uploadedDocument.rowVersion + 1);
+  assert.equal(archivedDocument.rowVersion, hiddenDocument.rowVersion + 1);
 
   const duplicateDocumentResponse = await fetch(`${baseUrl}/api/v1/admin/documents`, {
     method: "POST",
@@ -1269,6 +1536,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(reusedDocumentBody.reused, true);
   assert.equal(reusedDocumentBody.document.id, uploadedDocument.id);
   assert.equal(reusedDocumentBody.document.status, "active");
+  assert.equal(reusedDocumentBody.document.mobileVisible, false);
+  assert.equal(reusedDocumentBody.document.offlinePriority, false);
 
   const blockedProjectCompletion = await fetch(
     `${baseUrl}/api/v1/admin/projects/${project.id}`,
@@ -1600,6 +1869,157 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(assignment.comment, "API-Test Arbeitsanweisung");
   assert.equal(assignment.reportResponsible, true);
   assert.equal(assignment.reportResponsibilitySource, "automatic");
+
+  const planningTeamResponse = await fetch(`${baseUrl}/api/v1/admin/planning-teams`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+    body: JSON.stringify({
+      name: `Montageteam ${suffix}`,
+      memberIds: [employee.id, updatedEditableEmployee.id]
+    })
+  });
+  assert.equal(
+    planningTeamResponse.status,
+    201,
+    await planningTeamResponse.clone().text()
+  );
+  const planningTeam = (await planningTeamResponse.json()).planningTeam;
+  assert.equal(planningTeam.members.length, 2);
+
+  const planningTeamUpdateResponse = await fetch(
+    `${baseUrl}/api/v1/admin/planning-teams/${planningTeam.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        name: `Montageteam ${suffix} aktualisiert`,
+        memberIds: [employee.id, updatedEditableEmployee.id],
+        status: "active",
+        changeReason: "Integrationstest der Teamhistorie",
+        rowVersion: planningTeam.rowVersion
+      })
+    }
+  );
+  assert.equal(
+    planningTeamUpdateResponse.status,
+    200,
+    await planningTeamUpdateResponse.clone().text()
+  );
+  const updatedPlanningTeam = (
+    await planningTeamUpdateResponse.json()
+  ).planningTeam;
+  assert.equal(updatedPlanningTeam.rowVersion, planningTeam.rowVersion + 1);
+
+  const stalePlanningTeamResponse = await fetch(
+    `${baseUrl}/api/v1/admin/planning-teams/${planningTeam.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        name: `Montageteam ${suffix} veraltet`,
+        memberIds: [employee.id, updatedEditableEmployee.id],
+        status: "active",
+        changeReason: "Veraltete Änderung muss scheitern",
+        rowVersion: planningTeam.rowVersion
+      })
+    }
+  );
+  assert.equal(stalePlanningTeamResponse.status, 409);
+  assert.equal(
+    (await stalePlanningTeamResponse.json()).error.code,
+    "row_version_conflict"
+  );
+
+  const planningDate = nextBusinessDate(nextBusinessDate(assignmentDate));
+  const assignmentBatchResponse = await fetch(
+    `${baseUrl}/api/v1/admin/assignment-batches`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeIds: [employee.id, updatedEditableEmployee.id],
+        planningTeamId: planningTeam.id,
+        reportResponsibleEmployeeId: updatedEditableEmployee.id,
+        constructionSiteId: structuredSite.id,
+        workDate: planningDate,
+        plannedStartTime: "08:00",
+        plannedDurationMinutes: 360,
+        comment: "Plantafel-Teamtest"
+      })
+    }
+  );
+  assert.equal(
+    assignmentBatchResponse.status,
+    201,
+    await assignmentBatchResponse.clone().text()
+  );
+  const teamAssignments = (await assignmentBatchResponse.json()).assignments;
+  assert.equal(teamAssignments.length, 2);
+  assert.ok(teamAssignments.every((item) => item.planningTeamId === planningTeam.id));
+  assert.equal(
+    teamAssignments.filter((item) => item.reportResponsible).length,
+    1
+  );
+
+  const reassignedTeamMemberResponse = await fetch(
+    `${baseUrl}/api/v1/admin/assignments/${teamAssignments[0].id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: foreman.id,
+        workDate: planningDate,
+        changeReason: "Integrationstest verschiebt die Mitarbeiterzeile",
+        rowVersion: teamAssignments[0].rowVersion
+      })
+    }
+  );
+  assert.equal(
+    reassignedTeamMemberResponse.status,
+    200,
+    await reassignedTeamMemberResponse.clone().text()
+  );
+  const reassignedTeamMember = (
+    await reassignedTeamMemberResponse.json()
+  ).assignment;
+  assert.equal(reassignedTeamMember.employeeId, foreman.id);
+  assert.equal(reassignedTeamMember.plannedStartTime, "08:00:00");
+  assert.equal(reassignedTeamMember.planningTeamId, planningTeam.id);
+
+  const overlappingAssignmentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/assignments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: updatedEditableEmployee.id,
+        constructionSiteId: site.id,
+        workDate: planningDate,
+        plannedStartTime: "10:00",
+        plannedDurationMinutes: 120,
+        comment: "Muss als Überschneidung abgewiesen werden"
+      })
+    }
+  );
+  assert.equal(overlappingAssignmentResponse.status, 409);
+  assert.equal(
+    (await overlappingAssignmentResponse.json()).error.code,
+    "assignment_time_overlap"
+  );
+
+  const planningOverviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${planningDate}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(planningOverviewResponse.status, 200);
+  const planningOverview = (await planningOverviewResponse.json()).overview;
+  assert.ok(planningOverview.planningTeams.some((item) => item.id === planningTeam.id));
+  assert.equal(
+    planningOverview.planningAssignments.filter(
+      (item) => item.planningTeamId === planningTeam.id
+    ).length,
+    2
+  );
 
   const installerTaskResponse = await fetch(`${baseUrl}/api/v1/admin/site-tasks`, {
     method: "POST",
@@ -2385,7 +2805,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
         plannedDurationMinutes: 360,
         comment: "Vorarbeiter übernimmt Koordination und Bericht",
         reportResponsible: true,
-        changeReason: "Vorarbeiter für das Zweierteam festgelegt"
+        changeReason: "Vorarbeiter für das Zweierteam festgelegt",
+        rowVersion: secondTeamAssignment.rowVersion
       })
     }
   );
@@ -2406,19 +2827,30 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   );
   assert.equal(forbiddenOverview.status, 403);
 
+  const currentPlanningOverviewResponse = await fetch(
+    `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(currentPlanningOverviewResponse.status, 200);
+  const currentPlanningAssignment = (
+    await currentPlanningOverviewResponse.json()
+  ).overview.planningAssignments.find((item) => item.id === assignment.id);
+  assert.ok(currentPlanningAssignment);
+
   const movedDate = nextBusinessDate(assignmentDate);
   const movedAssignment = await fetch(`${baseUrl}/api/v1/admin/assignments/${assignment.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Cookie: plannerCookie },
     body: JSON.stringify({
       workDate: movedDate,
-      plannedStartTime: "08:00",
-      changeReason: "Integrationstest verschiebt den Termin"
+      changeReason: "Integrationstest verschiebt den Termin",
+      rowVersion: currentPlanningAssignment.rowVersion
     })
   });
   assert.equal(movedAssignment.status, 200, await movedAssignment.clone().text());
   const movedAssignmentBody = (await movedAssignment.json()).assignment;
   assert.equal(movedAssignmentBody.workDate, movedDate);
+  assert.equal(movedAssignmentBody.plannedStartTime, "07:30:00");
   assert.equal(movedAssignmentBody.plannedDurationMinutes, 450);
   assert.equal(movedAssignmentBody.comment, "API-Test Arbeitsanweisung");
 

@@ -12,7 +12,8 @@ Prüfprogrammen durch einen gemeinsamen Datenbestand vom Büro bis zur Baustelle
 Der gemeinsame Kern darf später für weitere Gewerke erweitert werden. Diese
 Möglichkeit macht Schäfchen in der aktuellen Entwicklungsphase jedoch nicht zu
 einer allgemeinen Handwerker-App. VDE und DGUV bleiben optionale
-Elektro-Spezialmodule und sind nicht der fachliche Kern.
+Elektro-Spezialmodule und sind nicht der fachliche Kern. DGUV beginnt gemäß
+Fahrplan erst nach V1.0.
 
 ## Verbindliche Grundsätze
 

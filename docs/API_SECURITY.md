@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 29.07.2026
-Technischer Stand: V0.40.0
+Stand: 01.08.2026
+Technischer Stand: V0.41.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -84,7 +84,7 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/construction-sites/:id/notes?date=JJJJ-MM-TT` | Notiz idempotent für eine an diesem Tag zugewiesene Baustelle speichern |
 | `POST` | `/api/v1/construction-sites/:id/photos?date=JJJJ-MM-TT` | Foto für eine an diesem Tag zugewiesene Baustelle zentral speichern |
 | `GET` | `/api/v1/construction-sites/:id/documents/:documentId/content?date=JJJJ-MM-TT` | mit Baustellenzuweisung verknüpften Dateiinhalt geschützt lesen |
-| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter samt optionalen Kontaktdaten, Kunden, Projekte, Baustellen, Arbeitsmodule, Abwesenheiten, Tageslage und Wochenplanung Montag bis Freitag |
+| `GET` | `/api/v1/admin/overview?date=JJJJ-MM-TT` | Mitarbeiter, Teamvorlagen, Kunden, Projekte, Baustellen, Berichtszentrale, Abwesenheiten sowie Wochen- und Monatsdaten der Plantafel lesen |
 | `GET` | `/api/v1/admin/time-accounts?year=JJJJ` | Jahresübersicht aller aktiven Mitarbeiter nach serverseitiger Planungsrollenprüfung |
 | `PATCH` | `/api/v1/admin/time-accounts/:employeeId/profile` | Aktivierung, Startdatum und kalenderjahrbezogenen Urlaubsanspruch mit getrenntem Versionsschutz ändern; nur Administration oder Geschäftsführung |
 | `POST` | `/api/v1/admin/time-account-adjustments` | Begründete Stundenkonto-Buchung mit Client-UUID unveränderlich und idempotent anlegen; nur Administration oder Geschäftsführung |
@@ -105,23 +105,29 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/site-tasks/:id` | Aufgabenstatus versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/site-materials` | Materialeintrag für eine aktive Baustelle anlegen |
 | `PATCH` | `/api/v1/admin/site-materials/:id` | Materialstatus versionsgeschützt ändern |
-| `POST` | `/api/v1/admin/site-reports` | Montage- oder Bautagesbericht anlegen und optional mit Originalfoto verknüpfen |
+| `POST` | `/api/v1/admin/site-reports` | Montage- oder Bautagesbericht mit strukturierten Angaben und optionalen Baustellenfotos samt Bildunterschrift anlegen |
+| `GET` | `/api/v1/admin/site-reports/:id/preview` | offene Berichtsversion ohne Unterschriften als klar markierte PDF-Vorschau lesen |
+| `POST` | `/api/v1/admin/site-reports/:id/return` | eingereichten Bericht mit Versionsstand und Pflichtkommentar zur Überarbeitung zurückgeben |
 | `POST` | `/api/v1/admin/site-reports/:id/finalize` | beide Touch-Unterschriften prüfen, Bericht freigeben und unveränderliche PDF zentral speichern |
 | `POST` | `/api/v1/admin/documents` | Datei einmalig hochladen und hierarchisch verknüpfen |
 | `GET` | `/api/v1/admin/documents/:id/content` | Dokument nach Sitzungs- und Rollenprüfung herunterladen |
-| `PATCH` | `/api/v1/admin/documents/:id` | Dokument versionsgeschützt archivieren oder reaktivieren |
+| `PATCH` | `/api/v1/admin/documents/:id` | Status, mobile Sichtbarkeit und Offline-Priorität eines Dokuments versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/employees` | Mitarbeiter mit optionalen Kontaktdaten, Startpasswort und begrenzter Rolle anlegen |
 | `PATCH` | `/api/v1/admin/employees/:id` | Mitarbeiterstammdaten, Kontaktdaten und Rolle mit Versionskonfliktschutz bearbeiten |
 | `POST` | `/api/v1/admin/customers` | Firmen- oder Privatkunden getrennt anlegen |
 | `PATCH` | `/api/v1/admin/customers/:id` | Kundenstammdaten und Archivstatus versionsgeschützt ändern |
-| `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden zuordnen |
-| `PATCH` | `/api/v1/admin/projects/:id` | Projektdaten und Status versionsgeschützt ändern |
-| `POST` | `/api/v1/admin/construction-sites` | Baustelle und Standort für einen aktiven oder neuen Kunden anlegen; interne Zuordnung erfolgt automatisch |
-| `PATCH` | `/api/v1/admin/construction-sites/:id` | Baustellendaten und Status versionsgeschützt ändern |
+| `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden und optional einem aktiven Projektleiter zuordnen |
+| `PATCH` | `/api/v1/admin/projects/:id` | Projektdaten, Status und Projektleiterzuordnung versionsgeschützt ändern |
+| `POST` | `/api/v1/admin/construction-sites` | Baustelle und Standort anlegen; Projektleiter können nur ein bereits zugeordnetes Projekt verwenden |
+| `PATCH` | `/api/v1/admin/construction-sites/:id` | Baustellendaten, Status und – mit firmenweiter Planungsrolle – Projektleiterzuordnung versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/construction-sites/:id/confirm` | Eine im Feld angelegte Baustelle fachlich bestätigen |
+| `GET` | `/api/v1/admin/construction-sites/:id/qr` | QR-Code zum stabilen, nach Anmeldung erneut berechtigungsgeprüften Baustellenlink lesen |
 | `POST` | `/api/v1/admin/sites` | Kompatibler Paket-Endpunkt für bestehende Integrationen |
+| `POST` | `/api/v1/admin/planning-teams` | persistente Teamvorlage aus aktiven Monteuren und Vorarbeitern anlegen |
+| `PATCH` | `/api/v1/admin/planning-teams/:id` | Teamvorlage und Mitgliedschaft versionsgeschützt und historisiert ändern oder archivieren |
 | `POST` | `/api/v1/admin/assignments` | Geordneten Tageseinsatz mit optionaler Dauer und Arbeitsanweisung freigeben |
-| `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Begründung einschließlich Datum, Startzeit, Dauer und Arbeitsanweisung ändern |
+| `POST` | `/api/v1/admin/assignment-batches` | Team oder mehrere Mitarbeiter atomar als weiterhin individuelle Einsätze zuweisen |
+| `PATCH` | `/api/v1/admin/assignments/:id` | Einsatz mit Versionsstand und Pflichtbegründung einschließlich Mitarbeiter, Datum, Startzeit, Dauer und Arbeitsanweisung ändern |
 | `POST` | `/api/v1/admin/assignments/:id/cancel` | Einsatz mit Begründung stornieren; Historie bleibt erhalten |
 | `POST` | `/api/v1/admin/assignment-imports/preview` | XLSX-Wochenplan prüfen und sichere X-Zuweisungen vorschlagen |
 | `POST` | `/api/v1/admin/assignment-imports` | zuvor prüfbare X-Zuweisungen geschützt importieren |
@@ -143,6 +149,7 @@ API setzt beide Werte ausschließlich selbst.
 | `POST` | `/api/v1/time-tracking/site-selection` | Andere vorhandene Baustelle als spontanen Tageseinsatz wählen |
 | `POST` | `/api/v1/time-tracking/sites` | Fehlende Baustelle im Feld anlegen und als Tageseinsatz auswählen |
 | `POST` | `/api/v1/site-reports` | Mobilen Bericht idempotent erfassen; nur für den berichtspflichtig eingeteilten Vorarbeiter |
+| `PATCH` | `/api/v1/site-reports/:id` | einen zurückgegebenen eigenen Bericht versionsgeschützt überarbeiten und erneut einreichen |
 | `POST` | `/api/v1/time-entries` | Offline-Zeitereignis idempotent synchronisieren |
 | `POST` | `/api/v1/time-entry-corrections` | Begründete Korrektur einer eigenen wirksamen Zeitbuchung beantragen |
 | `POST` | `/api/v1/time-entry-additions` | Fehlende eigene Zeitbuchung mit Pflichtgrund zur Freigabe ergänzen |
@@ -172,17 +179,22 @@ verwenden denselben nachvollziehbaren Prüfpfad. Ablehnungen lassen die
 wirksame Zeit unverändert; Originale werden niemals gelöscht.
 
 Die Verwaltungsendpunkte prüfen zusätzlich die aktiven Rollen aus der
-serverseitig aufgelösten Sitzung. Administrator, Geschäftsführer,
-Büro/Disposition und Projektleiter dürfen entsprechend ihrer fachlichen Rolle
-planen und verwalten. Verwaltungsrollen dürfen nur Administrator und
-Geschäftsführer vergeben. Bestehende Konten mit `office`, `planner` oder
-`executive_assistant` bleiben kompatibel, diese Rollen werden aber nicht mehr
-neu angeboten. Monteur und Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum
-persönlichen Wechsel des Startpassworts sind Fach- und Verwaltungsendpunkte für
-das neue Konto gesperrt.
+serverseitig aufgelösten Sitzung. Administrator, Geschäftsführer und
+Büro/Disposition besitzen den vorgesehenen firmenweiten Planungsumfang.
+Projektleiter werden über aktive, historisierte Einträge in
+`project_responsibles` zugeordnet. Ein reines Projektleiterkonto erhält in
+Übersicht, Plantafel, Baustellenakte, Dokumenten, Berichten, QR und VDE
+ausschließlich Daten dieser Projekte; direkte Zugriffe auf fremde Kennungen
+werden ebenfalls serverseitig mit `403` abgewiesen. Firmenweite Personal-,
+Kunden-, Zeitkonto-, Abwesenheits-, Import- und Teamverwaltung ist gesperrt.
+Verwaltungsrollen dürfen nur Administrator und Geschäftsführer vergeben.
+Bestehende Konten mit `office`, `planner` oder `executive_assistant` bleiben
+kompatibel, diese Rollen werden aber nicht mehr neu angeboten. Monteur und
+Vorarbeiter erhalten keine Verwaltungsrechte. Bis zum persönlichen Wechsel des
+Startpassworts sind Fach- und Verwaltungsendpunkte für das neue Konto gesperrt.
 
-Abwesenheiten besitzen eine eigene zweistufige Berechtigungsgrenze. Büro,
-Disposition oder Projektleitung führen die erste Prüfung aus; die
+Abwesenheiten besitzen eine eigene zweistufige Berechtigungsgrenze. Büro oder
+Disposition führen die erste Prüfung aus; die
 Geschäftsführung erteilt die verbindliche zweite Freigabe. Beide Schritte
 müssen von verschiedenen Konten stammen. Der Client sendet ausschließlich
 Entscheidung, Kommentar und aktuellen Versionsstand. Firma, Mitarbeiter und
@@ -297,6 +309,11 @@ Mandantentransaktion. Aufgaben- und Materialstatus verlangen die aktuelle
 Modultabellen verhindern fachliches Hartlöschen. Baustellennotizen bleiben
 inhaltlich unverändert und können nur über ihren nachvollziehbaren Status
 archiviert werden.
+
+Offline priorisierte Baustellendokumente liegen in einem versions- und
+benutzergebundenen Browsercache. Der Service Worker löst Offline-Abrufe nicht
+über eine cacheübergreifende Suche auf. Ein Kontowechsel entfernt fremde
+Dokumentcaches; eine ausdrückliche Abmeldung entfernt sie vollständig.
 
 ## Lokale Inbetriebnahme
 

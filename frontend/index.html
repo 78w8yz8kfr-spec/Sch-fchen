@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.40.0">
-    <script src="./app.js?v=0.40.0" defer></script>
-    <script src="./version.js?v=0.40.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.41.0">
+    <script src="./app.js?v=0.41.0" defer></script>
+    <script src="./version.js?v=0.41.0" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -124,7 +124,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.40.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.41.0</p>
         </div>
       </section>
 
@@ -296,11 +296,11 @@
             <nav class="workspace-section-nav" aria-label="Bereiche dieser Baustelle">
               <button class="workspace-section-tab workspace-section-tab--active" type="button" data-employee-site-section-button="overview" aria-pressed="true">Übersicht</button>
               <button class="workspace-section-tab" type="button" data-employee-site-section-button="tasks" aria-pressed="false">Aufgaben</button>
-              <button class="workspace-section-tab" type="button" data-employee-site-section-button="notes" aria-pressed="false">Notizen</button>
               <button class="workspace-section-tab" type="button" data-employee-site-section-button="reports" aria-pressed="false">Berichte</button>
-              <button class="workspace-section-tab" type="button" data-employee-site-section-button="documents" aria-pressed="false">Dokumente</button>
               <button class="workspace-section-tab" type="button" data-employee-site-section-button="photos" aria-pressed="false">Fotos</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="documents" aria-pressed="false">Dokumente</button>
               <button class="workspace-section-tab" type="button" data-employee-site-section-button="materials" aria-pressed="false">Material</button>
+              <button class="workspace-section-tab" type="button" data-employee-site-section-button="notes" aria-pressed="false">Notizen</button>
               <button id="employee-site-vde-tab" class="workspace-section-tab" type="button" data-employee-site-section-button="vde" aria-pressed="false" hidden>VDE</button>
             </nav>
 
@@ -360,6 +360,10 @@
                   </div>
                   <span id="employee-site-report-count" class="module-count">0</span>
                 </div>
+                <label class="workspace-section-search" for="employee-site-report-search">
+                  <span>Berichte durchsuchen</span>
+                  <input id="employee-site-report-search" type="search" maxlength="120" placeholder="Titel, Nummer oder Monteur">
+                </label>
                 <ul id="employee-site-reports" class="employee-site-list"></ul>
               </section>
 
@@ -371,6 +375,10 @@
                   </div>
                   <span id="employee-site-document-count" class="module-count">0</span>
                 </div>
+                <label class="workspace-section-search" for="employee-site-document-search">
+                  <span>Dokumente durchsuchen</span>
+                  <input id="employee-site-document-search" type="search" maxlength="120" placeholder="Titel oder Dokumentart">
+                </label>
                 <ul id="employee-site-documents" class="employee-site-list"></ul>
               </section>
 
@@ -391,6 +399,10 @@
                   hidden
                 >
                 <p id="employee-site-photo-message" class="form-message" aria-live="polite"></p>
+                <label class="workspace-section-search" for="employee-site-photo-search">
+                  <span>Fotos durchsuchen</span>
+                  <input id="employee-site-photo-search" type="search" maxlength="120" placeholder="Bildtitel">
+                </label>
                 <ul id="employee-site-photos" class="employee-site-photo-grid"></ul>
               </section>
 
@@ -991,6 +1003,79 @@
               <p id="dispatch-summary-note">Noch keine Planung für heute.</p>
             </section>
 
+            <section id="report-center" class="report-center" aria-labelledby="report-center-title" hidden>
+              <div class="report-center__heading">
+                <div>
+                  <p class="eyebrow">Alle Baustellen</p>
+                  <h3 id="report-center-title">Berichtszentrale</h3>
+                  <p>Offene, zurückgegebene und abgeschlossene Berichte an einer Stelle.</p>
+                </div>
+                <div class="report-center__metrics" aria-label="Berichtsstatus">
+                  <span><strong id="report-center-draft-count">0</strong> Entwürfe</span>
+                  <span><strong id="report-center-open-count">0</strong> offen</span>
+                  <span><strong id="report-center-returned-count">0</strong> Überarbeitung</span>
+                  <span><strong id="report-center-approved-count">0</strong> abgeschlossen</span>
+                  <span><strong id="report-center-missing-count">0</strong> fehlen</span>
+                </div>
+              </div>
+              <div class="report-center__filters">
+                <label for="report-center-search">
+                  <span>Suchen</span>
+                  <input id="report-center-search" type="search" maxlength="120" placeholder="Baustelle, Monteur oder Bericht">
+                </label>
+                <label for="report-center-status">
+                  <span>Status</span>
+                  <select id="report-center-status">
+                    <option value="all">Alle</option>
+                    <option value="submitted">Vollständig · Unterschrift offen</option>
+                    <option value="returned">Zur Überarbeitung</option>
+                    <option value="approved">Abgeschlossen</option>
+                    <option value="draft">Entwurf</option>
+                  </select>
+                </label>
+                <label for="report-center-type">
+                  <span>Berichtsart</span>
+                  <select id="report-center-type">
+                    <option value="all">Alle</option>
+                    <option value="daily">Bautagesbericht</option>
+                    <option value="montage">Montageschein</option>
+                  </select>
+                </label>
+                <label for="report-center-site">
+                  <span>Baustelle</span>
+                  <select id="report-center-site"><option value="all">Alle Baustellen</option></select>
+                </label>
+                <label for="report-center-employee">
+                  <span>Monteur</span>
+                  <select id="report-center-employee"><option value="all">Alle Monteure</option></select>
+                </label>
+                <label for="report-center-from">
+                  <span>Von</span>
+                  <input id="report-center-from" type="date">
+                </label>
+                <label for="report-center-to">
+                  <span>Bis</span>
+                  <input id="report-center-to" type="date">
+                </label>
+                <label for="report-center-sort">
+                  <span>Sortierung</span>
+                  <select id="report-center-sort">
+                    <option value="date-desc">Datum – neu zuerst</option>
+                    <option value="date-asc">Datum – alt zuerst</option>
+                    <option value="employee">Monteur</option>
+                    <option value="site">Baustelle</option>
+                    <option value="status">Status</option>
+                  </select>
+                </label>
+              </div>
+              <details id="report-center-missing-panel" class="report-center__missing">
+                <summary>Fehlende Pflichtberichte <span id="report-center-missing-badge" class="module-count">0</span></summary>
+                <ul id="report-center-missing-list" class="site-module-list"></ul>
+              </details>
+              <p id="report-center-result-count" class="report-center__result-count">0 Berichte</p>
+              <ul id="report-center-list" class="site-module-list report-center__list"></ul>
+            </section>
+
             <section id="assignment-planning-shell" class="planning-shell-direct">
               <div id="assignment-planning-content" class="planning-group">
                 <p class="planning-intro">Wochenübersicht, einzelne Zuweisung und Excel-Import an einem Ort.</p>
@@ -1047,6 +1132,7 @@
                   <p id="site-dashboard-meta"></p>
                 </div>
                 <div class="site-dashboard__actions">
+                  <button id="site-dashboard-copy-link" class="text-button" type="button">Baustellenlink / QR</button>
                   <button id="site-dashboard-edit" class="text-button" type="button">Bearbeiten</button>
                   <button id="site-dashboard-close" class="text-button" type="button">Schließen</button>
                 </div>
@@ -1072,11 +1158,12 @@
               <nav class="workspace-section-nav workspace-section-nav--site-dashboard" aria-label="Baustellenakte">
                 <button class="workspace-section-tab workspace-section-tab--active" type="button" data-site-dashboard-section-button="overview" aria-pressed="true">Übersicht</button>
                 <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="team" aria-pressed="false">Mitarbeiter</button>
-                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="reports" aria-pressed="false">Berichte</button>
-                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="documents" aria-pressed="false">Dokumente</button>
                 <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="tasks" aria-pressed="false">Aufgaben</button>
-                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="notes" aria-pressed="false">Notizen</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="reports" aria-pressed="false">Berichte</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="photos" aria-pressed="false">Fotos</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="documents" aria-pressed="false">Dokumente</button>
                 <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="materials" aria-pressed="false">Material</button>
+                <button class="workspace-section-tab" type="button" data-site-dashboard-section-button="notes" aria-pressed="false">Notizen</button>
                 <button id="site-dashboard-vde-tab" class="workspace-section-tab" type="button" data-site-dashboard-section-button="vde" aria-pressed="false" hidden>VDE</button>
               </nav>
               <form id="site-edit-form" class="admin-form site-edit-form" novalidate hidden>
@@ -1091,6 +1178,8 @@
                 <input id="site-edit-name" maxlength="200" required>
                 <label for="site-edit-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
                 <input id="site-edit-short-text" maxlength="300">
+                <label for="site-edit-project-manager">Projektleiter <span>(optional)</span></label>
+                <select id="site-edit-project-manager"><option value="">Noch nicht zuweisen</option></select>
                 <div class="address-grid">
                   <div>
                     <label for="site-edit-street">Straße</label>
@@ -1173,6 +1262,11 @@
                       <strong id="site-report-personnel-total" class="mobile-report-personnel__total">Gesamt: 0:00 h</strong>
                       <p>Aus der Einsatzplanung für den gewählten Tag vorausgefüllt.</p>
                     </fieldset>
+                    <fieldset class="site-report-photos">
+                      <legend>Baustellenfotos <span>(optional)</span></legend>
+                      <p>JPG- und PNG-Fotos auswählen und mit einer Bildunterschrift für die PDF versehen.</p>
+                      <div id="site-report-photo-list" class="site-report-photo-list"></div>
+                    </fieldset>
                     <label for="site-report-summary">Titel</label>
                     <input id="site-report-summary" maxlength="200" required placeholder="z. B. Unterverteilung montiert">
                     <label for="site-report-details">Ausgeführte Arbeiten</label>
@@ -1201,6 +1295,10 @@
                     </div>
                     <p id="site-report-message" class="form-message" aria-live="polite"></p>
                   </form>
+                  <label class="workspace-section-search" for="site-dashboard-report-search">
+                    <span>Berichte durchsuchen</span>
+                    <input id="site-dashboard-report-search" type="search" maxlength="120" placeholder="Titel, Nummer oder Monteur">
+                  </label>
                   <ul id="site-dashboard-reports" class="site-module-list" aria-label="Berichte dieser Baustelle"></ul>
                   <form id="site-report-finalize-form" class="site-module-form report-finalize-form" novalidate hidden>
                     <div class="site-module-form__heading">
@@ -1228,6 +1326,17 @@
                   </form>
                 </div>
               </details>
+              <details id="site-dashboard-photos-panel" data-site-dashboard-section="photos" hidden>
+                <summary>Fotos <span id="site-dashboard-photo-count" class="module-count">0</span></summary>
+                <div class="site-document-module">
+                  <button id="site-dashboard-add-photo" class="button button--primary" type="button">Foto hinzufügen</button>
+                  <label class="workspace-section-search" for="site-dashboard-photo-search">
+                    <span>Fotos durchsuchen</span>
+                    <input id="site-dashboard-photo-search" type="search" maxlength="120" placeholder="Bildtitel">
+                  </label>
+                  <ul id="site-dashboard-photos" class="employee-site-photo-grid" aria-label="Fotos dieser Baustelle"></ul>
+                </div>
+              </details>
               <details id="site-dashboard-documents-panel" data-site-dashboard-section="documents" hidden>
                 <summary>Dokumente <span id="site-dashboard-document-count" class="module-count">0</span></summary>
                 <div class="site-document-module">
@@ -1252,6 +1361,10 @@
                     <p id="site-dashboard-delivery-note-message" class="form-message" aria-live="polite"></p>
                   </form>
                   <button id="site-dashboard-add-document" class="button button--secondary" type="button">Anderes Dokument hinzufügen</button>
+                  <label class="workspace-section-search" for="site-dashboard-document-search">
+                    <span>Dokumente durchsuchen</span>
+                    <input id="site-dashboard-document-search" type="search" maxlength="120" placeholder="Titel oder Dokumentart">
+                  </label>
                   <ul id="site-dashboard-documents" class="document-compact-list" aria-label="Dokumente dieser Baustelle"></ul>
                 </div>
               </details>
@@ -1355,13 +1468,47 @@
 
             <section id="admin-week" class="admin-week" aria-labelledby="admin-week-title">
               <div class="admin-week__header">
-                <button id="admin-week-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
+                <button id="admin-week-previous" class="week-button" type="button" aria-label="Vorheriger Zeitraum">‹</button>
                 <div>
-                  <span>Wochenplanung</span>
+                  <span>Desktop-Plantafel</span>
                   <strong id="admin-week-title">Montag bis Freitag</strong>
                 </div>
-                <button id="admin-week-next" class="week-button" type="button" aria-label="Nächste Woche">›</button>
+                <button id="admin-week-next" class="week-button" type="button" aria-label="Nächster Zeitraum">›</button>
               </div>
+              <div class="planning-board-toolbar">
+                <label for="planning-board-view">
+                  <span>Ansicht</span>
+                  <select id="planning-board-view">
+                    <option value="week">Woche</option>
+                    <option value="month">Monat</option>
+                  </select>
+                </label>
+                <label for="planning-board-employee">
+                  <span>Mitarbeiter</span>
+                  <select id="planning-board-employee"><option value="all">Alle</option></select>
+                </label>
+                <label for="planning-board-team">
+                  <span>Team</span>
+                  <select id="planning-board-team"><option value="all">Alle</option></select>
+                </label>
+                <label for="planning-board-site">
+                  <span>Baustelle</span>
+                  <select id="planning-board-site"><option value="all">Alle</option></select>
+                </label>
+                <label for="planning-board-project-manager">
+                  <span>Projektleiter</span>
+                  <select id="planning-board-project-manager"><option value="all">Alle</option></select>
+                </label>
+                <label for="planning-board-status">
+                  <span>Planstatus</span>
+                  <select id="planning-board-status">
+                    <option value="all">Alle</option>
+                    <option value="conflict">Nur Konflikte</option>
+                    <option value="unassigned">Nur nicht eingeplant</option>
+                  </select>
+                </label>
+              </div>
+              <p id="planning-board-summary" class="planning-board-summary" aria-live="polite"></p>
               <div id="admin-week-board" class="admin-week-board"></div>
             </section>
 
@@ -1371,6 +1518,10 @@
                 <strong id="assignment-edit-title">Einsatz</strong>
               </div>
               <div class="setup-grid">
+                <div>
+                  <label for="assignment-edit-employee">Mitarbeiter</label>
+                  <select id="assignment-edit-employee" required></select>
+                </div>
                 <div>
                   <label for="assignment-edit-date">Neues Datum</label>
                   <input id="assignment-edit-date" type="date" required>
@@ -1731,6 +1882,8 @@
                 <input id="project-name" maxlength="200" required>
                 <label for="project-short-text">Kurzbeschreibung <span>(optional)</span></label>
                 <input id="project-short-text" maxlength="300" placeholder="z. B. Elektroinstallation Neubau">
+                <label for="project-manager">Projektleiter <span>(optional)</span></label>
+                <select id="project-manager"><option value="">Noch nicht zuweisen</option></select>
                 <button class="button button--primary" type="submit">Projekt anlegen</button>
                 <p id="project-message" class="form-message" aria-live="polite"></p>
               </form>
@@ -1771,6 +1924,8 @@
                 <input id="project-edit-name" maxlength="200" required>
                 <label for="project-edit-short-text">Kurzbeschreibung <span>(optional)</span></label>
                 <input id="project-edit-short-text" maxlength="300">
+                <label for="project-edit-manager">Projektleiter <span>(optional)</span></label>
+                <select id="project-edit-manager"><option value="">Noch nicht zuweisen</option></select>
                 <label for="project-edit-status">Status</label>
                 <select id="project-edit-status" required>
                   <option value="planned">Geplant</option>
@@ -1797,11 +1952,16 @@
                   <label for="site-customer-name">Neuer Kunde</label>
                   <input id="site-customer-name" maxlength="200" placeholder="Firmen- oder Kundenname">
                 </div>
-                <select id="site-project" hidden aria-hidden="true"><option value=""></option></select>
+                <div id="site-project-field" hidden>
+                  <label for="site-project">Zugeordnetes Projekt</label>
+                  <select id="site-project"><option value="">Projekt auswählen</option></select>
+                </div>
                 <label for="site-name">Baustellenname</label>
                 <input id="site-name" maxlength="200" required>
                 <label for="site-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
                 <input id="site-short-text" maxlength="300" placeholder="z. B. Verteilung erneuern">
+                <label for="site-project-manager">Projektleiter <span>(optional)</span></label>
+                <select id="site-project-manager"><option value="">Noch nicht zuweisen</option></select>
                 <div class="address-grid">
                   <div>
                     <label for="site-street">Straße</label>
@@ -1907,6 +2067,16 @@
                   <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5"/></svg>
                   <span><strong>Datei auswählen</strong><small id="document-file-name">Noch keine Datei gewählt</small></span>
                 </button>
+                <div class="document-access-options">
+                  <label class="toggle-field" for="document-mobile-visible">
+                    <input id="document-mobile-visible" type="checkbox" checked>
+                    <span><strong>Mobil freigeben</strong><small>Zugewiesene Mitarbeiter sehen das Dokument in der Baustellenakte.</small></span>
+                  </label>
+                  <label class="toggle-field" for="document-offline-priority">
+                    <input id="document-offline-priority" type="checkbox">
+                    <span><strong>Für Offline-Ansicht vormerken</strong><small>Wichtige Pläne werden auf dem zugewiesenen Gerät zwischengespeichert.</small></span>
+                  </label>
+                </div>
                 <button id="document-submit" class="button button--primary" type="submit" disabled>Dokument speichern</button>
                 <p id="document-message" class="form-message" aria-live="polite"></p>
               </form>
@@ -1930,8 +2100,17 @@
             <details id="assignment-panel" class="admin-panel" open>
               <summary>Einsätze anlegen</summary>
               <form id="assignment-form" class="admin-form" novalidate>
-                <label for="assignment-employee">Mitarbeiter</label>
+                <label for="assignment-employee">Hauptmitarbeiter</label>
                 <select id="assignment-employee" required></select>
+                <label for="assignment-team">Teamvorlage <span>(optional)</span></label>
+                <select id="assignment-team">
+                  <option value="">Keine Teamvorlage</option>
+                </select>
+                <fieldset class="planning-member-picker">
+                  <legend>Weitere Mitarbeiter <span>(optional)</span></legend>
+                  <div id="assignment-member-list"></div>
+                  <p>Ein Einsatz wird je Mitarbeiter einzeln gespeichert. So bleiben mobile Ansicht und Historie eindeutig.</p>
+                </fieldset>
                 <label for="assignment-site">Baustelle</label>
                 <select id="assignment-site" required></select>
                 <div class="setup-grid">
@@ -1955,10 +2134,66 @@
                 <button class="button button--primary" type="submit">Einsatz freigeben</button>
                 <p id="assignment-message" class="form-message" aria-live="polite"></p>
               </form>
+              <details id="planning-team-panel" class="planning-team-panel">
+                <summary>Teamvorlagen verwalten</summary>
+                <form id="planning-team-form" class="admin-form" novalidate>
+                  <input id="planning-team-id" type="hidden">
+                  <label for="planning-team-name">Teamname</label>
+                  <input id="planning-team-name" maxlength="100" required placeholder="z. B. Team Nord">
+                  <fieldset class="planning-member-picker">
+                    <legend>Feste Teammitglieder</legend>
+                    <div id="planning-team-member-list"></div>
+                  </fieldset>
+                  <label for="planning-team-reason">Änderungsgrund <span>(nur beim Bearbeiten)</span></label>
+                  <input id="planning-team-reason" maxlength="500" placeholder="z. B. Teamzuschnitt angepasst">
+                  <div class="site-module-form__actions">
+                    <button id="planning-team-submit" class="button button--primary" type="submit">Teamvorlage speichern</button>
+                    <button id="planning-team-reset" class="text-button" type="button">Neue Vorlage</button>
+                  </div>
+                  <p id="planning-team-message" class="form-message" aria-live="polite"></p>
+                </form>
+                <ul id="planning-team-list" class="admin-list" aria-label="Teamvorlagen"></ul>
+              </details>
               <ul id="admin-assignment-list" class="admin-list" aria-label="Freigegebene Einsätze"></ul>
             </details>
 
           </section>
+
+          <dialog id="report-return-dialog" class="time-correction-dialog" aria-labelledby="report-return-title">
+            <form id="report-return-form" class="time-correction-form" method="dialog" novalidate>
+              <div class="time-correction-form__heading">
+                <div>
+                  <p class="eyebrow">Bericht prüfen</p>
+                  <h2 id="report-return-title">Zur Überarbeitung zurückgeben</h2>
+                  <p id="report-return-number" class="time-correction-original"></p>
+                </div>
+                <button id="report-return-close" class="dialog-close" type="button" aria-label="Rückgabe schließen">×</button>
+              </div>
+              <label for="report-return-comment">Was muss überarbeitet werden?</label>
+              <textarea id="report-return-comment" maxlength="1000" rows="5" required placeholder="Konkreter Hinweis für den Verfasser"></textarea>
+              <button id="report-return-submit" class="button button--primary" type="submit">Mit Kommentar zurückgeben</button>
+              <p class="time-correction-note">Der Bericht bleibt mit vollständiger Historie erhalten und kann nur vom ursprünglichen Verfasser erneut eingereicht werden.</p>
+              <p id="report-return-message" class="form-message" aria-live="polite"></p>
+            </form>
+          </dialog>
+
+          <dialog id="site-qr-dialog" class="time-correction-dialog site-qr-dialog" aria-labelledby="site-qr-title">
+            <section class="time-correction-form">
+              <div class="time-correction-form__heading">
+                <div>
+                  <p class="eyebrow">Direkt zur berechtigten Akte</p>
+                  <h2 id="site-qr-title">Baustellenlink und QR-Code</h2>
+                  <p id="site-qr-name" class="time-correction-original"></p>
+                </div>
+                <button id="site-qr-close" class="dialog-close" type="button" aria-label="QR-Code schließen">×</button>
+              </div>
+              <img id="site-qr-image" class="site-qr-image" alt="QR-Code zur Baustellenakte">
+              <label for="site-qr-link">Direktlink</label>
+              <input id="site-qr-link" type="url" readonly>
+              <button id="site-qr-copy" class="button button--primary" type="button">Link kopieren</button>
+              <p class="time-correction-note">Nach dem Scannen prüft Schäfchen zuerst die Anmeldung und anschließend die Berechtigung für diese Baustelle.</p>
+            </section>
+          </dialog>
 
           <aside class="info-card" data-dashboard-pane="more" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>

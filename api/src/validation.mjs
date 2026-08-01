@@ -147,6 +147,27 @@ function optionalUuid(value, label) {
   return uuid(value, label);
 }
 
+function uniqueUuidList(value, label, minimum = 1, maximum = 100) {
+  if (!Array.isArray(value) || value.length < minimum || value.length > maximum) {
+    throw new InputError(`${label} muss zwischen ${minimum} und ${maximum} Einträge enthalten.`);
+  }
+  const identifiers = value.map((entry, index) => uuid(entry, `${label} ${index + 1}`));
+  if (new Set(identifiers).size !== identifiers.length) {
+    throw new InputError(`${label} darf keine doppelten Einträge enthalten.`);
+  }
+  return identifiers;
+}
+
+function assertAssignmentFitsDay(plannedStartTime, plannedDurationMinutes) {
+  if (!plannedStartTime || plannedDurationMinutes === null || plannedDurationMinutes === undefined) {
+    return;
+  }
+  const [hours, minutes] = plannedStartTime.split(":").map(Number);
+  if (hours * 60 + minutes + plannedDurationMinutes > 1440) {
+    throw new InputError("Der Einsatz darf nicht über Mitternacht hinaus geplant werden.");
+  }
+}
+
 function boolean(value, label, fallback = false) {
   if (value === undefined) return fallback;
   if (typeof value !== "boolean") throw new InputError(`${label} ist ungültig.`);
@@ -295,7 +316,8 @@ export function validateProject(body) {
   return {
     customerId: uuid(body.customerId, "Kunde"),
     name: text(body.name, "Projektname", 2, 200),
-    installerShortText: optionalText(body.installerShortText, "Kurztext", 300)
+    installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    projectManagerId: optionalUuid(body.projectManagerId, "Projektleiter")
   };
 }
 
@@ -312,6 +334,9 @@ export function validateProjectUpdate(body) {
   return {
     name: text(body.name, "Projektname", 2, 200),
     installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    projectManagerId: body.projectManagerId === undefined
+      ? undefined
+      : optionalUuid(body.projectManagerId, "Projektleiter"),
     status,
     rowVersion
   };
@@ -337,6 +362,9 @@ export function validateConstructionSite(body) {
     customerName,
     name: text(body.name, "Baustellenname", 2, 200),
     installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    projectManagerId: body.projectManagerId === undefined
+      ? undefined
+      : optionalUuid(body.projectManagerId, "Projektleiter"),
     street: text(body.street, "Straße", 1, 150),
     houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
     postalCode: text(body.postalCode, "Postleitzahl", 1, 12),
@@ -357,6 +385,9 @@ export function validateConstructionSiteUpdate(body) {
   return {
     name: text(body.name, "Baustellenname", 2, 200),
     installerShortText: optionalText(body.installerShortText, "Kurztext", 300),
+    projectManagerId: body.projectManagerId === undefined
+      ? undefined
+      : optionalUuid(body.projectManagerId, "Projektleiter"),
     street: text(body.street, "Straße", 1, 150),
     houseNumber: text(body.houseNumber, "Hausnummer", 1, 20),
     postalCode: text(body.postalCode, "Postleitzahl", 1, 12),
@@ -389,6 +420,7 @@ export function validateAssignment(body) {
   ) {
     throw new InputError("Die geplante Einsatzdauer muss zwischen 15 Minuten und 24 Stunden liegen.");
   }
+  assertAssignmentFitsDay(plannedStartTime, plannedDurationMinutes);
   return {
     employeeId: uuid(body.employeeId, "Mitarbeiter"),
     constructionSiteId: uuid(body.constructionSiteId, "Baustelle"),
@@ -404,7 +436,10 @@ export function validateAssignmentUpdate(body) {
   if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
     throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
   }
-  const plannedStartTime = optionalText(body.plannedStartTime, "Startzeit", 5);
+  const hasPlannedStart = body.plannedStartTime !== undefined;
+  const plannedStartTime = hasPlannedStart
+    ? optionalText(body.plannedStartTime, "Startzeit", 5)
+    : undefined;
   if (plannedStartTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedStartTime)) {
     throw new InputError("Die Startzeit muss dem Format HH:MM entsprechen.");
   }
@@ -425,7 +460,15 @@ export function validateAssignmentUpdate(body) {
   ) {
     throw new InputError("Die geplante Einsatzdauer muss zwischen 15 Minuten und 24 Stunden liegen.");
   }
+  if (hasPlannedStart && hasPlannedDuration) {
+    assertAssignmentFitsDay(plannedStartTime, plannedDurationMinutes);
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Einsatzversion ist ungültig.");
+  }
   return {
+    employeeId: optionalUuid(body.employeeId, "Mitarbeiter"),
     workDate: validateWorkDate(body.workDate),
     plannedStartTime,
     plannedDurationMinutes,
@@ -435,7 +478,71 @@ export function validateAssignmentUpdate(body) {
     changeReason: text(body.changeReason, "Änderungsgrund", 3, 500),
     reportResponsible: Object.hasOwn(body, "reportResponsible")
       ? boolean(body.reportResponsible, "Vorarbeiterzuweisung")
-      : null
+      : null,
+    rowVersion
+  };
+}
+
+export function validateAssignmentBatch(body) {
+  if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
+    throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
+  }
+  const employeeIds = uniqueUuidList(body.employeeIds, "Mitarbeiter", 1, 100);
+  const planningTeamId = optionalUuid(body.planningTeamId, "Teamvorlage");
+  const reportResponsibleEmployeeId = optionalUuid(
+    body.reportResponsibleEmployeeId,
+    "Berichtsverantwortlicher"
+  );
+  if (
+    reportResponsibleEmployeeId
+    && !employeeIds.includes(reportResponsibleEmployeeId)
+  ) {
+    throw new InputError(
+      "Der Berichtsverantwortliche muss zu den ausgewählten Mitarbeitern gehören."
+    );
+  }
+  const common = validateAssignment({
+    ...body,
+    employeeId: employeeIds[0],
+    reportResponsible: false
+  });
+  return {
+    employeeIds,
+    planningTeamId,
+    reportResponsibleEmployeeId,
+    constructionSiteId: common.constructionSiteId,
+    workDate: common.workDate,
+    plannedStartTime: common.plannedStartTime,
+    plannedDurationMinutes: common.plannedDurationMinutes,
+    comment: common.comment
+  };
+}
+
+export function validatePlanningTeam(body) {
+  if (Object.hasOwn(body, "companyId") || Object.hasOwn(body, "company_id")) {
+    throw new InputError("companyId wird ausschließlich vom Server bestimmt.");
+  }
+  return {
+    name: text(body.name, "Teamname", 2, 100),
+    memberIds: uniqueUuidList(body.memberIds, "Teammitglieder", 1, 100)
+  };
+}
+
+export function validatePlanningTeamUpdate(body) {
+  const team = validatePlanningTeam(body);
+  const status = text(body.status, "Teamstatus", 6, 20);
+  if (!["active", "archived"].includes(status)) {
+    throw new InputError("Der Teamstatus ist ungültig.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Teamversion ist ungültig.");
+  }
+  return {
+    ...team,
+    status,
+    changeReason: text(body.changeReason, "Änderungsgrund", 3, 500),
+    rowVersion
   };
 }
 
@@ -684,6 +791,17 @@ export function validateDocumentUpload(body) {
     throw new InputError("Bitte das Dokument mindestens einem Kunden, Projekt oder einer Baustelle zuordnen.");
   }
 
+  const mobileVisible = body.mobileVisible === undefined
+    ? true
+    : boolean(body.mobileVisible, "Mobile Dokumentfreigabe");
+  const offlinePriority = body.offlinePriority === undefined
+    ? false
+    : boolean(body.offlinePriority, "Offline-Markierung");
+  if (offlinePriority && !mobileVisible) {
+    throw new InputError(
+      "Nur mobil freigegebene Dokumente können für die Offline-Ansicht vorgemerkt werden."
+    );
+  }
   return {
     title: text(body.title, "Dokumenttitel", 2, 200),
     category,
@@ -692,21 +810,34 @@ export function validateDocumentUpload(body) {
     content,
     customerId,
     projectId,
-    constructionSiteId
+    constructionSiteId,
+    mobileVisible,
+    offlinePriority
   };
 }
 
 export function validateDocumentStatusUpdate(body) {
   rejectTenantFields(body);
-  const status = text(body.status, "Dokumentstatus", 2, 20).toLowerCase();
-  if (!new Set(["active", "archived"]).has(status)) {
+  const status = body.status === undefined
+    ? null
+    : text(body.status, "Dokumentstatus", 2, 20).toLowerCase();
+  if (status && !new Set(["active", "archived"]).has(status)) {
     throw new InputError("Der Dokumentstatus ist ungültig.");
+  }
+  const mobileVisible = body.mobileVisible === undefined
+    ? null
+    : boolean(body.mobileVisible, "Mobile Dokumentfreigabe");
+  const offlinePriority = body.offlinePriority === undefined
+    ? null
+    : boolean(body.offlinePriority, "Offline-Markierung");
+  if (status === null && mobileVisible === null && offlinePriority === null) {
+    throw new InputError("Es wurde keine Dokumentänderung angegeben.");
   }
   const rowVersion = Number(body.rowVersion);
   if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
     throw new InputError("Die Dokumentversion ist ungültig.");
   }
-  return { status, rowVersion };
+  return { status, mobileVisible, offlinePriority, rowVersion };
 }
 
 export function validateCompanyModuleUpdate(moduleKey, body) {
@@ -1476,6 +1607,28 @@ function validateReportPersonnel(value) {
   return { provided: true, entries };
 }
 
+function validateReportPhotos(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 20) {
+    throw new InputError("Die Berichtsfotos sind ungültig.");
+  }
+  const seen = new Set();
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new InputError("Ein Berichtsfoto ist ungültig.");
+    }
+    const documentId = uuid(entry.documentId, "Berichtsfoto");
+    if (seen.has(documentId)) {
+      throw new InputError("Ein Foto darf im Bericht nur einmal vorkommen.");
+    }
+    seen.add(documentId);
+    return {
+      documentId,
+      caption: optionalText(entry.caption, "Bildunterschrift", 300)
+    };
+  });
+}
+
 export function validateSiteReport(body) {
   rejectTenantFields(body);
   const reportType = text(body.reportType, "Berichtsart", 2, 20).toLowerCase();
@@ -1508,7 +1661,8 @@ export function validateSiteReport(body) {
     agreements: optionalText(body.agreements, "Absprachen und Anweisungen", 3000),
     incidents: optionalText(body.incidents, "Mängel, Schäden oder Sicherheit", 3000),
     personnel: personnel.entries,
-    personnelProvided: personnel.provided
+    personnelProvided: personnel.provided,
+    photos: validateReportPhotos(body.photos)
   };
 }
 
@@ -1560,6 +1714,30 @@ export function validateSiteReportFinalization(body) {
     customerSignatureName: text(body.customerSignatureName, "Name des Auftraggebers", 2, 200),
     customerSignatureData: signaturePng(body.customerSignatureData, "Auftraggeberunterschrift")
   };
+}
+
+export function validateSiteReportReturn(body) {
+  rejectTenantFields(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Berichtsversion ist ungültig.");
+  }
+  return {
+    rowVersion,
+    comment: text(body.comment, "Rückgabegrund", 2, 1000)
+  };
+}
+
+export function validateMobileSiteReportRevision(body) {
+  const report = validateSiteReport(body);
+  if (report.sourceMode !== "digital" || report.sourceDocumentId) {
+    throw new InputError("Mobile Berichte werden direkt digital überarbeitet.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Berichtsversion ist ungültig.");
+  }
+  return { ...report, rowVersion };
 }
 
 export function validateWorkDate(value) {

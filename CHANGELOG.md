@@ -4,7 +4,55 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
-### V0.40.0 – Klare Baustellenbereiche und VDE-PDF-Seiten
+- keine noch nicht zugeordnete Produktänderung
+
+## [0.41.0] – Fahrplan-Abgleich, Berichtszentrale und vollständige Baustellenakte
+
+- zentrale Berichtszentrale mit Suche, Sortierung und Filtern nach Status, Art,
+  Baustelle, Mitarbeiter und Zeitraum sowie sofort sichtbaren fehlenden
+  Pflichtberichten
+- Berichte können mit Pflichtkommentar zur Überarbeitung zurückgegeben,
+  vom ursprünglichen Verfasser ohne Dublette erneut eingereicht, vor der
+  Unterschrift als PDF geprüft und anschließend unveränderlich abgeschlossen
+  werden; die vollständige Statushistorie bleibt erhalten
+- digitale Büroberichte werden automatisch lokal zwischengespeichert; Team,
+  Ist-Stunden, strukturierte Zusatzangaben und ausgewählte JPG-/PNG-Fotos mit
+  Bildunterschriften fließen ohne doppelte Eingabe in die Abschluss-PDF ein
+- mobile und Büro-Baustellenakte besitzen die verbindliche Reihenfolge Auftrag,
+  Team, Aufgaben, Berichte, Fotos, Dokumente, Material, Notizen und aktivierte
+  Prüfmodule; Rollenstandard und zuletzt verwendeter Bereich werden berücksichtigt
+- Dokumente lassen sich einzeln mobil freigeben und als offline wichtig
+  kennzeichnen; nur freigegebene Dokumente erscheinen mobil, wichtige Dateien
+  werden benutzerbezogen zwischengespeichert und bei Kontowechsel oder Abmeldung
+  sicher vom vorherigen Benutzer getrennt
+- stabiler Baustellen-QR-Code und Direktlink öffnen nach Anmeldung ausschließlich
+  die berechtigungsgeprüfte Baustellenakte
+- Projektleiter werden Projekten eindeutig zugeordnet und erhalten serverseitig
+  ausschließlich Kunden, Baustellen, Dokumente, Berichte, Prüfungen und Einsätze
+  ihrer aktiven Projektverantwortung; firmenweite Personal-, Zeit-, Import-,
+  Abwesenheits- und Teamverwaltung bleibt Büro, Geschäftsführung und Administration
+  vorbehalten
+- Desktop-Plantafel mit Mitarbeiterzeilen, Wochen- und Monatsansicht,
+  Mitarbeiter-, Team-, Baustellen- und Projektleiterfiltern, sichtbaren
+  Abwesenheits-, Überschneidungs- und Vorarbeiterkonflikten sowie klarer
+  Kennzeichnung nicht eingeplanter Feldmitarbeiter
+- Drag-and-drop übernimmt Mitarbeiter und Datum in die begründungspflichtige
+  Änderungsmaske; Einsatzkopie, Mehrfachzuweisung und persistente Teamvorlagen
+  erzeugen weiterhin einzelne, historisch nachvollziehbare Mitarbeitereinsätze
+- Datenbankmigrationen 037 und 038, RLS, Löschschutz,
+  Versionskonfliktprüfung, QR-/Foto-/Team-/Berichtshistorie sowie erweiterte
+  SQL-, API-, PDF-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern den Stand
+- die VDE-PDF wurde zusätzlich visuell gerendert: Messwerte beginnen auf Seite
+  zwei, das Stromkreisverzeichnis auf einer eigenen Folgeseite
+- Abnahmematrix und priorisierter Backlog trennen nachweislich automatisierte
+  Punkte von noch ausstehenden Geräte-, Last-, Infrastruktur-, Rechts- und
+  Pilotabnahmen; DGUV bleibt gemäß Fahrplan ausdrücklich nach V1.0
+- die offenen Freigabesperren sind als öffentliche GitHub-Issues #11 bis #23
+  mit Abschlussnachweis angelegt; ein idempotenter Workflow stellt die
+  P0-P3-/Kategorie-Labels sowie die belegten Tags und Releases V0.35 bis V0.41
+  bereit
+
+## [0.40.0] – Klare Baustellenbereiche und VDE-PDF-Seiten
 
 - die mobile Baustellenakte zeigt Übersicht, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und das optional aktivierte VDE-Modul als einzeln wählbare Arbeitsbereiche statt als lange Folge gleichzeitig sichtbarer Karten
 - das Büro-Baustellendashboard verwendet dieselbe Bereichsnavigation für Übersicht, Mitarbeiter, Berichte, Dokumente, Aufgaben, Notizen, Material und VDE
@@ -13,7 +61,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - das optionale Stromkreisverzeichnis beginnt nach den Messwertseiten immer auf einer eigenen neuen Seite und besitzt eine klare Tabellenüberschrift
 - PDF-, API- und PWA-Smoke-Tests sichern die neue Seitenfolge, A4-Ausgabe und getrennte Bereichsnavigation; eine Datenbankmigration ist nicht erforderlich
 
-### V0.39.0 – Integriertes VDE-Prüfmodul
+## [0.39.0] – Integriertes VDE-Prüfmodul
 
 - die vorhandene V15-Prüfprotokoll-Anwendung ist als erstes vollständig angebundenes, firmenweit aktivierbares Elektro-Spezialmodul direkt aus der Schäfchen-Baustellenakte erreichbar
 - Firma, Logo, Kunde, Projekt, Baustelle und Prüfer werden aus dem gemeinsamen Bestand referenziert; das Fachmodul erzeugt keine parallelen Stammdaten
@@ -25,7 +73,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - abgeschlossene Prüfungen und ihre vollständige Versionshistorie sind unveränderlich; Deaktivierung des Moduls löscht weder Fach- noch Dokumentdaten
 - Migration 036, RLS, zusammengesetzte Mandanten-Fremdschlüssel, Idempotenz-UUID, Rollen- und Tageszuweisungsprüfung sowie SQL-, Validierungs-, PDF-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern den Ablauf
 
-### V0.38.0 – Automatischer Feiertagskalender
+## [0.38.0] – Automatischer Feiertagskalender
 
 - der deutsche Feiertagskalender berechnet nach Rechtsstand 29.07.2026 die neun bundesweiten und die landesweiten Regeln aller 16 Bundesländer einschließlich beweglicher Feiertage reproduzierbar für 2000 bis 2100
 - der bestehende Schaaf-Mandant ist auf Sachsen vorkonfiguriert; Administration und Geschäftsführung ändern das Bundesland versionsgeschützt, Planungsrollen dürfen die Berechnungsgrundlage lesen
@@ -35,7 +83,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Mitarbeiter sehen die berücksichtigten Feiertage im eigenen Stundenkonto; die Büro-Jahresübersicht bündelt Bundesland, Jahreskalender und Verwaltung zusätzlicher freier Tage
 - Migration 035, Row Level Security, zusammengesetzte Mandanten-Fremdschlüssel sowie SQL-, Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Kalenderregeln, Sollwirkung, Rollen, Versionskonflikte und Mandantentrennung
 
-### V0.37.0 – Stundenkonten und Jahresübersicht
+## [0.37.0] – Stundenkonten und Jahresübersicht
 
 - jeder Mitarbeiter sieht in der bestehenden Wochenansicht sein fortlaufendes Stundenkonto mit Jahres-Soll, Ist, Abwesenheitsgutschrift, laufendem Stand und zwölf kompakten Monatszeilen
 - Planungsrollen erhalten eine kompakte Jahresübersicht aller aktiven Mitarbeiter mit Saldo, Resturlaub und genehmigtem Überstundenabbau
@@ -45,7 +93,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - manuelle Startsalden, Korrekturen und Auszahlungen besitzen eine Client-UUID, Pflichtbegründung, Löschschutz und unveränderliche Historie; Fehler werden per Gegenbuchung berichtigt
 - Row Level Security, zusammengesetzte Mandanten-Fremdschlüssel sowie SQL-, Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Rollen, Jahre, Abwesenheitswirkung und Mandantentrennung
 
-### V0.36.0 – Abwesenheiten und Urlaubsfreigabe
+## [0.36.0] – Abwesenheiten und Urlaubsfreigabe
 
 - Mitarbeiter beantragen Urlaub, Überstundenabbau, Freistellung, Krankheit, Lehrgang, Berufsschule und weitere Abwesenheiten selbst in ihrer Wochenansicht; ganze und halbe Tage werden unterstützt
 - jeder Antrag durchläuft zuerst die Büroprüfung und anschließend die verbindliche Freigabe durch die Geschäftsführung
@@ -55,7 +103,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Migration 033 speichert Anträge und ihre unveränderliche Ereignishistorie mandantengetrennt, versionsgeschützt und ohne fachliches Hartlöschen
 - Validierungs-, SQL-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Rollenfolge, Vier-Augen-Regel, Planungskonflikte, Historie und Mandantentrennung
 
-### V0.35.0 – Einsatzdetails und Tagesdisposition
+## [0.35.0] – Einsatzdetails und Tagesdisposition
 
 - Einsätze erhalten eine optionale geplante Dauer und eine konkrete Arbeitsanweisung; beides kann beim Anlegen und bei einer historisierten Änderung gepflegt werden
 - Startzeit, Dauer und Arbeitsauftrag erscheinen in der Büro-Wochenplanung, in der Tagesliste, am mobilen Tageseinsatz und in der Baustellenakte
@@ -65,7 +113,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - bestehende Einsatz- und Mitarbeiterfelder werden wiederverwendet; es ist keine neue Datenbankmigration erforderlich
 - zusätzliche Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern Dauer, Arbeitsanweisung, Kontaktdaten und Tagesdisposition
 
-### V0.34.0 – Direkte Baustellenabläufe
+## [0.34.0] – Direkte Baustellenabläufe
 
 - der heutige Einsatz bietet Navigation und Baustellenakte als eindeutige Schnellaktionen, ohne den großen Zeitbuchungs-Schritt zu verdrängen
 - berichtsverantwortliche Mitarbeiter können den Baustellenbericht schon während des Einsatzes speichern und bleiben dabei auf der Baustelle; beim späteren Verlassen wird der vorhandene Bericht wiederverwendet
@@ -74,7 +122,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Büro und Disposition erreichen Einsatzplanung, Bericht, Dokument und Aufgabe direkt aus dem geöffneten Baustellen-Dashboard; die Baustelle wird automatisch vorausgewählt
 - die dokumentierte Plancraft-Featureprüfung trennt bewusst übernommene Arbeitsmuster von späteren oder für Schäfchen ungeeigneten Modulen
 
-### V0.33.0 – Persönlicher PDF-Stundenzettel und einfache Baustellen
+## [0.33.0] – Persönlicher PDF-Stundenzettel und einfache Baustellen
 
 - Mitarbeiter laden ihre eigenen freigegebenen oder abgerechneten Stundenzettel jetzt direkt als übersichtliches A4-PDF oder weiterhin als Excel-Datei herunter
 - das persönliche PDF enthält Tageszeiten, Baustellen, Status, Soll-, Arbeits-, Pausen-, Fahrt- und Mehrzeit sowie eine klare Gesamtsumme und Unterschriftsfelder
@@ -84,7 +132,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - die Baustellen-Importvorlage wurde auf Kunde und Baustelle reduziert, neu gegliedert und mit einer kurzen Anleitung versehen
 - Bautagesberichte und Montagescheine zeigen in der finalen PDF nur noch Kunde und Baustelle statt einer zusätzlichen Projektzeile
 
-### V0.32.0 – Persönlicher Stundenzettelexport und Wochenvergleich
+## [0.32.0] – Persönlicher Stundenzettelexport und Wochenvergleich
 
 - Mitarbeiter können ausschließlich ihre eigenen vom Büro freigegebenen oder bereits abgerechneten Stundenzettel als Excel-Datei exportieren
 - der persönliche Endpunkt erzwingt Mitarbeiter- und Mandantentrennung serverseitig; unfertige oder nur abgeschlossene Tage gelangen nicht in die Datei
@@ -92,7 +140,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Status zeigen eindeutig „Freigegeben“ beziehungsweise „Abgerechnet“ und kennzeichnen exportierbare Tage
 - Wochensumme und Tageskarten zeigen zusätzlich Soll- und Mehrzeit; der Export meldet Server- und Zeitraumfehler direkt in der Oberfläche
 
-### V0.31.0 – Zeiterfassung, Berichte und Baustellenablage aufgeräumt
+## [0.31.0] – Zeiterfassung, Berichte und Baustellenablage aufgeräumt
 
 - die Büro-Wochenprüfung gruppiert Stundenzettel nach Monteur und zeigt Tage, Wochenstunden, Warnungen sowie kompakte Freigabe- und Abrechnungsaktionen ohne überdeckende Schaltflächen
 - beim spontanen Einsatz können Monteure einen vorhandenen Kunden und ein vorhandenes Projekt verwenden oder Kunde, Projekt und Baustelle vollständig in einem geführten Ablauf anlegen
@@ -102,7 +150,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - der Bereich Baustellen zeigt Kunde → Projekt → Baustelle als durchsuchbare Hauptablage; doppelte Verwaltungslisten entfallen und Formulare erscheinen nur noch zum gezielten Anlegen oder Bearbeiten
 - zentrale Dokumentablage ist standardmäßig eingeklappt; häufige Aktionen zum Anlegen und Bearbeiten liegen direkt am passenden Kunden oder Projekt
 
-### V0.30.0 – Zeiterfassung vollständig
+## [0.30.0] – Zeiterfassung vollständig
 
 - beendete Arbeitstage erscheinen ohne zusätzlichen Einreich-Schritt automatisch im Büro; die Oberfläche bündelt den Ablauf in „In Arbeit“, „Abgeschlossen“ und „Abgerechnet“
 - Büro, Projektleitung und Geschäftsführung sehen alle laufenden und abgeschlossenen Stundenzettel samt Warnhinweisen und können abgeschlossene Tage direkt prüfen und abrechnen
@@ -113,7 +161,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - automatische Pausen bleiben bei 3,5 Stunden mit 30 Minuten und ab 6 Stunden mit insgesamt 60 Minuten wirksam; Fahrtzeit zählt zur Arbeitszeit
 - Migration 032, erweiterte API-/Validierungs-/PWA-/PostgreSQL-Tests und Rechenregel Version 3
 
-### V0.29.0 – Stundenzettel prüfen und abrechnen
+## [0.29.0] – Stundenzettel prüfen und abrechnen
 
 - Monteure reichen einen vollständig beendeten Tages-Stundenzettel direkt in der Wochenansicht zur Prüfung ein
 - Büro und Geschäftsführung geben eingereichte Tage frei und sperren sie anschließend nachvollziehbar als abgerechnet
@@ -122,13 +170,13 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - begründete Korrekturanträge bleiben auch nach der Abrechnung möglich, während das Original historisch erhalten bleibt
 - neue Migration 031 trennt die erlaubte Korrekturanfrage von verbotenen neuen Buchungen an gesperrten Tagen
 
-### V0.28.1 – Korrektur auch auf Start
+## [0.28.1] – Korrektur auch auf Start
 
 - der rote Korrekturzugang steht wieder direkt an jeder synchronisierten Buchung im Start-Stundenzettel
 - bereits eingereichte Änderungen zeigen dort eindeutig „Prüfung offen“
 - die vollständige Korrekturmöglichkeit im Wochen-Stundenzettel bleibt zusätzlich bestehen
 
-### V0.28.0 – Wochen-Stundenzettel
+## [0.28.0] – Wochen-Stundenzettel
 
 - neuer vollständiger Wochen-Stundenzettel mit Arbeit, Pause und Fahrt als Wochensumme
 - Montag bis Sonntag werden als ruhige Tageskarten mit Status, Tageswerten und allen einzelnen Buchungen dargestellt
@@ -137,7 +185,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - offene Korrekturen liegen für berechtigte Bürorollen direkt im Bereich Woche statt in der Einsatzplanung
 - neuer geschützter Wochenendpunkt liefert die eigenen sieben Kalendertage einschließlich wirksamer Buchungen und Wochensummen
 
-### V0.27.0 – Nachvollziehbare Zeitkorrekturen
+## [0.27.0] – Nachvollziehbare Zeitkorrekturen
 
 - Mitarbeiter können eine synchronisierte eigene Zeitbuchung direkt im Stundenzettel mit neuer Uhrzeit und Pflichtbegründung zur Prüfung einreichen
 - bis zur Entscheidung bleibt ausschließlich die unveränderte Originalzeit wirksam
@@ -146,14 +194,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - API prüft Mandant, Eigentümer, Arbeitstag, Zeitreihenfolge und Baustellenfolge vor Antrag und Genehmigung
 - Validierungs-, PostgreSQL-Integrations- und PWA-Smoke-Tests sichern den vollständigen Ablauf
 
-### V0.26.1 – Modulumfang auf VDE und DGUV begrenzt
+## [0.26.1] – Modulumfang auf VDE und DGUV begrenzt
 
 - LWL und KNX vollständig aus API, Modulplanung und aktueller Produktdokumentation entfernt
 - nur VDE und DGUV bleiben als aktivierbare Elektro-Spezialmodule vorgesehen
 - neue Migration 030 verhindert auch auf Datenbankebene neue LWL- oder KNX-Freigaben
 - SQL-, API-, PostgreSQL- und Validierungstests an den verbindlichen Modulumfang angepasst
 
-### V0.26.0 – Grundlage für optionale Elektro-Module
+## [0.26.0] – Grundlage für optionale Elektro-Module
 
 - firmenbezogene Modulfreigaben für VDE, DGUV, LWL und KNX
 - Aktivierung ausschließlich durch Administration oder Geschäftsführung
@@ -161,14 +209,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - deaktivierte und noch nicht fachlich angebundene Module bleiben vollständig aus der Oberfläche ausgeblendet
 - Migration 029 sowie SQL-, API-, PostgreSQL- und Validierungstests
 
-### V0.25.1 – Netto-Arbeitszeit im Stundenzettel
+## [0.25.1] – Netto-Arbeitszeit im Stundenzettel
 
 - die große rote Stundenzettel-Anzeige zeigt jetzt die tatsächliche Netto-Arbeitszeit
 - Pausen und Unterbrechungen zwischen mehreren Arbeitsblöcken werden sichtbar von der Bruttozeit abgezogen
 - Bruttozeit, Pause, Arbeit und Fahrt bleiben zur Kontrolle getrennt ausgewiesen
 - PWA-Smoke-Test schützt die Nettoanzeige vor einer erneuten Verwechslung mit der Bruttozeit
 
-### V0.25.0 – Gemeinsame Baustellennotizen
+## [0.25.0] – Gemeinsame Baustellennotizen
 
 - eigener ruhiger Notizbereich direkt in jeder Baustelle statt einer globalen Aktivitätschronik
 - Büro und berechtigt eingeplante Mitarbeiter lesen denselben mandantengetrennten Notizbestand
@@ -176,14 +224,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - idempotente Speicherung verhindert doppelte Notizen bei wiederholtem Absenden
 - Migration 028, RLS, Löschschutz sowie erweiterte SQL-, API-, PostgreSQL- und PWA-Tests
 
-### V0.24.0 – Mehrere Arbeitsblöcke pro Tag
+## [0.24.0] – Mehrere Arbeitsblöcke pro Tag
 
 - nach Feierabend kann derselbe Arbeitstag mit einer großen Schaltfläche erneut gestartet werden
 - jeder Arbeitsbeginn und jeder Feierabend bleiben als eigener unveränderlicher Zeitblock erhalten
 - Unterbrechungen zwischen zwei Arbeitsblöcken zählen als Pause und nicht als Arbeitszeit
 - Datenbank-Rechenregel Version 2 sowie erweiterte SQL-, API-, PostgreSQL- und PWA-Tests
 
-### V0.23.0 – Mitarbeiter, Vorarbeiter und strukturierte Berichte
+## [0.23.0] – Mitarbeiter, Vorarbeiter und strukturierte Berichte
 
 - Mitarbeiterstammdaten und Betriebsrollen lassen sich geschützt bearbeiten; parallele Änderungen werden über den Versionsstand erkannt
 - manuell eingeplante Vorarbeiter werden technisch von der automatischen Verantwortung eines allein eingesetzten Monteurs unterschieden
@@ -193,7 +241,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - Mitarbeiter und Namen werden serverseitig gegen die Tagesplanung geprüft; Abschluss-PDFs übernehmen die strukturierte Gliederung
 - neue Migrationen 025 und 026 sowie erweiterte SQL-, API-, PostgreSQL-, PDF- und PWA-Tests
 
-### V0.22.0 – Mobile Baustellenakte
+## [0.22.0] – Mobile Baustellenakte
 
 - der bisherige Details-Hinweis des Tageseinsatzes öffnet jetzt die echte Baustellenakte
 - übersichtliche Themenkarten für Arbeitsauftrag, Mitarbeiter, Aufgaben, Berichte, Dokumente, Fotos und Material
@@ -203,7 +251,7 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 - die zuletzt geladene Baustellenübersicht bleibt als kleine Offline-Ansicht auf dem Gerät verfügbar
 - PostgreSQL-Integrationstest für berechtigten und verbotenen Zugriff, Rollenunterschiede, Foto-Upload und geschützten Dateiabruf
 
-### V0.21.0 – Mobile Vorarbeiterberichte
+## [0.21.0] – Mobile Vorarbeiterberichte
 
 - tägliche Vorarbeiter- und Berichtsverantwortung direkt in der Einsatzplanung
 - mobile Montage- oder Bautagesberichte beim Verlassen der Baustelle

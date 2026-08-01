@@ -1,0 +1,122 @@
+name: Fahrplan-Metadaten veröffentlichen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/roadmap-metadata.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  publish:
+    name: Labels, Tags und Releases anlegen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Prioritäten und Kategorien bereitstellen
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          ensure_label() {
+            gh label create "$1" \
+              --repo "$REPOSITORY" \
+              --color "$2" \
+              --description "$3" \
+              --force
+          }
+
+          ensure_label "P0" "B60205" "Sofortiger Release-Stopp"
+          ensure_label "P1" "D93F0B" "Blockierter Hauptablauf oder Release-Gate"
+          ensure_label "P2" "FBCA04" "Deutliche Einschränkung mit Umweg"
+          ensure_label "P3" "0E8A16" "Verbesserung oder Komfort"
+          ensure_label "Mobil" "1D76DB" "Mobile PWA und Feldabläufe"
+          ensure_label "Desktop" "5319E7" "Desktop- und Bürooberfläche"
+          ensure_label "API" "0052CC" "HTTP-API und Serverlogik"
+          ensure_label "Datenbank" "006B75" "PostgreSQL, Migrationen und Datenmodell"
+          ensure_label "Offline" "0E8A16" "Offline-Warteschlange und Synchronisation"
+          ensure_label "PDF" "C5DEF5" "PDF-Erzeugung, Viewer und Druck"
+          ensure_label "Berechtigungen" "BFD4F2" "Rollen- und Objektberechtigungen"
+          ensure_label "Sicherheit" "D4C5F9" "Anwendungs- und Betriebssicherheit"
+          ensure_label "Infrastruktur" "F9D0C4" "Hosting, Betrieb und Überwachung"
+          ensure_label "Release-Gate" "000000" "Verbindlicher Abschlussnachweis vor einer Freigabe"
+
+      - name: Offene Fahrplan-Gates einheitlich kennzeichnen
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          label_issue() {
+            local issue_number="$1"
+            shift
+            local arguments=()
+            for label in "$@"; do
+              arguments+=(--add-label "$label")
+            done
+            gh issue edit "$issue_number" \
+              --repo "$REPOSITORY" \
+              "${arguments[@]}"
+          }
+
+          label_issue 11 P1 Mobil Offline Release-Gate
+          label_issue 12 P1 Mobil Offline Release-Gate
+          label_issue 13 P1 Desktop Release-Gate
+          label_issue 14 P1 API Datenbank Release-Gate
+          label_issue 15 P1 Infrastruktur Sicherheit Release-Gate
+          label_issue 16 P1 Infrastruktur Datenbank Release-Gate
+          label_issue 17 P1 Sicherheit API Release-Gate
+          label_issue 18 P1 Infrastruktur Release-Gate
+          label_issue 19 P1 Sicherheit Berechtigungen Release-Gate
+          label_issue 20 P1 Mobil Desktop API Offline Release-Gate
+          label_issue 21 P2 PDF Release-Gate
+          label_issue 22 P2 Infrastruktur Release-Gate
+          label_issue 23 P2 API Datenbank Release-Gate
+
+      - name: Historische Versionsstände und V0.41 veröffentlichen
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          ensure_release() {
+            local tag="$1"
+            local target="$2"
+            local title="$3"
+            local notes="$4"
+            if gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1; then
+              return
+            fi
+            gh release create "$tag" \
+              --repo "$REPOSITORY" \
+              --target "$target" \
+              --title "$title" \
+              --notes "$notes"
+          }
+
+          ensure_release "v0.35.0" "21997c1b87825277b5d2c0a5d7d9c787032e4d6f" \
+            "Schäfchen V0.35.0" \
+            "Einsatzdetails und Tagesdisposition als nachvollziehbarer Ausgangsstand des Fahrplans."
+          ensure_release "v0.36.0" "c30e9e979d7ac2c095e2406f22f010ce222e8a25" \
+            "Schäfchen V0.36.0" \
+            "Zweistufige Abwesenheitsfreigabe mit Planungswirkung."
+          ensure_release "v0.37.0" "2cd78311d14c307fc4c415e82d231a22c83fac78" \
+            "Schäfchen V0.37.0" \
+            "Arbeitszeitkonten und Jahresübersicht."
+          ensure_release "v0.38.0" "8c5a222aecc019557069adc4eaf477d3c8183eac" \
+            "Schäfchen V0.38.0" \
+            "Automatischer deutscher Feiertagskalender."
+          ensure_release "v0.39.0" "3e58d7cb13f57a63339016110eb45a1cc1414567" \
+            "Schäfchen V0.39.0" \
+            "Integriertes VDE-Prüfmodul."
+          ensure_release "v0.40.0" "c626f8da65ab3e07dd541c638e225d7cd85eebf0" \
+            "Schäfchen V0.40.0" \
+            "Getrennte Baustellenbereiche und überarbeitete VDE-PDF."
+          ensure_release "v0.41.0" "$GITHUB_SHA" \
+            "Schäfchen V0.41.0" \
+            "Funktionsstand zur Fahrplanbereinigung, Desktop-Plantafel, Berichtszentrale und Baustellenakte 2.0. Externe Produktions-, Geräte-, Last-, Rechts- und Pilot-Gates bleiben ausdrücklich offen."

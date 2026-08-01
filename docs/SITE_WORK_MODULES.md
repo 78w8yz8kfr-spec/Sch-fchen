@@ -1,7 +1,7 @@
 # Baustellenarbeit: Aufgaben, Notizen, Material und Berichte
 
-Stand: 29.07.2026
-Technischer Stand: V0.40.0
+Stand: 01.08.2026
+Technischer Stand: V0.41.0
 
 ## Bedienkonzept
 
@@ -51,6 +51,16 @@ zwischengespeichert. Dadurch bleiben Auftrag, Team und Listen bei einem
 Verbindungsabbruch lesbar. Schreibaktionen warten weiterhin auf eine sichere
 Serververbindung.
 
+Die Bereichsreihenfolge ist verbindlich: Arbeitsauftrag, Team, Aufgaben,
+Berichte, Fotos, Dokumente, Material, Notizen und aktivierte Prüfmodule.
+Schäfchen öffnet je Rolle den häufigsten Bereich zuerst und merkt sich den
+zuletzt verwendeten Bereich pro Benutzer und Baustelle. Berichte, Fotos und
+Dokumente besitzen jeweils eine eigene Suche.
+
+Ein stabiler QR-Code verweist auf die Baustellenakte. Er ersetzt keine
+Berechtigung: Nach dem Scannen verlangt Schäfchen eine gültige Anmeldung und
+prüft anschließend erneut Rolle beziehungsweise Tageseinsatz.
+
 ## Aufgaben
 
 `site_tasks` speichert Aufgabe, Beschreibung, Priorität, optionalen Mitarbeiter,
@@ -93,6 +103,10 @@ Baustelle, Projekt und Kunde verknüpft. Der eigene Fotobereich ist lediglich
 eine thematische Sicht auf denselben zentralen Dokumentbestand und erzeugt
 keine zweite Dateikopie.
 
+Ausgewählte JPG- oder PNG-Fotos können mit einer Bildunterschrift in einen
+Montage- oder Bautagesbericht übernommen werden. Jede Datei bleibt ein zentrales
+Dokument; die Berichtsausgabe ergänzt je Foto eine sauber umbrochene Bildseite.
+
 ## Montagescheine und Bautagesberichte
 
 `site_reports` speichert Montageschein oder Bautagesbericht, Arbeitstag, Titel,
@@ -113,6 +127,31 @@ Berichte erhalten mandantenbezogene Nummern im Format
 `SE-R-JJJJ-00001`. Ein fotografierter Bericht ist nur gültig, wenn das
 Originaldokument derselben Baustelle zugeordnet ist. Derselbe Datei-Hash erzeugt
 keine Dokumentkopie.
+
+Das Büro besitzt zusätzlich eine zentrale Berichtszentrale mit Suche,
+Sortierung, Status-, Typ-, Baustellen-, Mitarbeiter- und Datumsfiltern. Fehlende
+Pflichtberichte, offene Unterschriften, zurückgegebene und abgeschlossene
+Berichte sind sofort erkennbar. Vor der Unterschrift steht eine klar markierte
+PDF-Vorschau bereit. Ein eingereichter Bericht kann mit Pflichtkommentar an den
+ursprünglichen Verfasser zurückgegeben und von ihm ohne zweite Berichtsnummer
+erneut eingereicht werden. Jeder Statuswechsel bleibt unveränderlich
+protokolliert.
+
+Digitale und diktierte Büroberichte werden während der Eingabe lokal und
+benutzerbezogen als Entwurf gesichert. Material, Geräte, Behinderungen, offene
+Punkte, Absprachen, Witterung und Vorfälle bleiben getrennte fachliche
+Abschnitte.
+
+## Dokumentfreigabe und Offline-Ansicht
+
+Jedes aktive Dokument besitzt eine eigene mobile Freigabe. Mobile Rollen sehen
+nur ausdrücklich freigegebene Dokumente der berechtigten Baustelle. Zusätzlich
+kann das Büro wichtige Pläne als offline prioritär markieren. Die PWA lädt
+diese Inhalte benutzerbezogen in einen getrennten Cache; die Serverberechtigung
+bleibt für jeden normalen Abruf bestehen. Der Service Worker liest nur den zur
+angemeldeten Benutzer-ID passenden Dokumentcache. Beim Kontowechsel werden
+fremde Dokumentcaches, beim Abmelden alle Dokumentcaches entfernt. Ein Dokument
+darf nur offline priorisiert sein, wenn es zugleich mobil freigegeben ist.
 
 ## Sicherheitsgrenzen
 

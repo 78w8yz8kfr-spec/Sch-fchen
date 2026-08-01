@@ -1,6 +1,8 @@
 (() => {
   const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
   const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
+  const DOCUMENT_CACHE_VERSION = "v41";
+  const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
   const queryMode = new URLSearchParams(window.location.search).get("mode");
   const demoMode = queryMode === "demo" || (
     queryMode !== "live"
@@ -128,13 +130,16 @@
     employeeSiteNoteMessage: document.querySelector("#employee-site-note-message"),
     employeeSiteReportCount: document.querySelector("#employee-site-report-count"),
     employeeSiteReports: document.querySelector("#employee-site-reports"),
+    employeeSiteReportSearch: document.querySelector("#employee-site-report-search"),
     employeeSiteDocumentCount: document.querySelector("#employee-site-document-count"),
     employeeSiteDocuments: document.querySelector("#employee-site-documents"),
+    employeeSiteDocumentSearch: document.querySelector("#employee-site-document-search"),
     employeeSitePhotoCount: document.querySelector("#employee-site-photo-count"),
     employeeSitePhotoAdd: document.querySelector("#employee-site-photo-add"),
     employeeSitePhotoInput: document.querySelector("#employee-site-photo-input"),
     employeeSitePhotoMessage: document.querySelector("#employee-site-photo-message"),
     employeeSitePhotos: document.querySelector("#employee-site-photos"),
+    employeeSitePhotoSearch: document.querySelector("#employee-site-photo-search"),
     employeeSiteMaterialCount: document.querySelector("#employee-site-material-count"),
     employeeSiteMaterials: document.querySelector("#employee-site-materials"),
     employeeSiteVdeModule: document.querySelector("#employee-site-vde-module"),
@@ -311,6 +316,25 @@
     dispatchActiveCount: document.querySelector("#dispatch-active-count"),
     dispatchReviewCount: document.querySelector("#dispatch-review-count"),
     dispatchSummaryNote: document.querySelector("#dispatch-summary-note"),
+    reportCenter: document.querySelector("#report-center"),
+    reportCenterSearch: document.querySelector("#report-center-search"),
+    reportCenterStatus: document.querySelector("#report-center-status"),
+    reportCenterType: document.querySelector("#report-center-type"),
+    reportCenterSite: document.querySelector("#report-center-site"),
+    reportCenterEmployee: document.querySelector("#report-center-employee"),
+    reportCenterFrom: document.querySelector("#report-center-from"),
+    reportCenterTo: document.querySelector("#report-center-to"),
+    reportCenterSort: document.querySelector("#report-center-sort"),
+    reportCenterDraftCount: document.querySelector("#report-center-draft-count"),
+    reportCenterOpenCount: document.querySelector("#report-center-open-count"),
+    reportCenterReturnedCount: document.querySelector("#report-center-returned-count"),
+    reportCenterApprovedCount: document.querySelector("#report-center-approved-count"),
+    reportCenterMissingCount: document.querySelector("#report-center-missing-count"),
+    reportCenterMissingPanel: document.querySelector("#report-center-missing-panel"),
+    reportCenterMissingBadge: document.querySelector("#report-center-missing-badge"),
+    reportCenterMissingList: document.querySelector("#report-center-missing-list"),
+    reportCenterResultCount: document.querySelector("#report-center-result-count"),
+    reportCenterList: document.querySelector("#report-center-list"),
     adminRefresh: document.querySelector("#admin-refresh"),
     assignmentPlanningShell: document.querySelector("#assignment-planning-shell"),
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
@@ -339,6 +363,7 @@
     siteDashboardProject: document.querySelector("#site-dashboard-project"),
     siteDashboardOrder: document.querySelector("#site-dashboard-order"),
     siteDashboardNavigation: document.querySelector("#site-dashboard-navigation"),
+    siteDashboardCopyLink: document.querySelector("#site-dashboard-copy-link"),
     siteDashboardEmployees: document.querySelector("#site-dashboard-employees"),
     siteDashboardPlanAssignment: document.querySelector("#site-dashboard-plan-assignment"),
     siteDashboardCreateReport: document.querySelector("#site-dashboard-create-report"),
@@ -347,6 +372,7 @@
     siteDashboardReportsPanel: document.querySelector("#site-dashboard-reports-panel"),
     siteDashboardReportCount: document.querySelector("#site-dashboard-report-count"),
     siteDashboardReports: document.querySelector("#site-dashboard-reports"),
+    siteDashboardReportSearch: document.querySelector("#site-dashboard-report-search"),
     siteReportDigital: document.querySelector("#site-report-digital"),
     siteReportPhoto: document.querySelector("#site-report-photo"),
     siteReportSpeech: document.querySelector("#site-report-speech"),
@@ -357,6 +383,7 @@
     siteReportDate: document.querySelector("#site-report-date"),
     siteReportPersonnelList: document.querySelector("#site-report-personnel-list"),
     siteReportPersonnelTotal: document.querySelector("#site-report-personnel-total"),
+    siteReportPhotoList: document.querySelector("#site-report-photo-list"),
     siteReportSummary: document.querySelector("#site-report-summary"),
     siteReportDetails: document.querySelector("#site-report-details"),
     siteReportObstructions: document.querySelector("#site-report-obstructions"),
@@ -383,6 +410,12 @@
     siteDashboardDocumentsPanel: document.querySelector("#site-dashboard-documents-panel"),
     siteDashboardDocumentCount: document.querySelector("#site-dashboard-document-count"),
     siteDashboardDocuments: document.querySelector("#site-dashboard-documents"),
+    siteDashboardDocumentSearch: document.querySelector("#site-dashboard-document-search"),
+    siteDashboardPhotosPanel: document.querySelector("#site-dashboard-photos-panel"),
+    siteDashboardPhotoCount: document.querySelector("#site-dashboard-photo-count"),
+    siteDashboardPhotos: document.querySelector("#site-dashboard-photos"),
+    siteDashboardPhotoSearch: document.querySelector("#site-dashboard-photo-search"),
+    siteDashboardAddPhoto: document.querySelector("#site-dashboard-add-photo"),
     siteDashboardCaptureDeliveryNote: document.querySelector("#site-dashboard-capture-delivery-note"),
     siteDashboardDeliveryNoteInput: document.querySelector("#site-dashboard-delivery-note-input"),
     siteDashboardDeliveryNoteForm: document.querySelector("#site-dashboard-delivery-note-form"),
@@ -438,6 +471,7 @@
     siteEditProject: document.querySelector("#site-edit-project"),
     siteEditName: document.querySelector("#site-edit-name"),
     siteEditShortText: document.querySelector("#site-edit-short-text"),
+    siteEditProjectManager: document.querySelector("#site-edit-project-manager"),
     siteEditStreet: document.querySelector("#site-edit-street"),
     siteEditHouseNumber: document.querySelector("#site-edit-house-number"),
     siteEditPostalCode: document.querySelector("#site-edit-postal-code"),
@@ -449,8 +483,16 @@
     adminWeekNext: document.querySelector("#admin-week-next"),
     adminWeekTitle: document.querySelector("#admin-week-title"),
     adminWeekBoard: document.querySelector("#admin-week-board"),
+    planningBoardView: document.querySelector("#planning-board-view"),
+    planningBoardEmployee: document.querySelector("#planning-board-employee"),
+    planningBoardTeam: document.querySelector("#planning-board-team"),
+    planningBoardSite: document.querySelector("#planning-board-site"),
+    planningBoardProjectManager: document.querySelector("#planning-board-project-manager"),
+    planningBoardStatus: document.querySelector("#planning-board-status"),
+    planningBoardSummary: document.querySelector("#planning-board-summary"),
     assignmentEditForm: document.querySelector("#assignment-edit-form"),
     assignmentEditTitle: document.querySelector("#assignment-edit-title"),
+    assignmentEditEmployee: document.querySelector("#assignment-edit-employee"),
     assignmentEditDate: document.querySelector("#assignment-edit-date"),
     assignmentEditTime: document.querySelector("#assignment-edit-time"),
     assignmentEditDuration: document.querySelector("#assignment-edit-duration"),
@@ -555,6 +597,7 @@
     projectCustomer: document.querySelector("#project-customer"),
     projectName: document.querySelector("#project-name"),
     projectShortText: document.querySelector("#project-short-text"),
+    projectManager: document.querySelector("#project-manager"),
     projectMessage: document.querySelector("#project-message"),
     projectManagementPanel: document.querySelector("#project-management-panel"),
     projectSearch: document.querySelector("#project-search"),
@@ -566,6 +609,7 @@
     projectEditCustomer: document.querySelector("#project-edit-customer"),
     projectEditName: document.querySelector("#project-edit-name"),
     projectEditShortText: document.querySelector("#project-edit-short-text"),
+    projectEditManager: document.querySelector("#project-edit-manager"),
     projectEditStatus: document.querySelector("#project-edit-status"),
     projectEditCancel: document.querySelector("#project-edit-cancel"),
     projectEditMessage: document.querySelector("#project-edit-message"),
@@ -575,9 +619,11 @@
     siteCustomer: document.querySelector("#site-customer"),
     siteNewCustomer: document.querySelector("#site-new-customer"),
     siteCustomerName: document.querySelector("#site-customer-name"),
+    siteProjectField: document.querySelector("#site-project-field"),
     siteProject: document.querySelector("#site-project"),
     siteName: document.querySelector("#site-name"),
     siteShortText: document.querySelector("#site-short-text"),
+    siteProjectManager: document.querySelector("#site-project-manager"),
     siteStreet: document.querySelector("#site-street"),
     siteHouseNumber: document.querySelector("#site-house-number"),
     sitePostalCode: document.querySelector("#site-postal-code"),
@@ -597,6 +643,8 @@
     documentFile: document.querySelector("#document-file"),
     documentFileChoose: document.querySelector("#document-file-choose"),
     documentFileName: document.querySelector("#document-file-name"),
+    documentMobileVisible: document.querySelector("#document-mobile-visible"),
+    documentOfflinePriority: document.querySelector("#document-offline-priority"),
     documentSubmit: document.querySelector("#document-submit"),
     documentMessage: document.querySelector("#document-message"),
     documentSearch: document.querySelector("#document-search"),
@@ -606,6 +654,8 @@
     assignmentPanel: document.querySelector("#assignment-panel"),
     assignmentForm: document.querySelector("#assignment-form"),
     assignmentEmployee: document.querySelector("#assignment-employee"),
+    assignmentTeam: document.querySelector("#assignment-team"),
+    assignmentMemberList: document.querySelector("#assignment-member-list"),
     assignmentSite: document.querySelector("#assignment-site"),
     assignmentDate: document.querySelector("#assignment-date"),
     assignmentTime: document.querySelector("#assignment-time"),
@@ -613,6 +663,16 @@
     assignmentComment: document.querySelector("#assignment-comment"),
     assignmentReportResponsible: document.querySelector("#assignment-report-responsible"),
     assignmentMessage: document.querySelector("#assignment-message"),
+    planningTeamPanel: document.querySelector("#planning-team-panel"),
+    planningTeamForm: document.querySelector("#planning-team-form"),
+    planningTeamId: document.querySelector("#planning-team-id"),
+    planningTeamName: document.querySelector("#planning-team-name"),
+    planningTeamMemberList: document.querySelector("#planning-team-member-list"),
+    planningTeamReason: document.querySelector("#planning-team-reason"),
+    planningTeamSubmit: document.querySelector("#planning-team-submit"),
+    planningTeamReset: document.querySelector("#planning-team-reset"),
+    planningTeamMessage: document.querySelector("#planning-team-message"),
+    planningTeamList: document.querySelector("#planning-team-list"),
     adminAssignmentList: document.querySelector("#admin-assignment-list"),
     timeCorrectionReviewPanel: document.querySelector("#time-correction-review-panel"),
     timeCorrectionReviewCount: document.querySelector("#time-correction-review-count"),
@@ -620,6 +680,19 @@
     absenceReviewPanel: document.querySelector("#absence-review-panel"),
     absenceReviewCount: document.querySelector("#absence-review-count"),
     absenceReviewList: document.querySelector("#absence-review-list"),
+    reportReturnDialog: document.querySelector("#report-return-dialog"),
+    reportReturnForm: document.querySelector("#report-return-form"),
+    reportReturnNumber: document.querySelector("#report-return-number"),
+    reportReturnComment: document.querySelector("#report-return-comment"),
+    reportReturnSubmit: document.querySelector("#report-return-submit"),
+    reportReturnClose: document.querySelector("#report-return-close"),
+    reportReturnMessage: document.querySelector("#report-return-message"),
+    siteQrDialog: document.querySelector("#site-qr-dialog"),
+    siteQrName: document.querySelector("#site-qr-name"),
+    siteQrImage: document.querySelector("#site-qr-image"),
+    siteQrLink: document.querySelector("#site-qr-link"),
+    siteQrCopy: document.querySelector("#site-qr-copy"),
+    siteQrClose: document.querySelector("#site-qr-close"),
     toast: document.querySelector("#toast")
   };
 
@@ -659,6 +732,7 @@
   let timeAccountsState = null;
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
+  let draggedAssignmentId = null;
   let correctingTimeEntryId = null;
   let addingTimeEntryDate = null;
   let siteOptionsState = null;
@@ -675,6 +749,8 @@
   let deliveryNoteFile = null;
   let reportPhotoFile = null;
   let finalizingReportId = null;
+  let returningReportId = null;
+  let deepLinkedSiteHandled = false;
   let editingEmployeeId = null;
   let editingTimeAccountId = null;
   let speechRecognition = null;
@@ -911,7 +987,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.40.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.41.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -980,6 +1056,7 @@
     openedCustomerId = null;
     openedProjectId = null;
     openedSiteId = null;
+    deepLinkedSiteHandled = false;
     selectedWeekStart = currentWeekStart();
     weekState = null;
     elements.customerEditForm.hidden = true;
@@ -1039,6 +1116,20 @@
     return !demoMode && Boolean(session?.user.roles?.some((role) => planningRoles.has(role)));
   }
 
+  function isProjectScopedSession() {
+    const roles = session?.user?.roles || [];
+    const fullPlanningRoles = new Set([
+      "admin",
+      "managing_director",
+      "dispatch_office",
+      "office",
+      "planner",
+      "executive_assistant"
+    ]);
+    return roles.includes("project_manager")
+      && !roles.some((role) => fullPlanningRoles.has(role));
+  }
+
   function canAdministerModules() {
     return !demoMode && Boolean(
       session?.user.roles?.some((role) => (
@@ -1051,6 +1142,13 @@
     const value = new Date(`${date}T00:00:00Z`);
     value.setUTCDate(value.getUTCDate() + days);
     return value.toISOString().slice(0, 10);
+  }
+
+  function addIsoMonths(date, months) {
+    const [year, month] = date.slice(0, 7).split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1 + months, 1))
+      .toISOString()
+      .slice(0, 10);
   }
 
   function dateFromIso(date) {
@@ -1079,6 +1177,12 @@
     if (value === "" || value === null || value === undefined) return null;
     const hours = Number(value);
     return Number.isFinite(hours) ? Math.round(hours * 60) : null;
+  }
+
+  function assignmentStartMinutes(value) {
+    if (!value) return null;
+    const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
+    return hours * 60 + minutes;
   }
 
   function arrayBufferToBase64(buffer) {
@@ -1516,6 +1620,8 @@
         documentItem.number,
         documentItem.fileName,
         formatFileSize(documentItem.sizeBytes),
+        documentItem.mobileVisible ? "Mobil freigegeben" : "Nur Büro",
+        documentItem.offlinePriority ? "Offline vorgemerkt" : null,
         ...documentItem.links.map((link) => link.targetName)
       ].filter(Boolean).join(" · ");
       heading.append(title, badge);
@@ -1541,20 +1647,87 @@
           statusButton.disabled = false;
         }
       });
-      actions.append(documentDownloadLink(documentItem), statusButton);
+      const mobileButton = document.createElement("button");
+      mobileButton.type = "button";
+      mobileButton.className = "text-button";
+      mobileButton.textContent = documentItem.mobileVisible
+        ? "Mobil ausblenden"
+        : "Mobil freigeben";
+      mobileButton.addEventListener("click", async () => {
+        mobileButton.disabled = true;
+        try {
+          await requestJson(`./api/v1/admin/documents/${encodeURIComponent(documentItem.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              mobileVisible: !documentItem.mobileVisible,
+              rowVersion: documentItem.rowVersion
+            })
+          });
+          await refreshAdmin();
+          showToast(documentItem.mobileVisible
+            ? "Dokument ist mobil nicht mehr sichtbar."
+            : "Dokument ist für zugewiesene Mitarbeiter mobil freigegeben.");
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          mobileButton.disabled = false;
+        }
+      });
+      const offlineButton = document.createElement("button");
+      offlineButton.type = "button";
+      offlineButton.className = "text-button";
+      offlineButton.textContent = documentItem.offlinePriority
+        ? "Offline-Markierung entfernen"
+        : "Für Offline vormerken";
+      offlineButton.disabled = !documentItem.mobileVisible;
+      offlineButton.addEventListener("click", async () => {
+        offlineButton.disabled = true;
+        try {
+          await requestJson(`./api/v1/admin/documents/${encodeURIComponent(documentItem.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              offlinePriority: !documentItem.offlinePriority,
+              rowVersion: documentItem.rowVersion
+            })
+          });
+          await refreshAdmin();
+          showToast(documentItem.offlinePriority
+            ? "Offline-Markierung entfernt."
+            : "Dokument wird beim Öffnen der Baustelle für Offline vorgemerkt.");
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          offlineButton.disabled = false;
+        }
+      });
+      actions.append(
+        documentDownloadLink(documentItem),
+        mobileButton,
+        offlineButton,
+        statusButton
+      );
       item.append(content, actions);
       elements.documentList.append(item);
     });
   }
 
   function renderSiteDocuments(siteId) {
-    const documents = documentsForEntity("construction_site", siteId);
-    elements.siteDashboardDocumentCount.textContent = String(documents.length);
+    const query = elements.siteDashboardDocumentSearch.value
+      .trim()
+      .toLocaleLowerCase("de-DE");
+    const allDocuments = documentsForEntity("construction_site", siteId)
+      .filter((documentItem) => documentItem.category !== "photo");
+    const documents = allDocuments.filter((documentItem) => (
+      !query || documentSearchText(documentItem).includes(query)
+    ));
+    elements.siteDashboardDocumentCount.textContent = String(allDocuments.length);
     elements.siteDashboardDocuments.replaceChildren();
     if (documents.length === 0) {
       const empty = document.createElement("li");
       empty.className = "admin-list__empty";
-      empty.textContent = "Noch kein Dokument mit dieser Baustelle verknüpft.";
+      empty.textContent = query
+        ? "Kein Dokument passt zur Suche."
+        : "Noch kein Dokument mit dieser Baustelle verknüpft.";
       elements.siteDashboardDocuments.append(empty);
       return;
     }
@@ -1568,6 +1741,40 @@
       content.append(title, meta);
       item.append(content, documentDownloadLink(documentItem, true));
       elements.siteDashboardDocuments.append(item);
+    });
+  }
+
+  function renderSitePhotos(siteId) {
+    const query = elements.siteDashboardPhotoSearch.value
+      .trim()
+      .toLocaleLowerCase("de-DE");
+    const allPhotos = documentsForEntity("construction_site", siteId)
+      .filter((documentItem) => documentItem.category === "photo");
+    const photos = allPhotos.filter((photo) => (
+      !query || documentSearchText(photo).includes(query)
+    ));
+    elements.siteDashboardPhotoCount.textContent = String(allPhotos.length);
+    elements.siteDashboardPhotos.replaceChildren();
+    if (photos.length === 0) {
+      appendSiteModuleEmpty(
+        elements.siteDashboardPhotos,
+        query ? "Kein Foto passt zur Suche." : "Noch kein Baustellenfoto gespeichert."
+      );
+      return;
+    }
+    photos.forEach((photo) => {
+      const item = document.createElement("li");
+      const link = documentDownloadLink(photo, true);
+      const image = document.createElement("img");
+      const caption = document.createElement("span");
+      link.className = "employee-site-photo";
+      image.src = link.href;
+      image.alt = photo.title;
+      image.loading = "lazy";
+      caption.textContent = photo.title;
+      link.replaceChildren(image, caption);
+      item.append(link);
+      elements.siteDashboardPhotos.append(item);
     });
   }
 
@@ -1600,9 +1807,9 @@
   function reportStatusLabel(status) {
     return {
       draft: "Entwurf",
-      submitted: "Zur Unterschrift",
+      submitted: "Vollständig · Unterschrift offen",
       approved: "Abgeschlossen",
-      returned: "Zurückgegeben",
+      returned: "Zur Überarbeitung",
       archived: "Archiviert"
     }[status] || status;
   }
@@ -1770,7 +1977,23 @@
   }
 
   function renderSiteReports(siteId) {
-    const reports = (adminState?.siteReports || []).filter((report) => report.constructionSiteId === siteId);
+    const query = elements.siteDashboardReportSearch.value
+      .trim()
+      .toLocaleLowerCase("de-DE");
+    const reports = (adminState?.siteReports || []).filter((report) => (
+      report.constructionSiteId === siteId
+      && (
+        !query
+        || [
+          report.number,
+          report.summary,
+          report.authorName,
+          report.details,
+          reportStatusLabel(report.status),
+          reportTypeLabel(report.reportType)
+        ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query)
+      )
+    ));
     elements.siteDashboardReportCount.textContent = String(reports.length);
     elements.siteDashboardReports.replaceChildren();
     if (reports.length === 0) {
@@ -1797,7 +2020,13 @@
         new Intl.DateTimeFormat("de-DE").format(new Date(`${report.workDate}T12:00:00`)),
         reportSourceLabel(report.sourceMode),
         report.authorName,
+        report.structuredData?.photos?.length
+          ? `${report.structuredData.photos.length} Berichtsfoto${
+            report.structuredData.photos.length === 1 ? "" : "s"
+          }`
+          : null,
         report.status === "approved" ? `signiert von ${report.employeeSignatureName} und ${report.customerSignatureName}` : null,
+        report.status === "returned" ? `Überarbeitung: ${report.returnComment}` : null,
         report.details
       ].filter(Boolean).join(" · ");
       content.append(heading, meta);
@@ -1817,15 +2046,341 @@
         actions.append(pdfLink);
       }
       if (report.status === "submitted") {
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "text-button site-module-item__action";
+        preview.textContent = "PDF-Vorschau";
+        preview.addEventListener("click", () => previewReportPdf(report));
+        actions.append(preview);
         const finalize = document.createElement("button");
         finalize.type = "button";
         finalize.className = "text-button site-module-item__action";
         finalize.textContent = "Unterschreiben";
         finalize.addEventListener("click", () => openSiteReportFinalization(report));
         actions.append(finalize);
+        const returnButton = document.createElement("button");
+        returnButton.type = "button";
+        returnButton.className = "text-button site-module-item__action";
+        returnButton.textContent = "Überarbeiten lassen";
+        returnButton.addEventListener("click", () => openReportReturnDialog(report));
+        actions.append(returnButton);
+      } else if (report.status === "returned") {
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "text-button site-module-item__action";
+        preview.textContent = "PDF-Vorschau";
+        preview.addEventListener("click", () => previewReportPdf(report));
+        actions.append(preview);
       }
       if (actions.childElementCount > 0) item.append(actions);
       elements.siteDashboardReports.append(item);
+    });
+  }
+
+  function reportSite(report) {
+    return adminState?.sites.find((site) => site.id === report.constructionSiteId) || null;
+  }
+
+  function reportCenterMissingAssignments() {
+    const reports = adminState?.siteReports || [];
+    return (adminState?.weekAssignments || []).filter((assignment) => (
+      assignment.reportResponsible
+      && !reports.some((report) => (
+        report.constructionSiteId === assignment.constructionSiteId
+        && report.workDate === assignment.workDate
+        && !["archived", "draft"].includes(report.status)
+      ))
+    ));
+  }
+
+  function localReportCenterDrafts() {
+    if (!adminState || !session?.user) return [];
+    const authorName = [session.user.firstName, session.user.lastName]
+      .filter(Boolean)
+      .join(" ");
+    return adminState.sites.flatMap((site) => (
+      ["digital", "speech"].flatMap((sourceMode) => {
+        const draft = readSiteReportDraft(site.id, sourceMode);
+        if (!draft) return [];
+        return [{
+          id: `local-draft:${site.id}:${sourceMode}`,
+          number: "Lokaler Entwurf",
+          constructionSiteId: site.id,
+          reportType: draft.reportType || "montage",
+          workDate: draft.workDate || adminState.date,
+          sourceMode,
+          summary: draft.summary?.trim() || "Noch ohne Kurzbeschreibung",
+          details: draft.details?.trim() || "",
+          authorName,
+          status: "draft",
+          updatedAt: draft.updatedAt || null,
+          localDraft: true
+        }];
+      })
+    ));
+  }
+
+  function reportCenterReports() {
+    return [
+      ...(adminState?.siteReports || []).filter((report) => report.status !== "archived"),
+      ...localReportCenterDrafts()
+    ];
+  }
+
+  function populateReportCenterFilters() {
+    const selectedSite = elements.reportCenterSite.value || "all";
+    const selectedEmployee = elements.reportCenterEmployee.value || "all";
+    const sites = [...(adminState?.sites || [])]
+      .sort((left, right) => left.name.localeCompare(right.name, "de-DE"));
+    const authors = [...new Set(
+      reportCenterReports().map((report) => report.authorName).filter(Boolean)
+    )].sort((left, right) => left.localeCompare(right, "de-DE"));
+    elements.reportCenterSite.replaceChildren(new Option("Alle Baustellen", "all"));
+    sites.forEach((site) => elements.reportCenterSite.add(new Option(site.name, site.id)));
+    elements.reportCenterSite.value = sites.some((site) => site.id === selectedSite)
+      ? selectedSite
+      : "all";
+    elements.reportCenterEmployee.replaceChildren(new Option("Alle Monteure", "all"));
+    authors.forEach((author) => elements.reportCenterEmployee.add(new Option(author, author)));
+    elements.reportCenterEmployee.value = authors.includes(selectedEmployee)
+      ? selectedEmployee
+      : "all";
+  }
+
+  function reportCenterSort(reports) {
+    const statusRank = { returned: 1, submitted: 2, draft: 3, approved: 4, archived: 5 };
+    const sort = elements.reportCenterSort.value;
+    return [...reports].sort((left, right) => {
+      if (sort === "date-asc") return left.workDate.localeCompare(right.workDate);
+      if (sort === "employee") {
+        return left.authorName.localeCompare(right.authorName, "de-DE")
+          || right.workDate.localeCompare(left.workDate);
+      }
+      if (sort === "site") {
+        return (reportSite(left)?.name || "").localeCompare(
+          reportSite(right)?.name || "",
+          "de-DE"
+        ) || right.workDate.localeCompare(left.workDate);
+      }
+      if (sort === "status") {
+        return (statusRank[left.status] || 99) - (statusRank[right.status] || 99)
+          || right.workDate.localeCompare(left.workDate);
+      }
+      return right.workDate.localeCompare(left.workDate);
+    });
+  }
+
+  function openReportSite(report, { finalize = false } = {}) {
+    const site = reportSite(report);
+    if (!site) return;
+    openSiteDashboard(site);
+    showSiteDashboardSection("reports", true);
+    if (report.localDraft) {
+      openSiteReportForm(report.sourceMode);
+      return;
+    }
+    if (finalize) openSiteReportFinalization(report);
+  }
+
+  async function previewReportPdf(report) {
+    try {
+      await downloadFile(
+        `./api/v1/admin/site-reports/${encodeURIComponent(report.id)}/preview`,
+        `${report.number}-Vorschau.pdf`
+      );
+      showToast("PDF-Vorschau erstellt · noch nicht freigegeben.");
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+
+  function closeReportReturnDialog() {
+    returningReportId = null;
+    elements.reportReturnForm.reset();
+    elements.reportReturnMessage.textContent = "";
+    elements.reportReturnSubmit.disabled = false;
+    if (elements.reportReturnDialog.open) elements.reportReturnDialog.close();
+  }
+
+  function openReportReturnDialog(report) {
+    if (report.status !== "submitted") {
+      showToast("Nur ein Bericht mit offener Unterschrift kann zurückgegeben werden.");
+      return;
+    }
+    returningReportId = report.id;
+    elements.reportReturnNumber.textContent = [
+      report.number,
+      report.summary,
+      reportSite(report)?.name
+    ].filter(Boolean).join(" · ");
+    elements.reportReturnComment.value = "";
+    elements.reportReturnMessage.textContent = "";
+    elements.reportReturnSubmit.disabled = false;
+    elements.reportReturnDialog.showModal();
+    window.setTimeout(() => elements.reportReturnComment.focus(), 100);
+  }
+
+  function renderReportCenter() {
+    if (!adminState) return;
+    populateReportCenterFilters();
+    const allReports = reportCenterReports();
+    const missing = reportCenterMissingAssignments();
+    elements.reportCenterDraftCount.textContent = String(
+      allReports.filter((report) => report.status === "draft").length
+    );
+    elements.reportCenterOpenCount.textContent = String(
+      allReports.filter((report) => report.status === "submitted").length
+    );
+    elements.reportCenterReturnedCount.textContent = String(
+      allReports.filter((report) => report.status === "returned").length
+    );
+    elements.reportCenterApprovedCount.textContent = String(
+      allReports.filter((report) => report.status === "approved").length
+    );
+    elements.reportCenterMissingCount.textContent = String(missing.length);
+    elements.reportCenterMissingBadge.textContent = String(missing.length);
+    elements.reportCenterMissingPanel.open = missing.length > 0;
+    elements.reportCenterMissingList.replaceChildren();
+    if (missing.length === 0) {
+      appendSiteModuleEmpty(
+        elements.reportCenterMissingList,
+        "In der angezeigten Woche fehlt kein Pflichtbericht."
+      );
+    } else {
+      missing.forEach((assignment) => {
+        const item = document.createElement("li");
+        const content = document.createElement("div");
+        const title = document.createElement("strong");
+        const meta = document.createElement("span");
+        const open = document.createElement("button");
+        const site = adminState.sites.find(
+          (candidate) => candidate.id === assignment.constructionSiteId
+        );
+        title.textContent = assignment.siteName;
+        meta.textContent = `${assignment.workDate} · ${assignment.employeeName}`;
+        content.append(title, meta);
+        open.type = "button";
+        open.className = "text-button";
+        open.textContent = "Baustelle öffnen";
+        open.addEventListener("click", () => {
+          if (site) openSiteDashboard(site);
+        });
+        item.className = "site-module-item";
+        item.append(content, open);
+        elements.reportCenterMissingList.append(item);
+      });
+    }
+
+    const query = elements.reportCenterSearch.value.trim().toLocaleLowerCase("de-DE");
+    const filtered = reportCenterSort(allReports.filter((report) => {
+      const site = reportSite(report);
+      return (
+        (elements.reportCenterStatus.value === "all"
+          || report.status === elements.reportCenterStatus.value)
+        && (elements.reportCenterType.value === "all"
+          || report.reportType === elements.reportCenterType.value)
+        && (elements.reportCenterSite.value === "all"
+          || report.constructionSiteId === elements.reportCenterSite.value)
+        && (elements.reportCenterEmployee.value === "all"
+          || report.authorName === elements.reportCenterEmployee.value)
+        && (!elements.reportCenterFrom.value
+          || report.workDate >= elements.reportCenterFrom.value)
+        && (!elements.reportCenterTo.value
+          || report.workDate <= elements.reportCenterTo.value)
+        && (
+          !query
+          || [
+            report.number,
+            report.summary,
+            report.authorName,
+            report.details,
+            report.returnComment,
+            site?.name,
+            site?.customerName,
+            reportStatusLabel(report.status),
+            reportTypeLabel(report.reportType)
+          ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query)
+        )
+      );
+    }));
+
+    elements.reportCenterResultCount.textContent =
+      `${filtered.length} Bericht${filtered.length === 1 ? "" : "e"}`;
+    elements.reportCenterList.replaceChildren();
+    if (filtered.length === 0) {
+      appendSiteModuleEmpty(elements.reportCenterList, "Keine Berichte für diese Auswahl.");
+      return;
+    }
+    filtered.forEach((report) => {
+      const site = reportSite(report);
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const type = document.createElement("small");
+      const status = document.createElement("small");
+      const meta = document.createElement("span");
+      const detail = document.createElement("span");
+      const actions = document.createElement("div");
+      title.textContent = report.summary;
+      type.className = "module-chip";
+      type.textContent = reportTypeLabel(report.reportType);
+      status.className = `module-chip module-chip--${report.status}`;
+      status.textContent = reportStatusLabel(report.status);
+      heading.append(title, type, status);
+      meta.textContent = [
+        report.number,
+        report.workDate,
+        site?.name,
+        report.authorName,
+        report.localDraft && report.updatedAt
+          ? `gesichert ${formatDateTime(report.updatedAt)}`
+          : null
+      ].filter(Boolean).join(" · ");
+      detail.textContent = report.status === "returned"
+        ? `Überarbeitung: ${report.returnComment}`
+        : report.details || "";
+      detail.hidden = !detail.textContent;
+      content.append(heading, meta, detail);
+      actions.className = "site-module-item__actions";
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "text-button";
+      open.textContent = report.localDraft ? "Weiterbearbeiten" : "Baustelle";
+      open.addEventListener("click", () => openReportSite(report));
+      actions.append(open);
+      if (report.status === "submitted" || report.status === "returned") {
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "text-button";
+        preview.textContent = "PDF-Vorschau";
+        preview.addEventListener("click", () => previewReportPdf(report));
+        actions.append(preview);
+      }
+      if (report.status === "submitted") {
+        const finalize = document.createElement("button");
+        finalize.type = "button";
+        finalize.className = "text-button";
+        finalize.textContent = "Unterschreiben";
+        finalize.addEventListener("click", () => openReportSite(report, { finalize: true }));
+        const returnButton = document.createElement("button");
+        returnButton.type = "button";
+        returnButton.className = "text-button";
+        returnButton.textContent = "Zurückgeben";
+        returnButton.addEventListener("click", () => openReportReturnDialog(report));
+        actions.append(finalize, returnButton);
+      }
+      const finalDocument = adminState.documents.find(
+        (documentItem) => documentItem.id === report.finalDocumentId
+      );
+      if (finalDocument) {
+        const pdf = documentDownloadLink(finalDocument, true);
+        pdf.textContent = "Abschluss-PDF";
+        actions.append(pdf);
+      }
+      item.className = "site-module-item report-center__item";
+      item.append(content, actions);
+      elements.reportCenterList.append(item);
     });
   }
 
@@ -1899,6 +2454,7 @@
       sectionAttribute: "employeeSiteSection",
       scroll
     });
+    rememberWorkspaceSection("employee", employeeSiteState?.site?.id, employeeSiteSection);
   }
 
   function showSiteDashboardSection(section, scroll = false) {
@@ -1910,6 +2466,34 @@
       sectionAttribute: "siteDashboardSection",
       scroll
     });
+    rememberWorkspaceSection("office", openedSiteId, siteDashboardSection);
+  }
+
+  function workspaceSectionStorageKey(scope, siteId) {
+    const userId = session?.user?.id || cachedUserId || "demo";
+    return `schaefchen:workspace-section:${scope}:${userId}:${siteId}`;
+  }
+
+  function rememberWorkspaceSection(scope, siteId, section) {
+    if (!siteId || !section) return;
+    try {
+      window.localStorage.setItem(workspaceSectionStorageKey(scope, siteId), section);
+    } catch {
+      // Die Bereichswahl ist Komfortzustand und darf den Arbeitsablauf nie blockieren.
+    }
+  }
+
+  function preferredWorkspaceSection(scope, siteId) {
+    try {
+      const saved = window.localStorage.getItem(workspaceSectionStorageKey(scope, siteId));
+      if (saved) return saved;
+    } catch {
+      // Ohne lokalen Speicher wird die rollenabhängige Standardansicht verwendet.
+    }
+    const roles = session?.user?.roles || [];
+    if (scope === "employee" && roles.includes("foreman")) return "reports";
+    if (scope === "employee" && roles.includes("installer")) return "tasks";
+    return "overview";
   }
 
   function appendVdeInspection(list, inspection, siteId, date) {
@@ -2100,14 +2684,121 @@
       .filter((entry) => Number.isSafeInteger(entry.minutes) && entry.minutes > 0);
   }
 
+  function collectSiteReportPhotos() {
+    return [...elements.siteReportPhotoList.querySelectorAll("[data-report-photo-id]")]
+      .filter((row) => row.querySelector('input[type="checkbox"]').checked)
+      .map((row) => ({
+        documentId: row.dataset.reportPhotoId,
+        caption: row.querySelector('input[type="text"]').value.trim() || null
+      }));
+  }
+
+  function renderSiteReportPhotoChoices() {
+    const photos = documentsForEntity("construction_site", openedSiteId)
+      .filter((documentItem) => (
+        documentItem.category === "photo"
+        && ["image/jpeg", "image/png"].includes(documentItem.mimeType)
+      ));
+    elements.siteReportPhotoList.replaceChildren();
+    if (photos.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "site-module-form__note";
+      empty.textContent = "Noch kein geeignetes JPG- oder PNG-Baustellenfoto vorhanden.";
+      elements.siteReportPhotoList.append(empty);
+      return;
+    }
+    photos.forEach((photo) => {
+      const row = document.createElement("div");
+      const select = document.createElement("label");
+      const checkbox = document.createElement("input");
+      const title = document.createElement("span");
+      const caption = document.createElement("input");
+      row.dataset.reportPhotoId = photo.id;
+      checkbox.type = "checkbox";
+      title.textContent = photo.title;
+      select.append(checkbox, title);
+      caption.type = "text";
+      caption.maxLength = 300;
+      caption.placeholder = "Bildunterschrift";
+      caption.disabled = true;
+      caption.setAttribute("aria-label", `Bildunterschrift für ${photo.title}`);
+      checkbox.addEventListener("change", () => {
+        caption.disabled = !checkbox.checked;
+        if (checkbox.checked) caption.focus();
+        saveSiteReportDraft();
+      });
+      caption.addEventListener("input", saveSiteReportDraft);
+      row.append(select, caption);
+      elements.siteReportPhotoList.append(row);
+    });
+  }
+
   function updateSiteReportPersonnelTotal() {
     const total = collectSiteReportPersonnel().reduce((sum, entry) => sum + entry.minutes, 0);
     elements.siteReportPersonnelTotal.textContent = `Gesamt: ${formatMinutes(total)} h`;
   }
 
+  function siteReportDraftStorageKey(siteId, sourceMode) {
+    const userId = session?.user?.id || cachedUserId || "demo";
+    return `schaefchen:site-report-draft:${userId}:${siteId}:${sourceMode}`;
+  }
+
+  function readSiteReportDraft(siteId, sourceMode) {
+    if (!siteId || !["digital", "speech"].includes(sourceMode)) return null;
+    try {
+      return JSON.parse(
+        window.localStorage.getItem(siteReportDraftStorageKey(siteId, sourceMode))
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  function clearSiteReportDraft(siteId, sourceMode) {
+    if (!siteId || !sourceMode) return;
+    try {
+      window.localStorage.removeItem(siteReportDraftStorageKey(siteId, sourceMode));
+      if (adminState) renderReportCenter();
+    } catch {
+      // Ein blockierter Komfortspeicher darf den Bericht nicht blockieren.
+    }
+  }
+
+  function saveSiteReportDraft() {
+    const sourceMode = elements.siteReportSourceMode.value;
+    if (
+      !openedSiteId
+      || elements.siteReportForm.hidden
+      || !["digital", "speech"].includes(sourceMode)
+    ) return;
+    try {
+      window.localStorage.setItem(
+        siteReportDraftStorageKey(openedSiteId, sourceMode),
+        JSON.stringify({
+          reportType: elements.siteReportType.value,
+          workDate: elements.siteReportDate.value,
+          summary: elements.siteReportSummary.value,
+          details: elements.siteReportDetails.value,
+          obstructions: elements.siteReportObstructions.value,
+          openItems: elements.siteReportOpenItems.value,
+          weather: elements.siteReportWeather.value,
+          materialsAndEquipment: elements.siteReportMaterials.value,
+          agreements: elements.siteReportAgreements.value,
+          incidents: elements.siteReportIncidents.value,
+          personnel: collectSiteReportPersonnel(),
+          photos: collectSiteReportPhotos(),
+          updatedAt: new Date().toISOString()
+        })
+      );
+      if (adminState) renderReportCenter();
+    } catch {
+      // Der Bericht bleibt vollständig manuell speicherbar.
+    }
+  }
+
   function renderSiteReportPersonnel() {
     const members = new Map();
-    (adminState?.weekAssignments || [])
+    (adminState?.planningAssignments || adminState?.weekAssignments || [])
       .filter((assignment) => (
         assignment.constructionSiteId === openedSiteId
         && assignment.workDate === elements.siteReportDate.value
@@ -2142,7 +2833,10 @@
       input.value = member.plannedDurationMinutes
         ? String(Math.round(member.plannedDurationMinutes / 15) / 4)
         : "";
-      input.addEventListener("input", updateSiteReportPersonnelTotal);
+      input.addEventListener("input", () => {
+        updateSiteReportPersonnelTotal();
+        saveSiteReportDraft();
+      });
       unit.textContent = "Std.";
       inputWrap.append(input, unit);
       row.append(name, inputWrap);
@@ -2151,7 +2845,10 @@
     updateSiteReportPersonnelTotal();
   }
 
-  function resetSiteReportForm() {
+  function resetSiteReportForm({ clearDraft = false } = {}) {
+    if (clearDraft) {
+      clearSiteReportDraft(openedSiteId, elements.siteReportSourceMode.value);
+    }
     if (speechRecognition) {
       speechRecognition.stop();
       speechRecognition = null;
@@ -2164,6 +2861,7 @@
     elements.siteReportSourceNote.textContent = "";
     elements.siteReportMessage.textContent = "";
     elements.siteReportPersonnelList.replaceChildren();
+    elements.siteReportPhotoList.replaceChildren();
     updateSiteReportPersonnelTotal();
     elements.siteReportForm.hidden = true;
     elements.siteReportSubmit.disabled = false;
@@ -2175,12 +2873,46 @@
     elements.siteReportSourceMode.value = sourceMode;
     elements.siteReportDate.value = localDateKey();
     renderSiteReportPersonnel();
+    renderSiteReportPhotoChoices();
     elements.siteReportSourceNote.textContent = {
       digital: "Der Bericht wird direkt digital erfasst.",
       photo: reportPhotoFile ? `${reportPhotoFile.name} · ${formatFileSize(reportPhotoFile.size)}` : "Originalfoto auswählen.",
       speech: "Das Diktat wird als bearbeitbarer Text übernommen."
     }[sourceMode];
     elements.siteReportForm.hidden = false;
+    const draft = readSiteReportDraft(openedSiteId, sourceMode);
+    if (draft) {
+      elements.siteReportType.value = draft.reportType || "montage";
+      elements.siteReportDate.value = draft.workDate || localDateKey();
+      renderSiteReportPersonnel();
+      elements.siteReportSummary.value = draft.summary || "";
+      elements.siteReportDetails.value = draft.details || "";
+      elements.siteReportObstructions.value = draft.obstructions || "";
+      elements.siteReportOpenItems.value = draft.openItems || "";
+      elements.siteReportWeather.value = draft.weather || "";
+      elements.siteReportMaterials.value = draft.materialsAndEquipment || "";
+      elements.siteReportAgreements.value = draft.agreements || "";
+      elements.siteReportIncidents.value = draft.incidents || "";
+      (draft.personnel || []).forEach((entry) => {
+        const input = elements.siteReportPersonnelList.querySelector(
+          `input[data-user-id="${entry.userId}"]`
+        );
+        if (input) input.value = String(Math.round(entry.minutes / 15) / 4);
+      });
+      (draft.photos || []).forEach((entry) => {
+        const row = elements.siteReportPhotoList.querySelector(
+          `[data-report-photo-id="${entry.documentId}"]`
+        );
+        if (!row) return;
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        const caption = row.querySelector('input[type="text"]');
+        checkbox.checked = true;
+        caption.disabled = false;
+        caption.value = entry.caption || "";
+      });
+      updateSiteReportPersonnelTotal();
+      elements.siteReportSourceNote.textContent += " · Entwurf automatisch wiederhergestellt.";
+    }
     elements.siteReportSummary.focus({ preventScroll: true });
   }
 
@@ -2304,7 +3036,13 @@
       title.textContent = project.name;
       badge.className = `site-status site-status--${projectStatusGroup(project.status)}`;
       badge.textContent = projectStatusLabel(project.status);
-      meta.textContent = `${project.customerName} · ${project.number} · ${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"} · ${documentCount} Dokument${documentCount === 1 ? "" : "e"}`;
+      meta.textContent = [
+        project.customerName,
+        project.number,
+        project.projectManagerName ? `Projektleitung: ${project.projectManagerName}` : "ohne Projektleitung",
+        `${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`,
+        `${documentCount} Dokument${documentCount === 1 ? "" : "e"}`
+      ].join(" · ");
       heading.append(title, badge);
       content.append(heading, meta);
       button.type = "button";
@@ -2360,6 +3098,8 @@
     elements.projectEditCustomer.textContent = project.customerName;
     elements.projectEditName.value = project.name;
     elements.projectEditShortText.value = project.shortText || "";
+    elements.projectEditManager.value = project.projectManagerId || "";
+    elements.projectEditManager.disabled = Boolean(adminState.projectScopeRestricted);
     elements.projectEditStatus.value = project.status;
     elements.projectEditMessage.textContent = "";
     elements.projectEditForm.hidden = false;
@@ -2482,14 +3222,14 @@
   function openSiteDashboard(site) {
     const address = siteAddressText(site);
     const assignedEmployees = new Map();
-    adminState.weekAssignments
+    planningAssignments()
       .filter((assignment) => assignment.constructionSiteId === site.id)
       .forEach((assignment) => {
         assignedEmployees.set(assignment.employeeId, assignment.employeeName);
       });
 
     openedSiteId = site.id;
-    siteDashboardSection = "overview";
+    siteDashboardSection = preferredWorkspaceSection("office", site.id);
     resetDeliveryNoteCapture();
     resetSiteTaskForm();
     resetSiteNoteForm();
@@ -2515,6 +3255,7 @@
       });
     }
     renderSiteDocuments(site.id);
+    renderSitePhotos(site.id);
     renderAdminSelect(
       elements.siteTaskAssignee,
       adminState.employees,
@@ -2526,12 +3267,36 @@
     renderSiteMaterials(site.id);
     renderSiteReports(site.id);
     renderSiteVdeInspections(site.id);
+    showSiteDashboardSection(siteDashboardSection);
     elements.siteEditForm.hidden = true;
     elements.siteEditMessage.textContent = "";
     elements.siteDashboardEdit.hidden = false;
     elements.siteDashboard.hidden = false;
-    showSiteDashboardSection("overview");
+    showSiteDashboardSection(siteDashboardSection);
     elements.siteDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function siteDirectUrl(site) {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("site", site.qrCode || site.id);
+    return url.toString();
+  }
+
+  function closeSiteQrDialog() {
+    elements.siteQrImage.removeAttribute("src");
+    if (elements.siteQrDialog.open) elements.siteQrDialog.close();
+  }
+
+  function openSiteQrDialog() {
+    const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
+    if (!site) return;
+    elements.siteQrName.textContent = [site.number, site.name].filter(Boolean).join(" · ");
+    elements.siteQrLink.value = siteDirectUrl(site);
+    elements.siteQrImage.src =
+      `./api/v1/admin/construction-sites/${encodeURIComponent(site.id)}/qr?v=${site.rowVersion}`;
+    elements.siteQrDialog.showModal();
   }
 
   function openAssignmentPlanningForSite() {
@@ -2586,6 +3351,8 @@
     elements.siteEditProject.textContent = site.customerName;
     elements.siteEditName.value = site.name;
     elements.siteEditShortText.value = site.shortText || "";
+    elements.siteEditProjectManager.value = site.projectManagerIds?.[0] || "";
+    elements.siteEditProjectManager.disabled = Boolean(adminState.projectScopeRestricted);
     elements.siteEditStreet.value = site.address.street || "";
     elements.siteEditHouseNumber.value = site.address.houseNumber || "";
     elements.siteEditPostalCode.value = site.address.postalCode || "";
@@ -2735,119 +3502,592 @@
     elements.assignmentEditReason.value = "";
   }
 
-  function openAssignmentEditor(assignment) {
+  function fieldPlanningEmployees() {
+    return (adminState?.employees || []).filter((employee) => (
+      employee.roles.some((role) => ["installer", "foreman"].includes(role))
+    ));
+  }
+
+  function populatePlanningFilter(select, items, allLabel, label) {
+    const selected = select.value || "all";
+    select.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "all";
+    all.textContent = allLabel;
+    select.append(all);
+    items.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = label(item);
+      select.append(option);
+    });
+    select.value = items.some((item) => item.id === selected) ? selected : "all";
+  }
+
+  function renderPlanningMemberPicker(container, selectedIds = new Set()) {
+    container.replaceChildren();
+    const employees = fieldPlanningEmployees();
+    if (employees.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "Noch keine Monteure oder Vorarbeiter angelegt.";
+      container.append(empty);
+      return;
+    }
+    employees.forEach((employee) => {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      const name = document.createElement("span");
+      input.type = "checkbox";
+      input.value = employee.id;
+      input.checked = selectedIds.has(employee.id);
+      name.textContent = `${employee.firstName} ${employee.lastName}`;
+      label.append(input, name);
+      container.append(label);
+    });
+  }
+
+  function selectedPlanningMemberIds(container) {
+    return [...container.querySelectorAll('input[type="checkbox"]:checked')]
+      .map((input) => input.value);
+  }
+
+  function resetPlanningTeamForm() {
+    elements.planningTeamForm.reset();
+    elements.planningTeamId.value = "";
+    elements.planningTeamMessage.textContent = "";
+    elements.planningTeamSubmit.textContent = "Teamvorlage speichern";
+    renderPlanningMemberPicker(elements.planningTeamMemberList);
+  }
+
+  function editPlanningTeam(team) {
+    elements.planningTeamId.value = team.id;
+    elements.planningTeamName.value = team.name;
+    elements.planningTeamReason.value = "";
+    elements.planningTeamMessage.textContent = "";
+    elements.planningTeamSubmit.textContent = "Teamvorlage aktualisieren";
+    renderPlanningMemberPicker(
+      elements.planningTeamMemberList,
+      new Set(team.members.map((member) => member.userId))
+    );
+    elements.planningTeamPanel.open = true;
+    elements.planningTeamName.focus({ preventScroll: true });
+  }
+
+  function renderPlanningTeamList() {
+    elements.planningTeamList.replaceChildren();
+    const teams = adminState?.planningTeams || [];
+    if (teams.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = "Noch keine Teamvorlage gespeichert.";
+      elements.planningTeamList.append(empty);
+      return;
+    }
+    teams.forEach((team) => {
+      const item = document.createElement("li");
+      const content = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      const edit = document.createElement("button");
+      title.textContent = team.name;
+      meta.textContent = [
+        team.members.map((member) => member.employeeName).join(", "),
+        team.status === "archived" ? "Archiviert" : "Aktiv"
+      ].filter(Boolean).join(" · ");
+      edit.type = "button";
+      edit.className = "text-button";
+      edit.textContent = "Bearbeiten";
+      edit.addEventListener("click", () => editPlanningTeam(team));
+      actions.append(edit);
+      if (team.status === "active") {
+        const archive = document.createElement("button");
+        archive.type = "button";
+        archive.className = "text-button text-button--danger";
+        archive.textContent = "Archivieren";
+        archive.addEventListener("click", async () => {
+          const changeReason = window.prompt(
+            "Warum wird diese Teamvorlage archiviert?",
+            "Teamvorlage nicht mehr benötigt"
+          )?.trim();
+          if (!changeReason || changeReason.length < 3) return;
+          try {
+            await requestJson(
+              `./api/v1/admin/planning-teams/${encodeURIComponent(team.id)}`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  name: team.name,
+                  memberIds: team.members.map((member) => member.userId),
+                  status: "archived",
+                  changeReason,
+                  rowVersion: team.rowVersion
+                })
+              }
+            );
+            await refreshAdmin(adminState.date);
+            showToast("Teamvorlage archiviert · bestehende Einsätze bleiben erhalten.");
+          } catch (error) {
+            showToast(error.message);
+          }
+        });
+        actions.append(archive);
+      }
+      content.append(title, meta);
+      item.append(content, actions);
+      elements.planningTeamList.append(item);
+    });
+  }
+
+  function renderPlanningControls() {
+    const fieldEmployees = fieldPlanningEmployees();
+    renderAdminSelect(
+      elements.assignmentEmployee,
+      fieldEmployees,
+      "Mitarbeiter auswählen",
+      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
+    );
+    renderAdminSelect(
+      elements.assignmentEditEmployee,
+      fieldEmployees,
+      "Mitarbeiter auswählen",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    const selectedAdditional = new Set(
+      selectedPlanningMemberIds(elements.assignmentMemberList)
+    );
+    renderPlanningMemberPicker(elements.assignmentMemberList, selectedAdditional);
+    const teams = (adminState?.planningTeams || []).filter((team) => team.status === "active");
+    const selectedTeam = elements.assignmentTeam.value;
+    elements.assignmentTeam.replaceChildren();
+    const noTeam = document.createElement("option");
+    noTeam.value = "";
+    noTeam.textContent = "Keine Teamvorlage";
+    elements.assignmentTeam.append(noTeam);
+    teams.forEach((team) => {
+      const option = document.createElement("option");
+      option.value = team.id;
+      option.textContent = `${team.name} · ${team.members.length} Mitglieder`;
+      elements.assignmentTeam.append(option);
+    });
+    if (teams.some((team) => team.id === selectedTeam)) {
+      elements.assignmentTeam.value = selectedTeam;
+    }
+    populatePlanningFilter(
+      elements.planningBoardEmployee,
+      fieldEmployees,
+      "Alle Mitarbeiter",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    populatePlanningFilter(
+      elements.planningBoardTeam,
+      teams,
+      "Alle Teams",
+      (team) => team.name
+    );
+    populatePlanningFilter(
+      elements.planningBoardSite,
+      adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
+      "Alle Baustellen",
+      (site) => site.name
+    );
+    populatePlanningFilter(
+      elements.planningBoardProjectManager,
+      adminState.employees.filter((employee) => employee.roles.includes("project_manager")),
+      "Alle Projektleiter",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    renderPlanningMemberPicker(elements.planningTeamMemberList);
+    renderPlanningTeamList();
+    updateAssignmentResponsibilityControl();
+  }
+
+  function openAssignmentEditor(assignment, destination = {}) {
     editingAssignmentId = assignment.id;
     elements.assignmentEditTitle.textContent = `${assignment.employeeName} · ${assignment.siteName}`;
-    elements.assignmentEditDate.value = assignment.workDate;
+    elements.assignmentEditEmployee.value = destination.employeeId || assignment.employeeId;
+    elements.assignmentEditDate.value = destination.workDate || assignment.workDate;
     elements.assignmentEditTime.value = assignment.plannedStartTime?.slice(0, 5) || "";
     elements.assignmentEditDuration.value = assignment.plannedDurationMinutes
       ? String(assignment.plannedDurationMinutes / 60)
       : "";
     elements.assignmentEditComment.value = assignment.comment || "";
-    const employee = adminState?.employees.find((item) => item.id === assignment.employeeId);
-    elements.assignmentEditReportResponsible.disabled =
-      assignment.reportResponsibilitySource === "automatic"
-      || !employee?.roles?.includes("foreman");
     elements.assignmentEditReportResponsible.checked = Boolean(assignment.reportResponsible);
+    updateAssignmentEditResponsibilityControl();
     elements.assignmentEditReason.value = "";
     elements.assignmentEditMessage.textContent = "";
+    if (destination.employeeId || destination.workDate) {
+      elements.assignmentEditMessage.textContent =
+        "Ziel aus der Plantafel übernommen. Bitte Änderung prüfen und begründen.";
+    }
     elements.assignmentEditForm.hidden = false;
     elements.assignmentEditForm.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  function planningAssignments() {
+    return adminState?.planningAssignments || adminState?.weekAssignments || [];
+  }
+
+  function planningMonthBounds(date) {
+    const value = dateFromIso(date);
+    const start = new Date(value.getFullYear(), value.getMonth(), 1);
+    const end = new Date(value.getFullYear(), value.getMonth() + 1, 0);
+    return {
+      start: localDateKey(start),
+      end: localDateKey(end)
+    };
+  }
+
+  function assignmentConflictMessages(assignment, assignments = planningAssignments()) {
+    const messages = [];
+    const absence = (adminState?.absences || []).find((item) => (
+      item.status === "approved"
+      && item.employeeId === assignment.employeeId
+      && item.startDate <= assignment.workDate
+      && item.endDate >= assignment.workDate
+    ));
+    if (absence) messages.push(`${absenceTypeLabel(absence.absenceType)} eingetragen`);
+    const start = assignmentStartMinutes(assignment.plannedStartTime);
+    const end = start === null || !assignment.plannedDurationMinutes
+      ? null
+      : start + assignment.plannedDurationMinutes;
+    if (start !== null && end !== null && assignments.some((candidate) => {
+      if (
+        candidate.id === assignment.id
+        || candidate.employeeId !== assignment.employeeId
+        || candidate.workDate !== assignment.workDate
+      ) return false;
+      const candidateStart = assignmentStartMinutes(candidate.plannedStartTime);
+      const candidateEnd = candidateStart === null || !candidate.plannedDurationMinutes
+        ? null
+        : candidateStart + candidate.plannedDurationMinutes;
+      return candidateStart !== null && candidateEnd !== null
+        && candidateStart < end && candidateEnd > start;
+    })) {
+      messages.push("Zeitüberschneidung");
+    }
+    const siteAssignments = assignments.filter((candidate) => (
+      candidate.constructionSiteId === assignment.constructionSiteId
+      && candidate.workDate === assignment.workDate
+    ));
+    if (
+      siteAssignments.length > 1
+      && !siteAssignments.some((candidate) => candidate.reportResponsible)
+    ) {
+      messages.push("Vorarbeiter fehlt");
+    }
+    return messages;
+  }
+
+  function planningFilters() {
+    const team = (adminState?.planningTeams || []).find(
+      (item) => item.id === elements.planningBoardTeam.value
+    );
+    return {
+      employeeId: elements.planningBoardEmployee.value,
+      teamMemberIds: team
+        ? new Set(team.members.map((member) => member.userId))
+        : null,
+      siteId: elements.planningBoardSite.value,
+      projectManagerId: elements.planningBoardProjectManager.value,
+      status: elements.planningBoardStatus.value
+    };
+  }
+
+  function assignmentMatchesPlanningFilters(assignment, filters) {
+    if (filters.employeeId !== "all" && assignment.employeeId !== filters.employeeId) return false;
+    if (filters.teamMemberIds && !filters.teamMemberIds.has(assignment.employeeId)) return false;
+    if (filters.siteId !== "all" && assignment.constructionSiteId !== filters.siteId) return false;
+    if (filters.projectManagerId !== "all") {
+      const site = adminState.sites.find(
+        (candidate) => candidate.id === assignment.constructionSiteId
+      );
+      if (!site?.projectManagerIds?.includes(filters.projectManagerId)) return false;
+    }
+    if (
+      filters.status === "conflict"
+      && assignmentConflictMessages(assignment).length === 0
+    ) return false;
+    if (filters.status === "unassigned") return false;
+    return true;
+  }
+
+  function copyAssignmentToForm(assignment) {
+    elements.assignmentEmployee.value = assignment.employeeId;
+    elements.assignmentTeam.value = "";
+    renderPlanningMemberPicker(elements.assignmentMemberList);
+    elements.assignmentSite.value = assignment.constructionSiteId;
+    elements.assignmentDate.value = assignment.workDate;
+    elements.assignmentTime.value = assignment.plannedStartTime?.slice(0, 5) || "";
+    elements.assignmentDuration.value = assignment.plannedDurationMinutes
+      ? String(assignment.plannedDurationMinutes / 60)
+      : "";
+    elements.assignmentComment.value = assignment.comment || "";
+    updateAssignmentResponsibilityControl();
+    elements.assignmentReportResponsible.checked = Boolean(
+      assignment.reportResponsible
+      && !elements.assignmentReportResponsible.disabled
+    );
+    elements.assignmentMessage.textContent =
+      "Einsatzdaten kopiert. Datum und weitere Mitarbeiter können jetzt angepasst werden.";
+    elements.assignmentPanel.open = true;
+    elements.assignmentForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function createPlanningAssignmentCard(assignment, compact = false) {
+    const card = document.createElement("article");
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const instruction = document.createElement("span");
+    const actions = document.createElement("div");
+    const edit = document.createElement("button");
+    const copy = document.createElement("button");
+    const duty = document.createElement("span");
+    const conflicts = assignmentConflictMessages(assignment);
+    const startTime = assignment.plannedStartTime
+      ? `${assignment.plannedStartTime.slice(0, 5)} Uhr`
+      : "ohne Startzeit";
+    card.className = `week-assignment${conflicts.length ? " week-assignment--conflict" : ""}`;
+    card.draggable = true;
+    card.dataset.assignmentId = assignment.id;
+    title.textContent = compact
+      ? `${assignment.employeeName} · ${assignment.siteName}`
+      : assignment.siteName;
+    meta.textContent = [
+      startTime,
+      assignmentDurationLabel(assignment.plannedDurationMinutes),
+      compact ? null : assignment.employeeName
+    ].filter(Boolean).join(" · ");
+    instruction.className = "week-assignment__instruction";
+    instruction.textContent = assignment.comment || "";
+    instruction.hidden = compact || !assignment.comment;
+    duty.className = "foreman-duty";
+    duty.textContent = assignment.reportResponsibilitySource === "automatic"
+      ? "Automatisch Vorarbeiter"
+      : "Vorarbeiter · Bericht";
+    duty.hidden = !assignment.reportResponsible;
+    if (conflicts.length) {
+      const warning = document.createElement("span");
+      warning.className = "planning-conflict";
+      warning.textContent = conflicts.join(" · ");
+      content.append(warning);
+    }
+    edit.type = "button";
+    edit.textContent = "Ändern";
+    edit.addEventListener("click", () => openAssignmentEditor(assignment));
+    copy.type = "button";
+    copy.textContent = "Kopieren";
+    copy.addEventListener("click", () => copyAssignmentToForm(assignment));
+    actions.className = "week-assignment__actions";
+    actions.append(edit, copy);
+    content.prepend(title, meta, instruction, duty);
+    card.append(content, actions);
+    card.addEventListener("dragstart", (event) => {
+      draggedAssignmentId = assignment.id;
+      card.classList.add("week-assignment--dragging");
+      event.dataTransfer?.setData("text/plain", assignment.id);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => {
+      draggedAssignmentId = null;
+      card.classList.remove("week-assignment--dragging");
+      document.querySelectorAll(".planning-board-cell--drop-target").forEach(
+        (cell) => cell.classList.remove("planning-board-cell--drop-target")
+      );
+    });
+    return card;
+  }
+
+  function makePlanningDropTarget(cell, employeeId, workDate) {
+    cell.addEventListener("dragover", (event) => {
+      if (!draggedAssignmentId) return;
+      event.preventDefault();
+      cell.classList.add("planning-board-cell--drop-target");
+    });
+    cell.addEventListener("dragleave", () => {
+      cell.classList.remove("planning-board-cell--drop-target");
+    });
+    cell.addEventListener("drop", (event) => {
+      event.preventDefault();
+      cell.classList.remove("planning-board-cell--drop-target");
+      const assignmentId = event.dataTransfer?.getData("text/plain")
+        || draggedAssignmentId;
+      const assignment = planningAssignments().find(
+        (candidate) => candidate.id === assignmentId
+      );
+      if (!assignment) return;
+      openAssignmentEditor(assignment, { employeeId, workDate });
+    });
+  }
+
   function renderAdminWeek() {
+    const view = elements.planningBoardView.value;
+    const filters = planningFilters();
+    const allAssignments = planningAssignments();
+    elements.adminWeekBoard.replaceChildren();
+    elements.adminWeekBoard.className = view === "month"
+      ? "admin-week-board planning-month-board"
+      : "admin-week-board planning-week-board";
+
+    if (view === "month") {
+      const bounds = planningMonthBounds(adminState.date);
+      const monthDate = dateFromIso(bounds.start);
+      elements.adminWeekTitle.textContent = monthDate.toLocaleDateString("de-DE", {
+        month: "long",
+        year: "numeric"
+      });
+      let visibleCount = 0;
+      for (let workDate = bounds.start; workDate <= bounds.end; workDate = addIsoDays(workDate, 1)) {
+        const day = document.createElement("section");
+        const heading = document.createElement("strong");
+        const items = document.createElement("div");
+        const date = dateFromIso(workDate);
+        const assignments = allAssignments.filter((assignment) => (
+          assignment.workDate === workDate
+          && assignmentMatchesPlanningFilters(assignment, filters)
+        ));
+        day.className = `planning-month-day${
+          [0, 6].includes(date.getDay()) ? " planning-month-day--weekend" : ""
+        }`;
+        heading.textContent = date.toLocaleDateString("de-DE", {
+          weekday: "short",
+          day: "2-digit"
+        }).replace(".", "");
+        items.className = "planning-month-day__items";
+        assignments.forEach((assignment) => {
+          items.append(createPlanningAssignmentCard(assignment, true));
+          visibleCount += 1;
+        });
+        if (assignments.length === 0) {
+          const empty = document.createElement("span");
+          empty.className = "admin-week-empty";
+          empty.textContent = "frei";
+          items.append(empty);
+        }
+        day.append(heading, items);
+        elements.adminWeekBoard.append(day);
+      }
+      elements.planningBoardSummary.textContent =
+        `${visibleCount} sichtbare Einsätze im Monat · zum Ändern Karte öffnen`;
+      return;
+    }
+
     const weekStart = adminState.weekStart;
     const weekEnd = addIsoDays(weekStart, 4);
     const start = dateFromIso(weekStart);
     const end = dateFromIso(weekEnd);
-    const startLabel = start.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
-    const endLabel = end.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
-    elements.adminWeekTitle.textContent = `${startLabel} – ${endLabel}`;
-    elements.adminWeekBoard.replaceChildren();
+    elements.adminWeekTitle.textContent = `${
+      start.toLocaleDateString("de-DE", { day: "numeric", month: "short" })
+    } – ${
+      end.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })
+    }`;
 
-    for (let offset = 0; offset < 5; offset += 1) {
-      const workDate = addIsoDays(weekStart, offset);
+    const dates = Array.from({ length: 5 }, (_, index) => addIsoDays(weekStart, index));
+    const header = document.createElement("div");
+    header.className = "planning-board-row planning-board-row--header";
+    const employeeHeading = document.createElement("strong");
+    employeeHeading.textContent = "Mitarbeiter";
+    header.append(employeeHeading);
+    dates.forEach((workDate) => {
       const date = dateFromIso(workDate);
-      const day = document.createElement("section");
-      const dateBlock = document.createElement("div");
-      const dayName = document.createElement("span");
-      const dayNumber = document.createElement("strong");
-      const items = document.createElement("div");
-      day.className = "admin-week-day";
-      dateBlock.className = "admin-week-day__date";
-      items.className = "admin-week-day__items";
-      dayName.textContent = shortDayFormatter.format(date).replace(".", "");
-      dayNumber.textContent = String(date.getDate());
-      dateBlock.append(dayName, dayNumber);
+      const label = document.createElement("strong");
+      label.textContent = date.toLocaleDateString("de-DE", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit"
+      }).replace(".", "");
+      header.append(label);
+    });
+    elements.adminWeekBoard.append(header);
 
-      const dayAssignments = adminState.weekAssignments.filter(
-        (assignment) => assignment.workDate === workDate
-      );
-      const dayAbsences = (adminState.absences || []).filter((absence) => (
-        absence.status === "approved"
-        && absence.startDate <= workDate
-        && absence.endDate >= workDate
+    let visibleAssignments = 0;
+    let unassignedEmployees = 0;
+    const availabilityFilters = filters.status === "unassigned"
+      ? { ...filters, status: "all" }
+      : filters;
+    const employees = fieldPlanningEmployees().filter((employee) => {
+      if (filters.employeeId !== "all" && employee.id !== filters.employeeId) return false;
+      if (filters.teamMemberIds && !filters.teamMemberIds.has(employee.id)) return false;
+      const employeeAssignments = allAssignments.filter((assignment) => (
+        assignment.employeeId === employee.id
+        && assignment.workDate >= weekStart
+        && assignment.workDate <= weekEnd
+        && assignmentMatchesPlanningFilters(assignment, availabilityFilters)
       ));
-      if (dayAssignments.length === 0 && dayAbsences.length === 0) {
-        const empty = document.createElement("span");
-        empty.className = "admin-week-empty";
-        empty.textContent = "Noch kein Einsatz";
-        items.append(empty);
-      } else {
-        dayAbsences.forEach((absence) => {
-          const card = document.createElement("article");
-          const content = document.createElement("div");
-          const title = document.createElement("strong");
-          const meta = document.createElement("span");
-          const conflict = dayAssignments.some(
-            (assignment) => assignment.employeeId === absence.employeeId
-          );
-          card.className = `week-absence${conflict ? " week-absence--conflict" : ""}`;
-          title.textContent = absence.employeeName;
-          meta.textContent = `${absenceTypeLabel(absence.absenceType)} · ${
+      if (filters.status === "unassigned") return employeeAssignments.length === 0;
+      if (filters.status === "conflict") return employeeAssignments.length > 0;
+      if (
+        (filters.siteId !== "all" || filters.projectManagerId !== "all")
+        && employeeAssignments.length === 0
+      ) return false;
+      return true;
+    });
+
+    employees.forEach((employee) => {
+      const row = document.createElement("section");
+      const identity = document.createElement("div");
+      const name = document.createElement("strong");
+      const role = document.createElement("span");
+      row.className = "planning-board-row";
+      identity.className = "planning-board-employee";
+      name.textContent = `${employee.firstName} ${employee.lastName}`;
+      role.textContent = employee.roles.includes("foreman") ? "Vorarbeiter" : "Monteur";
+      identity.append(name, role);
+      row.append(identity);
+      let employeeCount = 0;
+      dates.forEach((workDate) => {
+        const cell = document.createElement("div");
+        const assignments = allAssignments.filter((assignment) => (
+          assignment.employeeId === employee.id
+          && assignment.workDate === workDate
+          && assignmentMatchesPlanningFilters(assignment, filters)
+        ));
+        const absences = (adminState.absences || []).filter((absence) => (
+          absence.status === "approved"
+          && absence.employeeId === employee.id
+          && absence.startDate <= workDate
+          && absence.endDate >= workDate
+        ));
+        cell.className = "planning-board-cell";
+        cell.dataset.employeeId = employee.id;
+        cell.dataset.workDate = workDate;
+        cell.setAttribute(
+          "aria-label",
+          `${employee.firstName} ${employee.lastName}, ${shortDate(workDate)}`
+        );
+        absences.forEach((absence) => {
+          const absenceCard = document.createElement("div");
+          absenceCard.className = `week-absence${
+            assignments.length ? " week-absence--conflict" : ""
+          }`;
+          absenceCard.textContent = `${absenceTypeLabel(absence.absenceType)} · ${
             absenceDayPartLabel(absence.dayPart)
-          }${conflict ? " · Planungskonflikt" : ""}`;
-          content.append(title, meta);
-          card.append(content);
-          items.append(card);
+          }`;
+          cell.append(absenceCard);
         });
-        dayAssignments.forEach((assignment) => {
-          const card = document.createElement("article");
-          const content = document.createElement("div");
-          const title = document.createElement("strong");
-          const meta = document.createElement("span");
-          const instruction = document.createElement("span");
-          const edit = document.createElement("button");
-          const duty = document.createElement("span");
-          const startTime = assignment.plannedStartTime
-            ? `${assignment.plannedStartTime.slice(0, 5)} Uhr`
-            : "ohne Startzeit";
-          card.className = "week-assignment";
-          title.textContent = assignment.employeeName;
-          meta.textContent = [
-            startTime,
-            assignmentDurationLabel(assignment.plannedDurationMinutes),
-            assignment.siteName
-          ].filter(Boolean).join(" · ");
-          instruction.className = "week-assignment__instruction";
-          instruction.textContent = assignment.comment || "";
-          instruction.hidden = !assignment.comment;
-          duty.className = "foreman-duty";
-          duty.textContent = assignment.reportResponsibilitySource === "automatic"
-            ? "Automatisch Vorarbeiter · allein vor Ort"
-            : "Vorarbeiter · Bericht";
-          duty.hidden = !assignment.reportResponsible;
-          edit.type = "button";
-          edit.textContent = "Ändern";
-          edit.addEventListener("click", () => openAssignmentEditor(assignment));
-          content.append(title, meta, instruction, duty);
-          card.append(content, edit);
-          items.append(card);
+        assignments.forEach((assignment) => {
+          cell.append(createPlanningAssignmentCard(assignment));
+          employeeCount += 1;
+          visibleAssignments += 1;
         });
+        if (assignments.length === 0 && absences.length === 0) {
+          const empty = document.createElement("span");
+          empty.className = "admin-week-empty";
+          empty.textContent = "frei";
+          cell.append(empty);
+        }
+        makePlanningDropTarget(cell, employee.id, workDate);
+        row.append(cell);
+      });
+      if (employeeCount === 0) {
+        row.classList.add("planning-board-row--unassigned");
+        unassignedEmployees += 1;
       }
-      day.append(dateBlock, items);
-      elements.adminWeekBoard.append(day);
-    }
+      elements.adminWeekBoard.append(row);
+    });
+    elements.planningBoardSummary.textContent =
+      `${visibleAssignments} sichtbare Einsätze · ${unassignedEmployees} nicht eingeplante Mitarbeiter · Karten lassen sich per Drag-and-drop verschieben`;
   }
 
   function renderWorkDayReviews() {
@@ -3221,10 +4461,35 @@
   }
 
   function updateSiteCustomerMode() {
-    const createsCustomer = elements.siteCustomer.value === "__new__";
+    const projectScoped = Boolean(adminState?.projectScopeRestricted);
+    const createsCustomer = !projectScoped && elements.siteCustomer.value === "__new__";
     elements.siteNewCustomer.hidden = !createsCustomer;
     elements.siteCustomerName.required = createsCustomer;
     if (!createsCustomer) elements.siteCustomerName.value = "";
+    elements.siteProjectField.hidden = !projectScoped;
+    elements.siteProject.required = projectScoped;
+    if (projectScoped) {
+      renderAdminSelect(
+        elements.siteProject,
+        adminState.projects.filter((project) => (
+          projectStatusGroup(project.status) === "active"
+          && project.customerId === elements.siteCustomer.value
+        )),
+        "Projekt auswählen",
+        (project) => `${project.name} · ${project.number}`
+      );
+      syncSiteProjectManager();
+    } else {
+      elements.siteProject.value = "";
+    }
+  }
+
+  function syncSiteProjectManager() {
+    if (!adminState?.projectScopeRestricted) return;
+    const project = adminState.projects.find((candidate) => (
+      candidate.id === elements.siteProject.value
+    ));
+    elements.siteProjectManager.value = project?.projectManagerId || "";
   }
 
   function closeEmployeeEditor() {
@@ -3316,6 +4581,13 @@
 
   function renderAdmin() {
     if (!adminState) return;
+    const projectScoped = Boolean(adminState.projectScopeRestricted);
+    elements.assignmentImportPanel.hidden = projectScoped;
+    elements.siteImportPanel.hidden = projectScoped;
+    elements.planningTeamPanel.hidden = projectScoped;
+    elements.hierarchyNewCustomer.hidden = true;
+    elements.hierarchyNewProject.hidden = true;
+    if (projectScoped) elements.employeePanel.hidden = true;
     elements.adminEmployeeCount.textContent = String(adminState.employees.length);
     elements.adminCustomerCount.textContent = String(
       adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active").length
@@ -3350,34 +4622,58 @@
       "Kunde auswählen",
       (customer) => `${customer.displayName} · ${customer.number}`
     );
+    const projectManagers = adminState.employees.filter((employee) => (
+      employee.roles.includes("project_manager")
+    ));
+    renderAdminSelect(
+      elements.projectManager,
+      projectManagers,
+      "Noch nicht zuweisen",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    renderAdminSelect(
+      elements.projectEditManager,
+      projectManagers,
+      "Noch nicht zuweisen",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    renderAdminSelect(
+      elements.siteProjectManager,
+      projectManagers,
+      "Noch nicht zuweisen",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    renderAdminSelect(
+      elements.siteEditProjectManager,
+      projectManagers,
+      "Noch nicht zuweisen",
+      (employee) => `${employee.firstName} ${employee.lastName}`
+    );
+    elements.siteProjectManager.disabled = Boolean(adminState.projectScopeRestricted);
+    elements.siteEditProjectManager.disabled = Boolean(adminState.projectScopeRestricted);
     renderAdminSelect(
       elements.siteCustomer,
       adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
       "Kunde auswählen",
       (customer) => `${customer.displayName} · ${customer.number}`
     );
-    const createCustomer = document.createElement("option");
-    createCustomer.value = "__new__";
-    createCustomer.textContent = "＋ Neuen Kunden anlegen";
-    elements.siteCustomer.append(createCustomer);
-    if (!adminState.customers.some((customer) => customerStatusGroup(customer.status) === "active")) {
-      elements.siteCustomer.value = "__new__";
+    if (!adminState.projectScopeRestricted) {
+      const createCustomer = document.createElement("option");
+      createCustomer.value = "__new__";
+      createCustomer.textContent = "＋ Neuen Kunden anlegen";
+      elements.siteCustomer.append(createCustomer);
+      if (!adminState.customers.some((customer) => customerStatusGroup(customer.status) === "active")) {
+        elements.siteCustomer.value = "__new__";
+      }
     }
-    elements.siteProject.value = "";
     updateSiteCustomerMode();
-    renderAdminSelect(
-      elements.assignmentEmployee,
-      adminState.employees,
-      "Mitarbeiter auswählen",
-      (employee) => `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`
-    );
-    updateAssignmentResponsibilityControl();
     renderAdminSelect(
       elements.assignmentSite,
       adminState.sites.filter((site) => siteStatusGroup(site.status) === "active"),
       "Baustelle auswählen",
       (site) => `${site.name} · ${site.address.city}`
     );
+    renderPlanningControls();
     renderAdminSelect(
       elements.documentCustomer,
       adminState.customers.filter((customer) => customerStatusGroup(customer.status) === "active"),
@@ -3419,7 +4715,7 @@
           employee.phone,
           employee.email
         ].filter(Boolean).join(" · "),
-        employee.roles.includes("admin")
+        employee.roles.includes("admin") || projectScoped
           ? null
           : { label: "Bearbeiten", handler: () => openEmployeeEditor(employee) }
       );
@@ -3429,6 +4725,7 @@
     renderProjectList();
     renderSiteList();
     renderDocumentList();
+    renderReportCenter();
     renderWorkDayReviews();
     renderTimeCorrections();
     renderAbsenceReviews();
@@ -3437,6 +4734,7 @@
     renderElectricalModuleAdministration();
     if (openedSiteId && !elements.siteDashboard.hidden) {
       renderSiteDocuments(openedSiteId);
+      renderSitePhotos(openedSiteId);
       renderSiteTasks(openedSiteId);
       renderSiteNotes(openedSiteId);
       renderSiteMaterials(openedSiteId);
@@ -3481,6 +4779,21 @@
     if (!isForeman) elements.assignmentReportResponsible.checked = false;
   }
 
+  function updateAssignmentEditResponsibilityControl() {
+    const assignment = planningAssignments().find(
+      (candidate) => candidate.id === editingAssignmentId
+    );
+    const employee = adminState?.employees.find(
+      (item) => item.id === elements.assignmentEditEmployee.value
+    );
+    const lockedAutomatic = assignment?.reportResponsibilitySource === "automatic";
+    elements.assignmentEditReportResponsible.disabled =
+      lockedAutomatic || !employee?.roles?.includes("foreman");
+    if (!employee?.roles?.includes("foreman")) {
+      elements.assignmentEditReportResponsible.checked = false;
+    }
+  }
+
   async function refreshAdmin(date = elements.assignmentDate.value || localDateKey()) {
     if (!canPlan()) return;
     elements.adminRefresh.disabled = true;
@@ -3495,6 +4808,36 @@
     } finally {
       elements.adminRefresh.disabled = false;
     }
+  }
+
+  async function maybeOpenDeepLinkedSite() {
+    if (deepLinkedSiteHandled) return;
+    const siteId = new URLSearchParams(window.location.search).get("site");
+    if (!siteId) return;
+    deepLinkedSiteHandled = true;
+    if (canPlan()) {
+      const site = adminState?.sites.find((candidate) => (
+        candidate.id === siteId || candidate.qrCode === siteId
+      ));
+      if (!site) {
+        showToast("Die verlinkte Baustelle ist nicht vorhanden oder nicht zugänglich.");
+        return;
+      }
+      showDashboardPane("sites");
+      openSiteDashboard(site);
+      return;
+    }
+    const assignment = assignments.find(
+      (candidate) => (
+        candidate.constructionSite.id === siteId
+        || candidate.constructionSite.qrCode === siteId
+      )
+    );
+    if (!assignment) {
+      showToast("Diese Baustelle ist dir heute nicht zugewiesen.");
+      return;
+    }
+    await openEmployeeSiteWorkspace(assignment);
   }
 
   async function submitAdminForm(form, messageElement, requestPath, payload, successMessage) {
@@ -3565,7 +4908,47 @@
     const siteId = encodeURIComponent(employeeSiteState.site.id);
     const documentId = encodeURIComponent(documentItem.id);
     const date = encodeURIComponent(employeeSiteState.date);
-    return `./api/v1/construction-sites/${siteId}/documents/${documentId}/content?date=${date}`;
+    const offlineScope = encodeURIComponent(session?.user?.id || cachedUserId || "anonymous");
+    return `./api/v1/construction-sites/${siteId}/documents/${documentId}/content?date=${date}&offlineScope=${offlineScope}`;
+  }
+
+  function documentCacheName(userId) {
+    return `${DOCUMENT_CACHE_PREFIX}${userId}`;
+  }
+
+  async function removeOfflineDocumentCachesExcept(userId = null) {
+    if (!("caches" in window)) return;
+    const retainedCache = userId ? documentCacheName(userId) : null;
+    try {
+      const cacheNames = await window.caches.keys();
+      await Promise.all(cacheNames
+        .filter((cacheName) => (
+          cacheName.startsWith(DOCUMENT_CACHE_PREFIX)
+          && cacheName !== retainedCache
+        ))
+        .map((cacheName) => window.caches.delete(cacheName)));
+    } catch {
+      // Ein blockierter Cache-Speicher darf Anmeldung und Abmeldung nicht verhindern.
+    }
+  }
+
+  async function cacheImportantSiteDocuments(dashboard) {
+    if (
+      !navigator.onLine
+      || !("caches" in window)
+      || !session?.user?.id
+      || !Array.isArray(dashboard?.documents)
+    ) return;
+    const important = dashboard.documents.filter((documentItem) => documentItem.offlinePriority);
+    if (important.length === 0) return;
+    const cache = await window.caches.open(documentCacheName(session.user.id));
+    await Promise.allSettled(important.map(async (documentItem) => {
+      const request = new Request(employeeSiteContentUrl(documentItem), {
+        credentials: "same-origin"
+      });
+      const response = await fetch(request);
+      if (response.ok) await cache.put(request, response);
+    }));
   }
 
   function employeeSiteDocumentLink(documentItem) {
@@ -3643,6 +5026,62 @@
     }
     item.append(content, actions);
     elements.employeeSiteTasks.append(item);
+  }
+
+  function includesWorkspaceSearch(query, values) {
+    return !query || values
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("de-DE")
+      .includes(query);
+  }
+
+  function assignmentForReturnedReport(report) {
+    return assignments.find((assignment) => (
+      assignment.constructionSite.id === report.constructionSiteId
+      && assignment.reportResponsible
+      && (
+        assignment.mobileReport?.id === report.id
+        || (
+          report.workDate === state.workDate
+          && assignment.mobileReport?.status === "returned"
+        )
+      )
+    )) || null;
+  }
+
+  function appendEmployeeSiteReport(report) {
+    const item = document.createElement("li");
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const badge = document.createElement("small");
+    title.textContent = report.summary;
+    meta.textContent = [
+      report.number,
+      report.workDate,
+      report.authorName,
+      report.status === "returned" ? `Hinweis: ${report.returnComment}` : null
+    ].filter(Boolean).join(" · ");
+    badge.textContent = `${reportTypeLabel(report.reportType)} · ${reportStatusLabel(report.status)}`;
+    content.append(title, meta);
+    item.append(content, badge);
+    if (report.status === "returned") {
+      const assignment = assignmentForReturnedReport(report);
+      if (assignment) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "text-button";
+        edit.textContent = "Bericht überarbeiten";
+        edit.disabled = !navigator.onLine;
+        edit.addEventListener("click", () => {
+          showDashboardPane("start");
+          void openMobileReportForm(assignment, { leaveAfterSave: false });
+        });
+        item.append(edit);
+      }
+    }
+    elements.employeeSiteReports.append(item);
   }
 
   function renderEmployeeSiteWorkspace(dashboard) {
@@ -3730,27 +5169,63 @@
       });
     }
 
+    const reportQuery = elements.employeeSiteReportSearch.value
+      .trim()
+      .toLocaleLowerCase("de-DE");
+    const visibleReports = dashboard.reports.filter((report) => includesWorkspaceSearch(
+      reportQuery,
+      [
+        report.number,
+        report.summary,
+        report.authorName,
+        report.returnComment,
+        reportTypeLabel(report.reportType),
+        reportStatusLabel(report.status)
+      ]
+    ));
     elements.employeeSiteReportCount.textContent = String(dashboard.reports.length);
     elements.employeeSiteReports.replaceChildren();
-    if (dashboard.reports.length === 0) {
-      appendEmployeeSiteEmpty(elements.employeeSiteReports, "Noch kein Bericht für diese Baustelle.");
+    if (visibleReports.length === 0) {
+      appendEmployeeSiteEmpty(
+        elements.employeeSiteReports,
+        reportQuery
+          ? "Kein Bericht passt zur Suche."
+          : "Noch kein Bericht für diese Baustelle."
+      );
     } else {
-      dashboard.reports.forEach((report) => {
-        appendEmployeeSiteItem(
-          elements.employeeSiteReports,
-          report.summary,
-          [report.number, report.workDate, report.authorName].filter(Boolean).join(" · "),
-          `${reportTypeLabel(report.reportType)} · ${reportStatusLabel(report.status)}`
-        );
-      });
+      visibleReports.forEach(appendEmployeeSiteReport);
     }
 
-    const photos = dashboard.documents.filter((documentItem) => documentItem.category === "photo");
-    const documents = dashboard.documents.filter((documentItem) => documentItem.category !== "photo");
-    elements.employeeSiteDocumentCount.textContent = String(documents.length);
+    const allPhotos = dashboard.documents.filter((documentItem) => documentItem.category === "photo");
+    const allDocuments = dashboard.documents.filter((documentItem) => documentItem.category !== "photo");
+    const documentQuery = elements.employeeSiteDocumentSearch.value
+      .trim()
+      .toLocaleLowerCase("de-DE");
+    const photoQuery = elements.employeeSitePhotoSearch.value
+      .trim()
+      .toLocaleLowerCase("de-DE");
+    const documents = allDocuments.filter((documentItem) => includesWorkspaceSearch(
+      documentQuery,
+      [
+        documentItem.number,
+        documentItem.title,
+        documentItem.fileName,
+        documentCategoryLabel(documentItem.category)
+      ]
+    ));
+    const photos = allPhotos.filter((photo) => includesWorkspaceSearch(
+      photoQuery,
+      [photo.number, photo.title, photo.fileName]
+    ));
+    elements.employeeSiteDocumentCount.textContent = String(allDocuments.length);
     elements.employeeSiteDocuments.replaceChildren();
     if (documents.length === 0) {
-      appendEmployeeSiteEmpty(elements.employeeSiteDocuments, "Noch kein Dokument für diese Baustelle.");
+      appendEmployeeSiteEmpty(
+        elements.employeeSiteDocuments,
+        documentQuery
+          ? "Kein Dokument passt zur Suche."
+          : "Noch kein Dokument für diese Baustelle."
+      );
     } else {
       documents.forEach((documentItem) => {
         const item = document.createElement("li");
@@ -3765,10 +5240,15 @@
       });
     }
 
-    elements.employeeSitePhotoCount.textContent = String(photos.length);
+    elements.employeeSitePhotoCount.textContent = String(allPhotos.length);
     elements.employeeSitePhotos.replaceChildren();
     if (photos.length === 0) {
-      appendEmployeeSiteEmpty(elements.employeeSitePhotos, "Noch kein Baustellenfoto gespeichert.");
+      appendEmployeeSiteEmpty(
+        elements.employeeSitePhotos,
+        photoQuery
+          ? "Kein Foto passt zur Suche."
+          : "Noch kein Baustellenfoto gespeichert."
+      );
     } else {
       photos.forEach((photo) => {
         const item = document.createElement("li");
@@ -3860,8 +5340,8 @@
     showEmployeeSiteSection(employeeSiteSection);
   }
 
-  async function openEmployeeSiteWorkspace() {
-    const assignment = assignments[currentSiteIndex()];
+  async function openEmployeeSiteWorkspace(requestedAssignment = null) {
+    const assignment = requestedAssignment || assignments[currentSiteIndex()];
     if (!assignment?.constructionSite?.id || demoMode) {
       showToast(demoMode
         ? "Die Baustellenakte ist in der Online-Version mit einem echten Einsatz verfügbar."
@@ -3870,7 +5350,10 @@
     }
 
     resetEmployeeSiteNoteForm();
-    employeeSiteSection = "overview";
+    employeeSiteSection = preferredWorkspaceSection(
+      "employee",
+      assignment.constructionSite.id
+    );
     const cached = employeeSiteState
       && employeeSiteState.site?.id === assignment.constructionSite.id
       && employeeSiteState.date === state.workDate;
@@ -3891,6 +5374,7 @@
         `./api/v1/construction-sites/${encodeURIComponent(assignment.constructionSite.id)}/dashboard?date=${encodeURIComponent(state.workDate)}`
       );
       renderEmployeeSiteWorkspace(body.dashboard);
+      void cacheImportantSiteDocuments(body.dashboard);
       showDashboardPane("site");
     } catch (error) {
       if (error.status === 401) showLogin();
@@ -4196,6 +5680,11 @@
     )) || null;
   }
 
+  function reportNeedsAction(assignment) {
+    const report = reportForAssignment(assignment);
+    return !report || report.status === "returned";
+  }
+
   function closeMobileReportForm() {
     elements.mobileReportCard.hidden = true;
     elements.mobileReportMessage.textContent = "";
@@ -4326,33 +5815,43 @@
 
   async function openMobileReportForm(assignment, { leaveAfterSave = true } = {}) {
     mobileReportLeavesSite = leaveAfterSave;
-    elements.mobileReportEyebrow.textContent = leaveAfterSave
-      ? "Vorarbeiter · Tagesabschluss"
-      : "Vorarbeiter · Baustellenbericht";
-    elements.mobileReportBadge.textContent = leaveAfterSave ? "Pflicht" : "Zwischenspeichern";
-    elements.mobileReportSubmit.textContent = leaveAfterSave
-      ? "Bericht speichern & Baustelle verlassen"
-      : "Bericht speichern";
+    const existing = reportForAssignment(assignment);
+    let returnedReport = existing?.status === "returned"
+      ? employeeSiteState?.reports?.find((report) => report.id === existing.id) || null
+      : null;
+    elements.mobileReportEyebrow.textContent = existing?.status === "returned"
+      ? "Vorarbeiter · Überarbeitung"
+      : leaveAfterSave
+        ? "Vorarbeiter · Tagesabschluss"
+        : "Vorarbeiter · Baustellenbericht";
+    elements.mobileReportBadge.textContent = existing?.status === "returned"
+      ? "Rückgabe"
+      : leaveAfterSave
+        ? "Pflicht"
+        : "Zwischenspeichern";
+    elements.mobileReportSubmit.textContent = existing?.status === "returned"
+      ? (leaveAfterSave
+        ? "Überarbeitet einreichen & Baustelle verlassen"
+        : "Überarbeitet erneut einreichen")
+      : leaveAfterSave
+        ? "Bericht speichern & Baustelle verlassen"
+        : "Bericht speichern";
     const draft = mobileReportDraftFor(assignment);
     elements.mobileReportSite.textContent = assignment.constructionSite.name;
-    elements.mobileReportType.value = draft?.reportType || "daily";
-    elements.mobileReportSummary.value = draft?.summary || "";
-    elements.mobileReportDetails.value = draft?.workPerformed || "";
-    elements.mobileReportObstructions.value = draft?.obstructions || "";
-    elements.mobileReportOpenItems.value = draft?.openItems || "";
-    elements.mobileReportWeather.value = draft?.weather || "";
-    elements.mobileReportMaterials.value = draft?.materialsAndEquipment || "";
-    elements.mobileReportAgreements.value = draft?.agreements || "";
-    elements.mobileReportIncidents.value = draft?.incidents || "";
     elements.mobileReportPersonnelList.replaceChildren();
-    elements.mobileReportMessage.textContent = "";
+    elements.mobileReportMessage.textContent = existing?.status === "returned"
+      ? `Bitte überarbeiten: ${existing.returnComment || "Hinweis des Büros beachten."}`
+      : "";
     elements.mobileReportCard.hidden = false;
     elements.mobileReportCard.scrollIntoView({ behavior: "smooth", block: "center" });
     let team = employeeSiteState?.site?.id === assignment.constructionSite.id
       && employeeSiteState.date === state.workDate
       ? employeeSiteState.team
       : [];
-    if (navigator.onLine && team.length === 0) {
+    if (
+      navigator.onLine
+      && (team.length === 0 || (existing?.status === "returned" && !returnedReport))
+    ) {
       elements.mobileReportMessage.textContent = "Heutiges Baustellenteam wird geladen …";
       try {
         const body = await requestJson(
@@ -4362,14 +5861,48 @@
         state.siteWorkspace = body.dashboard;
         saveState();
         team = body.dashboard.team;
-        elements.mobileReportMessage.textContent = "";
+        returnedReport = existing?.status === "returned"
+          ? body.dashboard.reports.find((report) => report.id === existing.id) || null
+          : null;
+        elements.mobileReportMessage.textContent = existing?.status === "returned"
+          ? `Bitte überarbeiten: ${
+            returnedReport?.returnComment
+            || existing.returnComment
+            || "Hinweis des Büros beachten."
+          }`
+          : "";
       } catch (error) {
         if (!error.network) elements.mobileReportMessage.textContent =
           "Team konnte nicht geladen werden. Die eigenen Stunden können trotzdem erfasst werden.";
       }
     }
+    const returnedData = returnedReport?.structuredData || null;
+    const returnedSource = returnedReport
+      ? {
+          reportType: returnedReport.reportType,
+          summary: returnedReport.summary,
+          workPerformed: returnedData?.workPerformed || returnedReport.details,
+          obstructions: returnedData?.obstructions,
+          openItems: returnedData?.openItems,
+          weather: returnedData?.weather,
+          materialsAndEquipment: returnedData?.materialsAndEquipment,
+          agreements: returnedData?.agreements,
+          incidents: returnedData?.incidents,
+          personnel: returnedData?.personnel || []
+        }
+      : null;
+    const source = draft || returnedSource;
+    elements.mobileReportType.value = source?.reportType || "daily";
+    elements.mobileReportSummary.value = source?.summary || "";
+    elements.mobileReportDetails.value = source?.workPerformed || "";
+    elements.mobileReportObstructions.value = source?.obstructions || "";
+    elements.mobileReportOpenItems.value = source?.openItems || "";
+    elements.mobileReportWeather.value = source?.weather || "";
+    elements.mobileReportMaterials.value = source?.materialsAndEquipment || "";
+    elements.mobileReportAgreements.value = source?.agreements || "";
+    elements.mobileReportIncidents.value = source?.incidents || "";
     renderMobileReportPersonnel(assignment, team);
-    (draft?.personnel || []).forEach((entry) => {
+    (source?.personnel || []).forEach((entry) => {
       const input = elements.mobileReportPersonnelList.querySelector(
         `input[data-user-id="${entry.userId}"]`
       );
@@ -4522,7 +6055,7 @@
     else if (latest.type === "clock_in" || latest.type === "next_site") addEntry("site_arrival", siteIndex);
     else if (latest.type === "site_arrival") {
       const assignment = assignments[siteIndex];
-      if (assignment?.reportResponsible && !reportForAssignment(assignment)) {
+      if (assignment?.reportResponsible && reportNeedsAction(assignment)) {
         openMobileReportForm(assignment);
       } else {
         addEntry("site_departure", siteIndex);
@@ -4645,8 +6178,12 @@
     elements.assignmentNavigation.href = siteNavigationUrl(assignment.constructionSite);
     const showReportAction = latest?.type === "site_arrival"
       && assignment.reportResponsible
-      && !reportForAssignment(assignment);
+      && reportNeedsAction(assignment);
     elements.assignmentReport.hidden = !showReportAction;
+    elements.assignmentReport.querySelector("strong").textContent =
+      reportForAssignment(assignment)?.status === "returned"
+        ? "Bericht überarbeiten"
+        : "Bericht";
     elements.assignmentQuickActions.classList.toggle(
       "assignment-quick-actions--report",
       showReportAction
@@ -5261,7 +6798,7 @@
   }
 
   function renderAdminTimeAccounts() {
-    const visible = canPlan();
+    const visible = canPlan() && !isProjectScopedSession();
     elements.timeAccountAdminPanel.hidden = !visible;
     if (!visible) return;
     const requestedYear = Number(selectedWeekStart.slice(0, 4));
@@ -5633,7 +7170,8 @@
     if (canPlan()) {
       elements.assignmentPlanningShell.hidden = pane !== "assignments";
       elements.sitePlanningShell.hidden = pane !== "sites";
-      elements.employeePanel.hidden = pane !== "more";
+      elements.reportCenter.hidden = pane !== "sites";
+      elements.employeePanel.hidden = pane !== "more" || isProjectScopedSession();
       elements.adminSummary.hidden = pane === "more";
       elements.dispatchSummary.hidden = pane !== "assignments";
       const copy = {
@@ -5767,7 +7305,7 @@
   }
 
   async function refreshAdminTimeAccounts() {
-    if (!canPlan()) {
+    if (!canPlan() || isProjectScopedSession()) {
       timeAccountsState = null;
       renderAdminTimeAccounts();
       return;
@@ -5839,6 +7377,7 @@
   }
 
   async function enterLiveDashboard(sessionView) {
+    await removeOfflineDocumentCachesExcept(sessionView.user.id);
     if (cachedUserId && cachedUserId !== sessionView.user.id) {
       state = initialState();
       assignments = [];
@@ -5871,6 +7410,7 @@
       refreshAdminTimeAccounts(),
       refreshAdmin()
     ]);
+    await maybeOpenDeepLinkedSite();
     await syncPendingEntries();
   }
 
@@ -6337,7 +7877,8 @@
       {
         customerId: elements.projectCustomer.value,
         name: elements.projectName.value,
-        installerShortText: elements.projectShortText.value
+        installerShortText: elements.projectShortText.value,
+        projectManagerId: elements.projectManager.value || null
       },
       "Projekt angelegt · jetzt kann eine Baustelle hinzugefügt werden."
     );
@@ -6379,6 +7920,7 @@
         body: JSON.stringify({
           name: elements.projectEditName.value,
           installerShortText: elements.projectEditShortText.value,
+          projectManagerId: elements.projectEditManager.value || null,
           status: nextStatus,
           rowVersion: project.rowVersion
         })
@@ -6396,18 +7938,24 @@
   });
 
   elements.siteCustomer.addEventListener("change", updateSiteCustomerMode);
+  elements.siteProject.addEventListener("change", syncSiteProjectManager);
   elements.siteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const createsCustomer = elements.siteCustomer.value === "__new__";
+    const projectScoped = Boolean(adminState?.projectScopeRestricted);
+    const createsCustomer = !projectScoped && elements.siteCustomer.value === "__new__";
     const saved = await submitAdminForm(
       elements.siteForm,
       elements.siteMessage,
       "./api/v1/admin/construction-sites",
       {
-        customerId: createsCustomer ? null : elements.siteCustomer.value,
+        projectId: projectScoped ? elements.siteProject.value : null,
+        customerId: createsCustomer || projectScoped ? null : elements.siteCustomer.value,
         customerName: createsCustomer ? elements.siteCustomerName.value : null,
         name: elements.siteName.value,
         installerShortText: elements.siteShortText.value,
+        projectManagerId: projectScoped
+          ? undefined
+          : elements.siteProjectManager.value || null,
         street: elements.siteStreet.value,
         houseNumber: elements.siteHouseNumber.value,
         postalCode: elements.sitePostalCode.value,
@@ -6447,6 +7995,9 @@
         body: JSON.stringify({
           name: elements.siteEditName.value,
           installerShortText: elements.siteEditShortText.value,
+          projectManagerId: adminState.projectScopeRestricted
+            ? undefined
+            : elements.siteEditProjectManager.value || null,
           street: elements.siteEditStreet.value,
           houseNumber: elements.siteEditHouseNumber.value,
           postalCode: elements.siteEditPostalCode.value,
@@ -6521,7 +8072,9 @@
           contentBase64: arrayBufferToBase64(await documentFile.arrayBuffer()),
           customerId: elements.documentCustomer.value,
           projectId: elements.documentProject.value,
-          constructionSiteId: elements.documentSite.value
+          constructionSiteId: elements.documentSite.value,
+          mobileVisible: elements.documentMobileVisible.checked,
+          offlinePriority: elements.documentOfflinePriority.checked
         })
       });
       const reused = body.reused;
@@ -6545,6 +8098,13 @@
   });
 
   elements.siteDashboardAddDocument.addEventListener("click", openDocumentUploadForSite);
+  elements.siteDashboardAddPhoto.addEventListener("click", () => {
+    openDocumentUploadForSite();
+    elements.documentCategory.value = "photo";
+    elements.documentMobileVisible.checked = true;
+    elements.documentOfflinePriority.checked = false;
+    updateDocumentFileSelection();
+  });
 
   elements.siteDashboardCaptureDeliveryNote.addEventListener("click", () => {
     elements.siteDashboardDeliveryNoteInput.click();
@@ -6708,7 +8268,14 @@
   });
 
   elements.siteReportDigital.addEventListener("click", () => openSiteReportForm("digital"));
-  elements.siteReportDate.addEventListener("change", renderSiteReportPersonnel);
+  elements.siteReportDate.addEventListener("change", () => {
+    renderSiteReportPersonnel();
+    saveSiteReportDraft();
+  });
+  elements.siteReportForm.addEventListener("input", (event) => {
+    if (event.target.matches("input[data-user-id]")) return;
+    saveSiteReportDraft();
+  });
   elements.siteReportPhoto.addEventListener("click", () => elements.siteReportPhotoInput.click());
   elements.siteReportPhotoInput.addEventListener("change", () => {
     const file = elements.siteReportPhotoInput.files?.[0] || null;
@@ -6745,6 +8312,7 @@
         .trim();
       if (transcript) {
         elements.siteReportDetails.value = `${elements.siteReportDetails.value.trim()} ${transcript}`.trim();
+        saveSiteReportDraft();
       }
     };
     recognition.onerror = () => {
@@ -6764,7 +8332,9 @@
       elements.siteReportMessage.textContent = "Das Diktat konnte nicht gestartet werden. Der Bericht kann direkt eingetippt werden.";
     }
   });
-  elements.siteReportCancel.addEventListener("click", resetSiteReportForm);
+  elements.siteReportCancel.addEventListener("click", () => {
+    resetSiteReportForm({ clearDraft: true });
+  });
   elements.siteReportForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
@@ -6817,9 +8387,11 @@
           agreements: elements.siteReportAgreements.value,
           incidents: elements.siteReportIncidents.value,
           personnel: collectSiteReportPersonnel(),
+          photos: collectSiteReportPhotos(),
           sourceDocumentId
         })
       });
+      clearSiteReportDraft(site.id, sourceMode);
       resetSiteReportForm();
       await refreshAdmin();
       showToast("Bericht gespeichert und der Baustelle zugeordnet.");
@@ -6866,6 +8438,51 @@
     }
   });
 
+  elements.reportReturnClose.addEventListener("click", closeReportReturnDialog);
+  elements.reportReturnDialog.addEventListener("click", (event) => {
+    if (event.target === elements.reportReturnDialog) closeReportReturnDialog();
+  });
+  elements.reportReturnDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeReportReturnDialog();
+  });
+  elements.reportReturnForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const report = adminState?.siteReports.find(
+      (candidate) => candidate.id === returningReportId
+    );
+    const comment = elements.reportReturnComment.value.trim();
+    if (!report) {
+      elements.reportReturnMessage.textContent =
+        "Der Bericht wurde nicht gefunden. Bitte die Ansicht aktualisieren.";
+      return;
+    }
+    if (comment.length < 2) {
+      elements.reportReturnMessage.textContent =
+        "Bitte einen konkreten Hinweis für die Überarbeitung eingeben.";
+      elements.reportReturnComment.focus();
+      return;
+    }
+    elements.reportReturnSubmit.disabled = true;
+    elements.reportReturnMessage.textContent =
+      "Bericht wird mit nachvollziehbarer Historie zurückgegeben …";
+    try {
+      await requestJson(
+        `./api/v1/admin/site-reports/${encodeURIComponent(report.id)}/return`,
+        {
+          method: "POST",
+          body: JSON.stringify({ comment, rowVersion: report.rowVersion })
+        }
+      );
+      closeReportReturnDialog();
+      await refreshAdmin();
+      showToast("Bericht zur Überarbeitung zurückgegeben.");
+    } catch (error) {
+      elements.reportReturnMessage.textContent = error.message;
+      elements.reportReturnSubmit.disabled = false;
+    }
+  });
+
   elements.mobileReportType.addEventListener("change", () => {
     updateMobileReportTypeFields();
     saveMobileReportDraft();
@@ -6875,7 +8492,7 @@
     updateMobileReportCheck();
     saveMobileReportDraft();
   });
-  elements.mobileReportForm.addEventListener("submit", (event) => {
+  elements.mobileReportForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const latest = lastEvent();
     const siteIndex = currentSiteIndex();
@@ -6885,10 +8502,16 @@
       return;
     }
     const leaveAfterSave = mobileReportLeavesSite;
-    if (reportForAssignment(assignment)) {
+    const existingReport = reportForAssignment(assignment);
+    if (existingReport && existingReport.status !== "returned") {
       closeMobileReportForm();
       if (leaveAfterSave) addEntry("site_departure", siteIndex);
       else showToast("Der Bericht für diese Baustelle ist bereits gespeichert.");
+      return;
+    }
+    if (existingReport?.status === "returned" && !navigator.onLine) {
+      elements.mobileReportMessage.textContent =
+        "Die Überarbeitung kann nach dem Wiederverbinden erneut eingereicht werden.";
       return;
     }
     const summary = elements.mobileReportSummary.value.trim();
@@ -6909,12 +8532,11 @@
       elements.mobileReportPersonnelList.querySelector(`input[data-user-id="${session.user.id}"]`)?.focus();
       return;
     }
-    const report = {
-      clientReportId: createClientEntryId(),
-      assignmentId: assignment.id,
+    const reportPayload = {
       constructionSiteId: assignment.constructionSite.id,
       workDate: state.workDate,
       reportType: elements.mobileReportType.value,
+      sourceMode: "digital",
       summary,
       details: workPerformed,
       workPerformed,
@@ -6926,7 +8548,60 @@
       materialsAndEquipment: elements.mobileReportMaterials.value.trim() || null,
       agreements: elements.mobileReportAgreements.value.trim() || null,
       incidents: elements.mobileReportIncidents.value.trim() || null,
-      personnel,
+      personnel
+    };
+    if (existingReport?.status === "returned") {
+      elements.mobileReportSubmit.disabled = true;
+      elements.mobileReportMessage.textContent =
+        "Überarbeiteter Bericht wird erneut eingereicht …";
+      try {
+        const body = await requestJson(
+          `./api/v1/site-reports/${encodeURIComponent(existingReport.id)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              ...reportPayload,
+              rowVersion: existingReport.rowVersion
+            })
+          }
+        );
+        assignment.mobileReport = {
+          id: body.siteReport.id,
+          number: body.siteReport.number,
+          status: body.siteReport.status,
+          rowVersion: body.siteReport.rowVersion,
+          returnComment: body.siteReport.returnComment
+        };
+        if (employeeSiteState?.reports) {
+          employeeSiteState.reports = employeeSiteState.reports.map((report) => (
+            report.id === body.siteReport.id ? body.siteReport : report
+          ));
+        }
+        state.reports = (state.reports || []).filter(
+          (report) => report.id !== body.siteReport.id
+        );
+        state.reportDraft = null;
+        saveState();
+        closeMobileReportForm();
+        if (leaveAfterSave) {
+          addEntry("site_departure", siteIndex);
+          showToast("Bericht erneut eingereicht · Baustelle wird abgeschlossen.");
+        } else {
+          render();
+          showToast("Überarbeiteter Bericht erneut eingereicht.");
+        }
+      } catch (error) {
+        if (error.status === 401) showLogin();
+        else elements.mobileReportMessage.textContent = error.message;
+      } finally {
+        elements.mobileReportSubmit.disabled = false;
+      }
+      return;
+    }
+    const report = {
+      clientReportId: createClientEntryId(),
+      assignmentId: assignment.id,
+      ...reportPayload,
       pendingSync: !demoMode,
       syncError: null
     };
@@ -6951,22 +8626,45 @@
 
   elements.assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const employeeIds = [...new Set([
+      elements.assignmentEmployee.value,
+      ...selectedPlanningMemberIds(elements.assignmentMemberList)
+    ].filter(Boolean))];
+    const usesBatch = employeeIds.length > 1 || Boolean(elements.assignmentTeam.value);
+    const common = {
+      constructionSiteId: elements.assignmentSite.value,
+      workDate: elements.assignmentDate.value,
+      plannedStartTime: elements.assignmentTime.value,
+      plannedDurationMinutes: durationHoursToMinutes(elements.assignmentDuration.value),
+      comment: elements.assignmentComment.value
+    };
     const saved = await submitAdminForm(
       elements.assignmentForm,
       elements.assignmentMessage,
-      "./api/v1/admin/assignments",
-      {
-        employeeId: elements.assignmentEmployee.value,
-        constructionSiteId: elements.assignmentSite.value,
-        workDate: elements.assignmentDate.value,
-        plannedStartTime: elements.assignmentTime.value,
-        plannedDurationMinutes: durationHoursToMinutes(elements.assignmentDuration.value),
-        comment: elements.assignmentComment.value,
-        reportResponsible: elements.assignmentReportResponsible.checked
-      },
-      "Einsatz freigegeben · auf dem Mitarbeiter-Handy sichtbar."
+      usesBatch
+        ? "./api/v1/admin/assignment-batches"
+        : "./api/v1/admin/assignments",
+      usesBatch
+        ? {
+          ...common,
+          employeeIds,
+          planningTeamId: elements.assignmentTeam.value || null,
+          reportResponsibleEmployeeId: elements.assignmentReportResponsible.checked
+            ? elements.assignmentEmployee.value
+            : null
+        }
+        : {
+          ...common,
+          employeeId: elements.assignmentEmployee.value,
+          reportResponsible: elements.assignmentReportResponsible.checked
+        },
+      usesBatch
+        ? `${employeeIds.length} individuelle Einsätze freigegeben.`
+        : "Einsatz freigegeben · auf dem Mitarbeiter-Handy sichtbar."
     );
     if (!saved) return;
+    elements.assignmentTeam.value = "";
+    renderPlanningMemberPicker(elements.assignmentMemberList);
     elements.assignmentTime.value = "";
     elements.assignmentDuration.value = "";
     elements.assignmentComment.value = "";
@@ -7144,17 +8842,25 @@
     elements.assignmentEditMessage.textContent = "Änderung wird sicher gespeichert …";
     try {
       const destinationDate = elements.assignmentEditDate.value;
+      const assignment = planningAssignments().find(
+        (candidate) => candidate.id === editingAssignmentId
+      );
+      if (!assignment) {
+        throw new Error("Der Einsatz wurde nicht gefunden. Bitte neu laden.");
+      }
       await requestJson(`./api/v1/admin/assignments/${encodeURIComponent(editingAssignmentId)}`, {
         method: "PATCH",
         body: JSON.stringify({
+          employeeId: elements.assignmentEditEmployee.value,
           workDate: destinationDate,
           plannedStartTime: elements.assignmentEditTime.value,
           plannedDurationMinutes: durationHoursToMinutes(elements.assignmentEditDuration.value),
           comment: elements.assignmentEditComment.value,
-          ...(elements.assignmentEditReportResponsible.disabled
+          ...(assignment.reportResponsibilitySource === "automatic"
             ? {}
             : { reportResponsible: elements.assignmentEditReportResponsible.checked }),
-          changeReason
+          changeReason,
+          rowVersion: assignment.rowVersion
         })
       });
       closeAssignmentEditor();
@@ -7197,12 +8903,100 @@
   });
 
   elements.assignmentEditClose.addEventListener("click", closeAssignmentEditor);
-  elements.assignmentEmployee.addEventListener("change", updateAssignmentResponsibilityControl);
+  elements.assignmentEditEmployee.addEventListener(
+    "change",
+    updateAssignmentEditResponsibilityControl
+  );
+  elements.assignmentEmployee.addEventListener("change", () => {
+    updateAssignmentResponsibilityControl();
+  });
+  elements.assignmentTeam.addEventListener("change", () => {
+    const team = (adminState?.planningTeams || []).find(
+      (candidate) => candidate.id === elements.assignmentTeam.value
+    );
+    if (!team) {
+      renderPlanningMemberPicker(elements.assignmentMemberList);
+      return;
+    }
+    const memberIds = new Set(team.members.map((member) => member.userId));
+    if (!memberIds.has(elements.assignmentEmployee.value)) {
+      const foreman = fieldPlanningEmployees().find((employee) => (
+        memberIds.has(employee.id) && employee.roles.includes("foreman")
+      ));
+      elements.assignmentEmployee.value = foreman?.id || team.members[0]?.userId || "";
+    }
+    renderPlanningMemberPicker(elements.assignmentMemberList, memberIds);
+    updateAssignmentResponsibilityControl();
+  });
+  elements.planningTeamReset.addEventListener("click", resetPlanningTeamForm);
+  elements.planningTeamForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const memberIds = selectedPlanningMemberIds(elements.planningTeamMemberList);
+    if (memberIds.length === 0) {
+      elements.planningTeamMessage.textContent =
+        "Bitte mindestens ein Teammitglied auswählen.";
+      return;
+    }
+    const team = (adminState?.planningTeams || []).find(
+      (candidate) => candidate.id === elements.planningTeamId.value
+    );
+    const changeReason = elements.planningTeamReason.value.trim();
+    if (team && changeReason.length < 3) {
+      elements.planningTeamMessage.textContent =
+        "Bitte die Änderung der Teamvorlage kurz begründen.";
+      return;
+    }
+    elements.planningTeamSubmit.disabled = true;
+    elements.planningTeamMessage.textContent = "Teamvorlage wird gespeichert …";
+    try {
+      await requestJson(
+        team
+          ? `./api/v1/admin/planning-teams/${encodeURIComponent(team.id)}`
+          : "./api/v1/admin/planning-teams",
+        {
+          method: team ? "PATCH" : "POST",
+          body: JSON.stringify(team
+            ? {
+              name: elements.planningTeamName.value,
+              memberIds,
+              status: "active",
+              changeReason,
+              rowVersion: team.rowVersion
+            }
+            : {
+              name: elements.planningTeamName.value,
+              memberIds
+            })
+        }
+      );
+      resetPlanningTeamForm();
+      await refreshAdmin(adminState.date);
+      showToast(team ? "Teamvorlage aktualisiert." : "Teamvorlage gespeichert.");
+    } catch (error) {
+      elements.planningTeamMessage.textContent = error.message;
+    } finally {
+      elements.planningTeamSubmit.disabled = false;
+    }
+  });
+  [
+    elements.planningBoardView,
+    elements.planningBoardEmployee,
+    elements.planningBoardTeam,
+    elements.planningBoardSite,
+    elements.planningBoardProjectManager,
+    elements.planningBoardStatus
+  ].forEach((control) => control.addEventListener("change", renderAdminWeek));
   elements.adminWeekPrevious.addEventListener("click", () => {
-    void refreshAdmin(addIsoDays(adminState?.weekStart || localDateKey(), -7));
+    const date = adminState?.date || localDateKey();
+    void refreshAdmin(elements.planningBoardView.value === "month"
+      ? addIsoMonths(date, -1)
+      : addIsoDays(adminState?.weekStart || date, -7));
   });
   elements.adminWeekNext.addEventListener("click", () => {
-    void refreshAdmin(addIsoDays(adminState?.weekStart || localDateKey(), 7));
+    const date = adminState?.date || localDateKey();
+    void refreshAdmin(elements.planningBoardView.value === "month"
+      ? addIsoMonths(date, 1)
+      : addIsoDays(adminState?.weekStart || date, 7));
   });
 
   elements.adminRefresh.addEventListener("click", () => void refreshAdmin());
@@ -7366,6 +9160,7 @@
       timeAccountsState = null;
       closeTimeAccountEditor();
       employeeSiteState = null;
+      await removeOfflineDocumentCachesExcept();
       cachedUserId = null;
       assignments = [];
       state = initialState();
@@ -7457,6 +9252,15 @@
   elements.employeeSiteSectionButtons.forEach((button) => {
     button.addEventListener("click", () => {
       showEmployeeSiteSection(button.dataset.employeeSiteSectionButton, true);
+    });
+  });
+  [
+    elements.employeeSiteReportSearch,
+    elements.employeeSiteDocumentSearch,
+    elements.employeeSitePhotoSearch
+  ].forEach((control) => {
+    control.addEventListener("input", () => {
+      if (employeeSiteState) renderEmployeeSiteWorkspace(employeeSiteState);
     });
   });
   elements.employeeSiteVdeStart.addEventListener("click", () => {
@@ -7683,6 +9487,33 @@
       showSiteDashboardSection(button.dataset.siteDashboardSectionButton, true);
     });
   });
+  elements.siteDashboardCopyLink.addEventListener("click", openSiteQrDialog);
+  elements.siteQrCopy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(elements.siteQrLink.value);
+      showToast("Berechtigungsgeprüfter Baustellenlink kopiert.");
+    } catch {
+      elements.siteQrLink.select();
+      window.prompt("Baustellenlink kopieren:", elements.siteQrLink.value);
+    }
+  });
+  elements.siteQrClose.addEventListener("click", closeSiteQrDialog);
+  elements.siteQrDialog.addEventListener("click", (event) => {
+    if (event.target === elements.siteQrDialog) closeSiteQrDialog();
+  });
+  elements.siteQrDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeSiteQrDialog();
+  });
+  elements.siteDashboardReportSearch.addEventListener("input", () => {
+    if (openedSiteId) renderSiteReports(openedSiteId);
+  });
+  elements.siteDashboardDocumentSearch.addEventListener("input", () => {
+    if (openedSiteId) renderSiteDocuments(openedSiteId);
+  });
+  elements.siteDashboardPhotoSearch.addEventListener("input", () => {
+    if (openedSiteId) renderSitePhotos(openedSiteId);
+  });
   elements.siteDashboardPlanAssignment.addEventListener("click", openAssignmentPlanningForSite);
   elements.siteDashboardCreateReport.addEventListener("click", openReportForSite);
   elements.siteDashboardAddDocumentShortcut.addEventListener("click", openDocumentsForSite);
@@ -7717,6 +9548,17 @@
     openMasterDataForm(elements.siteFormPanel, elements.siteName);
   });
   elements.siteStatusFilter.addEventListener("change", renderSiteList);
+
+  [
+    elements.reportCenterStatus,
+    elements.reportCenterType,
+    elements.reportCenterSite,
+    elements.reportCenterEmployee,
+    elements.reportCenterFrom,
+    elements.reportCenterTo,
+    elements.reportCenterSort
+  ].forEach((control) => control.addEventListener("change", renderReportCenter));
+  elements.reportCenterSearch.addEventListener("input", renderReportCenter);
 
   elements.absenceStartDate.value = localDateKey();
   elements.absenceEndDate.value = localDateKey();
