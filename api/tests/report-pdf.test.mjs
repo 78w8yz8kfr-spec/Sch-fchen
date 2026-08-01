@@ -62,3 +62,54 @@ test("freigegebener Bericht wird als unveränderliche PDF-Ausgabe erzeugt", asyn
   assert.equal(loaded.getTitle(), "Montageschein SE-R-2026-00001");
   assert.equal(loaded.getPageCount(), 2);
 });
+
+test("Berichtsvorschau ist klar als offen markiert und benötigt keine Unterschriften", async () => {
+  const photo = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64"
+  );
+  const pdf = await buildFinalReportPdf({
+    report: {
+      id: "22222222-2222-4222-8222-222222222222",
+      number: "SE-R-2026-00002",
+      reportType: "daily",
+      workDate: "2026-07-29",
+      summary: "Vorschau des Bautagesberichts",
+      details: "Leitungen geprüft.",
+      structuredData: {
+        workPerformed: "Leitungen geprüft.",
+        personnel: []
+      },
+      authorName: "Max Monteur"
+    },
+    company: {
+      legalName: "Schaaf Elektro GmbH",
+      displayName: "Schaaf Elektro GmbH",
+      street: "Dresdner Straße",
+      houseNumber: "30b",
+      postalCode: "04720",
+      city: "Döbeln"
+    },
+    context: {
+      customerName: "Musterkunde GmbH",
+      siteNumber: "SE-B-2026-0001",
+      siteName: "Verwaltungsgebäude",
+      siteAddress: "Musterstraße 1, 04720 Döbeln"
+    },
+    finalizedAt: "2026-07-29T18:30:00.000Z",
+    photos: [{
+      documentId: "55555555-5555-4555-8555-555555555555",
+      title: "Unterverteilung",
+      caption: "Unterverteilung nach Abschluss der Montage",
+      mimeType: "image/png",
+      content: photo
+    }],
+    preview: true
+  });
+
+  assert.ok(pdf.length > 1200);
+  const loaded = await PDFDocument.load(pdf);
+  assert.equal(loaded.getTitle(), "Bautagesbericht SE-R-2026-00002");
+  assert.equal(loaded.getSubject(), "Berichtsvorschau vor der Unterschrift");
+  assert.equal(loaded.getPageCount(), 2);
+});

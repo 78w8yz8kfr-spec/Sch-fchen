@@ -1,10 +1,35 @@
 # Projektstatus
 
-Stand: 29.07.2026
-Technischer Stand: V0.40.0
+Stand: 01.08.2026
+Technischer Stand: V0.41.0
 
 ## Abgeschlossen
 
+- zentrale Berichtszentrale mit Statuskennzahlen, fehlenden Pflichtberichten,
+  Suche, Sortierung und Filtern nach Mitarbeiter, Baustelle, Datum, Art und Status
+- kontrollierte Berichtsrückgabe mit Pflichtkommentar, erneute Einreichung ohne
+  Dublette, PDF-Vorschau und unveränderlicher Abschluss mit vollständiger Historie
+- Berichtsentwürfe im Büro werden automatisch gesichert; Baustellenfotos mit
+  Bildunterschrift erhalten eigene PDF-Bildseiten
+- verbindlich geordnete Baustellenakte mit rollenabhängigem Einstieg, gemerktem
+  Bereich sowie eigener Suche für Berichte, Fotos und Dokumente
+- einzelne mobile Dokumentfreigabe, Offline-Priorität und benutzerbezogener
+  Dokumentcache für wichtige Pläne
+- stabiler Baustellen-QR-Code und Direktlink mit erneuter serverseitiger
+  Berechtigungsprüfung
+- aktive Projektleiterzuordnung an Projekt und Baustelle mit serverseitig
+  erzwungener Sicht auf ausschließlich zugeordnete Kunden, Baustellen,
+  Dokumente, Berichte, VDE-Prüfungen und Einsätze; firmenweite Verwaltungsdaten
+  bleiben für reine Projektleiterkonten gesperrt
+- Desktop-Plantafel mit Mitarbeiterzeilen, Wochen- und Monatsansicht,
+  persistenter Teamvorlage, Kopieren/Mehrfachzuweisung, Drag-and-drop über eine
+  begründungspflichtige Änderungsmaske sowie Filtern und sichtbaren Konflikten
+- Migration 037 für Dokumentfreigabe, Offline-Priorität, stabile QR-Schlüssel,
+  Berichtsrückgabe und unveränderliche Berichtshistorie
+- Migration 038 für mandantengetrennte Teamvorlagen, historisierte
+  Mitgliedsänderungen und unverändert individuelle Mitarbeitereinsätze
+- nachweisbezogene Fahrplan-Abnahme und priorisierter Backlog in
+  [`ROADMAP_ACCEPTANCE.md`](ROADMAP_ACCEPTANCE.md) und [`BACKLOG.md`](BACKLOG.md)
 - getrennt wählbare Baustellenbereiche für Übersicht, Team, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und optional VDE in der mobilen sowie der Büroansicht
 - direkte Zuordnung der Baustellen-Schnellaktionen zum jeweils passenden Arbeitsbereich ohne lange Sammelansicht
 - VDE-Messwerte beginnen auf Seite zwei; das optionale Stromkreisverzeichnis startet nach allen Messwertseiten auf einer eigenen Folgeseite
@@ -26,7 +51,9 @@ Technischer Stand: V0.40.0
 - jahresbezogener Urlaubsanspruch in ganzen oder halben Tagen sowie getrennte Versionsprüfung für Stundenkonto-Profil und Kalenderjahr
 - unveränderliche, idempotente Startsaldo-, Korrektur- und Auszahlungsbuchungen mit Pflichtbegründung und Gegenbuchungsprinzip
 - reproduzierbare Tagesberechnung bis einschließlich gestern: Arbeit plus freigegebene Abwesenheitsgutschrift minus eingefrorenes oder konfiguriertes Soll
-- Rollen- und Mandantenschutz: eigenes Konto für jeden, Gesamtübersicht für Planungsrollen, Änderungen ausschließlich durch Administration oder Geschäftsführung
+- Rollen- und Mandantenschutz: eigenes Konto für jeden, firmenweite
+  Gesamtübersicht nur für Büro, Geschäftsführung und Administration sowie
+  Änderungen am Stundenkonto ausschließlich durch Administration oder Geschäftsführung
 - eigene Abwesenheitsanträge für ganze oder halbe Tage mit Urlaub, Überstundenabbau, Freistellung, Krankheit, Lehrgang, Berufsschule und weiteren Arten
 - zweistufige Prüfung mit Büroentscheidung vor der verbindlichen Freigabe durch die Geschäftsführung sowie technisch erzwungener Vier-Augen-Regel
 - unveränderliche Antrags- und Entscheidungshistorie mit Begründung, Versionskonfliktschutz, RLS, Mandantentrennung und Löschschutz in Migration 033
@@ -204,26 +231,44 @@ Technischer Stand: V0.40.0
 - Migration 034 ergänzt Stundenkonto-Profile, kalenderjahrbezogene Urlaubsansprüche, unveränderliche Korrekturbuchungen und die mandantengeschützte Tagesberechnung
 - Migration 035 ergänzt Mandantenkalender, gesetzliche Feiertagsregeln, betriebliche freie Tage und ihre verbindliche Wirkung auf die Tagesberechnung
 - Migration 036 integriert VDE-Prüfungen, unveränderliche Vollversionen, V15-Originale und zentrale Abschlussdokumente ohne doppelte Stammdaten
+- Migration 037 vervollständigt Baustellenakte, Dokumentfreigabe, QR-Zugang und Berichtshistorie
+- Migration 038 ergänzt persistente Teamvorlagen für die Desktop-Plantafel
 
 ## Noch zu prüfen
 
-- vollständiger lokaler Docker-Start auf einem eigenen Rechner mit Docker
-- Backup-/Restore-Abnahme mit einem dauerhaft gespeicherten lokalen Entwicklungsvolumen; der isolierte CI-Durchlauf ist automatisiert
-- genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden bewusst keine Daten erfunden
-- Render-Blueprint einmalig mit dem GitHub-Konto bereitstellen und Online-Adresse abnehmen
-- vor echten Betriebsdaten dauerhafte Tarife, Backups und Aufbewahrungskonzept festlegen
+- grüne GitHub-CI des exakten V0.41.0-Commits einschließlich Migrationen 037/038,
+  SQL-Tests und PostgreSQL-Integration
+- reale iPhone-, Android-, Chrome-, Edge- und vollständige Offline-Abnahme
+- Last- und Datenmengentest mit 10.000 Mitarbeitern und mehrjährigen Buchungen
+- freigegebene Zielplattform, getrennte Staging-/Produktionsumgebungen,
+  dauerhafte Backups, PITR, Wiederherstellungsprobe und Alarmierung
+- Upload-Schadsoftwareprüfung, Rate Limits, Passwortzurücksetzung und
+  dokumentierter Admin-Notzugang
+- externe Datenschutz-, AVV-, TOM-, Impressums- und Vertragsprüfung
+- vierwöchiger Pilot sowie Onboarding-, Support-, Störungs-, Preis- und
+  Lizenzprozess
+- genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden
+  bewusst keine Daten erfunden
+
+Die vollständigen Gates mit Priorität und Abschlussnachweis stehen in
+[`ROADMAP_ACCEPTANCE.md`](ROADMAP_ACCEPTANCE.md) und
+[`BACKLOG.md`](BACKLOG.md). Diese Punkte werden nicht als bestanden behandelt,
+solange der reale Nachweis fehlt.
 
 ## Nächster Entwicklungsschritt
 
-Als nächstes wird DGUV nach dem jetzt bewährten VDE-Muster als zweites
-aktivierbares Elektro-Spezialmodul fachlich spezifiziert: gemeinsamer
-Stammdatenbestand, rollenbezogener Baustelleneinstieg, strukturierte
-Prüfdaten, unveränderliche Historie und zentrale Abschlussdokumente.
+Nach grüner V0.41.0-CI folgt der Fahrplan-Schritt V0.50. Die VDE-Integration ist
+bereits technisch vorhanden; deshalb wird V0.50 als formale
+Integrationsabnahme genutzt: gemeinsamer Vertrag, Rollen- und
+Deaktivierungsgrenzen, V15-Migration, Messdatenhistorie und zentrale
+Abschlussdokumente werden gegen die Fahrplanmatrix geschlossen.
 
-Betriebssicherheit mit dauerhafter Datenbank, Backup-Plan,
-Wiederherstellungsprobe, Überwachung und Objektspeicher wurde auf ausdrücklichen
-Wunsch für diesen Schritt übersprungen und bleibt vor echten Betriebsdaten
-verbindlich nachzuholen.
+Parallel bleiben die Produktions-, Geräte-, Last-, Rechts- und Pilot-Gates
+verbindlich offen. Sie dürfen vor echten Betriebsdaten beziehungsweise V1.0
+nicht übersprungen werden.
+
+DGUV gehört laut verbindlichem Fahrplan erst in die Reihenfolge nach V1.0 und
+ist ausdrücklich nicht der nächste Entwicklungsschritt.
 
 Die öffentliche GitHub-Pages-PWA bleibt eindeutig als lokale Demo
 gekennzeichnet; die echte Anmeldung läuft ausschließlich auf der gemeinsamen

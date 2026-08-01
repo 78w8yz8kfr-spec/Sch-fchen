@@ -6,6 +6,7 @@ import {
   validateAbsenceDecision,
   validateAbsenceRequest,
   validateAssignment,
+  validateAssignmentBatch,
   validateAssignmentCancellation,
   validateAssignmentUpdate,
   validateConstructionSite,
@@ -25,13 +26,17 @@ import {
   validateInitialSetup,
   validateLogin,
   validateMobileSiteReport,
+  validateMobileSiteReportRevision,
   validateProject,
   validateProjectUpdate,
+  validatePlanningTeam,
+  validatePlanningTeamUpdate,
   validateSiteMaterial,
   validateSiteMaterialUpdate,
   validateSiteNote,
   validateSiteReport,
   validateSiteReportFinalization,
+  validateSiteReportReturn,
   validateSiteTask,
   validateSiteTaskUpdate,
   validateSpontaneousSiteSelection,
@@ -453,6 +458,8 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
   assert.equal(document.category, "plan");
   assert.equal(document.content.toString("utf8"), "%PDF-1.4\nTest");
   assert.equal(document.customerId, null);
+  assert.equal(document.mobileVisible, true);
+  assert.equal(document.offlinePriority, false);
 
   const deliveryNote = validateDocumentUpload({
     title: "Lieferschein 4711",
@@ -512,7 +519,42 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
 
   assert.deepEqual(
     validateDocumentStatusUpdate({ status: "archived", rowVersion: 2 }),
-    { status: "archived", rowVersion: 2 }
+    {
+      status: "archived",
+      mobileVisible: null,
+      offlinePriority: null,
+      rowVersion: 2
+    }
+  );
+  assert.deepEqual(
+    validateDocumentStatusUpdate({
+      mobileVisible: false,
+      offlinePriority: false,
+      rowVersion: 3
+    }),
+    {
+      status: null,
+      mobileVisible: false,
+      offlinePriority: false,
+      rowVersion: 3
+    }
+  );
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Unsichtbarer Offline-Plan",
+      category: "plan",
+      fileName: "Plan.pdf",
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from("%PDF-1.4").toString("base64"),
+      constructionSiteId: "22222222-2222-4222-8222-222222222222",
+      mobileVisible: false,
+      offlinePriority: true
+    }),
+    /mobil freigegebene Dokumente/
+  );
+  assert.throws(
+    () => validateDocumentStatusUpdate({ rowVersion: 2 }),
+    /keine Dokumentänderung/
   );
   assert.throws(
     () => validateDocumentStatusUpdate({ status: "deleted", rowVersion: 2 }),
@@ -583,6 +625,32 @@ test("Baustellenmodule validieren Aufgaben, Notizen, Material und Berichte", () 
     summary: "Papierbericht",
     sourceDocumentId: documentId
   }).sourceDocumentId, documentId);
+  const reportWithPhoto = validateSiteReport({
+    constructionSiteId: siteId,
+    reportType: "daily",
+    workDate: "2026-07-21",
+    sourceMode: "digital",
+    summary: "Bericht mit Foto",
+    photos: [{
+      documentId,
+      caption: "  Unterverteilung nach der Montage  "
+    }]
+  });
+  assert.deepEqual(reportWithPhoto.photos, [{
+    documentId,
+    caption: "Unterverteilung nach der Montage"
+  }]);
+  assert.throws(() => validateSiteReport({
+    constructionSiteId: siteId,
+    reportType: "daily",
+    workDate: "2026-07-21",
+    sourceMode: "digital",
+    summary: "Doppeltes Foto",
+    photos: [
+      { documentId, caption: "Erstes Bild" },
+      { documentId, caption: "Dasselbe Bild" }
+    ]
+  }), /nur einmal/);
   assert.throws(() => validateSiteReport({
     constructionSiteId: siteId,
     reportType: "daily",
@@ -643,6 +711,34 @@ test("Baustellenmodule validieren Aufgaben, Notizen, Material und Berichte", () 
     ...mobileReport,
     sourceMode: "speech"
   }), /direkt digital/);
+
+  const revision = validateMobileSiteReportRevision({
+    constructionSiteId: siteId,
+    reportType: "daily",
+    workDate: "2026-07-21",
+    sourceMode: "digital",
+    summary: "Tagesfortschritt überarbeitet",
+    details: "Leitungen vollständig verlegt",
+    workPerformed: "Leitungen vollständig verlegt",
+    personnel: [{
+      userId: "44444444-4444-4444-8444-444444444444",
+      minutes: 480
+    }],
+    rowVersion: 4
+  });
+  assert.equal(revision.rowVersion, 4);
+  assert.equal(revision.summary, "Tagesfortschritt überarbeitet");
+  assert.deepEqual(validateSiteReportReturn({
+    rowVersion: 3,
+    comment: "  Bitte Material und offene Punkte ergänzen.  "
+  }), {
+    rowVersion: 3,
+    comment: "Bitte Material und offene Punkte ergänzen."
+  });
+  assert.throws(
+    () => validateSiteReportReturn({ rowVersion: 3, comment: " " }),
+    /Rückgabegrund/
+  );
 
   const signature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   const finalization = validateSiteReportFinalization({
@@ -767,16 +863,27 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   );
 
   const update = validateAssignmentUpdate({
+    employeeId: "33333333-3333-4333-8333-333333333333",
     workDate: "2026-07-21",
     plannedStartTime: "08:15",
     plannedDurationMinutes: 360,
     comment: "Beschriftung prüfen",
-    changeReason: "Kunde öffnet später"
+    changeReason: "Kunde öffnet später",
+    rowVersion: 4
   });
   assert.equal(update.workDate, "2026-07-21");
   assert.equal(update.plannedDurationMinutes, 360);
   assert.equal(update.comment, "Beschriftung prüfen");
   assert.equal(update.reportResponsible, null);
+  assert.equal(update.employeeId, "33333333-3333-4333-8333-333333333333");
+  assert.equal(update.rowVersion, 4);
+  const partialUpdate = validateAssignmentUpdate({
+    workDate: "2026-07-21",
+    changeReason: "Nur den Termin verschieben",
+    rowVersion: 4
+  });
+  assert.equal(partialUpdate.plannedStartTime, undefined);
+  assert.equal(partialUpdate.plannedDurationMinutes, undefined);
   assert.equal(validateAssignmentUpdate({ ...update, reportResponsible: true }).reportResponsible, true);
   assert.equal(
     validateAssignmentCancellation({ changeReason: "Termin abgesagt" }).changeReason,
@@ -789,6 +896,54 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   assert.throws(
     () => validateAssignmentUpdate({ ...update, plannedDurationMinutes: 14 }),
     /Einsatzdauer/
+  );
+  assert.throws(
+    () => validateAssignment({
+      ...assignment,
+      plannedStartTime: "23:00",
+      plannedDurationMinutes: 120
+    }),
+    /Mitternacht/
+  );
+
+  const batch = validateAssignmentBatch({
+    employeeIds: [
+      "11111111-1111-4111-8111-111111111111",
+      "33333333-3333-4333-8333-333333333333"
+    ],
+    planningTeamId: "44444444-4444-4444-8444-444444444444",
+    reportResponsibleEmployeeId: "33333333-3333-4333-8333-333333333333",
+    constructionSiteId: "22222222-2222-4222-8222-222222222222",
+    workDate: "2026-07-22",
+    plannedStartTime: "07:00",
+    plannedDurationMinutes: 480,
+    comment: "Gemeinsamer Einsatz"
+  });
+  assert.equal(batch.employeeIds.length, 2);
+  assert.equal(
+    batch.reportResponsibleEmployeeId,
+    "33333333-3333-4333-8333-333333333333"
+  );
+
+  const team = validatePlanningTeam({
+    name: "Team Nord",
+    memberIds: batch.employeeIds
+  });
+  assert.equal(team.name, "Team Nord");
+  assert.equal(team.memberIds.length, 2);
+  const teamUpdate = validatePlanningTeamUpdate({
+    ...team,
+    status: "active",
+    changeReason: "Neue Teamaufteilung",
+    rowVersion: 2
+  });
+  assert.equal(teamUpdate.rowVersion, 2);
+  assert.throws(
+    () => validatePlanningTeam({
+      name: "Team Nord",
+      memberIds: [batch.employeeIds[0], batch.employeeIds[0]]
+    }),
+    /doppelten/
   );
 });
 
@@ -824,12 +979,15 @@ test("Kunde, Projekt und Baustelle werden als getrennte Hierarchie validiert", (
   const project = validateProject({
     customerId: "11111111-1111-4111-8111-111111111111",
     name: "Neubau Musterweg",
-    installerShortText: "Elektroinstallation"
+    installerShortText: "Elektroinstallation",
+    projectManagerId: "33333333-3333-4333-8333-333333333333"
   });
   assert.equal(project.name, "Neubau Musterweg");
+  assert.equal(project.projectManagerId, "33333333-3333-4333-8333-333333333333");
 
   const site = validateConstructionSite({
     projectId: "22222222-2222-4222-8222-222222222222",
+    projectManagerId: "33333333-3333-4333-8333-333333333333",
     name: "Musterweg 4",
     street: "Musterweg",
     houseNumber: "4",
@@ -837,6 +995,7 @@ test("Kunde, Projekt und Baustelle werden als getrennte Hierarchie validiert", (
     city: "Musterstadt"
   });
   assert.equal(site.projectId, "22222222-2222-4222-8222-222222222222");
+  assert.equal(site.projectManagerId, "33333333-3333-4333-8333-333333333333");
   assert.throws(
     () => validateConstructionSite({ ...site, projectId: "falsch" }),
     /Auftrag/
@@ -860,11 +1019,13 @@ test("Baustellenänderungen erlauben nur sichere Status und Versionsstände", ()
     houseNumber: "12",
     postalCode: "12345",
     city: "Musterstadt",
+    projectManagerId: "33333333-3333-4333-8333-333333333333",
     status: "completed",
     rowVersion: 3
   });
   assert.equal(update.status, "completed");
   assert.equal(update.rowVersion, 3);
+  assert.equal(update.projectManagerId, "33333333-3333-4333-8333-333333333333");
   assert.throws(
     () => validateConstructionSiteUpdate({ ...update, status: "cancelled" }),
     /Baustellenstatus/
@@ -893,11 +1054,13 @@ test("Kunden- und Projektänderungen verlangen Status und Versionsstand", () => 
   const project = validateProjectUpdate({
     name: "Neubau Musterweg",
     installerShortText: "Elektroinstallation",
+    projectManagerId: "33333333-3333-4333-8333-333333333333",
     status: "on_hold",
     rowVersion: 4
   });
   assert.equal(project.status, "on_hold");
   assert.equal(project.rowVersion, 4);
+  assert.equal(project.projectManagerId, "33333333-3333-4333-8333-333333333333");
   assert.throws(
     () => validateProjectUpdate({ ...project, rowVersion: 0 }),
     /Projektversion/

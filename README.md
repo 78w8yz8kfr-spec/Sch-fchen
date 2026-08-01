@@ -3,8 +3,9 @@
 Schäfchen ist eine modulare All-in-One-Unternehmenssoftware, die zunächst für
 Elektrobetriebe entwickelt wird. Die Progressive Web App verbindet eine besonders einfache
 Live-Oberfläche für Monteure mit der Verwaltung für Geschäftsführung,
-Administrator, Büro/Disposition, Projektleitung und Vorarbeiter. VDE und DGUV
-sind optionale Spezialmodule auf demselben gemeinsamen Kern.
+Administrator, Büro/Disposition, Projektleitung und Vorarbeiter. VDE ist als
+optionales Spezialmodul auf demselben gemeinsamen Kern integriert; DGUV folgt
+laut Fahrplan erst nach V1.0.
 
 ## Projektstand
 
@@ -27,6 +28,8 @@ Aktuell enthalten:
 - Migration `016_add_business_roles.sql` für die sichtbaren Betriebsrollen und kompatible Bestandskonten
 - Migrationen `017_create_documents.sql` bis `026_automatic_site_foreman.sql` für zentrale Dokumente, Baustellenarbeit, strukturierte Berichte und Vorarbeiterverantwortung
 - Migrationen `027_allow_multiple_work_blocks.sql` bis `036_create_vde_inspections.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule, Abwesenheiten, Stundenkonten, Feiertage und VDE-Prüfungen
+- Migration `037_complete_site_workspace.sql` für mobile Dokumentfreigaben, Offline-Prioritäten, Baustellen-QR-Zugriff und den vollständigen Berichts-Rücklauf
+- Migration `038_create_planning_teams.sql` für feste Planungsteams, Mitgliederhistorie und konfliktfeste Teamvorlagen
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -41,6 +44,9 @@ Aktuell enthalten:
 - mobile Baustellenakte für zugewiesene Monteure und Vorarbeiter mit Auftrag, Navigation sowie getrennten Ansichten für Team, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und optional VDE
 - direkter, berechtigungsgeprüfter Kamera-Upload in den zentralen Dokumentenbestand
 - mobile Verwaltung für Mitarbeiter, Baustellen und die Wochenplanung Montag bis Freitag
+- Desktop-Plantafel mit Wochen- und Monatsansicht, Mitarbeiterzeilen, Mehrfachzuweisung, Kopieren und historisiertem Verschieben per Drag-and-drop
+- feste Planungsteams sowie Filter nach Mitarbeiter, Team, Baustelle, Projektleitung und Status
+- sichtbare Konflikte für Abwesenheiten, Zeitüberschneidungen und fehlende Vorarbeiterverantwortung
 - geschützte Bearbeitung von Mitarbeiterstammdaten, Kontaktdaten und Betriebsrollen
 - Tageslage für die Disposition mit Planung, freien Feldmitarbeitern, laufenden Arbeitstagen und Zeitprüfungen
 - eigene Urlaubs- und Abwesenheitsanträge mit Büroprüfung, Vier-Augen-Freigabe und unveränderlicher Historie
@@ -60,6 +66,9 @@ Aktuell enthalten:
 - Produktionscontainer und Render-Blueprint für eine gemeinsame HTTPS-Adresse
 - doppelte Touch-Unterschrift und unveränderliche Abschluss-PDF für Montage- und Bautagesberichte
 - strukturierte Montage- und Bautagesberichte mit Leistungen, Behinderungen, offenen Punkten und Mitarbeiterstunden
+- Berichtszentrale mit Filterung, Vorschau, Rückgabe samt Pflichtgrund, mobiler Überarbeitung und erneuter Einreichung
+- automatische Berichtsentwürfe sowie Fotoseiten mit auswählbaren Bildern und Bildunterschriften
+- getrennte Baustellenbereiche mit eigener Suche, mobiler Dokumentfreigabe, Offline-Markierung und QR-Einstieg
 - vollständig integriertes, firmenweit aktivierbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
 - mobiler VDE-Editor für geordnete Verteilungen, FI/RCD-Gruppen, Stromkreise, passende Schutzorganparameter und Messwerte einschließlich Zi, Zs, Ik und stromkreisbezogener RCD-Werte
 - kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF mit Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
@@ -77,7 +86,9 @@ wieder. Es werden keine GPS-Daten abgefragt.
 
 ## Online-Betrieb
 
-`render.yaml` stellt Web-App, API und PostgreSQL gemeinsam bereit. Die
+`render.yaml` stellt Web-App, API und PostgreSQL als Erprobungs-Blueprint
+gemeinsam bereit; die endgültige Produktionsplattform ist damit nicht
+festgelegt. Die
 Handy-Anleitung einschließlich der einmaligen sicheren Admin-Ersteinrichtung
 steht in [`docs/ONLINE_DEPLOYMENT.md`](docs/ONLINE_DEPLOYMENT.md). Die
 kostenlose Vorlage ist nur für die Erprobung; vor dem Einsatz mit echten
@@ -139,7 +150,8 @@ make frontend-serve # PWA unter http://localhost:4173 öffnen
 - Das Frontend greift ausschließlich über eine API auf Daten zu.
 - Keine Datenbankänderung ohne Migration, Test und Dokumentationsupdate.
 - Ein Datenbestand für alle Module; Dokumente und Stammdaten werden referenziert statt kopiert.
-- VDE und DGUV werden als optionale Spezialmodule angebunden.
+- VDE ist als optionales Spezialmodul angebunden; DGUV wird erst nach V1.0
+  begonnen.
 
 Die technische Struktur und der aktuelle Umsetzungsstand stehen unter
 [`docs/`](docs/). Das Sprint-2-Modell ist in
@@ -150,4 +162,8 @@ Fach-, Rollen-, Import- und Abschlussregeln des VDE-Moduls stehen in
 [`docs/VDE_MODULE.md`](docs/VDE_MODULE.md). Die
 Sicherheitsgrenze und die Endpunkte der API stehen in
 [`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die verbindliche fachliche
-Grundlage steht in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
+Grundlage steht in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md). Der
+beleggestützte Abgleich mit dem Fahrplan steht in
+[`docs/ROADMAP_ACCEPTANCE.md`](docs/ROADMAP_ACCEPTANCE.md); offene Release-Gates
+und die gemeinsame Definition of Done stehen in
+[`docs/BACKLOG.md`](docs/BACKLOG.md).

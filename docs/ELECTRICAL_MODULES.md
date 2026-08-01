@@ -1,7 +1,7 @@
 # Optionale Elektro-Spezialmodule
 
-Stand: 29.07.2026
-Technischer Stand: V0.40.0
+Stand: 01.08.2026
+Technischer Stand: V0.41.0
 
 ## Ziel
 
@@ -52,5 +52,7 @@ Die vollständigen Fach- und Berechtigungsregeln stehen in
 ## Reihenfolge
 
 1. VDE ist kontrolliert mit dem gemeinsamen Bestand verbunden.
-2. Der nächste Fachbaustein ist DGUV nach demselben Aktivierungs-, Referenz-,
-   Historisierungs- und Dokumentprinzip.
+2. Zuerst folgen die im Fahrplan vorgesehenen VDE-Abnahmen, Pilotierung und
+   V1.0-Freigabe.
+3. DGUV beginnt ausdrücklich erst nach V1.0 und folgt dann demselben
+   Aktivierungs-, Referenz-, Historisierungs- und Dokumentprinzip.

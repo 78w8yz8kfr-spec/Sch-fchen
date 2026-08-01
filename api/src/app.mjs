@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
+import { toString as qrToString } from "qrcode";
 import {
   companyLogoUrl,
   sessionView,
@@ -38,6 +39,7 @@ import {
   validateAbsenceDecision,
   validateAbsenceRequest,
   validateAssignment,
+  validateAssignmentBatch,
   validateAssignmentCancellation,
   validateAssignmentUpdate,
   validateConstructionSite,
@@ -58,12 +60,16 @@ import {
   validateLogin,
   validateProject,
   validateProjectUpdate,
+  validatePlanningTeam,
+  validatePlanningTeamUpdate,
   validateSiteMaterial,
   validateSiteMaterialUpdate,
   validateSiteNote,
   validateMobileSiteReport,
+  validateMobileSiteReportRevision,
   validateSiteReport,
   validateSiteReportFinalization,
+  validateSiteReportReturn,
   validateSiteTask,
   validateSiteTaskUpdate,
   validateSiteBundle,
@@ -93,6 +99,14 @@ const PLANNER_ROLES = new Set([
   "office",
   "planner",
   "project_manager",
+  "executive_assistant"
+]);
+const FULL_PLANNER_ROLES = new Set([
+  "admin",
+  "managing_director",
+  "dispatch_office",
+  "office",
+  "planner",
   "executive_assistant"
 ]);
 const MANAGEMENT_ROLES = new Set(["managing_director", "dispatch_office", "project_manager"]);
@@ -170,6 +184,17 @@ function attachment(response, document) {
     "Content-Length": document.content.length,
     "Content-Disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
     "Cache-Control": "no-store",
+    ...securityHeaders()
+  });
+  response.end(document.content);
+}
+
+function inlineDocument(response, document) {
+  response.writeHead(200, {
+    "Content-Type": document.mimeType,
+    "Content-Length": document.content.length,
+    "Content-Disposition": `inline; filename="${document.fileName}"`,
+    "Cache-Control": "private, max-age=300",
     ...securityHeaders()
   });
   response.end(document.content);
@@ -567,7 +592,7 @@ async function getAdminWorkDay(client, context, workDayId) {
 }
 
 async function reviewWorkDay(client, context, workDayId, input) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const current = await client.query(
     `SELECT id, user_id, status
      FROM work_days
@@ -665,22 +690,26 @@ async function getAssignments(client, context, date) {
        report.id AS mobile_report_id,
        report.report_number AS mobile_report_number,
        report.status AS mobile_report_status,
+       report.row_version AS mobile_report_row_version,
+       report.return_comment AS mobile_report_return_comment,
        site.id AS construction_site_id,
        site.site_number,
        site.name,
        site.area_label,
-       site.installer_short_text
+       site.installer_short_text,
+       site.qr_code
      FROM site_assignments AS assignment
      JOIN construction_sites AS site
       ON site.company_id = assignment.company_id
       AND site.id = assignment.construction_site_id
      LEFT JOIN LATERAL (
-       SELECT candidate.id, candidate.report_number, candidate.status
+       SELECT candidate.id, candidate.report_number, candidate.status,
+              candidate.row_version, candidate.return_comment
        FROM site_reports AS candidate
        WHERE candidate.company_id = assignment.company_id
          AND candidate.construction_site_id = assignment.construction_site_id
          AND candidate.work_date = assignment.work_date
-         AND candidate.status IN ('submitted', 'approved')
+         AND candidate.status IN ('submitted', 'approved', 'returned')
        ORDER BY (candidate.site_assignment_id = assignment.id) DESC NULLS LAST, candidate.created_at DESC
        LIMIT 1
      ) AS report ON TRUE
@@ -703,25 +732,34 @@ async function getAssignments(client, context, date) {
     mobileReport: row.mobile_report_id ? {
       id: row.mobile_report_id,
       number: row.mobile_report_number,
-      status: row.mobile_report_status
+      status: row.mobile_report_status,
+      rowVersion: Number(row.mobile_report_row_version),
+      returnComment: row.mobile_report_return_comment || null
     } : null,
     constructionSite: {
       id: row.construction_site_id,
       number: row.site_number,
       name: row.name,
       area: row.area_label,
-      shortText: row.installer_short_text
+      shortText: row.installer_short_text,
+      qrCode: row.qr_code || null
     }
   }));
 }
 
 async function getTimeTrackingSiteOptions(client, context, date) {
+  const roles = await activeRoleKeys(client, context);
+  const projectScopeRestricted = hasProjectScopedAccess(roles);
+  const projectScope = projectScopeRestricted
+    ? await assignedProjectIds(client, context)
+    : null;
   const suggested = await getAssignments(client, context, date);
   const suggestedSiteIds = suggested.map((assignment) => assignment.constructionSite.id);
   const [sites, projects, customers] = await Promise.all([
     client.query(
       `SELECT site.id, site.project_id, project.customer_id, site.site_number,
               site.name, site.installer_short_text, site.status, site.row_version,
+              site.qr_code,
               site.updated_at, site.creation_source, site.field_review_status,
               project.name AS project_name,
               COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
@@ -767,12 +805,26 @@ async function getTimeTrackingSiteOptions(client, context, date) {
       [context.companyId]
     )
   ]);
+  const visibleProjects = projects.rows
+    .map(projectDto)
+    .filter((project) => !projectScopeRestricted || projectScope.has(project.id));
+  const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
+  const visibleSites = sites.rows
+    .map(siteDto)
+    .filter((site) => !projectScopeRestricted || visibleProjectIds.has(site.projectId));
+  const visibleCustomerIds = new Set(visibleProjects.map((project) => project.customerId));
   return {
     workDate: date,
-    suggestedAssignments: suggested,
-    sites: sites.rows.map(siteDto),
-    projects: projects.rows.map(projectDto),
-    customers: customers.rows.map((customer) => ({
+    suggestedAssignments: projectScopeRestricted
+      ? suggested.filter((assignment) => visibleSites.some((site) => (
+        site.id === assignment.constructionSite.id
+      )))
+      : suggested,
+    sites: visibleSites,
+    projects: visibleProjects,
+    customers: customers.rows.filter((customer) => (
+      !projectScopeRestricted || visibleCustomerIds.has(customer.id)
+    )).map((customer) => ({
       id: customer.id,
       number: customer.customer_number,
       displayName: customer.display_name
@@ -845,6 +897,15 @@ async function createEmployeeSelectedAssignment(
 
 async function selectSpontaneousSite(client, context, input, timeZone) {
   requireToday(input.workDate, timeZone);
+  const roles = await activeRoleKeys(client, context);
+  if (hasProjectScopedAccess(roles)) {
+    await requireConstructionSiteAccess(
+      client,
+      context,
+      input.constructionSiteId,
+      roles
+    );
+  }
   const site = await client.query(
     `SELECT id, name
      FROM construction_sites
@@ -963,6 +1024,14 @@ async function resolveConstructionSiteParent(client, context, input) {
 
 async function createFieldConstructionSite(client, context, input, timeZone) {
   requireToday(input.workDate, timeZone);
+  const roles = await activeRoleKeys(client, context);
+  if (hasProjectScopedAccess(roles)) {
+    throw new InputError(
+      "Projektleiter können neue Baustellen nur in der Verwaltung innerhalb eines zugeordneten Projekts anlegen.",
+      403,
+      "field_site_project_access_forbidden"
+    );
+  }
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`sites:${context.companyId}`]
@@ -1013,7 +1082,7 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
      ) VALUES (
        $1, $2, $3, $4, $5, 'active', 'field', $6, 'pending'
      )
-     RETURNING id, project_id, site_number, name, installer_short_text,
+     RETURNING id, project_id, site_number, name, installer_short_text, qr_code,
                status, row_version, updated_at, creation_source, field_review_status`,
     [
       context.companyId,
@@ -1048,7 +1117,8 @@ async function createFieldConstructionSite(client, context, input, timeZone) {
 }
 
 async function confirmFieldConstructionSite(client, context, siteId) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(client, context, siteId, roles);
   const updated = await client.query(
     `UPDATE construction_sites
      SET field_review_status = 'confirmed',
@@ -1093,9 +1163,224 @@ async function requirePlanner(client, context) {
   return roles;
 }
 
+function hasFullPlannerAccess(roles) {
+  return [...roles].some((role) => FULL_PLANNER_ROLES.has(role));
+}
+
+function hasProjectScopedAccess(roles) {
+  return roles.has("project_manager") && !hasFullPlannerAccess(roles);
+}
+
+async function requireFullPlanner(client, context) {
+  const roles = await requirePlanner(client, context);
+  if (!hasFullPlannerAccess(roles)) {
+    throw new InputError(
+      "Diese firmenweite Funktion ist nur für Administration, Geschäftsführung oder Büro/Disposition freigeschaltet.",
+      403,
+      "global_planning_forbidden"
+    );
+  }
+  return roles;
+}
+
+async function assignedProjectIds(client, context) {
+  const result = await client.query(
+    `SELECT project_id
+     FROM project_responsibles
+     WHERE company_id = $1
+       AND user_id = $2
+       AND responsibility = 'project_management'
+       AND removed_at IS NULL`,
+    [context.companyId, context.userId]
+  );
+  return new Set(result.rows.map((row) => row.project_id));
+}
+
+async function hasAssignedProjectForSite(client, context, constructionSiteId) {
+  const result = await client.query(
+    `SELECT 1
+     FROM construction_sites AS site
+     JOIN project_responsibles AS responsible
+       ON responsible.company_id = site.company_id
+      AND responsible.project_id = site.project_id
+      AND responsible.user_id = $3
+      AND responsible.responsibility = 'project_management'
+      AND responsible.removed_at IS NULL
+     WHERE site.company_id = $1 AND site.id = $2`,
+    [context.companyId, constructionSiteId, context.userId]
+  );
+  return result.rowCount === 1;
+}
+
+async function requireProjectAccess(client, context, projectId, roles = null) {
+  const effectiveRoles = roles || await requirePlanner(client, context);
+  if (!hasProjectScopedAccess(effectiveRoles)) return effectiveRoles;
+  const result = await client.query(
+    `SELECT 1
+     FROM project_responsibles
+     WHERE company_id = $1
+       AND project_id = $2
+       AND user_id = $3
+       AND responsibility = 'project_management'
+       AND removed_at IS NULL`,
+    [context.companyId, projectId, context.userId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Dieses Projekt ist dir nicht zugeordnet.",
+      403,
+      "project_access_forbidden"
+    );
+  }
+  return effectiveRoles;
+}
+
+async function requireConstructionSiteAccess(
+  client,
+  context,
+  constructionSiteId,
+  roles = null
+) {
+  const effectiveRoles = roles || await requirePlanner(client, context);
+  if (!hasProjectScopedAccess(effectiveRoles)) return effectiveRoles;
+  if (!await hasAssignedProjectForSite(client, context, constructionSiteId)) {
+    throw new InputError(
+      "Diese Baustelle gehört nicht zu einem dir zugeordneten Projekt.",
+      403,
+      "site_project_access_forbidden"
+    );
+  }
+  return effectiveRoles;
+}
+
+async function requireCustomerAccess(client, context, customerId, roles = null) {
+  const effectiveRoles = roles || await requirePlanner(client, context);
+  if (!hasProjectScopedAccess(effectiveRoles)) return effectiveRoles;
+  const result = await client.query(
+    `SELECT 1
+     FROM projects AS project
+     JOIN project_responsibles AS responsible
+       ON responsible.company_id = project.company_id
+      AND responsible.project_id = project.id
+      AND responsible.user_id = $3
+      AND responsible.responsibility = 'project_management'
+      AND responsible.removed_at IS NULL
+     WHERE project.company_id = $1 AND project.customer_id = $2
+     LIMIT 1`,
+    [context.companyId, customerId, context.userId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Dieser Kunde gehört nicht zu einem dir zugeordneten Projekt.",
+      403,
+      "customer_project_access_forbidden"
+    );
+  }
+  return effectiveRoles;
+}
+
+async function requireLinkedDocumentAccess(client, context, documentId, roles = null) {
+  const effectiveRoles = roles || await requirePlanner(client, context);
+  if (!hasProjectScopedAccess(effectiveRoles)) return effectiveRoles;
+  const result = await client.query(
+    `SELECT 1
+     FROM document_links AS link
+     LEFT JOIN construction_sites AS site
+       ON site.company_id = link.company_id
+      AND site.id = link.construction_site_id
+     LEFT JOIN projects AS direct_project
+       ON direct_project.company_id = link.company_id
+      AND direct_project.id = link.project_id
+     LEFT JOIN projects AS customer_project
+       ON customer_project.company_id = link.company_id
+      AND customer_project.customer_id = link.customer_id
+     JOIN project_responsibles AS responsible
+       ON responsible.company_id = link.company_id
+      AND responsible.project_id = COALESCE(
+        site.project_id,
+        direct_project.id,
+        customer_project.id
+      )
+      AND responsible.user_id = $3
+      AND responsible.responsibility = 'project_management'
+      AND responsible.removed_at IS NULL
+     WHERE link.company_id = $1 AND link.document_id = $2
+     LIMIT 1`,
+    [context.companyId, documentId, context.userId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Dieses Dokument gehört nicht zu einem dir zugeordneten Projekt.",
+      403,
+      "document_project_access_forbidden"
+    );
+  }
+  return effectiveRoles;
+}
+
+async function requireDocumentTargetAccess(client, context, input, roles = null) {
+  const effectiveRoles = roles || await requirePlanner(client, context);
+  if (!hasProjectScopedAccess(effectiveRoles)) return effectiveRoles;
+  if (input.constructionSiteId) {
+    return requireConstructionSiteAccess(
+      client,
+      context,
+      input.constructionSiteId,
+      effectiveRoles
+    );
+  }
+  if (input.projectId) {
+    return requireProjectAccess(client, context, input.projectId, effectiveRoles);
+  }
+  if (input.customerId) {
+    return requireCustomerAccess(client, context, input.customerId, effectiveRoles);
+  }
+  throw new InputError(
+    "Projektleiter müssen Dokumente einem zugeordneten Kunden, Projekt oder einer Baustelle zuordnen.",
+    403,
+    "document_target_access_forbidden"
+  );
+}
+
+async function requireScopedEntitySiteAccess(
+  client,
+  context,
+  tableName,
+  entityId,
+  roles = null
+) {
+  const allowedTables = new Set([
+    "site_tasks",
+    "site_material_entries",
+    "site_notes",
+    "site_reports",
+    "site_assignments"
+  ]);
+  if (!allowedTables.has(tableName)) throw new Error("Ungültige Baustellenentität.");
+  const effectiveRoles = roles || await requirePlanner(client, context);
+  if (!hasProjectScopedAccess(effectiveRoles)) return effectiveRoles;
+  const result = await client.query(
+    `SELECT construction_site_id FROM ${tableName}
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, entityId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Der Datensatz wurde nicht gefunden.", 404, "site_entity_not_found");
+  }
+  return requireConstructionSiteAccess(
+    client,
+    context,
+    result.rows[0].construction_site_id,
+    effectiveRoles
+  );
+}
+
 async function requireAbsenceOfficeReviewer(client, context) {
   const roles = await activeRoleKeys(client, context);
-  if (![...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role))) {
+  if (
+    hasProjectScopedAccess(roles)
+    || ![...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role))
+  ) {
     throw new InputError(
       "Die erste Abwesenheitsprüfung ist nur für Büro und Planung freigeschaltet.",
       403,
@@ -1444,8 +1729,7 @@ async function requireVdeModuleEnabled(client, context) {
   }
 }
 
-function vdePermissions(roles, assigned) {
-  const planner = [...roles].some((role) => PLANNER_ROLES.has(role));
+function vdePermissions(roles, assigned, planner = hasFullPlannerAccess(roles)) {
   const fieldRole = roles.has("foreman") || roles.has("installer");
   return {
     read: planner || assigned,
@@ -1465,7 +1749,11 @@ async function vdeSiteAccess(
 ) {
   await requireVdeModuleEnabled(client, context);
   const roles = await activeRoleKeys(client, context);
-  const planner = [...roles].some((role) => PLANNER_ROLES.has(role));
+  const planner = hasFullPlannerAccess(roles)
+    || (
+      hasProjectScopedAccess(roles)
+      && await hasAssignedProjectForSite(client, context, constructionSiteId)
+    );
   let assigned = false;
   if (!planner) {
     const assignment = await client.query(
@@ -1486,7 +1774,7 @@ async function vdeSiteAccess(
     );
     assigned = assignment.rowCount === 1;
   }
-  const permissions = vdePermissions(roles, assigned);
+  const permissions = vdePermissions(roles, assigned, planner);
   if (!permissions.read) {
     throw new InputError(
       "Diese Baustelle ist dir für das VDE-Modul nicht zugewiesen.",
@@ -2036,10 +2324,14 @@ function siteDto(row) {
     creationSource: row.creation_source || "office",
     fieldReviewStatus: row.field_review_status || "not_required",
     fieldCreatedByName: row.field_created_by_name || null,
+    qrCode: row.qr_code || null,
     rowVersion: Number(row.row_version || 1),
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
     customerName: row.customer_name,
     projectName: row.project_name,
+    projectManagerIds: Array.isArray(row.project_manager_ids)
+      ? row.project_manager_ids
+      : [],
     address: {
       street: row.street,
       houseNumber: row.house_number,
@@ -2086,7 +2378,9 @@ function projectDto(row) {
     status: row.status,
     rowVersion: Number(row.row_version || 1),
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
-    siteCount: Number(row.site_count || 0)
+    siteCount: Number(row.site_count || 0),
+    projectManagerId: row.project_manager_id || null,
+    projectManagerName: row.project_manager_name || null
   };
 }
 
@@ -2101,6 +2395,8 @@ function documentDto(row) {
     sizeBytes: Number(row.size_bytes),
     sha256: row.sha256_hex,
     status: row.status,
+    mobileVisible: row.mobile_visible !== false,
+    offlinePriority: Boolean(row.offline_priority),
     rowVersion: Number(row.row_version),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
@@ -2183,6 +2479,10 @@ function siteReportDto(row) {
     customerSignatureName: row.customer_signature_name,
     finalDocumentId: row.final_document_id,
     finalDocumentFileName: row.final_document_file_name,
+    returnComment: row.return_comment || null,
+    returnedAt: row.returned_at ? new Date(row.returned_at).toISOString() : null,
+    returnedByName: row.returned_by_name || null,
+    returnCount: Number(row.return_count || 0),
     rowVersion: Number(row.row_version),
     createdAt: new Date(row.created_at).toISOString()
   };
@@ -2197,6 +2497,7 @@ function siteWorkspaceDocumentDto(row) {
     fileName: row.original_file_name,
     mimeType: row.mime_type,
     sizeBytes: Number(row.size_bytes),
+    offlinePriority: Boolean(row.offline_priority),
     createdAt: new Date(row.created_at).toISOString(),
     uploadedByName: row.uploaded_by_name
   };
@@ -2213,6 +2514,13 @@ function addUtcDays(date, days) {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
+}
+
+function monthBounds(date) {
+  const [year, month] = date.split("-").map(Number);
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const end = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  return { start, end };
 }
 
 function databaseDate(value) {
@@ -2259,7 +2567,7 @@ async function exportTimesheets(
   timeZone,
   { ownApprovedOnly = false, format = "xlsx" } = {}
 ) {
-  if (!ownApprovedOnly) await requirePlanner(client, context);
+  if (!ownApprovedOnly) await requireFullPlanner(client, context);
   const employeeId = ownApprovedOnly ? context.userId : parameters.employeeId;
   const [company, dayResult] = await Promise.all([
     client.query(
@@ -2722,6 +3030,24 @@ async function lockAssignmentAvailability(
      ORDER BY day.work_date`,
     [context.companyId, employeeId, startDate, endDate]
   );
+}
+
+async function lockAssignmentTargets(client, context, targets) {
+  const uniqueTargets = new Map();
+  targets.forEach(({ employeeId, workDate }) => {
+    uniqueTargets.set(`${employeeId}:${workDate}`, { employeeId, workDate });
+  });
+  for (const target of [...uniqueTargets.values()].sort((left, right) => (
+    left.employeeId.localeCompare(right.employeeId)
+      || left.workDate.localeCompare(right.workDate)
+  ))) {
+    await lockAssignmentAvailability(
+      client,
+      context,
+      target.employeeId,
+      target.workDate
+    );
+  }
 }
 
 async function assertNoApprovedFullDayAbsence(client, context, employeeId, workDate) {
@@ -3284,7 +3610,7 @@ async function getOwnTimeAccount(client, context, year, asOfDate) {
 }
 
 async function getAdminTimeAccounts(client, context, year, asOfDate) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const employees = await client.query(
     `SELECT id
      FROM users
@@ -3515,9 +3841,16 @@ async function createTimeAccountAdjustment(client, context, input, asOfDate) {
 
 async function adminOverview(client, context, date) {
   const roles = await requirePlanner(client, context);
+  const projectScopeRestricted = hasProjectScopedAccess(roles);
+  const projectScope = projectScopeRestricted
+    ? await assignedProjectIds(client, context)
+    : null;
   const weekStart = mondayFor(date);
   const weekEnd = addUtcDays(weekStart, 4);
   const reviewWeekEnd = addUtcDays(weekStart, 6);
+  const month = monthBounds(date);
+  const planningStart = month.start < weekStart ? month.start : weekStart;
+  const planningEnd = month.end > reviewWeekEnd ? month.end : reviewWeekEnd;
   const [
     employeeResult,
     customerResult,
@@ -3531,7 +3864,9 @@ async function adminOverview(client, context, date) {
     reportResult,
     workDayResult,
     correctionResult,
-    absenceResult
+    absenceResult,
+    planningTeamResult,
+    projectManagerResult
   ] = await Promise.all([
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
@@ -3596,10 +3931,27 @@ async function adminOverview(client, context, date) {
     ),
     client.query(
       `SELECT site.id, site.project_id, project.customer_id, site.site_number, site.name, site.installer_short_text,
+              site.qr_code,
               site.status, site.row_version, site.updated_at,
               site.creation_source, site.field_review_status,
               project.name AS project_name,
               COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
+              COALESCE(
+                (
+                  SELECT jsonb_agg(
+                    responsible.user_id
+                    ORDER BY responsible.is_primary DESC,
+                             responsible.assigned_at,
+                             responsible.id
+                  )
+                  FROM project_responsibles AS responsible
+                  WHERE responsible.company_id = site.company_id
+                    AND responsible.project_id = site.project_id
+                    AND responsible.responsibility = 'project_management'
+                    AND responsible.removed_at IS NULL
+                ),
+                '[]'::jsonb
+              ) AS project_manager_ids,
               CASE WHEN field_creator.id IS NULL THEN NULL
                    ELSE field_creator.first_name || ' ' || field_creator.last_name
               END AS field_created_by_name,
@@ -3629,7 +3981,9 @@ async function adminOverview(client, context, date) {
               assignment.work_date,
               assignment.sequence_number, assignment.planned_start_time::TEXT,
               assignment.planned_duration_minutes, assignment.comment,
+              assignment.status, assignment.planning_template_key,
               assignment.report_responsible, assignment.report_responsibility_source,
+              assignment.row_version,
               account.first_name, account.last_name, site.name AS site_name
        FROM site_assignments AS assignment
        JOIN users AS account
@@ -3640,12 +3994,13 @@ async function adminOverview(client, context, date) {
          AND assignment.work_date BETWEEN $2 AND $3
          AND assignment.status IN ('draft', 'released')
        ORDER BY assignment.work_date, LOWER(account.last_name), LOWER(account.first_name), assignment.sequence_number`,
-      [context.companyId, weekStart, weekEnd]
+      [context.companyId, planningStart, planningEnd]
     ),
     client.query(
       `SELECT document.id, document.document_number, document.title, document.category,
               document.original_file_name, document.mime_type, document.size_bytes,
-              document.sha256_hex, document.status, document.row_version,
+              document.sha256_hex, document.status, document.mobile_visible,
+              document.offline_priority, document.row_version,
               document.created_at, document.updated_at,
               uploader.first_name || ' ' || uploader.last_name AS uploaded_by_name,
               COALESCE(
@@ -3723,9 +4078,11 @@ async function adminOverview(client, context, date) {
               report.site_assignment_id, report.client_report_id,
               report.status, report.approved_at, report.employee_signature_name,
               report.customer_signature_name, report.final_document_id,
+              report.return_comment, report.returned_at, report.return_count,
               report.row_version, report.created_at,
               author.first_name || ' ' || author.last_name AS author_name,
               approver.first_name || ' ' || approver.last_name AS approved_by_name,
+              returned_by.first_name || ' ' || returned_by.last_name AS returned_by_name,
               document.original_file_name AS source_document_file_name,
               final_document.original_file_name AS final_document_file_name
        FROM site_reports AS report
@@ -3735,6 +4092,9 @@ async function adminOverview(client, context, date) {
          ON document.company_id = report.company_id AND document.id = report.source_document_id
        LEFT JOIN users AS approver
          ON approver.company_id = report.company_id AND approver.id = report.approved_by_user_id
+       LEFT JOIN users AS returned_by
+         ON returned_by.company_id = report.company_id
+        AND returned_by.id = report.returned_by_user_id
        LEFT JOIN documents AS final_document
          ON final_document.company_id = report.company_id AND final_document.id = report.final_document_id
        WHERE report.company_id = $1
@@ -3839,7 +4199,48 @@ async function adminOverview(client, context, date) {
          LOWER(employee.last_name),
          LOWER(employee.first_name),
          request.created_at`,
-      [context.companyId, weekStart, reviewWeekEnd]
+      [context.companyId, planningStart, planningEnd]
+    ),
+    client.query(
+      `SELECT team.id, team.name, team.status, team.row_version,
+              team.created_at, team.updated_at,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'userId', member.user_id,
+                    'employeeName', account.first_name || ' ' || account.last_name
+                  )
+                  ORDER BY LOWER(account.last_name), LOWER(account.first_name), member.user_id
+                ) FILTER (WHERE member.user_id IS NOT NULL),
+                '[]'::jsonb
+              ) AS members
+       FROM planning_teams AS team
+       LEFT JOIN planning_team_members AS member
+         ON member.company_id = team.company_id
+        AND member.planning_team_id = team.id
+        AND member.ended_at IS NULL
+       LEFT JOIN users AS account
+         ON account.company_id = member.company_id
+        AND account.id = member.user_id
+       WHERE team.company_id = $1
+       GROUP BY team.id
+       ORDER BY CASE team.status WHEN 'active' THEN 1 ELSE 2 END, LOWER(team.name), team.id`,
+      [context.companyId]
+    ),
+    client.query(
+      `SELECT responsible.project_id,
+              responsible.user_id AS project_manager_id,
+              account.first_name || ' ' || account.last_name AS project_manager_name
+       FROM project_responsibles AS responsible
+       JOIN users AS account
+         ON account.company_id = responsible.company_id
+        AND account.id = responsible.user_id
+       WHERE responsible.company_id = $1
+         AND responsible.responsibility = 'project_management'
+         AND responsible.removed_at IS NULL
+       ORDER BY responsible.project_id, responsible.is_primary DESC,
+                responsible.assigned_at, responsible.id`,
+      [context.companyId]
     )
   ]);
 
@@ -3854,8 +4255,11 @@ async function adminOverview(client, context, date) {
       ? null
       : Number(row.planned_duration_minutes),
     comment: row.comment,
+    status: row.status,
+    planningTeamId: row.planning_template_key || null,
     reportResponsible: row.report_responsible,
     reportResponsibilitySource: row.report_responsibility_source,
+    rowVersion: Number(row.row_version),
     employeeName: `${row.first_name} ${row.last_name}`,
     siteName: row.site_name
   }));
@@ -3874,38 +4278,104 @@ async function adminOverview(client, context, date) {
     )
     : { rows: [] };
 
+  const managerByProject = new Map();
+  projectManagerResult.rows.forEach((manager) => {
+    if (!managerByProject.has(manager.project_id)) {
+      managerByProject.set(manager.project_id, manager);
+    }
+  });
+  const allProjects = projectResult.rows.map((project) => projectDto({
+    ...project,
+    ...(managerByProject.get(project.id) || {})
+  }));
+  const projects = projectScopeRestricted
+    ? allProjects.filter((project) => projectScope.has(project.id))
+    : allProjects;
+  const visibleProjectIds = new Set(projects.map((project) => project.id));
+  const allSites = siteResult.rows.map(siteDto);
+  const sites = projectScopeRestricted
+    ? allSites.filter((site) => visibleProjectIds.has(site.projectId))
+    : allSites;
+  const visibleSiteIds = new Set(sites.map((site) => site.id));
+  const visibleCustomerIds = new Set(projects.map((project) => project.customerId));
+  const customers = customerResult.rows
+    .map(customerDto)
+    .filter((customer) => !projectScopeRestricted || visibleCustomerIds.has(customer.id))
+    .map((customer) => projectScopeRestricted ? {
+      ...customer,
+      projectCount: projects.filter((project) => project.customerId === customer.id).length
+    } : customer);
+  const documents = documentResult.rows
+    .map(documentDto)
+    .map((document) => projectScopeRestricted ? {
+      ...document,
+      links: document.links.filter((link) => (
+        (link.entityType === "construction_site" && visibleSiteIds.has(link.constructionSiteId))
+        || (link.entityType === "project" && visibleProjectIds.has(link.projectId))
+        || (link.entityType === "customer" && visibleCustomerIds.has(link.customerId))
+      ))
+    } : document)
+    .filter((document) => !projectScopeRestricted || document.links.length > 0);
+  const visibleWeekAssignments = projectScopeRestricted
+    ? weekAssignments.filter((assignment) => visibleSiteIds.has(assignment.constructionSiteId))
+    : weekAssignments;
+  const onlyVisibleSiteRecords = (rows, mapper) => rows
+    .filter((row) => !projectScopeRestricted || visibleSiteIds.has(row.construction_site_id))
+    .map(mapper);
+
   return {
     date,
     weekStart,
+    planningStart,
+    planningEnd,
     canCreateManagementRoles: [...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role)),
-    canReviewAbsenceOffice: [...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role)),
+    projectScopeRestricted,
+    canReviewAbsenceOffice: !projectScopeRestricted
+      && [...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role)),
     canApproveAbsenceManagement: [...roles].some(
       (role) => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role)
     ),
     employees: employeeResult.rows.map(employeeDto),
-    customers: customerResult.rows.map(customerDto),
-    projects: projectResult.rows.map(projectDto),
-    sites: siteResult.rows.map(siteDto),
-    documents: documentResult.rows.map(documentDto),
-    siteTasks: taskResult.rows.map(siteTaskDto),
-    siteMaterials: materialResult.rows.map(siteMaterialDto),
-    siteNotes: noteResult.rows.map(siteNoteDto),
-    siteReports: reportResult.rows.map(siteReportDto),
+    customers,
+    projects,
+    sites,
+    planningTeams: planningTeamResult.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      rowVersion: Number(row.row_version),
+      members: row.members
+    })),
+    documents,
+    siteTasks: onlyVisibleSiteRecords(taskResult.rows, siteTaskDto),
+    siteMaterials: onlyVisibleSiteRecords(materialResult.rows, siteMaterialDto),
+    siteNotes: onlyVisibleSiteRecords(noteResult.rows, siteNoteDto),
+    siteReports: onlyVisibleSiteRecords(reportResult.rows, siteReportDto),
     modules,
-    vdeInspections: vdeInspectionResult.rows.map((inspection) => (
-      vdeInspectionDto(inspection)
+    vdeInspections: onlyVisibleSiteRecords(
+      vdeInspectionResult.rows,
+      (inspection) => vdeInspectionDto(inspection)
+    ),
+    workDays: projectScopeRestricted ? [] : workDayResult.rows.map(adminWorkDayDto),
+    timeCorrections: projectScopeRestricted
+      ? []
+      : correctionResult.rows.map(timeEntryCorrectionDto),
+    absences: projectScopeRestricted ? [] : absenceResult.rows.map(absenceRequestDto),
+    assignments: visibleWeekAssignments.filter((assignment) => assignment.workDate === date),
+    weekAssignments: visibleWeekAssignments.filter((assignment) => (
+      assignment.workDate >= weekStart && assignment.workDate <= weekEnd
     )),
-    workDays: workDayResult.rows.map(adminWorkDayDto),
-    timeCorrections: correctionResult.rows.map(timeEntryCorrectionDto),
-    absences: absenceResult.rows.map(absenceRequestDto),
-    assignments: weekAssignments.filter((assignment) => assignment.workDate === date),
-    weekAssignments
+    planningAssignments: visibleWeekAssignments
   };
 }
 
 async function requireSiteWorkspaceAccess(client, context, constructionSiteId, date) {
   const roles = await activeRoleKeys(client, context);
-  const canManage = [...roles].some((role) => PLANNER_ROLES.has(role));
+  const canManage = hasFullPlannerAccess(roles)
+    || (
+      hasProjectScopedAccess(roles)
+      && await hasAssignedProjectForSite(client, context, constructionSiteId)
+    );
   const assignment = await client.query(
     `SELECT id, sequence_number, planned_start_time::TEXT,
             planned_duration_minutes, comment, report_responsible
@@ -3953,6 +4423,7 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
   const siteResult = await client.query(
     `SELECT site.id, site.project_id, project.customer_id, site.site_number,
             site.name, site.installer_short_text, site.status, site.row_version,
+            site.qr_code,
             site.updated_at, project.name AS project_name,
             COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name,
             location.street, location.house_number, location.postal_code, location.city
@@ -4007,7 +4478,7 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
     client.query(
       `SELECT document.id, document.document_number, document.title, document.category,
               document.original_file_name, document.mime_type, document.size_bytes,
-              document.created_at,
+              document.offline_priority, document.created_at,
               uploader.first_name || ' ' || uploader.last_name AS uploaded_by_name
        FROM documents AS document
        JOIN users AS uploader
@@ -4019,6 +4490,7 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
         AND link.construction_site_id = $2
        WHERE document.company_id = $1
          AND document.status = 'active'
+         AND document.mobile_visible
        ORDER BY document.created_at DESC, document.document_number DESC`,
       [context.companyId, constructionSiteId]
     ),
@@ -4071,9 +4543,11 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
               report.site_assignment_id, report.client_report_id,
               report.status, report.approved_at, report.employee_signature_name,
               report.customer_signature_name, report.final_document_id,
+              report.return_comment, report.returned_at, report.return_count,
               report.row_version, report.created_at,
               author.first_name || ' ' || author.last_name AS author_name,
               approver.first_name || ' ' || approver.last_name AS approved_by_name,
+              returned_by.first_name || ' ' || returned_by.last_name AS returned_by_name,
               document.original_file_name AS source_document_file_name,
               final_document.original_file_name AS final_document_file_name
        FROM site_reports AS report
@@ -4083,14 +4557,21 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
          ON document.company_id = report.company_id AND document.id = report.source_document_id
        LEFT JOIN users AS approver
          ON approver.company_id = report.company_id AND approver.id = report.approved_by_user_id
+       LEFT JOIN users AS returned_by
+         ON returned_by.company_id = report.company_id
+        AND returned_by.id = report.returned_by_user_id
        LEFT JOIN documents AS final_document
          ON final_document.company_id = report.company_id AND final_document.id = report.final_document_id
        WHERE report.company_id = $1
          AND report.construction_site_id = $2
          AND report.status <> 'archived'
-         AND ($3::BOOLEAN OR report.status IN ('submitted', 'approved'))
+         AND (
+           $3::BOOLEAN
+           OR report.status IN ('submitted', 'approved')
+           OR (report.status = 'returned' AND report.author_user_id = $4)
+         )
        ORDER BY report.work_date DESC, report.created_at DESC`,
-      [context.companyId, constructionSiteId, access.canLead]
+      [context.companyId, constructionSiteId, access.canLead, context.userId]
     )
   ]);
   const modules = await loadCompanyModules(client, context);
@@ -4138,7 +4619,7 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
       vde: {
         enabled: vdeEnabled,
         permissions: vdeEnabled
-          ? vdePermissions(access.roles, true)
+          ? vdePermissions(access.roles, true, access.canManage)
           : {
             read: false,
             create: false,
@@ -4158,7 +4639,8 @@ async function getDocumentRecord(client, context, documentId) {
   const result = await client.query(
     `SELECT document.id, document.document_number, document.title, document.category,
             document.original_file_name, document.mime_type, document.size_bytes,
-            document.sha256_hex, document.status, document.row_version,
+            document.sha256_hex, document.status, document.mobile_visible,
+            document.offline_priority, document.row_version,
             document.created_at, document.updated_at,
             uploader.first_name || ' ' || uploader.last_name AS uploaded_by_name,
             COALESCE(
@@ -4294,11 +4776,14 @@ async function insertDocumentLinks(client, context, documentId, targets) {
 async function storeDocument(client, context, input) {
   const targets = await resolveDocumentTargets(client, context, input);
   const sha256 = createHash("sha256").update(input.content).digest("hex");
+  const mobileVisible = input.mobileVisible ?? true;
+  const offlinePriority = input.offlinePriority ?? false;
   const inserted = await client.query(
     `INSERT INTO documents (
        company_id, document_number, title, category, original_file_name,
-       mime_type, size_bytes, sha256_hex, uploaded_by_user_id
-     ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8)
+       mime_type, size_bytes, sha256_hex, uploaded_by_user_id,
+       mobile_visible, offline_priority
+     ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (company_id, sha256_hex) DO NOTHING
      RETURNING id`,
     [
@@ -4309,7 +4794,9 @@ async function storeDocument(client, context, input) {
       input.mimeType,
       input.content.length,
       sha256,
-      context.userId
+      context.userId,
+      mobileVisible,
+      offlinePriority
     ]
   );
 
@@ -4328,7 +4815,9 @@ async function storeDocument(client, context, input) {
     documentId = existing.rows[0].id;
     if (existing.rows[0].status === "archived") {
       await client.query(
-        "UPDATE documents SET status = 'active' WHERE company_id = $1 AND id = $2",
+        `UPDATE documents
+         SET status = 'active'
+         WHERE company_id = $1 AND id = $2`,
         [context.companyId, documentId]
       );
     }
@@ -4345,7 +4834,8 @@ async function storeDocument(client, context, input) {
 }
 
 async function createDocument(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireDocumentTargetAccess(client, context, input, roles);
   return storeDocument(client, context, input);
 }
 
@@ -4355,7 +4845,8 @@ async function createSitePhoto(client, context, constructionSiteId, date, input)
 }
 
 async function getDocumentContent(client, context, documentId) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireLinkedDocumentAccess(client, context, documentId, roles);
   const result = await client.query(
     `SELECT document.original_file_name, document.mime_type, content.content
      FROM documents AS document
@@ -4388,7 +4879,8 @@ async function getSiteDocumentContent(client, context, constructionSiteId, docum
       AND link.construction_site_id = $2
      WHERE document.company_id = $1
        AND document.id = $3
-       AND document.status = 'active'`,
+       AND document.status = 'active'
+       AND document.mobile_visible`,
     [context.companyId, constructionSiteId, documentId]
   );
   if (result.rowCount !== 1) {
@@ -4402,9 +4894,10 @@ async function getSiteDocumentContent(client, context, constructionSiteId, docum
 }
 
 async function updateDocumentStatus(client, context, documentId, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireLinkedDocumentAccess(client, context, documentId, roles);
   const current = await client.query(
-    `SELECT status, row_version
+    `SELECT status, mobile_visible, offline_priority, row_version
      FROM documents
      WHERE company_id = $1 AND id = $2
      FOR UPDATE`,
@@ -4420,12 +4913,38 @@ async function updateDocumentStatus(client, context, documentId, input) {
       "row_version_conflict"
     );
   }
-  if (current.rows[0].status !== input.status) {
-    await client.query(
-      `UPDATE documents SET status = $3
-       WHERE company_id = $1 AND id = $2 AND row_version = $4`,
-      [context.companyId, documentId, input.status, input.rowVersion]
+  const nextStatus = input.status ?? current.rows[0].status;
+  const nextMobileVisible = input.mobileVisible ?? current.rows[0].mobile_visible;
+  const nextOfflinePriority = nextMobileVisible
+    ? input.offlinePriority ?? current.rows[0].offline_priority
+    : false;
+  if (
+    current.rows[0].status !== nextStatus
+    || current.rows[0].mobile_visible !== nextMobileVisible
+    || current.rows[0].offline_priority !== nextOfflinePriority
+  ) {
+    const updated = await client.query(
+      `UPDATE documents
+       SET status = $3,
+           mobile_visible = $4,
+           offline_priority = $5
+       WHERE company_id = $1 AND id = $2 AND row_version = $6`,
+      [
+        context.companyId,
+        documentId,
+        nextStatus,
+        nextMobileVisible,
+        nextOfflinePriority,
+        input.rowVersion
+      ]
     );
+    if (updated.rowCount !== 1) {
+      throw new InputError(
+        "Das Dokument wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
+        409,
+        "row_version_conflict"
+      );
+    }
   }
   return getDocumentRecord(client, context, documentId);
 }
@@ -4457,7 +4976,13 @@ async function getSiteTaskRecord(client, context, taskId) {
 }
 
 async function createSiteTask(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
   await requireActiveSite(client, context, input.constructionSiteId);
   if (input.assignedUserId) {
     const assignee = await client.query(
@@ -4479,7 +5004,8 @@ async function createSiteTask(client, context, input) {
 }
 
 async function updateSiteTask(client, context, taskId, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireScopedEntitySiteAccess(client, context, "site_tasks", taskId, roles);
   const result = await client.query(
     `UPDATE site_tasks
      SET status = $3, changed_by_user_id = $4
@@ -4592,7 +5118,13 @@ async function getSiteMaterialRecord(client, context, materialId) {
 }
 
 async function createSiteMaterial(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
   await requireActiveSite(client, context, input.constructionSiteId);
   const result = await client.query(
     `INSERT INTO site_material_entries (
@@ -4607,7 +5139,14 @@ async function createSiteMaterial(client, context, input) {
 }
 
 async function updateSiteMaterial(client, context, materialId, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireScopedEntitySiteAccess(
+    client,
+    context,
+    "site_material_entries",
+    materialId,
+    roles
+  );
   const result = await client.query(
     `UPDATE site_material_entries
      SET status = $3, changed_by_user_id = $4
@@ -4683,7 +5222,13 @@ async function storeSiteNote(client, context, input) {
 }
 
 async function createAdminSiteNote(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
   await requireActiveSite(client, context, input.constructionSiteId);
   return storeSiteNote(client, context, input);
 }
@@ -4702,9 +5247,11 @@ async function getSiteReportRecord(client, context, reportId) {
             report.site_assignment_id, report.client_report_id,
             report.status, report.approved_at, report.employee_signature_name,
             report.customer_signature_name, report.final_document_id,
+            report.return_comment, report.returned_at, report.return_count,
             report.row_version, report.created_at,
             author.first_name || ' ' || author.last_name AS author_name,
             approver.first_name || ' ' || approver.last_name AS approved_by_name,
+            returned_by.first_name || ' ' || returned_by.last_name AS returned_by_name,
             document.original_file_name AS source_document_file_name,
             final_document.original_file_name AS final_document_file_name
      FROM site_reports AS report
@@ -4714,6 +5261,9 @@ async function getSiteReportRecord(client, context, reportId) {
        ON document.company_id = report.company_id AND document.id = report.source_document_id
      LEFT JOIN users AS approver
        ON approver.company_id = report.company_id AND approver.id = report.approved_by_user_id
+     LEFT JOIN users AS returned_by
+       ON returned_by.company_id = report.company_id
+      AND returned_by.id = report.returned_by_user_id
      LEFT JOIN documents AS final_document
        ON final_document.company_id = report.company_id AND final_document.id = report.final_document_id
      WHERE report.company_id = $1 AND report.id = $2`,
@@ -4759,7 +5309,79 @@ async function resolveReportPersonnel(client, context, constructionSiteId, workD
   });
 }
 
-function structuredReportData(input, personnel) {
+async function resolveReportPhotos(client, context, constructionSiteId, photos) {
+  if (photos.length === 0) return [];
+  const requestedIds = photos.map((photo) => photo.documentId);
+  const result = await client.query(
+    `SELECT document.id, document.title, document.mime_type
+     FROM documents AS document
+     JOIN document_links AS link
+       ON link.company_id = document.company_id
+      AND link.document_id = document.id
+      AND link.entity_type = 'construction_site'
+      AND link.construction_site_id = $2
+     WHERE document.company_id = $1
+       AND document.id = ANY($3::UUID[])
+       AND document.status = 'active'
+       AND document.category = 'photo'
+       AND document.mime_type IN ('image/jpeg', 'image/png')`,
+    [context.companyId, constructionSiteId, requestedIds]
+  );
+  const records = new Map(result.rows.map((row) => [row.id, row]));
+  if (records.size !== requestedIds.length) {
+    throw new InputError(
+      "Mindestens ein Berichtsfoto gehört nicht als JPG oder PNG zu dieser Baustelle.",
+      409,
+      "report_photo_conflict"
+    );
+  }
+  return photos.map((photo) => {
+    const record = records.get(photo.documentId);
+    return {
+      documentId: photo.documentId,
+      title: record.title,
+      caption: photo.caption,
+      mimeType: record.mime_type
+    };
+  });
+}
+
+async function loadReportPhotoContents(client, context, structuredData) {
+  const photos = Array.isArray(structuredData?.photos) ? structuredData.photos : [];
+  if (photos.length === 0) return [];
+  const requestedIds = photos.map((photo) => photo.documentId);
+  const result = await client.query(
+    `SELECT document.id, document.title, document.mime_type, content.content
+     FROM documents AS document
+     JOIN document_contents AS content
+       ON content.company_id = document.company_id
+      AND content.document_id = document.id
+     WHERE document.company_id = $1
+       AND document.id = ANY($2::UUID[])
+       AND document.mime_type IN ('image/jpeg', 'image/png')`,
+    [context.companyId, requestedIds]
+  );
+  const records = new Map(result.rows.map((row) => [row.id, row]));
+  if (records.size !== requestedIds.length) {
+    throw new InputError(
+      "Mindestens ein Berichtsfoto ist nicht mehr vollständig verfügbar.",
+      409,
+      "report_photo_unavailable"
+    );
+  }
+  return photos.flatMap((photo) => {
+    const record = records.get(photo.documentId);
+    return record ? [{
+      documentId: photo.documentId,
+      title: photo.title || record.title,
+      caption: photo.caption,
+      mimeType: record.mime_type,
+      content: record.content
+    }] : [];
+  });
+}
+
+function structuredReportData(input, personnel, photos = []) {
   return {
     workPerformed: input.workPerformed,
     obstructions: input.obstructions,
@@ -4768,12 +5390,19 @@ function structuredReportData(input, personnel) {
     materialsAndEquipment: input.materialsAndEquipment,
     agreements: input.agreements,
     incidents: input.incidents,
-    personnel
+    personnel,
+    photos
   };
 }
 
 async function createSiteReport(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
   await requireActiveSite(client, context, input.constructionSiteId);
   if (input.sourceDocumentId) {
     const document = await client.query(
@@ -4798,6 +5427,12 @@ async function createSiteReport(client, context, input) {
     input.workDate,
     input.personnel
   );
+  const photos = await resolveReportPhotos(
+    client,
+    context,
+    input.constructionSiteId,
+    input.photos
+  );
   const result = await client.query(
     `INSERT INTO site_reports (
        company_id, construction_site_id, report_number, report_type, work_date,
@@ -4807,7 +5442,7 @@ async function createSiteReport(client, context, input) {
      RETURNING id`,
     [context.companyId, input.constructionSiteId, input.reportType, input.workDate,
       input.sourceMode, input.summary, input.details,
-      JSON.stringify(structuredReportData(input, personnel)),
+      JSON.stringify(structuredReportData(input, personnel, photos)),
       input.sourceDocumentId, context.userId]
   );
   return getSiteReportRecord(client, context, result.rows[0].id);
@@ -4837,6 +5472,10 @@ async function createMobileSiteReport(client, context, input) {
       && (row.structured_data?.materialsAndEquipment || null) === input.materialsAndEquipment
       && (row.structured_data?.agreements || null) === input.agreements
       && (row.structured_data?.incidents || null) === input.incidents
+      && JSON.stringify((row.structured_data?.photos || []).map((photo) => ({
+        documentId: photo.documentId,
+        caption: photo.caption || null
+      }))) === JSON.stringify(input.photos)
       && JSON.stringify((row.structured_data?.personnel || []).map((entry) => ({
         userId: entry.userId,
         minutes: entry.minutes
@@ -4881,11 +5520,17 @@ async function createMobileSiteReport(client, context, input) {
     input.workDate,
     input.personnel
   );
+  const photos = await resolveReportPhotos(
+    client,
+    context,
+    input.constructionSiteId,
+    input.photos
+  );
 
   const existingReport = await client.query(
     `SELECT id FROM site_reports
      WHERE company_id = $1 AND construction_site_id = $3 AND work_date = $4
-       AND status IN ('submitted', 'approved')
+       AND status IN ('submitted', 'approved', 'returned')
      ORDER BY (site_assignment_id = $2) DESC NULLS LAST, created_at DESC
      LIMIT 1`,
     [context.companyId, assignment.rows[0].id, input.constructionSiteId, input.workDate]
@@ -4906,7 +5551,8 @@ async function createMobileSiteReport(client, context, input) {
      ) VALUES ($1, $2, NULL, $3, $4, 'digital', $5, $6, $7::JSONB, NULL, 'submitted', $8, $9, $10)
      RETURNING id`,
     [context.companyId, input.constructionSiteId, input.reportType, input.workDate,
-      input.summary, input.details, JSON.stringify(structuredReportData(input, personnel)),
+      input.summary, input.details,
+      JSON.stringify(structuredReportData(input, personnel, photos)),
       context.userId, assignment.rows[0].id, input.clientReportId]
   );
   return { siteReport: await getSiteReportRecord(client, context, result.rows[0].id), idempotent: false };
@@ -4925,8 +5571,255 @@ async function readCompanyLogo(staticDirectory, logoObjectKey) {
   }
 }
 
+async function previewSiteReport(client, context, reportId, staticDirectory) {
+  const roles = await requirePlanner(client, context);
+  await requireScopedEntitySiteAccess(client, context, "site_reports", reportId, roles);
+  const result = await client.query(
+    `SELECT report.id, report.report_number, report.report_type, report.work_date,
+            report.summary, report.details, report.structured_data, report.status,
+            author.first_name || ' ' || author.last_name AS author_name,
+            company.legal_name, company.display_name, company.street AS company_street,
+            company.house_number AS company_house_number,
+            company.postal_code AS company_postal_code,
+            company.city AS company_city, company.phone AS company_phone,
+            company.email AS company_email, company.website AS company_website,
+            company.logo_object_key,
+            site.site_number, site.name AS site_name,
+            location.street AS site_street, location.house_number AS site_house_number,
+            location.postal_code AS site_postal_code, location.city AS site_city,
+            project.project_number, project.name AS project_name,
+            COALESCE(customer.company_name, customer.first_name || ' ' || customer.last_name) AS customer_name
+     FROM site_reports AS report
+     JOIN users AS author
+       ON author.company_id = report.company_id AND author.id = report.author_user_id
+     JOIN companies AS company ON company.id = report.company_id
+     JOIN construction_sites AS site
+       ON site.company_id = report.company_id AND site.id = report.construction_site_id
+     JOIN projects AS project
+       ON project.company_id = site.company_id AND project.id = site.project_id
+     JOIN customers AS customer
+       ON customer.company_id = project.company_id AND customer.id = project.customer_id
+     LEFT JOIN customer_locations AS location
+       ON location.company_id = site.company_id AND location.id = site.customer_location_id
+     WHERE report.company_id = $1
+       AND report.id = $2
+       AND report.status IN ('submitted', 'returned')`,
+    [context.companyId, reportId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Für diesen Bericht ist keine offene Vorschau verfügbar.",
+      409,
+      "site_report_preview_unavailable"
+    );
+  }
+  const row = result.rows[0];
+  const generatedAt = new Date().toISOString();
+  const companySnapshot = {
+    legalName: row.legal_name,
+    displayName: row.display_name,
+    street: row.company_street,
+    houseNumber: row.company_house_number,
+    postalCode: row.company_postal_code,
+    city: row.company_city,
+    phone: row.company_phone,
+    email: row.company_email,
+    website: row.company_website,
+    logoObjectKey: row.logo_object_key
+  };
+  const siteAddress = [
+    [row.site_street, row.site_house_number].filter(Boolean).join(" "),
+    [row.site_postal_code, row.site_city].filter(Boolean).join(" ")
+  ].filter(Boolean).join(", ");
+  const pdf = await buildFinalReportPdf({
+    report: {
+      id: row.id,
+      number: row.report_number,
+      reportType: row.report_type,
+      workDate: databaseDate(row.work_date),
+      summary: row.summary,
+      details: row.details,
+      structuredData: row.structured_data,
+      authorName: row.author_name
+    },
+    company: companySnapshot,
+    context: {
+      customerName: row.customer_name,
+      projectNumber: row.project_number,
+      projectName: row.project_name,
+      siteNumber: row.site_number,
+      siteName: row.site_name,
+      siteAddress
+    },
+    finalizedAt: generatedAt,
+    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key),
+    photos: await loadReportPhotoContents(client, context, row.structured_data),
+    preview: true
+  });
+  return {
+    fileName: `${row.report_number}-${databaseDate(row.work_date)}-Vorschau.pdf`,
+    mimeType: "application/pdf",
+    content: pdf
+  };
+}
+
+async function returnSiteReport(client, context, reportId, input) {
+  const roles = await requirePlanner(client, context);
+  await requireScopedEntitySiteAccess(client, context, "site_reports", reportId, roles);
+  const result = await client.query(
+    `UPDATE site_reports
+     SET status = 'returned',
+         returned_by_user_id = $3,
+         returned_at = CURRENT_TIMESTAMP,
+         return_comment = $4,
+         return_count = return_count + 1
+     WHERE company_id = $1
+       AND id = $2
+       AND status = 'submitted'
+       AND row_version = $5
+     RETURNING id`,
+    [context.companyId, reportId, context.userId, input.comment, input.rowVersion]
+  );
+  if (result.rowCount !== 1) {
+    const current = await client.query(
+      `SELECT status, row_version
+       FROM site_reports
+       WHERE company_id = $1 AND id = $2`,
+      [context.companyId, reportId]
+    );
+    if (current.rowCount !== 1) {
+      throw new InputError("Der Bericht wurde nicht gefunden.", 404, "site_report_not_found");
+    }
+    if (current.rows[0].status !== "submitted") {
+      throw new InputError(
+        "Nur ein Bericht mit offener Unterschrift kann zurückgegeben werden.",
+        409,
+        "site_report_state_conflict"
+      );
+    }
+    throw new InputError(
+      "Der Bericht wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return getSiteReportRecord(client, context, reportId);
+}
+
+async function reviseMobileSiteReport(client, context, reportId, input) {
+  const current = await client.query(
+    `SELECT id, construction_site_id, work_date, author_user_id, status, row_version
+     FROM site_reports
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, reportId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Bericht wurde nicht gefunden.", 404, "site_report_not_found");
+  }
+  const row = current.rows[0];
+  if (row.status !== "returned") {
+    throw new InputError(
+      "Nur ein zurückgegebener Bericht kann überarbeitet werden.",
+      409,
+      "site_report_state_conflict"
+    );
+  }
+  if (row.author_user_id !== context.userId) {
+    throw new InputError(
+      "Nur der ursprüngliche Verfasser darf den Bericht überarbeiten.",
+      403,
+      "report_revision_forbidden"
+    );
+  }
+  if (
+    row.construction_site_id !== input.constructionSiteId
+    || databaseDate(row.work_date) !== input.workDate
+  ) {
+    throw new InputError(
+      "Baustelle und Arbeitstag eines Berichts sind unveränderlich.",
+      409,
+      "report_revision_conflict"
+    );
+  }
+  if (Number(row.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der Bericht wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  const access = await requireSiteWorkspaceAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    input.workDate
+  );
+  if (!access.reportResponsible) {
+    throw new InputError(
+      "Du bist für diesen Baustellentag nicht berichtsverantwortlich.",
+      403,
+      "report_revision_forbidden"
+    );
+  }
+  const personnel = await resolveReportPersonnel(
+    client,
+    context,
+    input.constructionSiteId,
+    input.workDate,
+    input.personnel
+  );
+  const photos = await resolveReportPhotos(
+    client,
+    context,
+    input.constructionSiteId,
+    input.photos
+  );
+  if (
+    input.personnelProvided
+    && !input.personnel.some((entry) => entry.userId === context.userId)
+  ) {
+    throw new InputError(
+      "Der verantwortliche Vorarbeiter muss mit seinen Stunden im Bericht enthalten sein.",
+      409,
+      "report_author_hours_required"
+    );
+  }
+  const update = await client.query(
+    `UPDATE site_reports
+     SET report_type = $3,
+         summary = $4,
+         details = $5,
+         structured_data = $6::JSONB,
+         status = 'submitted'
+     WHERE company_id = $1
+       AND id = $2
+       AND status = 'returned'
+       AND row_version = $7
+     RETURNING id`,
+    [
+      context.companyId,
+      reportId,
+      input.reportType,
+      input.summary,
+      input.details,
+      JSON.stringify(structuredReportData(input, personnel, photos)),
+      input.rowVersion
+    ]
+  );
+  if (update.rowCount !== 1) {
+    throw new InputError(
+      "Der Bericht wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return getSiteReportRecord(client, context, reportId);
+}
+
 async function finalizeSiteReport(client, context, reportId, input, staticDirectory) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireScopedEntitySiteAccess(client, context, "site_reports", reportId, roles);
   const result = await client.query(
     `SELECT report.id, report.report_number, report.report_type, report.work_date,
             report.summary, report.details, report.structured_data,
@@ -5011,7 +5904,8 @@ async function finalizeSiteReport(client, context, reportId, input, staticDirect
       customer: { name: input.customerSignatureName, data: input.customerSignatureData }
     },
     finalizedAt,
-    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key)
+    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key),
+    photos: await loadReportPhotoContents(client, context, row.structured_data)
   });
   const reportLabel = row.report_type === "daily" ? "Bautagesbericht" : "Montageschein";
   const finalDocument = await createDocument(client, context, {
@@ -5053,7 +5947,7 @@ function publicAssignmentImportPreview(preview) {
 }
 
 async function prepareAssignmentImport(client, context, plan, mappings) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const [employeeResult, siteResult, existingResult] = await Promise.all([
     client.query(
       `SELECT id, personnel_number, first_name, last_name
@@ -5212,7 +6106,7 @@ function publicSiteImportPreview(preview) {
 }
 
 async function prepareSiteImport(client, context, plan) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const [siteResult, customerResult] = await Promise.all([
     client.query(
       `SELECT id, site_number, name
@@ -5235,7 +6129,7 @@ async function prepareSiteImport(client, context, plan) {
 }
 
 async function importSitesFromWorkbook(client, context, plan) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`sites:${context.companyId}`]
@@ -5336,7 +6230,7 @@ async function getEmployeeRecord(client, context, employeeId) {
 }
 
 async function createEmployee(client, context, input) {
-  const roles = await requirePlanner(client, context);
+  const roles = await requireFullPlanner(client, context);
   if (
     MANAGEMENT_ROLES.has(input.role)
     && ![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))
@@ -5395,7 +6289,7 @@ async function createEmployee(client, context, input) {
 }
 
 async function updateEmployee(client, context, employeeId, input) {
-  const actorRoles = await requirePlanner(client, context);
+  const actorRoles = await requireFullPlanner(client, context);
   if (
     MANAGEMENT_ROLES.has(input.role)
     && ![...actorRoles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))
@@ -5544,7 +6438,7 @@ async function updateEmployee(client, context, employeeId, input) {
 }
 
 async function createCustomer(client, context, input) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const existing = await client.query(
     `SELECT customer_type, company_name, first_name, last_name
      FROM customers
@@ -5591,7 +6485,7 @@ async function createCustomer(client, context, input) {
 }
 
 async function updateCustomer(client, context, customerId, input) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const current = await client.query(
     `SELECT id, status, row_version
      FROM customers
@@ -5691,8 +6585,109 @@ async function updateCustomer(client, context, customerId, input) {
   return customerDto(updated.rows[0]);
 }
 
+async function setProjectManager(client, context, projectId, projectManagerId) {
+  const project = await client.query(
+    `SELECT id
+     FROM projects
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, projectId]
+  );
+  if (project.rowCount !== 1) {
+    throw new InputError("Das Projekt wurde nicht gefunden.", 404, "project_not_found");
+  }
+  if (projectManagerId) {
+    const manager = await client.query(
+      `SELECT account.id, account.first_name, account.last_name
+       FROM users AS account
+       JOIN user_roles AS assignment
+         ON assignment.company_id = account.company_id
+        AND assignment.user_id = account.id
+        AND assignment.revoked_at IS NULL
+       JOIN roles AS role
+         ON role.company_id = assignment.company_id
+        AND role.id = assignment.role_id
+        AND role.status = 'active'
+        AND role.role_key = 'project_manager'
+       WHERE account.company_id = $1
+         AND account.id = $2
+         AND account.status = 'active'
+       LIMIT 1`,
+      [context.companyId, projectManagerId]
+    );
+    if (manager.rowCount !== 1) {
+      throw new InputError(
+        "Der gewählte Projektleiter ist nicht aktiv oder besitzt nicht die Projektleiterrolle.",
+        409,
+        "project_manager_role_conflict"
+      );
+    }
+  }
+
+  await client.query(
+    `UPDATE project_responsibles
+     SET removed_at = CURRENT_TIMESTAMP, is_primary = FALSE
+     WHERE company_id = $1
+       AND project_id = $2
+       AND responsibility = 'project_management'
+       AND removed_at IS NULL
+       AND user_id IS DISTINCT FROM $3::UUID`,
+    [context.companyId, projectId, projectManagerId]
+  );
+  if (projectManagerId) {
+    await client.query(
+      `INSERT INTO project_responsibles (
+         company_id, project_id, user_id, responsibility, is_primary
+       )
+       SELECT $1, $2, $3, 'project_management', TRUE
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM project_responsibles
+         WHERE company_id = $1
+           AND project_id = $2
+           AND user_id = $3
+           AND responsibility = 'project_management'
+           AND removed_at IS NULL
+       )`,
+      [context.companyId, projectId, projectManagerId]
+    );
+    await client.query(
+      `UPDATE project_responsibles
+       SET is_primary = TRUE
+       WHERE company_id = $1
+         AND project_id = $2
+         AND user_id = $3
+         AND responsibility = 'project_management'
+         AND removed_at IS NULL`,
+      [context.companyId, projectId, projectManagerId]
+    );
+  }
+}
+
+async function getProjectManager(client, context, projectId) {
+  const result = await client.query(
+    `SELECT responsible.user_id AS project_manager_id,
+            account.first_name || ' ' || account.last_name AS project_manager_name
+     FROM project_responsibles AS responsible
+     JOIN users AS account
+       ON account.company_id = responsible.company_id
+      AND account.id = responsible.user_id
+     WHERE responsible.company_id = $1
+       AND responsible.project_id = $2
+       AND responsible.responsibility = 'project_management'
+       AND responsible.removed_at IS NULL
+     ORDER BY responsible.is_primary DESC, responsible.assigned_at, responsible.id
+     LIMIT 1`,
+    [context.companyId, projectId]
+  );
+  return result.rows[0] || {
+    project_manager_id: null,
+    project_manager_name: null
+  };
+}
+
 async function createProject(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requireFullPlanner(client, context);
   const customer = await client.query(
     `SELECT id, customer_type, company_name, first_name, last_name
      FROM customers
@@ -5718,9 +6713,20 @@ async function createProject(client, context, input) {
                status, row_version, updated_at`,
     [context.companyId, input.customerId, input.name, input.installerShortText]
   );
+  const projectManagerId = hasProjectScopedAccess(roles)
+    ? context.userId
+    : input.projectManagerId;
+  await setProjectManager(
+    client,
+    context,
+    inserted.rows[0].id,
+    projectManagerId
+  );
+  const manager = await getProjectManager(client, context, inserted.rows[0].id);
   const row = customer.rows[0];
   return projectDto({
     ...inserted.rows[0],
+    ...manager,
     customer_name: row.customer_type === "company"
       ? row.company_name
       : `${row.first_name} ${row.last_name}`,
@@ -5729,7 +6735,19 @@ async function createProject(client, context, input) {
 }
 
 async function updateProject(client, context, projectId, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireProjectAccess(client, context, projectId, roles);
+  if (
+    hasProjectScopedAccess(roles)
+    && input.projectManagerId !== undefined
+    && input.projectManagerId !== context.userId
+  ) {
+    throw new InputError(
+      "Projektleiter dürfen die Projektverantwortung nicht selbst übertragen.",
+      403,
+      "project_manager_assignment_forbidden"
+    );
+  }
   const current = await client.query(
     `SELECT project.id, project.customer_id, project.status, project.row_version,
             customer.status AS customer_status,
@@ -5827,15 +6845,32 @@ async function updateProject(client, context, projectId, input) {
       "row_version_conflict"
     );
   }
+  if (input.projectManagerId !== undefined && !hasProjectScopedAccess(roles)) {
+    await setProjectManager(client, context, projectId, input.projectManagerId);
+  }
+  const manager = await getProjectManager(client, context, projectId);
   return projectDto({
     ...updated.rows[0],
+    ...manager,
     customer_name: currentProject.customer_name,
     site_count: 0
   });
 }
 
 async function createConstructionSite(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  if (hasProjectScopedAccess(roles) && !input.projectId) {
+    throw new InputError(
+      "Projektleiter können Baustellen nur innerhalb eines zugeordneten Projekts anlegen.",
+      403,
+      "site_project_required"
+    );
+  }
+  if (input.projectId) {
+    await requireProjectAccess(client, context, input.projectId, roles);
+  } else if (input.customerId) {
+    await requireCustomerAccess(client, context, input.customerId, roles);
+  }
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`sites:${context.companyId}`]
@@ -5850,6 +6885,10 @@ async function createConstructionSite(client, context, input) {
   }
 
   const projectRow = await resolveConstructionSiteParent(client, context, input);
+  if (!hasProjectScopedAccess(roles) && input.projectManagerId !== undefined) {
+    await setProjectManager(client, context, projectRow.id, input.projectManagerId);
+  }
+  const projectManager = await getProjectManager(client, context, projectRow.id);
   const location = await client.query(
     `INSERT INTO customer_locations (
        company_id, customer_id, name, location_type, street, house_number,
@@ -5875,7 +6914,8 @@ async function createConstructionSite(client, context, input) {
     `INSERT INTO construction_sites (
        company_id, project_id, customer_location_id, name, installer_short_text, status
      ) VALUES ($1, $2, $3, $4, $5, 'active')
-     RETURNING id, project_id, site_number, name, installer_short_text, status, row_version, updated_at`,
+     RETURNING id, project_id, site_number, name, installer_short_text, qr_code,
+               status, row_version, updated_at`,
     [context.companyId, projectRow.id, location.rows[0].id, input.name, input.installerShortText]
   );
   return siteDto({
@@ -5885,6 +6925,9 @@ async function createConstructionSite(client, context, input) {
       ? projectRow.company_name
       : `${projectRow.first_name} ${projectRow.last_name}`,
     project_name: projectRow.name,
+    project_manager_ids: projectManager.project_manager_id
+      ? [projectManager.project_manager_id]
+      : [],
     street: input.street,
     house_number: input.houseNumber,
     postal_code: input.postalCode,
@@ -5892,10 +6935,64 @@ async function createConstructionSite(client, context, input) {
   });
 }
 
+async function buildConstructionSiteQrCode(
+  client,
+  context,
+  constructionSiteId,
+  allowedOrigin
+) {
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    constructionSiteId,
+    roles
+  );
+  const result = await client.query(
+    `SELECT site_number, qr_code
+     FROM construction_sites
+     WHERE company_id = $1
+       AND id = $2
+       AND status <> 'cancelled'`,
+    [context.companyId, constructionSiteId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
+  }
+  const row = result.rows[0];
+  const target = new URL("/", allowedOrigin);
+  target.searchParams.set("site", row.qr_code || constructionSiteId);
+  const svg = await qrToString(target.toString(), {
+    type: "svg",
+    errorCorrectionLevel: "M",
+    margin: 2,
+    width: 480,
+    color: {
+      dark: "#111111ff",
+      light: "#ffffffff"
+    }
+  });
+  return {
+    fileName: `${row.site_number}-QR.svg`,
+    mimeType: "image/svg+xml; charset=utf-8",
+    content: Buffer.from(svg, "utf8"),
+    target: target.toString()
+  };
+}
+
 async function updateConstructionSite(client, context, siteId, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(client, context, siteId, roles);
+  if (hasProjectScopedAccess(roles) && input.projectManagerId !== undefined) {
+    throw new InputError(
+      "Projektleiter dürfen die Projektverantwortung nicht selbst übertragen.",
+      403,
+      "project_manager_assignment_forbidden"
+    );
+  }
   const current = await client.query(
     `SELECT site.id, site.project_id, site.customer_location_id, site.site_number,
+            site.qr_code,
             site.name, site.status, site.row_version,
             project.customer_id, project.name AS project_name, project.status AS project_status,
             customer.customer_type, customer.company_name, customer.first_name, customer.last_name,
@@ -5997,7 +7094,7 @@ async function updateConstructionSite(client, context, siteId, input) {
     `UPDATE construction_sites
      SET customer_location_id = $3, name = $4, installer_short_text = $5, status = $6
      WHERE company_id = $1 AND id = $2 AND row_version = $7
-     RETURNING id, project_id, site_number, name, installer_short_text,
+     RETURNING id, project_id, site_number, name, installer_short_text, qr_code,
                status, row_version, updated_at`,
     [
       context.companyId,
@@ -6016,6 +7113,19 @@ async function updateConstructionSite(client, context, siteId, input) {
       "site_version_conflict"
     );
   }
+  if (input.projectManagerId !== undefined) {
+    await setProjectManager(
+      client,
+      context,
+      currentSite.project_id,
+      input.projectManagerId
+    );
+  }
+  const projectManager = await getProjectManager(
+    client,
+    context,
+    currentSite.project_id
+  );
   return siteDto({
     ...updated.rows[0],
     customer_id: currentSite.customer_id,
@@ -6023,6 +7133,9 @@ async function updateConstructionSite(client, context, siteId, input) {
       ? currentSite.company_name
       : `${currentSite.first_name} ${currentSite.last_name}`,
     project_name: currentSite.project_name,
+    project_manager_ids: projectManager.project_manager_id
+      ? [projectManager.project_manager_id]
+      : [],
     street: input.street,
     house_number: input.houseNumber,
     postal_code: input.postalCode,
@@ -6031,7 +7144,7 @@ async function updateConstructionSite(client, context, siteId, input) {
 }
 
 async function createSiteBundle(client, context, input) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`sites:${context.companyId}`]
@@ -6084,7 +7197,8 @@ async function createSiteBundle(client, context, input) {
     `INSERT INTO construction_sites (
        company_id, project_id, customer_location_id, name, installer_short_text, status
      ) VALUES ($1, $2, $3, $4, $5, 'active')
-     RETURNING id, project_id, site_number, name, installer_short_text, status, row_version, updated_at`,
+     RETURNING id, project_id, site_number, name, installer_short_text, qr_code,
+               status, row_version, updated_at`,
     [context.companyId, project.rows[0].id, location.rows[0].id, input.siteName, input.installerShortText]
   );
   return siteDto({
@@ -6168,13 +7282,364 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
   }
 }
 
+async function assertPlanningTeamEmployees(client, context, memberIds) {
+  const result = await client.query(
+    `SELECT account.id
+     FROM users AS account
+     WHERE account.company_id = $1
+       AND account.id = ANY($2::UUID[])
+       AND account.status = 'active'
+       AND EXISTS (
+         SELECT 1
+         FROM user_roles AS assignment
+         JOIN roles AS role
+           ON role.company_id = assignment.company_id
+          AND role.id = assignment.role_id
+         WHERE assignment.company_id = account.company_id
+           AND assignment.user_id = account.id
+           AND assignment.revoked_at IS NULL
+           AND role.status = 'active'
+           AND role.role_key IN ('installer', 'foreman')
+       )`,
+    [context.companyId, memberIds]
+  );
+  if (result.rowCount !== memberIds.length) {
+    throw new InputError(
+      "Teamvorlagen dürfen nur aktive Monteure und Vorarbeiter enthalten.",
+      409,
+      "planning_team_member_conflict"
+    );
+  }
+}
+
+async function getPlanningTeamRecord(client, context, planningTeamId) {
+  const result = await client.query(
+    `SELECT team.id, team.name, team.status, team.row_version,
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'userId', member.user_id,
+                  'employeeName', account.first_name || ' ' || account.last_name
+                )
+                ORDER BY LOWER(account.last_name), LOWER(account.first_name), member.user_id
+              ) FILTER (WHERE member.user_id IS NOT NULL),
+              '[]'::jsonb
+            ) AS members
+     FROM planning_teams AS team
+     LEFT JOIN planning_team_members AS member
+       ON member.company_id = team.company_id
+      AND member.planning_team_id = team.id
+      AND member.ended_at IS NULL
+     LEFT JOIN users AS account
+       ON account.company_id = member.company_id
+      AND account.id = member.user_id
+     WHERE team.company_id = $1 AND team.id = $2
+     GROUP BY team.id`,
+    [context.companyId, planningTeamId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Die Teamvorlage wurde nicht gefunden.", 404, "planning_team_not_found");
+  }
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    rowVersion: Number(row.row_version),
+    members: row.members
+  };
+}
+
+async function createPlanningTeam(client, context, input) {
+  await requireFullPlanner(client, context);
+  await assertPlanningTeamEmployees(client, context, input.memberIds);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1 || LOWER($2), 0))",
+    [`planning-team-name:${context.companyId}:`, input.name]
+  );
+  const duplicate = await client.query(
+    `SELECT 1 FROM planning_teams
+     WHERE company_id = $1 AND LOWER(name) = LOWER($2) AND status = 'active'`,
+    [context.companyId, input.name]
+  );
+  if (duplicate.rowCount) {
+    throw new InputError(
+      "Eine aktive Teamvorlage mit diesem Namen existiert bereits.",
+      409,
+      "planning_team_name_conflict"
+    );
+  }
+  const inserted = await client.query(
+    `INSERT INTO planning_teams (
+       company_id, name, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $3)
+     RETURNING id`,
+    [context.companyId, input.name, context.userId]
+  );
+  const planningTeamId = inserted.rows[0].id;
+  await client.query(
+    `INSERT INTO planning_team_members (
+       company_id, planning_team_id, user_id, added_by_user_id
+     )
+     SELECT $1, $2, member_id, $3
+     FROM UNNEST($4::UUID[]) AS member_id`,
+    [context.companyId, planningTeamId, context.userId, input.memberIds]
+  );
+  await client.query(
+    `INSERT INTO planning_team_member_events (
+       company_id, planning_team_id, user_id, event_type, actor_user_id
+     )
+     SELECT $1, $2, member_id, 'added', $3
+     FROM UNNEST($4::UUID[]) AS member_id`,
+    [context.companyId, planningTeamId, context.userId, input.memberIds]
+  );
+  return getPlanningTeamRecord(client, context, planningTeamId);
+}
+
+async function updatePlanningTeam(client, context, planningTeamId, input) {
+  await requireFullPlanner(client, context);
+  await assertPlanningTeamEmployees(client, context, input.memberIds);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1 || LOWER($2), 0))",
+    [`planning-team-name:${context.companyId}:`, input.name]
+  );
+  const current = await client.query(
+    `SELECT id, row_version
+     FROM planning_teams
+     WHERE company_id = $1 AND id = $2
+     FOR UPDATE`,
+    [context.companyId, planningTeamId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Die Teamvorlage wurde nicht gefunden.", 404, "planning_team_not_found");
+  }
+  if (Number(current.rows[0].row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Die Teamvorlage wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  const duplicate = await client.query(
+    `SELECT 1 FROM planning_teams
+     WHERE company_id = $1
+       AND id <> $2
+       AND LOWER(name) = LOWER($3)
+       AND status = 'active'`,
+    [context.companyId, planningTeamId, input.name]
+  );
+  if (input.status === "active" && duplicate.rowCount) {
+    throw new InputError(
+      "Eine aktive Teamvorlage mit diesem Namen existiert bereits.",
+      409,
+      "planning_team_name_conflict"
+    );
+  }
+  const previousMembers = await client.query(
+    `SELECT user_id, ended_at
+     FROM planning_team_members
+     WHERE company_id = $1 AND planning_team_id = $2
+     FOR UPDATE`,
+    [context.companyId, planningTeamId]
+  );
+  const activeIds = new Set(
+    previousMembers.rows.filter((row) => row.ended_at === null).map((row) => row.user_id)
+  );
+  const knownIds = new Set(previousMembers.rows.map((row) => row.user_id));
+  const requestedIds = new Set(input.memberIds);
+  const removedIds = [...activeIds].filter((userId) => !requestedIds.has(userId));
+  const addedIds = input.memberIds.filter((userId) => !knownIds.has(userId));
+  const reactivatedIds = input.memberIds.filter((userId) => (
+    knownIds.has(userId) && !activeIds.has(userId)
+  ));
+
+  await client.query(
+    `UPDATE planning_teams
+     SET name = $3,
+         status = $4,
+         changed_by_user_id = $5,
+         last_change_reason = $6
+     WHERE company_id = $1 AND id = $2 AND row_version = $7`,
+    [
+      context.companyId,
+      planningTeamId,
+      input.name,
+      input.status,
+      context.userId,
+      input.changeReason,
+      input.rowVersion
+    ]
+  );
+  if (removedIds.length) {
+    await client.query(
+      `UPDATE planning_team_members
+       SET ended_at = CURRENT_TIMESTAMP, ended_by_user_id = $3
+       WHERE company_id = $1
+         AND planning_team_id = $2
+         AND user_id = ANY($4::UUID[])
+         AND ended_at IS NULL`,
+      [context.companyId, planningTeamId, context.userId, removedIds]
+    );
+  }
+  if (addedIds.length) {
+    await client.query(
+      `INSERT INTO planning_team_members (
+         company_id, planning_team_id, user_id, added_by_user_id
+       )
+       SELECT $1, $2, member_id, $3
+       FROM UNNEST($4::UUID[]) AS member_id`,
+      [context.companyId, planningTeamId, context.userId, addedIds]
+    );
+  }
+  if (reactivatedIds.length) {
+    await client.query(
+      `UPDATE planning_team_members
+       SET added_at = CURRENT_TIMESTAMP,
+           added_by_user_id = $3,
+           ended_at = NULL,
+           ended_by_user_id = NULL
+       WHERE company_id = $1
+         AND planning_team_id = $2
+         AND user_id = ANY($4::UUID[])`,
+      [context.companyId, planningTeamId, context.userId, reactivatedIds]
+    );
+  }
+  const memberEvents = [
+    ...removedIds.map((userId) => ({ userId, eventType: "removed" })),
+    ...addedIds.map((userId) => ({ userId, eventType: "added" })),
+    ...reactivatedIds.map((userId) => ({ userId, eventType: "reactivated" }))
+  ];
+  for (const event of memberEvents) {
+    await client.query(
+      `INSERT INTO planning_team_member_events (
+         company_id, planning_team_id, user_id, event_type, actor_user_id
+       ) VALUES ($1, $2, $3, $4, $5)`,
+      [
+        context.companyId,
+        planningTeamId,
+        event.userId,
+        event.eventType,
+        context.userId
+      ]
+    );
+  }
+  return getPlanningTeamRecord(client, context, planningTeamId);
+}
+
+function assignmentStartMinutes(plannedStartTime) {
+  if (!plannedStartTime) return null;
+  const [hours, minutes] = plannedStartTime.slice(0, 5).split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function planningAssignmentDto(row) {
+  return {
+    id: row.id,
+    employeeId: row.user_id,
+    constructionSiteId: row.construction_site_id,
+    workDate: databaseDate(row.work_date),
+    sequenceNumber: row.sequence_number,
+    plannedStartTime: row.planned_start_time,
+    plannedDurationMinutes: row.planned_duration_minutes === null
+      ? null
+      : Number(row.planned_duration_minutes),
+    comment: row.comment,
+    status: row.status,
+    planningTeamId: row.planning_template_key || null,
+    reportResponsible: row.report_responsible,
+    reportResponsibilitySource: row.report_responsibility_source,
+    rowVersion: Number(row.row_version)
+  };
+}
+
+async function assertNoAssignmentTimeOverlap(
+  client,
+  context,
+  employeeId,
+  workDate,
+  plannedStartTime,
+  plannedDurationMinutes,
+  excludedAssignmentId = null
+) {
+  if (!plannedStartTime || !plannedDurationMinutes) return;
+  const startMinutes = assignmentStartMinutes(plannedStartTime);
+  const endMinutes = startMinutes + Number(plannedDurationMinutes);
+  if (endMinutes > 1440) {
+    throw new InputError(
+      "Der Einsatz darf nicht über Mitternacht hinaus geplant werden.",
+      409,
+      "assignment_crosses_midnight"
+    );
+  }
+  const conflict = await client.query(
+    `SELECT assignment.id, site.name AS site_name
+     FROM site_assignments AS assignment
+     JOIN construction_sites AS site
+       ON site.company_id = assignment.company_id
+      AND site.id = assignment.construction_site_id
+     WHERE assignment.company_id = $1
+       AND assignment.user_id = $2
+       AND assignment.work_date = $3
+       AND assignment.status <> 'cancelled'
+       AND assignment.id <> COALESCE(
+         $4::UUID,
+         '00000000-0000-0000-0000-000000000000'::UUID
+       )
+       AND assignment.planned_start_time IS NOT NULL
+       AND assignment.planned_duration_minutes IS NOT NULL
+       AND EXTRACT(EPOCH FROM assignment.planned_start_time)::INTEGER / 60 < $6
+       AND (
+         EXTRACT(EPOCH FROM assignment.planned_start_time)::INTEGER / 60
+         + assignment.planned_duration_minutes
+       ) > $5
+     LIMIT 1`,
+    [
+      context.companyId,
+      employeeId,
+      workDate,
+      excludedAssignmentId,
+      startMinutes,
+      endMinutes
+    ]
+  );
+  if (conflict.rowCount) {
+    throw new InputError(
+      `Der Einsatz überschneidet sich mit „${conflict.rows[0].site_name}“.`,
+      409,
+      "assignment_time_overlap"
+    );
+  }
+}
+
 async function createAssignment(client, context, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
   await lockAssignmentAvailability(client, context, input.employeeId, input.workDate);
   await assertNoApprovedFullDayAbsence(client, context, input.employeeId, input.workDate);
   const [employee, site] = await Promise.all([
     client.query(
-      "SELECT is_foreman FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+      `SELECT account.is_foreman,
+              EXISTS (
+                SELECT 1
+                FROM user_roles AS assignment
+                JOIN roles AS role
+                  ON role.company_id = assignment.company_id
+                 AND role.id = assignment.role_id
+                WHERE assignment.company_id = account.company_id
+                  AND assignment.user_id = account.id
+                  AND assignment.revoked_at IS NULL
+                  AND role.status = 'active'
+                  AND role.role_key IN ('installer', 'foreman')
+              ) AS is_field_employee
+       FROM users AS account
+       WHERE account.company_id = $1
+         AND account.id = $2
+         AND account.status = 'active'`,
       [context.companyId, input.employeeId]
     ),
     client.query(
@@ -6185,10 +7650,25 @@ async function createAssignment(client, context, input) {
     )
   ]);
   if (employee.rowCount !== 1) throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  if (!employee.rows[0].is_field_employee) {
+    throw new InputError(
+      "Einsätze können nur Monteuren oder Vorarbeitern zugewiesen werden.",
+      409,
+      "assignment_employee_role_conflict"
+    );
+  }
   if (site.rowCount !== 1) throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
   if (input.reportResponsible && !employee.rows[0].is_foreman) {
     throw new InputError("Nur ein Mitarbeiter mit der Rolle Vorarbeiter kann den Baustellenbericht übernehmen.");
   }
+  await assertNoAssignmentTimeOverlap(
+    client,
+    context,
+    input.employeeId,
+    input.workDate,
+    input.plannedStartTime,
+    input.plannedDurationMinutes
+  );
 
   if (input.reportResponsible) {
     await client.query(
@@ -6241,9 +7721,11 @@ async function createAssignment(client, context, input) {
     `INSERT INTO site_assignments (
        company_id, user_id, construction_site_id, work_date, sequence_number,
        planned_start_time, planned_duration_minutes, status, comment, report_responsible,
-       report_responsibility_source,
+       report_responsibility_source, planning_template_key,
        created_by_user_id, changed_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'released', $8, $9, $10, $11, $11)
+     ) VALUES (
+       $1, $2, $3, $4, $5, $6, $7, 'released', $8, $9, $10, $11, $12, $12
+     )
      RETURNING id`,
     [
       context.companyId,
@@ -6256,6 +7738,7 @@ async function createAssignment(client, context, input) {
       input.comment,
       input.reportResponsible,
       input.reportResponsible ? "manual" : null,
+      input.planningTeamId || null,
       context.userId
     ]
   );
@@ -6266,36 +7749,94 @@ async function createAssignment(client, context, input) {
     input.workDate
   );
   const assignment = await client.query(
-    `SELECT id, sequence_number, planned_start_time::TEXT,
+    `SELECT id, user_id, construction_site_id, work_date,
+            sequence_number, planned_start_time::TEXT,
             planned_duration_minutes, comment, report_responsible,
-            report_responsibility_source
+            report_responsibility_source, planning_template_key,
+            status, row_version
      FROM site_assignments
      WHERE company_id = $1 AND id = $2`,
     [context.companyId, inserted.rows[0].id]
   );
-  return {
-    id: assignment.rows[0].id,
-    employeeId: input.employeeId,
-    constructionSiteId: input.constructionSiteId,
-    workDate: input.workDate,
-    sequenceNumber: assignment.rows[0].sequence_number,
-    plannedStartTime: assignment.rows[0].planned_start_time,
-    plannedDurationMinutes: assignment.rows[0].planned_duration_minutes === null
-      ? null
-      : Number(assignment.rows[0].planned_duration_minutes),
-    comment: assignment.rows[0].comment,
-    reportResponsible: assignment.rows[0].report_responsible,
-    reportResponsibilitySource: assignment.rows[0].report_responsibility_source
-  };
+  return planningAssignmentDto(assignment.rows[0]);
+}
+
+async function createAssignmentBatch(client, context, input) {
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
+  if (input.planningTeamId) {
+    const planningTeam = await getPlanningTeamRecord(
+      client,
+      context,
+      input.planningTeamId
+    );
+    if (planningTeam.status !== "active") {
+      throw new InputError(
+        "Die gewählte Teamvorlage ist archiviert.",
+        409,
+        "planning_team_archived"
+      );
+    }
+    const selectedIds = new Set(input.employeeIds);
+    if (planningTeam.members.some((member) => !selectedIds.has(member.userId))) {
+      throw new InputError(
+        "Die ausgewählten Mitarbeiter bilden die Teamvorlage nicht vollständig ab.",
+        409,
+        "planning_team_selection_conflict"
+      );
+    }
+  }
+  await lockAssignmentTargets(
+    client,
+    context,
+    input.employeeIds.map((employeeId) => ({
+      employeeId,
+      workDate: input.workDate
+    }))
+  );
+  const assignmentIds = [];
+  for (const employeeId of input.employeeIds) {
+    const assignment = await createAssignment(client, context, {
+      employeeId,
+      constructionSiteId: input.constructionSiteId,
+      workDate: input.workDate,
+      plannedStartTime: input.plannedStartTime,
+      plannedDurationMinutes: input.plannedDurationMinutes,
+      comment: input.comment,
+      reportResponsible: input.reportResponsibleEmployeeId === employeeId,
+      planningTeamId: input.planningTeamId
+    });
+    assignmentIds.push(assignment.id);
+  }
+  const refreshed = await client.query(
+    `SELECT id, user_id, construction_site_id, work_date, sequence_number,
+            planned_start_time::TEXT, planned_duration_minutes, comment,
+            status, report_responsible, report_responsibility_source,
+            planning_template_key, row_version
+     FROM site_assignments
+     WHERE company_id = $1 AND id = ANY($2::UUID[])`,
+    [context.companyId, assignmentIds]
+  );
+  const assignmentsById = new Map(
+    refreshed.rows.map((row) => [row.id, planningAssignmentDto(row)])
+  );
+  return assignmentIds.map((assignmentId) => assignmentsById.get(assignmentId));
 }
 
 async function updateAssignment(client, context, assignmentId, input) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
   const current = await client.query(
     `SELECT assignment.id, assignment.user_id, assignment.construction_site_id,
             assignment.work_date, assignment.sequence_number, assignment.status,
+            assignment.planned_start_time::TEXT,
             assignment.planned_duration_minutes, assignment.comment,
             assignment.report_responsible, assignment.report_responsibility_source,
+            assignment.planning_template_key, assignment.row_version,
             EXISTS (
               SELECT 1 FROM site_reports AS report
               WHERE report.company_id = assignment.company_id
@@ -6310,20 +7851,51 @@ async function updateAssignment(client, context, assignmentId, input) {
     throw new InputError("Der Einsatz wurde nicht gefunden.", 404, "assignment_not_found");
   }
   const assignment = current.rows[0];
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    assignment.construction_site_id,
+    roles
+  );
   if (!["draft", "released"].includes(assignment.status)) {
     throw new InputError("Dieser Einsatz kann nicht mehr geändert werden.", 409, "assignment_locked");
   }
-  await lockAssignmentAvailability(client, context, assignment.user_id, input.workDate);
+  if (Number(assignment.row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der Einsatz wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  const employeeId = input.employeeId || assignment.user_id;
+  await lockAssignmentTargets(client, context, [
+    {
+      employeeId: assignment.user_id,
+      workDate: databaseDate(assignment.work_date)
+    },
+    { employeeId, workDate: input.workDate }
+  ]);
   await assertNoApprovedFullDayAbsence(
     client,
     context,
-    assignment.user_id,
+    employeeId,
     input.workDate
   );
+  await assertPlanningTeamEmployees(client, context, [employeeId]);
+  const targetEmployee = await client.query(
+    "SELECT is_foreman FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+    [context.companyId, employeeId]
+  );
+  if (targetEmployee.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
 
   const plannedDurationMinutes = input.plannedDurationMinutes === undefined
     ? assignment.planned_duration_minutes
     : input.plannedDurationMinutes;
+  const plannedStartTime = input.plannedStartTime === undefined
+    ? assignment.planned_start_time
+    : input.plannedStartTime;
   const comment = input.comment === undefined ? assignment.comment : input.comment;
   let reportResponsible = input.reportResponsible === null
     ? assignment.report_responsible
@@ -6332,7 +7904,10 @@ async function updateAssignment(client, context, assignmentId, input) {
     ? assignment.report_responsibility_source
     : (input.reportResponsible ? "manual" : null);
   if (
-    databaseDate(assignment.work_date) !== input.workDate
+    (
+      databaseDate(assignment.work_date) !== input.workDate
+      || assignment.user_id !== employeeId
+    )
     && assignment.report_responsibility_source === "automatic"
     && input.reportResponsible === null
   ) {
@@ -6341,6 +7916,7 @@ async function updateAssignment(client, context, assignmentId, input) {
   }
   if (assignment.has_mobile_report && (
     databaseDate(assignment.work_date) !== input.workDate
+    || assignment.user_id !== employeeId
     || reportResponsible !== assignment.report_responsible
   )) {
     throw new InputError(
@@ -6350,11 +7926,7 @@ async function updateAssignment(client, context, assignmentId, input) {
     );
   }
   if (reportResponsible && reportResponsibilitySource === "manual") {
-    const employee = await client.query(
-      "SELECT is_foreman FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
-      [context.companyId, assignment.user_id]
-    );
-    if (employee.rowCount !== 1 || !employee.rows[0].is_foreman) {
+    if (!targetEmployee.rows[0].is_foreman) {
       throw new InputError("Nur ein Mitarbeiter mit der Rolle Vorarbeiter kann den Baustellenbericht übernehmen.");
     }
     await client.query(
@@ -6403,46 +7975,68 @@ async function updateAssignment(client, context, assignmentId, input) {
       );
     }
   }
+  await assertNoAssignmentTimeOverlap(
+    client,
+    context,
+    employeeId,
+    input.workDate,
+    plannedStartTime,
+    plannedDurationMinutes,
+    assignmentId
+  );
 
   let sequenceNumber = assignment.sequence_number;
-  if (databaseDate(assignment.work_date) !== input.workDate) {
+  if (
+    databaseDate(assignment.work_date) !== input.workDate
+    || assignment.user_id !== employeeId
+  ) {
     const sequence = await client.query(
       `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_sequence
        FROM site_assignments
        WHERE company_id = $1 AND user_id = $2 AND work_date = $3
          AND status <> 'cancelled' AND id <> $4`,
-      [context.companyId, assignment.user_id, input.workDate, assignmentId]
+      [context.companyId, employeeId, input.workDate, assignmentId]
     );
     sequenceNumber = sequence.rows[0].next_sequence;
   }
 
   const updated = await client.query(
     `UPDATE site_assignments
-     SET work_date = $3,
-         sequence_number = $4,
-         planned_start_time = $5,
-         planned_duration_minutes = $6,
-         comment = $7,
-         report_responsible = $8,
-         report_responsibility_source = $9,
-         changed_by_user_id = $10,
-         last_change_reason = $11
-     WHERE company_id = $1 AND id = $2
+     SET user_id = $3,
+         work_date = $4,
+         sequence_number = $5,
+         planned_start_time = $6,
+         planned_duration_minutes = $7,
+         comment = $8,
+         report_responsible = $9,
+         report_responsibility_source = $10,
+         changed_by_user_id = $11,
+         last_change_reason = $12
+     WHERE company_id = $1 AND id = $2 AND row_version = $13
      RETURNING id`,
     [
       context.companyId,
       assignmentId,
+      employeeId,
       input.workDate,
       sequenceNumber,
-      input.plannedStartTime,
+      plannedStartTime,
       plannedDurationMinutes,
       comment,
       reportResponsible,
       reportResponsibilitySource,
       context.userId,
-      input.changeReason
+      input.changeReason,
+      input.rowVersion
     ]
   );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Der Einsatz wurde bereits geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
   const previousDate = databaseDate(assignment.work_date);
   await reconcileAutomaticSiteForeman(
     client,
@@ -6462,31 +8056,23 @@ async function updateAssignment(client, context, assignmentId, input) {
     `SELECT id, user_id, construction_site_id, work_date, sequence_number,
             planned_start_time::TEXT, planned_duration_minutes, comment,
             status, report_responsible,
-            report_responsibility_source
+            report_responsibility_source, planning_template_key, row_version
      FROM site_assignments
      WHERE company_id = $1 AND id = $2`,
     [context.companyId, updated.rows[0].id]
   );
-  const row = refreshed.rows[0];
-  return {
-    id: row.id,
-    employeeId: row.user_id,
-    constructionSiteId: row.construction_site_id,
-    workDate: databaseDate(row.work_date),
-    sequenceNumber: row.sequence_number,
-    plannedStartTime: row.planned_start_time,
-    plannedDurationMinutes: row.planned_duration_minutes === null
-      ? null
-      : Number(row.planned_duration_minutes),
-    comment: row.comment,
-    status: row.status,
-    reportResponsible: row.report_responsible,
-    reportResponsibilitySource: row.report_responsibility_source
-  };
+  return planningAssignmentDto(refreshed.rows[0]);
 }
 
 async function cancelAssignment(client, context, assignmentId, changeReason) {
-  await requirePlanner(client, context);
+  const roles = await requirePlanner(client, context);
+  await requireScopedEntitySiteAccess(
+    client,
+    context,
+    "site_assignments",
+    assignmentId,
+    roles
+  );
   const updated = await client.query(
     `UPDATE site_assignments
      SET status = 'cancelled',
@@ -7090,7 +8676,7 @@ async function createTimeEntryInvalidation(client, context, input) {
 }
 
 async function reviewTimeEntryCorrection(client, context, correctionId, input) {
-  await requirePlanner(client, context);
+  await requireFullPlanner(client, context);
   const correctionResult = await client.query(
     `SELECT correction.id, correction.user_id, correction.work_day_id,
             day.work_date, correction.original_entry_id,
@@ -7588,7 +9174,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           pool,
           tokenHash,
           async (client, context) => {
-            await requirePlanner(client, context);
+            await requireFullPlanner(client, context);
             return getHolidayCalendar(client, context, year, true);
           }
         );
@@ -7782,6 +9368,36 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 201, { siteReport });
       }
 
+      const siteReportPreviewMatch =
+        /^\/api\/v1\/admin\/site-reports\/([^/]+)\/preview$/.exec(url.pathname);
+      if (request.method === "GET" && siteReportPreviewMatch) {
+        const reportId = validateId(siteReportPreviewMatch[1], "Berichts-ID");
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => previewSiteReport(
+            client,
+            context,
+            reportId,
+            config.staticDirectory
+          )
+        );
+        return attachment(response, document);
+      }
+
+      const siteReportReturnMatch =
+        /^\/api\/v1\/admin\/site-reports\/([^/]+)\/return$/.exec(url.pathname);
+      if (request.method === "POST" && siteReportReturnMatch) {
+        const reportId = validateId(siteReportReturnMatch[1], "Berichts-ID");
+        const input = validateSiteReportReturn(await readJson(request));
+        const siteReport = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => returnSiteReport(client, context, reportId, input)
+        );
+        return json(response, 200, { siteReport });
+      }
+
       const siteReportFinalizeMatch = /^\/api\/v1\/admin\/site-reports\/([^/]+)\/finalize$/.exec(url.pathname);
       if (request.method === "POST" && siteReportFinalizeMatch) {
         const reportId = validateId(siteReportFinalizeMatch[1], "Berichts-ID");
@@ -7951,6 +9567,23 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 201, { site });
       }
 
+      const adminSiteQrMatch =
+        /^\/api\/v1\/admin\/construction-sites\/([^/]+)\/qr$/.exec(url.pathname);
+      if (request.method === "GET" && adminSiteQrMatch) {
+        const siteId = validateId(adminSiteQrMatch[1], "Baustellen-ID");
+        const document = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => buildConstructionSiteQrCode(
+            client,
+            context,
+            siteId,
+            config.allowedOrigin
+          )
+        );
+        return inlineDocument(response, document);
+      }
+
       const adminSiteMatch = /^\/api\/v1\/admin\/construction-sites\/([^/]+)$/.exec(url.pathname);
       if (request.method === "PATCH" && adminSiteMatch) {
         const siteId = validateId(adminSiteMatch[1], "Baustellen-ID");
@@ -7983,6 +9616,50 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createSiteBundle(client, context, input)
         );
         return json(response, 201, { site });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/planning-teams") {
+        const input = validatePlanningTeam(await readJson(request));
+        const planningTeam = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createPlanningTeam(client, context, input)
+        );
+        return json(response, 201, { planningTeam });
+      }
+
+      const adminPlanningTeamMatch =
+        /^\/api\/v1\/admin\/planning-teams\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminPlanningTeamMatch) {
+        const planningTeamId = validateId(
+          adminPlanningTeamMatch[1],
+          "Teamvorlagen-ID"
+        );
+        const input = validatePlanningTeamUpdate(await readJson(request));
+        const planningTeam = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updatePlanningTeam(
+            client,
+            context,
+            planningTeamId,
+            input
+          )
+        );
+        return json(response, 200, { planningTeam });
+      }
+
+      if (
+        request.method === "POST"
+        && url.pathname === "/api/v1/admin/assignment-batches"
+      ) {
+        const input = validateAssignmentBatch(await readJson(request));
+        const assignments = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createAssignmentBatch(client, context, input)
+        );
+        return json(response, 201, { assignments });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/assignments") {
@@ -8171,6 +9848,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createMobileSiteReport(client, context, input)
         );
         return json(response, created.idempotent ? 200 : 201, created);
+      }
+
+      const mobileSiteReportMatch = /^\/api\/v1\/site-reports\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && mobileSiteReportMatch) {
+        const reportId = validateId(mobileSiteReportMatch[1], "Berichts-ID");
+        const input = validateMobileSiteReportRevision(await readJson(request));
+        const siteReport = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => reviseMobileSiteReport(client, context, reportId, input)
+        );
+        return json(response, 200, { siteReport });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/time-entries") {

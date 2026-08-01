@@ -1,7 +1,7 @@
 # Integriertes VDE-Prüfmodul
 
-Stand: 29.07.2026
-Technischer Stand: V0.40.0
+Stand: 01.08.2026
+Technischer Stand: V0.41.0
 
 ## Ziel und Grenze
 
@@ -29,8 +29,9 @@ der Baustellenakte und keinen Zugriff über die Fachendpunkte. Deaktivierung
 löscht keine Entwürfe, abgeschlossenen Prüfungen, Historien oder Dokumente.
 
 DGUV ist weiterhin nur technisch vorbereitet. Es bleibt unsichtbar und kann
-nicht aktiviert werden, solange sein eigener Fachablauf nicht vollständig
-angebunden ist. KNX und LWL gehören nicht zum vorgesehenen Modulumfang.
+nicht aktiviert werden. Gemäß verbindlichem Fahrplan beginnt seine fachliche
+Umsetzung erst nach V1.0. KNX und LWL gehören nicht zum vorgesehenen
+Modulumfang.
 
 ## Rollen
 

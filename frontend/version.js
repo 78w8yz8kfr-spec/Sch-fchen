@@ -5,5 +5,5 @@
     && (window.location.hostname.endsWith("github.io") || window.location.port === "4173")
   );
   const footer = document.querySelector("#login-footer");
-  if (footer) footer.textContent = `Einfach vor komplex · Version 0.40.0 ${demoMode ? "Demo" : "Online"}`;
+  if (footer) footer.textContent = `Einfach vor komplex · Version 0.41.0 ${demoMode ? "Demo" : "Online"}`;
 })();
