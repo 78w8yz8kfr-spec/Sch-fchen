@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
 Stand: 01.08.2026
-Technischer Stand: V0.41.0
+Technischer Stand: V0.42.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -31,14 +31,14 @@ aus. Sie ist nur für die NOLOGIN-Rolle `schaefchen_api` ausführbar.
 
 ## Elektro-Spezialmodule
 
-`GET /api/v1/admin/modules` und `PATCH /api/v1/admin/modules/:moduleKey`
-arbeiten ausschließlich im Mandanten der aktiven Sitzung. Nur Administrator
-und Geschäftsführung dürfen vollständig angebundene Module aktivieren oder
-deaktivieren. VDE ist verfügbar; ein Aktivierungsversuch für das noch nicht
-fachlich angebundene DGUV-Modul wird serverseitig abgewiesen. Der Client sendet
-weder Firmen-ID noch Benutzer-ID. Änderungen
-werden mit Versionsstand geprüft und serverseitig dem angemeldeten Benutzer
-zugeordnet; die zugehörige Historie ist unveränderlich.
+`GET /api/v1/admin/modules` arbeitet ausschließlich im Mandanten der aktiven
+Sitzung und liefert Status sowie „auf Anfrage verfügbar“. Ein direkter
+`PATCH /api/v1/admin/modules/:moduleKey` wird unabhängig von der Firmenrolle
+mit 403 abgewiesen. Freigaben erfolgen nur über
+`PUT /api/v1/platform/companies/:companyId/modules/:moduleKey`, verlangen ein
+passendes Plattformrecht, Versionsstand und Begründung und erzeugen eine
+unveränderliche Historie. VDE ist fachlich angebunden; DGUV bleibt trotz
+Katalogeintrag nicht ohne ausdrückliche Plattformfreigabe nutzbar.
 
 Passwörter haben das Format
 `scrypt$N$r$p$salt-base64url$hash-base64url`. Zulässige Parameter sind begrenzt,
@@ -52,6 +52,22 @@ Ein erfolgreicher Login erzeugt 32 kryptografisch zufällige Bytes. In
 `user_sessions` wird nur deren SHA-256-Hash gespeichert. Der Browser erhält das
 Original als `HttpOnly`, `SameSite=Strict` und in Produktion `Secure` gesetztes
 Cookie. Abmeldung widerruft die Sitzung; ein Hartlöschen ist nicht erlaubt.
+
+## Plattformanmeldung und Laufzeitgrenze
+
+Die Plattformverwaltung verwendet `platform_users`, `platform_sessions`, ein
+eigenes Sitzungscookie und die Datenbankrolle `schaefchen_platform_api`. Ein
+Plattformkonto hat keine `company_id` und wird nie als Firmenbenutzer angelegt.
+`/api/v1/platform/*` prüft granulare Plattformrechte serverseitig. Der
+Supportmodus setzt keine Firmenrolle, sondern verlangt eine aktive,
+inhabergebundene `support_access_session`; abgelaufene oder beendete Header
+werden mit 409 abgewiesen.
+
+`GET /api/v1/runtime` ist ohne Fachdaten lesbar. Firmenaufrufe senden
+`X-Schaefchen-Version`. Wartungsmodus führt serverseitig zu 503,
+Pflichtupdates bei fehlender oder veralteter Version zu 426. Abmeldung und die
+getrennte Plattformverwaltung bleiben erreichbar, damit eine Störung sicher
+beendet werden kann.
 
 ## Mandantenschutz
 
@@ -78,6 +94,9 @@ API setzt beide Werte ausschließlich selbst.
 | `GET` | `/health` | Datenbank-Erreichbarkeit ohne Fachdaten prüfen |
 | `GET` | `/api/v1/setup` | Status der einmaligen Ersteinrichtung lesen |
 | `POST` | `/api/v1/setup` | Genau den ersten Admin geschützt anlegen |
+| `GET` | `/api/v1/runtime` | Wartungszustand, Produktionsversion und Pflichtupdate ohne Fachdaten lesen |
+| `GET` | `/api/v1/announcements` | Für Firma, Tarif, Modul oder Firmenrolle bestimmte aktive Mitteilungen lesen |
+| `POST` | `/api/v1/announcements/:id/read` | Sichtbare Mitteilung für den Sitzungsbenutzer als gelesen markieren |
 | `POST` | `/api/v1/account/initial-password` | Persönliches Startpasswort einmalig ersetzen |
 | `GET` | `/api/v1/construction-sites/:id/dashboard?date=JJJJ-MM-TT` | Rollen- und einsatzbezogene mobile Baustellenakte lesen |
 | `PATCH` | `/api/v1/construction-sites/:id/tasks/:taskId?date=JJJJ-MM-TT` | sichtbare Baustellenaufgabe mit Einsatz-, Rollen-, Status- und Versionsprüfung fortschreiben |
@@ -114,6 +133,13 @@ API setzt beide Werte ausschließlich selbst.
 | `PATCH` | `/api/v1/admin/documents/:id` | Status, mobile Sichtbarkeit und Offline-Priorität eines Dokuments versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/employees` | Mitarbeiter mit optionalen Kontaktdaten, Startpasswort und begrenzter Rolle anlegen |
 | `PATCH` | `/api/v1/admin/employees/:id` | Mitarbeiterstammdaten, Kontaktdaten und Rolle mit Versionskonfliktschutz bearbeiten |
+| `DELETE` | `/api/v1/admin/employees/:id` | Nach Abhängigkeitsprüfung hart löschen oder mit Pflichtgrund archivieren |
+| `POST` | `/api/v1/admin/employees/:id/reactivate` | Archivierten Mitarbeiter begründet und versionsgeschützt reaktivieren |
+| `PATCH` | `/api/v1/time-entries/:id` | Eigene wirksame Zeitbuchung vollständig und historienwahrend berichtigen |
+| `DELETE` | `/api/v1/time-entries/:id` | Eigenen Arbeitsblock nach Sicherheitsabfrage und Pflichtgrund ungültig markieren |
+| `PATCH` | `/api/v1/admin/time-entries/:id` | Zeitbuchung als berechtigte Firmenrolle berichtigen oder Korrekturprozess anlegen |
+| `DELETE` | `/api/v1/admin/time-entries/:id` | Arbeitsblock eines Mitarbeiters kontrolliert ungültig markieren |
+| `PATCH` | `/api/v1/admin/time-change-operations/:id` | Änderung eines freigegebenen oder abgerechneten Tags genehmigen oder ablehnen |
 | `POST` | `/api/v1/admin/customers` | Firmen- oder Privatkunden getrennt anlegen |
 | `PATCH` | `/api/v1/admin/customers/:id` | Kundenstammdaten und Archivstatus versionsgeschützt ändern |
 | `POST` | `/api/v1/admin/projects` | Projekt einem aktiven Kunden und optional einem aktiven Projektleiter zuordnen |
@@ -293,6 +319,29 @@ Sitzungsmandant und Aktivstatus und verwaltet die notwendige interne Zuordnung
 selbst. Dadurch kann das Frontend weder fremde Kunden verwenden noch Baustellen
 ohne eindeutigen Kundenbezug erzeugen.
 
+## Plattformendpunkte
+
+Alle folgenden Pfade liegen in der getrennten Plattformdomäne und verwenden
+nicht das Firmen-Sitzungscookie:
+
+| Methode | Pfadgruppe | Sicherheitszweck |
+| --- | --- | --- |
+| `GET/POST/DELETE` | `/api/v1/platform/setup`, `/session` | einmalige Superadmin-Anlage und getrennte Plattform-Sitzung |
+| `GET/POST/PATCH` | `/api/v1/platform/companies*` | Firmen, Status, Limits, Verträge und plattformseitige Module |
+| `GET/POST/PATCH` | `/api/v1/platform/accounts*`, `/administrators*`, `/roles*` | Firmenkonten und Plattformkonten ohne fachliche Personaldaten getrennt verwalten |
+| `GET/POST/PATCH` | `/api/v1/platform/plans*`, `/registrations*` | historische Tarifstände, Vertragsgrundlagen und kontrollierte Firmeneinladung |
+| `GET/POST/PATCH` | `/api/v1/platform/support*`, `/support-access*` | Supportfälle und befristeten Firmenkontext begründet protokollieren |
+| `GET/PATCH` | `/api/v1/platform/health*`, `/errors*`, `/versions*` | technische Zustände, bereinigte Fehlergruppen und Rollout verwalten |
+| `GET/POST/PATCH` | `/api/v1/platform/announcements*` | zeit- und zielgruppengesteuerte Mitteilungen verwalten |
+| `GET/POST` | `/api/v1/platform/backups*`, `/restores*` | Backupaufträge und vieräugig bestätigte Wiederherstellung vorbereiten |
+| `GET/POST/PATCH` | `/api/v1/platform/privacy*` | Export-, Aufbewahrungs-, Archivierungs-, Anonymisierungs- und Löschabläufe steuern |
+| `GET/PUT` | `/api/v1/platform/audit`, `/settings*` | unveränderliches Audit lesen und validierte globale Einstellungen ändern |
+
+Jede schreibende Plattformaktion verlangt eine Begründung. Kritische
+Firmenstatus-, Vertrags-, Wiederherstellungs- und Löschaktionen verlangen
+zusätzlich einen fest definierten Bestätigungstext; Wiederherstellung und
+endgültige Datenschutzmaßnahmen sperren eine Selbstbestätigung.
+
 ## Dokumentenschutz
 
 Dokumentuploads werden als größenbegrenztes Base64-JSON angenommen und vor dem
@@ -342,7 +391,8 @@ in Browserdaten.
 ## Prüfungen
 
 `npm --prefix api test` prüft Hashing, Cookieattribute, Login-Sperre,
-Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder und Schrittfolge. In
+Einrichtungsschlüssel, Eingabegrenzen, Mandantenfelder, semantische
+Versionsdurchsetzung und Schrittfolge. In
 GitHub Actions werden Migration und Seed zusätzlich mit einem nicht
 privilegierten, Render-ähnlichen Datenbankeigentümer geprüft. Danach folgt der
 echte PostgreSQL-Ablauf: ersten Admin anlegen, PWA ausliefern, anmelden,
@@ -352,5 +402,11 @@ Rollenverbot prüfen, Abwesenheit zweistufig freigeben, Planungskonflikte
 auflösen und anschließend sperren, Einsatz historisiert verschieben und
 stornieren, Feiertagskalender lesen und rollen- sowie versionsgeschützt ändern,
 einen betrieblichen freien Tag idempotent anlegen und begründet aufheben,
-Zeiten idempotent übertragen, Arbeitstag lesen, abmelden und den widerrufenen
-Cookie zurückweisen.
+Zeiten idempotent übertragen, eine Baustellenbuchung historienwahrend ändern,
+Pause und Wochenwerte neu berechnen, Mitarbeiter archivieren und reaktivieren,
+Plattformadministrator ohne Firma anmelden, Firmen/Tarife/Module verwalten,
+einen Supportmodus starten und beenden, Wartung und Pflichtupdate erzwingen,
+Audit lesen, Arbeitstag lesen, abmelden und den widerrufenen Cookie
+zurückweisen. Die SQL-Tests 039 bis 044 prüfen die negativen Rollen-,
+Mandanten-, Unveränderlichkeits-, Vier-Augen- und Konfliktfälle unmittelbar in
+PostgreSQL.

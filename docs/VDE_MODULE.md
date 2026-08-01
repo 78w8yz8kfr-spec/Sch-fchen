@@ -1,7 +1,7 @@
 # Integriertes VDE-Prüfmodul
 
 Stand: 01.08.2026
-Technischer Stand: V0.41.0
+Technischer Stand: V0.42.0
 
 ## Ziel und Grenze
 
@@ -23,8 +23,10 @@ als bearbeitbare Textkopien in `protocol_data` abgelegt.
 
 ## Aktivierung und Sichtbarkeit
 
-Nur Administrator oder Geschäftsführung schalten VDE firmenweit
-versionsgeschützt frei. Bei deaktiviertem Modul gibt es keinen VDE-Einstieg in
+Nur eine berechtigte Plattformrolle schaltet VDE für eine Firma
+versionsgeschützt frei. Firmenadministration und Geschäftsführung sehen den
+Status und können die Freigabe anfragen, aber nicht selbst ändern. Bei
+deaktiviertem Modul gibt es keinen VDE-Einstieg in
 der Baustellenakte und keinen Zugriff über die Fachendpunkte. Deaktivierung
 löscht keine Entwürfe, abgeschlossenen Prüfungen, Historien oder Dokumente.
 

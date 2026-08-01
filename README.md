@@ -30,6 +30,10 @@ Aktuell enthalten:
 - Migrationen `027_allow_multiple_work_blocks.sql` bis `036_create_vde_inspections.sql` für vollständige Zeiterfassung, Korrekturen, Spezialmodule, Abwesenheiten, Stundenkonten, Feiertage und VDE-Prüfungen
 - Migration `037_complete_site_workspace.sql` für mobile Dokumentfreigaben, Offline-Prioritäten, Baustellen-QR-Zugriff und den vollständigen Berichts-Rücklauf
 - Migration `038_create_planning_teams.sql` für feste Planungsteams, Mitgliederhistorie und konfliktfeste Teamvorlagen
+- Migrationen `039_create_platform_administration.sql` bis `041_create_platform_operations.sql` für vollständig getrennte Plattformkonten, Firmen-, Tarif-, Modul-, Support- und Betriebsverwaltung
+- Migration `042_enable_complete_time_editing.sql` für unveränderliche Zeitersatzbuchungen, vollständige Korrekturen und gemeinsame Neuberechnung nach Regelversion 4
+- Migration `043_add_employee_lifecycle.sql` für sichere Löschentscheidung, Archivierung, Reaktivierung und unveränderliche Lebenszyklushistorie
+- Migration `044_finalize_platform_security.sql` für gesperrte Firmenanmeldung, Versionsdurchsetzung, zielgerichtete Mitteilungen und abschließende Plattformrechte
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -40,6 +44,12 @@ Aktuell enthalten:
 - mobile, installierbare PWA mit echter Anmeldung und Offline-Synchronisation
 - vereinfachter Login mit Personalnummer und Passwort; die Firmennummer bleibt nach der Einrichtung im Hintergrund
 - getrenntes Live-, Wochen- und Verwaltungsdashboard
+- vollständig getrenntes Plattformadministrator-Dashboard ohne operative Firmenkennzahlen oder normale Betriebsnavigation
+- zentrale, rollenbasierte Firmen-, Konto-, Lizenz-, Modul-, Support-, Status-, Fehler-, Versions-, Backup-, Datenschutz- und Auditverwaltung
+- zeitlich begrenzter und protokollierter Supportmodus ohne Firmenmitgliedschaft
+- vollständiger Zeitbearbeitungsdialog mit Baustellen-, Zeit-, Pausen-, Tätigkeits-, Fahrt- und Tageskorrektur sowie begründetem Löschen
+- sichere Mitarbeiterarchivierung, bedingte Hartlöschung und Reaktivierung mit eigener Archivansicht
+- neu geordnete Wochenansicht mit kompaktem Arbeitskonto und einklappbarer Feiertagsliste
 - gegliedertes Baustellen-Dashboard mit einzeln wählbaren Arbeitsbereichen ohne Aktivitätschronik
 - mobile Baustellenakte für zugewiesene Monteure und Vorarbeiter mit Auftrag, Navigation sowie getrennten Ansichten für Team, Aufgaben, Notizen, Berichte, Dokumente, Fotos, Material und optional VDE
 - direkter, berechtigungsgeprüfter Kamera-Upload in den zentralen Dokumentenbestand
@@ -69,7 +79,7 @@ Aktuell enthalten:
 - Berichtszentrale mit Filterung, Vorschau, Rückgabe samt Pflichtgrund, mobiler Überarbeitung und erneuter Einreichung
 - automatische Berichtsentwürfe sowie Fotoseiten mit auswählbaren Bildern und Bildunterschriften
 - getrennte Baustellenbereiche mit eigener Suche, mobiler Dokumentfreigabe, Offline-Markierung und QR-Einstieg
-- vollständig integriertes, firmenweit aktivierbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
+- vollständig integriertes, ausschließlich plattformseitig freischaltbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
 - mobiler VDE-Editor für geordnete Verteilungen, FI/RCD-Gruppen, Stromkreise, passende Schutzorganparameter und Messwerte einschließlich Zi, Zs, Ik und stromkreisbezogener RCD-Werte
 - kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF mit Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
 
@@ -161,8 +171,13 @@ Berechnungs- und Rollenregeln der Jahreskonten stehen in
 Fach-, Rollen-, Import- und Abschlussregeln des VDE-Moduls stehen in
 [`docs/VDE_MODULE.md`](docs/VDE_MODULE.md). Die
 Sicherheitsgrenze und die Endpunkte der API stehen in
-[`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die verbindliche fachliche
-Grundlage steht in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md). Der
+[`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die Trennung und Bedienung der
+Plattformverwaltung steht in
+[`docs/PLATFORM_ADMINISTRATION.md`](docs/PLATFORM_ADMINISTRATION.md). Der
+Korrektur- und Mitarbeiter-Lebenszyklus ist in
+[`docs/TIME_CORRECTIONS_AND_EMPLOYEE_LIFECYCLE.md`](docs/TIME_CORRECTIONS_AND_EMPLOYEE_LIFECYCLE.md)
+dokumentiert. Die verbindliche fachliche Grundlage steht in
+[`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md). Der
 beleggestützte Abgleich mit dem Fahrplan steht in
 [`docs/ROADMAP_ACCEPTANCE.md`](docs/ROADMAP_ACCEPTANCE.md); offene Release-Gates
 und die gemeinsame Definition of Done stehen in

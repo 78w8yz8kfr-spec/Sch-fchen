@@ -6,6 +6,7 @@ import {
   companyLogoUrl,
   sessionView,
   withApiTransaction,
+  withPlatformTransaction,
   withSessionTransaction,
   withTenantTransaction
 } from "./database.mjs";
@@ -31,6 +32,7 @@ import { buildFinalReportPdf } from "./report-pdf.mjs";
 import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
+import { createPlatformHandler } from "./platform-admin.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -77,6 +79,8 @@ import {
   validateTimeEntryAddition,
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
+  validateTimeEntryDelete,
+  validateTimeEntryEdit,
   validateTimeEntryInvalidation,
   validateTimeAccountAdjustment,
   validateTimeAccountProfile,
@@ -169,6 +173,48 @@ function json(response, status, body, headers = {}) {
     ...headers
   });
   response.end(encoded);
+}
+
+export function compareApplicationVersions(left, right) {
+  const parse = (value) => String(value || "")
+    .replace(/^v/i, "")
+    .split(/[.+-]/)
+    .slice(0, 3)
+    .map((part) => (/^\d+$/.test(part) ? Number(part) : -1));
+  const leftParts = parse(left);
+  const rightParts = parse(right);
+  if (leftParts.includes(-1) || rightParts.includes(-1)) return null;
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (difference !== 0) return Math.sign(difference);
+  }
+  return 0;
+}
+
+async function readPlatformRuntimeState(pool) {
+  return withPlatformTransaction(pool, async (client) => {
+    const result = await client.query(
+      `SELECT
+         COALESCE((SELECT value FROM platform_settings
+                   WHERE setting_key = 'maintenance.enabled'), 'false'::JSONB) AS maintenance_enabled,
+         production.version AS production_version,
+         COALESCE(production.mandatory_update, FALSE) AS mandatory_update
+       FROM (SELECT 1) AS singleton
+       LEFT JOIN LATERAL (
+         SELECT version, mandatory_update
+         FROM application_versions
+         WHERE release_status = 'production'
+         ORDER BY released_at DESC NULLS LAST, created_at DESC
+         LIMIT 1
+       ) AS production ON TRUE`
+    );
+    const row = result.rows[0] || {};
+    return {
+      maintenanceEnabled: row.maintenance_enabled === true,
+      productionVersion: row.production_version || null,
+      mandatoryUpdate: Boolean(row.mandatory_update)
+    };
+  });
 }
 
 function attachment(response, document) {
@@ -283,6 +329,13 @@ function clientIp(request) {
   return request.socket.remoteAddress || "unknown";
 }
 
+function clientAppVersion(request) {
+  const value = request.headers["x-schaefchen-version"];
+  return typeof value === "string" && /^[0-9A-Za-z.+_-]{1,40}$/.test(value)
+    ? value
+    : null;
+}
+
 function timeEntryDto(row, idempotent = false) {
   return {
     id: row.id,
@@ -292,6 +345,12 @@ function timeEntryDto(row, idempotent = false) {
     recordedAt: new Date(row.recorded_at).toISOString(),
     clientCreatedAt: new Date(row.client_created_at).toISOString(),
     constructionSiteId: row.construction_site_id,
+    constructionSiteName: row.construction_site_name || null,
+    activityNote: row.activity_note || null,
+    travelMinutes: row.travel_minutes_override === null
+      || row.travel_minutes_override === undefined
+      ? null
+      : Number(row.travel_minutes_override),
     pendingCorrection: row.pending_correction_id ? {
       id: row.pending_correction_id,
       requestedRecordedAt: new Date(row.pending_requested_recorded_at).toISOString(),
@@ -319,7 +378,9 @@ function timeEntryCorrectionDto(row) {
     reason: row.correction_reason,
     requestedAt: new Date(row.requested_at).toISOString(),
     status: row.correction_status || "pending",
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : null
+    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : null,
+    operationId: row.edit_operation_id || null,
+    operationAction: row.operation_action || null
   };
 }
 
@@ -394,6 +455,10 @@ function workDayDto(day, entries) {
     lastClockOutAt: day.last_clock_out_at ? new Date(day.last_clock_out_at).toISOString() : null,
     grossMinutes: day.gross_minutes,
     breakMinutes: day.break_minutes,
+    breakMinutesOverride: day.break_minutes_override === null
+      || day.break_minutes_override === undefined
+      ? null
+      : Number(day.break_minutes_override),
     workMinutes: day.work_minutes,
     travelMinutes: day.travel_minutes,
     overtimeMinutes: day.overtime_minutes,
@@ -453,6 +518,15 @@ async function createLogin(pool, config, limiter, request, body) {
 
   const valid = await verifyPassword(input.password, account?.password_hash || DUMMY_HASH);
   if (!account || !valid) {
+    if (account) {
+      await withApiTransaction(
+        pool,
+        (client) => client.query(
+          "SELECT api_record_login_failure($1,$2)",
+          [account.company_id, account.user_id]
+        )
+      );
+    }
     limiter.fail(key);
     throw new InputError("Firmennummer, Personalnummer oder Passwort ist falsch.", 401, "invalid_credentials");
   }
@@ -469,16 +543,13 @@ async function createLogin(pool, config, limiter, request, body) {
 
   const view = await withTenantTransaction(pool, context, async (client) => {
     const inserted = await client.query(
-      `INSERT INTO user_sessions (company_id, user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO user_sessions (company_id, user_id, token_hash, expires_at, app_version)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [context.companyId, context.userId, tokenHash, expiresAt]
+      [context.companyId, context.userId, tokenHash, expiresAt, clientAppVersion(request)]
     );
     context.sessionId = inserted.rows[0].id;
-    await client.query(
-      "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE company_id = $1 AND id = $2",
-      [context.companyId, context.userId]
-    );
+    await client.query("SELECT api_record_login_success($1,$2)", [context.companyId, context.userId]);
     return sessionView(client, context);
   });
 
@@ -506,11 +577,15 @@ async function getWorkDay(client, context, date) {
   const entries = await client.query(
     `SELECT entry.id, entry.work_day_id, entry.client_entry_id, entry.entry_type,
             entry.recorded_at, entry.client_created_at, entry.construction_site_id,
+            entry.activity_note, entry.travel_minutes_override,
+            site.name AS construction_site_name,
             pending.id AS pending_correction_id,
             pending.recorded_at AS pending_requested_recorded_at,
             pending.correction_reason AS pending_correction_reason,
             pending.created_at AS pending_requested_at
      FROM time_entries AS entry
+     LEFT JOIN construction_sites AS site
+       ON site.company_id = entry.company_id AND site.id = entry.construction_site_id
      LEFT JOIN LATERAL (
        SELECT correction.id, correction.recorded_at,
               correction.correction_reason, correction.created_at
@@ -569,6 +644,64 @@ async function getWorkWeek(client, context, weekStart) {
       travelMinutes: 0,
       overtimeMinutes: 0
     })
+  };
+}
+
+async function getAdminWorkDayEntries(client, context, workDayId) {
+  await requireFullPlanner(client, context);
+  const dayResult = await client.query(
+    `SELECT day.*, account.first_name || ' ' || account.last_name AS employee_name,
+            EXISTS (
+              SELECT 1 FROM time_entries AS correction
+              WHERE correction.company_id = day.company_id
+                AND correction.user_id = day.user_id
+                AND correction.work_day_id = day.id
+                AND correction.correction_status = 'pending'
+            ) AS has_pending_correction
+     FROM work_days AS day
+     JOIN users AS account
+       ON account.company_id = day.company_id AND account.id = day.user_id
+     WHERE day.company_id = $1 AND day.id = $2`,
+    [context.companyId, workDayId]
+  );
+  if (dayResult.rowCount !== 1) {
+    throw new InputError("Der Arbeitstag wurde nicht gefunden.", 404, "work_day_not_found");
+  }
+  const day = dayResult.rows[0];
+  const entries = await client.query(
+    `SELECT entry.id, entry.work_day_id, entry.client_entry_id, entry.entry_type,
+            entry.recorded_at, entry.client_created_at, entry.construction_site_id,
+            entry.activity_note, entry.travel_minutes_override,
+            site.name AS construction_site_name,
+            pending.id AS pending_correction_id,
+            pending.recorded_at AS pending_requested_recorded_at,
+            pending.correction_reason AS pending_correction_reason,
+            pending.created_at AS pending_requested_at
+     FROM time_entries AS entry
+     LEFT JOIN construction_sites AS site
+       ON site.company_id = entry.company_id AND site.id = entry.construction_site_id
+     LEFT JOIN LATERAL (
+       SELECT correction.id, correction.recorded_at,
+              correction.correction_reason, correction.created_at
+       FROM time_entries AS correction
+       WHERE correction.company_id = entry.company_id
+         AND correction.user_id = entry.user_id
+         AND correction.original_entry_id = entry.id
+         AND correction.correction_status = 'pending'
+       ORDER BY correction.created_at DESC, correction.id DESC LIMIT 1
+     ) AS pending ON TRUE
+     WHERE entry.company_id = $1 AND entry.user_id = $2 AND entry.work_day_id = $3
+       AND entry.invalidated_at IS NULL
+       AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+       AND ((entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+            OR entry.correction_status = 'approved')
+     ORDER BY entry.recorded_at, entry.created_at, entry.id`,
+    [context.companyId, day.user_id, day.id]
+  );
+  return {
+    ...workDayDto(day, entries.rows),
+    employeeId: day.user_id,
+    employeeName: day.employee_name
   };
 }
 
@@ -666,6 +799,9 @@ async function reviewWorkDay(client, context, workDayId, input) {
       [context.companyId, workDayId, context.userId]
     );
   } else {
+    await client.query(
+      "SELECT set_config('app.controlled_time_correction','on',TRUE)"
+    );
     await client.query(
       `UPDATE work_days
        SET status = 'locked', locked_by_user_id = $3
@@ -1456,6 +1592,9 @@ function employeeDto(row) {
     phone: row.phone || null,
     roles: row.roles,
     mustChangePassword: row.must_change_password,
+    status: row.status || "active",
+    archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : null,
+    archivedReason: row.archived_reason || null,
     rowVersion: Number(row.row_version || 1)
   };
 }
@@ -1552,28 +1691,37 @@ function absenceRequestDto(row) {
 }
 
 function companyModuleDto(definition, row) {
+  const enabled = row?.entitlement_status === "permanent"
+    || (
+      row?.entitlement_status === "trial"
+      && (!row.starts_at || new Date(row.starts_at) <= new Date())
+      && (!row.ends_at || new Date(row.ends_at) > new Date())
+    );
   return {
     key: definition.key,
     name: definition.name,
     description: definition.description,
     available: definition.integrated,
-    enabled: definition.integrated && Boolean(row?.is_enabled),
+    enabled: definition.integrated && enabled,
+    status: row?.entitlement_status || "inactive",
+    availableOnRequest: !enabled,
     rowVersion: row ? Number(row.row_version) : 0,
     changedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null,
-    changedByName: row?.changed_by_name || null
+    changedByName: row ? "Plattformverwaltung" : null,
+    startsAt: row?.starts_at ? new Date(row.starts_at).toISOString() : null,
+    endsAt: row?.ends_at ? new Date(row.ends_at).toISOString() : null
   };
 }
 
 async function loadCompanyModules(client, context) {
   const result = await client.query(
-    `SELECT module.module_key, module.is_enabled, module.row_version,
-            module.updated_at,
-            account.first_name || ' ' || account.last_name AS changed_by_name
-     FROM company_modules AS module
-     JOIN users AS account
-       ON account.company_id = module.company_id
-      AND account.id = module.changed_by_user_id
-     WHERE module.company_id = $1`,
+    `SELECT catalog.module_key, entitlement.entitlement_status,
+            entitlement.row_version, entitlement.updated_at,
+            entitlement.starts_at, entitlement.ends_at
+     FROM module_catalog AS catalog
+     LEFT JOIN company_module_entitlements AS entitlement
+       ON entitlement.module_id = catalog.id AND entitlement.company_id = $1
+     WHERE catalog.module_key IN ('vde','dguv')`,
     [context.companyId]
   );
   const rows = new Map(result.rows.map((row) => [row.module_key, row]));
@@ -1587,70 +1735,56 @@ async function getCompanyModules(client, context) {
   return loadCompanyModules(client, context);
 }
 
+async function getPlatformAnnouncements(client, context) {
+  const result = await client.query(
+    `SELECT announcement.id, announcement.title, announcement.message,
+            announcement.announcement_type, announcement.publish_at,
+            announcement.expires_at, announcement.created_at,
+            read_state.read_at
+     FROM platform_announcements AS announcement
+     LEFT JOIN platform_announcement_reads AS read_state
+       ON read_state.announcement_id = announcement.id
+      AND read_state.company_id = $1
+      AND read_state.user_id = $2
+     ORDER BY COALESCE(announcement.publish_at, announcement.created_at) DESC
+     LIMIT 20`,
+    [context.companyId, context.userId]
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    message: row.message,
+    type: row.announcement_type,
+    publishedAt: new Date(row.publish_at || row.created_at).toISOString(),
+    expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+    readAt: row.read_at ? new Date(row.read_at).toISOString() : null
+  }));
+}
+
+async function markPlatformAnnouncementRead(client, context, announcementId) {
+  const visible = await client.query(
+    "SELECT id FROM platform_announcements WHERE id = $1",
+    [announcementId]
+  );
+  if (visible.rowCount !== 1) {
+    throw new InputError("Die Mitteilung wurde nicht gefunden.", 404, "announcement_not_found");
+  }
+  await client.query(
+    `INSERT INTO platform_announcement_reads (announcement_id,company_id,user_id)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (announcement_id,company_id,user_id) DO NOTHING`,
+    [announcementId, context.companyId, context.userId]
+  );
+  return { id: announcementId, read: true };
+}
+
 async function updateCompanyModule(client, context, input) {
   await requireModuleAdministrator(client, context);
-  const definition = ELECTRICAL_MODULES.find(
-    (module) => module.key === input.moduleKey
+  throw new InputError(
+    "Spezialmodule werden ausschließlich durch die Plattformverwaltung freigeschaltet. Das Modul kann auf Anfrage bereitgestellt werden.",
+    403,
+    "platform_module_administration_required"
   );
-  if (input.enabled && !definition?.integrated) {
-    throw new InputError(
-      "Dieses Spezialmodul ist noch nicht vollständig fachlich angebunden.",
-      409,
-      "module_not_integrated"
-    );
-  }
-  const existing = await client.query(
-    `SELECT module_key, is_enabled, row_version
-     FROM company_modules
-     WHERE company_id = $1 AND module_key = $2
-     FOR UPDATE`,
-    [context.companyId, input.moduleKey]
-  );
-
-  if (existing.rowCount === 0) {
-    if (input.rowVersion !== 0) {
-      throw new InputError(
-        "Die Modulfreigabe wurde geändert. Bitte neu laden.",
-        409,
-        "row_version_conflict"
-      );
-    }
-    const inserted = await client.query(
-      `INSERT INTO company_modules (
-         company_id, module_key, is_enabled, changed_by_user_id
-       ) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (company_id, module_key) DO NOTHING
-       RETURNING module_key`,
-      [context.companyId, input.moduleKey, input.enabled, context.userId]
-    );
-    if (inserted.rowCount !== 1) {
-      throw new InputError(
-        "Die Modulfreigabe wurde gleichzeitig angelegt. Bitte neu laden.",
-        409,
-        "row_version_conflict"
-      );
-    }
-  } else {
-    const current = existing.rows[0];
-    if (Number(current.row_version) !== input.rowVersion) {
-      throw new InputError(
-        "Die Modulfreigabe wurde geändert. Bitte neu laden.",
-        409,
-        "row_version_conflict"
-      );
-    }
-    if (current.is_enabled !== input.enabled) {
-      await client.query(
-        `UPDATE company_modules
-         SET is_enabled = $3, changed_by_user_id = $4
-         WHERE company_id = $1 AND module_key = $2`,
-        [context.companyId, input.moduleKey, input.enabled, context.userId]
-      );
-    }
-  }
-
-  const modules = await loadCompanyModules(client, context);
-  return modules.find((module) => module.key === input.moduleKey);
 }
 
 function vdeInspectionDto(row, includeProtocol = false) {
@@ -1714,10 +1848,13 @@ const VDE_INSPECTION_SELECT = `
 async function requireVdeModuleEnabled(client, context) {
   const result = await client.query(
     `SELECT 1
-     FROM company_modules
-     WHERE company_id = $1
-       AND module_key = 'vde'
-       AND is_enabled`,
+     FROM company_module_entitlements AS entitlement
+     JOIN module_catalog AS catalog ON catalog.id = entitlement.module_id
+     WHERE entitlement.company_id = $1
+       AND catalog.module_key = 'vde'
+       AND entitlement.entitlement_status IN ('permanent','trial')
+       AND (entitlement.starts_at IS NULL OR entitlement.starts_at <= CURRENT_TIMESTAMP)
+       AND (entitlement.ends_at IS NULL OR entitlement.ends_at > CURRENT_TIMESTAMP)`,
     [context.companyId]
   );
   if (result.rowCount !== 1) {
@@ -3871,7 +4008,8 @@ async function adminOverview(client, context, date) {
     client.query(
       `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
               account.email, account.phone,
-              account.must_change_password, account.row_version,
+              account.must_change_password, account.status, account.archived_at,
+              account.archived_reason, account.row_version,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
                   FILTER (WHERE role.id IS NOT NULL),
@@ -3886,7 +4024,7 @@ async function adminOverview(client, context, date) {
          ON role.company_id = role_assignment.company_id
         AND role.id = role_assignment.role_id
         AND role.status = 'active'
-       WHERE account.company_id = $1 AND account.status = 'active'
+       WHERE account.company_id = $1 AND account.status IN ('active', 'archived')
        GROUP BY account.id
        ORDER BY LOWER(account.last_name), LOWER(account.first_name), account.personnel_number`,
       [context.companyId]
@@ -4165,12 +4303,17 @@ async function adminOverview(client, context, date) {
       `SELECT correction.id, correction.user_id, correction.work_day_id,
               correction.work_date, correction.original_entry_id,
               correction.correction_kind,
+              correction.edit_operation_id,
+              operation.action AS operation_action,
               correction.entry_type, correction.requested_recorded_at,
               correction.original_recorded_at, correction.correction_reason,
               correction.requested_at, 'pending'::TEXT AS correction_status,
               NULL::TIMESTAMPTZ AS reviewed_at,
               account.first_name || ' ' || account.last_name AS employee_name
        FROM pending_time_entry_corrections_v2 AS correction
+       LEFT JOIN time_change_operations AS operation
+         ON operation.company_id = correction.company_id
+        AND operation.id = correction.edit_operation_id
        JOIN users AS account
          ON account.company_id = correction.company_id
         AND account.id = correction.user_id
@@ -4335,7 +4478,8 @@ async function adminOverview(client, context, date) {
     canApproveAbsenceManagement: [...roles].some(
       (role) => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role)
     ),
-    employees: employeeResult.rows.map(employeeDto),
+    employees: employeeResult.rows.filter((row) => row.status === "active").map(employeeDto),
+    archivedEmployees: employeeResult.rows.filter((row) => row.status === "archived").map(employeeDto),
     customers,
     projects,
     sites,
@@ -6202,7 +6346,8 @@ async function getEmployeeRecord(client, context, employeeId) {
   const result = await client.query(
     `SELECT account.id, account.personnel_number, account.first_name, account.last_name,
             account.email, account.phone,
-            account.must_change_password, account.row_version,
+            account.must_change_password, account.status, account.archived_at,
+            account.archived_reason, account.row_version,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
                 FILTER (WHERE role.id IS NOT NULL),
@@ -6219,7 +6364,7 @@ async function getEmployeeRecord(client, context, employeeId) {
       AND role.status = 'active'
      WHERE account.company_id = $1
        AND account.id = $2
-       AND account.status = 'active'
+       AND account.status IN ('active', 'archived')
      GROUP BY account.id`,
     [context.companyId, employeeId]
   );
@@ -6434,6 +6579,96 @@ async function updateEmployee(client, context, employeeId, input) {
     [context.companyId, employeeId, roleResult.rows[0].id, context.userId]
   );
 
+  return getEmployeeRecord(client, context, employeeId);
+}
+
+function employeeLifecycleInput(body) {
+  const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+  const rowVersion = Number(body?.rowVersion);
+  if (reason.length < 3 || reason.length > 500) {
+    throw new InputError("Die Begründung muss zwischen 3 und 500 Zeichen lang sein.");
+  }
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Mitarbeiterversion ist ungültig.");
+  }
+  return { reason, rowVersion };
+}
+
+async function requireEmployeeLifecycleAdministrator(client, context) {
+  const roles = await requireFullPlanner(client, context);
+  if (![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
+    throw new InputError(
+      "Mitarbeiter dürfen nur durch Administration oder Geschäftsführung entfernt oder reaktiviert werden.",
+      403,
+      "employee_lifecycle_forbidden"
+    );
+  }
+  return roles;
+}
+
+async function removeEmployee(client, context, employeeId, input) {
+  await requireEmployeeLifecycleAdministrator(client, context);
+  if (employeeId === context.userId) {
+    throw new InputError("Das eigene Konto kann nicht entfernt werden.", 409, "self_removal_forbidden");
+  }
+  const current = await client.query(
+    `SELECT id, status, row_version FROM users
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, employeeId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  if (Number(current.rows[0].row_version) !== input.rowVersion) {
+    throw new InputError("Der Mitarbeiter wurde zwischenzeitlich geändert.", 409, "row_version_conflict");
+  }
+  if (current.rows[0].status === "archived") {
+    throw new InputError("Der Mitarbeiter ist bereits archiviert.", 409, "employee_already_archived");
+  }
+  const targetRoles = await activeRoleKeys(client, { ...context, userId: employeeId });
+  if (targetRoles.has("admin")) {
+    throw new InputError("Das Firmenadministratorkonto kann nicht über die Mitarbeiterliste entfernt werden.", 409, "admin_account_locked");
+  }
+  const removal = await client.query(
+    "SELECT removal_mode FROM api_remove_or_archive_employee($1,$2,$3)",
+    [employeeId, context.userId, input.reason]
+  );
+  const mode = removal.rows[0]?.removal_mode;
+  return {
+    id: employeeId,
+    mode,
+    employee: mode === "archived" ? await getEmployeeRecord(client, context, employeeId) : null
+  };
+}
+
+async function reactivateEmployee(client, context, employeeId, input) {
+  await requireEmployeeLifecycleAdministrator(client, context);
+  const current = await client.query(
+    `SELECT id, status, row_version FROM users
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, employeeId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der archivierte Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  if (current.rows[0].status !== "archived") {
+    throw new InputError("Nur archivierte Mitarbeiter können reaktiviert werden.", 409, "employee_not_archived");
+  }
+  if (Number(current.rows[0].row_version) !== input.rowVersion) {
+    throw new InputError("Der Mitarbeiter wurde zwischenzeitlich geändert.", 409, "row_version_conflict");
+  }
+  await client.query(
+    "SELECT set_config('app.employee_lifecycle_reason', $1, TRUE)",
+    [input.reason]
+  );
+  const updated = await client.query(
+    `UPDATE users SET status = 'active'
+     WHERE company_id = $1 AND id = $2 AND row_version = $3 RETURNING id`,
+    [context.companyId, employeeId, input.rowVersion]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde zwischenzeitlich geändert.", 409, "row_version_conflict");
+  }
   return getEmployeeRecord(client, context, employeeId);
 }
 
@@ -8348,6 +8583,678 @@ async function assertCorrectionTimeline(client, {
   }
 }
 
+function assertEffectiveTimeline(entries) {
+  const timeline = [...entries].sort((left, right) => (
+    new Date(left.recorded_at).valueOf() - new Date(right.recorded_at).valueOf()
+    || String(left.id).localeCompare(String(right.id))
+  ));
+  let previous = null;
+  for (const entry of timeline) {
+    if (
+      previous
+      && new Date(entry.recorded_at).valueOf() <= new Date(previous.recorded_at).valueOf()
+    ) {
+      throw new InputError(
+        "Die Änderung würde eine doppelte oder überschneidende Buchungszeit erzeugen.",
+        409,
+        "time_edit_overlap"
+      );
+    }
+    if (!expectedNextTypes(previous?.entry_type).includes(entry.entry_type)) {
+      throw new InputError(
+        "Die Änderung würde die Reihenfolge des Arbeitsblocks ungültig machen.",
+        409,
+        "time_edit_sequence"
+      );
+    }
+    if (
+      (entry.entry_type === "site_departure"
+        && previous?.construction_site_id !== entry.construction_site_id)
+      || (
+        entry.entry_type === "site_arrival"
+        && previous?.entry_type === "next_site"
+        && previous.construction_site_id !== entry.construction_site_id
+      )
+    ) {
+      throw new InputError(
+        "Die geänderte Baustelle passt nicht zur Ankunfts- und Abfahrtsfolge.",
+        409,
+        "time_edit_site_sequence"
+      );
+    }
+    previous = entry;
+  }
+}
+
+async function effectiveEntriesForDays(client, companyId, userId, workDayIds) {
+  if (workDayIds.length === 0) return [];
+  const result = await client.query(
+    `SELECT id, work_day_id, entry_type, recorded_at, construction_site_id,
+            activity_note, travel_minutes_override, created_at
+     FROM time_entries
+     WHERE company_id = $1 AND user_id = $2 AND work_day_id = ANY($3::UUID[])
+       AND invalidated_at IS NULL
+       AND correction_kind IS DISTINCT FROM 'invalidation'
+       AND ((original_entry_id IS NULL AND correction_status IS NULL)
+            OR correction_status = 'approved')
+     ORDER BY recorded_at, created_at, id
+     FOR UPDATE`,
+    [companyId, userId, workDayIds]
+  );
+  return result.rows;
+}
+
+function enclosingWorkBlock(entries, selectedId) {
+  const index = entries.findIndex((entry) => entry.id === selectedId);
+  if (index < 0) return [];
+  let start = index;
+  while (start > 0 && entries[start].entry_type !== "clock_in") start -= 1;
+  if (entries[start]?.entry_type !== "clock_in") start = index;
+  let end = index;
+  while (end < entries.length - 1 && entries[end].entry_type !== "clock_out") end += 1;
+  if (entries[end]?.entry_type !== "clock_out") end = entries.length - 1;
+  return entries.slice(start, end + 1);
+}
+
+function siteOccurrenceIds(entries, selectedId) {
+  const index = entries.findIndex((entry) => entry.id === selectedId);
+  if (index < 0) return new Set([selectedId]);
+  const selected = entries[index];
+  let arrivalIndex = selected.entry_type === "site_arrival" ? index : -1;
+  if (selected.entry_type === "next_site") {
+    arrivalIndex = entries.findIndex((entry, candidate) => (
+      candidate > index && entry.entry_type === "site_arrival"
+    ));
+  }
+  if (selected.entry_type === "site_departure") {
+    for (let candidate = index - 1; candidate >= 0; candidate -= 1) {
+      if (entries[candidate].entry_type === "site_arrival") {
+        arrivalIndex = candidate;
+        break;
+      }
+      if (["clock_in", "clock_out"].includes(entries[candidate].entry_type)) break;
+    }
+  }
+  if (arrivalIndex < 0) return new Set([selectedId]);
+  const identifiers = new Set([entries[arrivalIndex].id]);
+  if (entries[arrivalIndex - 1]?.entry_type === "next_site") {
+    identifiers.add(entries[arrivalIndex - 1].id);
+  }
+  for (let candidate = arrivalIndex + 1; candidate < entries.length; candidate += 1) {
+    if (entries[candidate].entry_type === "site_departure") {
+      identifiers.add(entries[candidate].id);
+      break;
+    }
+    if (["site_arrival", "clock_out", "clock_in"].includes(entries[candidate].entry_type)) break;
+  }
+  return identifiers;
+}
+
+function timeChangeOperationDto(operation, items = []) {
+  return {
+    id: operation.id,
+    clientChangeId: operation.client_change_id,
+    employeeId: operation.user_id,
+    action: operation.action,
+    reason: operation.reason,
+    status: operation.status,
+    requestedAt: new Date(operation.requested_at).toISOString(),
+    reviewedAt: operation.reviewed_at ? new Date(operation.reviewed_at).toISOString() : null,
+    rowVersion: Number(operation.row_version),
+    changes: items.map((item) => ({
+      id: item.id,
+      action: item.item_action,
+      originalEntryId: item.original_entry_id || null,
+      replacementEntryId: item.replacement_entry_id || null,
+      oldValue: item.old_value || null,
+      newValue: item.new_value || null
+    }))
+  };
+}
+
+async function existingTimeChange(client, companyId, userId, clientChangeId, expectedAction) {
+  const operation = await client.query(
+    `SELECT * FROM time_change_operations
+     WHERE company_id = $1 AND client_change_id = $2`,
+    [companyId, clientChangeId]
+  );
+  if (operation.rowCount === 0) return null;
+  if (operation.rows[0].user_id !== userId) {
+    throw new InputError(
+      "Diese Änderungs-ID wurde bereits für einen anderen Mitarbeiter verwendet.",
+      409,
+      "time_change_id_conflict"
+    );
+  }
+  const expectedActions = expectedAction == null
+    ? null
+    : new Set(Array.isArray(expectedAction) ? expectedAction : [expectedAction]);
+  if (expectedActions && !expectedActions.has(operation.rows[0].action)) {
+    throw new InputError(
+      "Diese Änderungs-ID wurde bereits für eine andere Aktion verwendet.",
+      409,
+      "time_change_id_conflict"
+    );
+  }
+  const items = await client.query(
+    "SELECT * FROM time_change_items WHERE company_id = $1 AND operation_id = $2 ORDER BY created_at, id",
+    [companyId, operation.rows[0].id]
+  );
+  return timeChangeOperationDto(operation.rows[0], items.rows);
+}
+
+async function editableTimeEntry(client, context, entryId, administrator) {
+  if (administrator) await requireFullPlanner(client, context);
+  const result = await client.query(
+    `SELECT entry.*, day.work_date, day.status AS work_day_status,
+            day.break_minutes_override, day.break_minutes, day.row_version AS work_day_row_version
+     FROM time_entries AS entry
+     JOIN work_days AS day
+       ON day.company_id = entry.company_id AND day.user_id = entry.user_id
+      AND day.id = entry.work_day_id
+     WHERE entry.company_id = $1 AND entry.id = $2
+       AND ($3::BOOLEAN OR entry.user_id = $4)
+       AND entry.invalidated_at IS NULL
+       AND entry.correction_kind IS DISTINCT FROM 'invalidation'
+       AND ((entry.original_entry_id IS NULL AND entry.correction_status IS NULL)
+            OR entry.correction_status = 'approved')
+     FOR UPDATE OF entry, day`,
+    [context.companyId, entryId, administrator, context.userId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Der bearbeitbare Zeiteintrag wurde nicht gefunden.", 404, "time_entry_not_found");
+  }
+  return result.rows[0];
+}
+
+async function lockTimeEntryStream(client, context, entryId, administrator) {
+  if (administrator) await requireFullPlanner(client, context);
+  const owner = await client.query(
+    `SELECT user_id FROM time_entries
+     WHERE company_id = $1 AND id = $2 AND ($3::BOOLEAN OR user_id = $4)`,
+    [context.companyId, entryId, administrator, context.userId]
+  );
+  if (owner.rowCount !== 1) {
+    throw new InputError("Der Zeiteintrag wurde nicht gefunden.", 404, "time_entry_not_found");
+  }
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`time-edit:${context.companyId}:${owner.rows[0].user_id}`]
+  );
+  return owner.rows[0].user_id;
+}
+
+async function expectedTimeEditAction(client, context, entryId, input, administrator) {
+  if (administrator) await requireFullPlanner(client, context);
+  const result = await client.query(
+    `SELECT entry.construction_site_id,day.work_date
+     FROM time_entries AS entry
+     JOIN work_days AS day
+       ON day.company_id = entry.company_id AND day.user_id = entry.user_id
+      AND day.id = entry.work_day_id
+     WHERE entry.company_id = $1 AND entry.id = $2
+       AND ($3::BOOLEAN OR entry.user_id = $4)`,
+    [context.companyId, entryId, administrator, context.userId]
+  );
+  if (result.rowCount !== 1) return null;
+  return input.workDate !== databaseDate(result.rows[0].work_date)
+    ? "move_work_day"
+    : input.constructionSiteId !== result.rows[0].construction_site_id
+      ? "move_site"
+      : "edit_entry";
+}
+
+async function ensureEditableSite(client, context, userId, workDate, siteId, administrator) {
+  const site = await client.query(
+    `SELECT id FROM construction_sites
+     WHERE company_id = $1 AND id = $2 AND status IN ('active','planned','on_hold')`,
+    [context.companyId, siteId]
+  );
+  if (site.rowCount !== 1) {
+    throw new InputError("Die Zielbaustelle wurde nicht gefunden oder ist nicht aktiv.", 404, "site_not_found");
+  }
+  if (!administrator) {
+    const assignment = await client.query(
+      `SELECT 1 FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+         AND work_date = $4 AND status IN ('released','completed')`,
+      [context.companyId, userId, siteId, workDate]
+    );
+    if (assignment.rowCount === 0) {
+      throw new InputError("Die Zielbaustelle ist für diesen Arbeitstag nicht freigegeben.", 403, "site_not_assigned");
+    }
+  }
+}
+
+async function targetWorkDay(client, companyId, userId, workDate) {
+  let result = await client.query(
+    `SELECT * FROM work_days
+     WHERE company_id = $1 AND user_id = $2 AND work_date = $3 FOR UPDATE`,
+    [companyId, userId, workDate]
+  );
+  if (result.rowCount === 0) {
+    result = await client.query(
+      `INSERT INTO work_days (company_id,user_id,work_date,target_work_minutes)
+       VALUES ($1,$2,$3,NULL) RETURNING *`,
+      [companyId, userId, workDate]
+    );
+  }
+  return result.rows[0];
+}
+
+async function editTimeEntry(client, context, entryId, input, timeZone, administrator = false) {
+  const expectedActionHint = await expectedTimeEditAction(
+    client, context, entryId, input, administrator
+  );
+  const editableActions = expectedActionHint
+    || ["edit_entry", "move_site", "move_work_day", "change_break", "controlled_correction"];
+  const streamUserId = await lockTimeEntryStream(client, context, entryId, administrator);
+  const idempotent = await existingTimeChange(
+    client, context.companyId, streamUserId, input.clientChangeId, editableActions
+  );
+  if (idempotent) return { operation: idempotent, idempotent: true };
+  const original = await editableTimeEntry(client, context, entryId, administrator);
+  const expectedAction = input.workDate !== databaseDate(original.work_date)
+    ? "move_work_day"
+    : input.constructionSiteId !== original.construction_site_id
+      ? "move_site"
+      : "edit_entry";
+  if (new Date(input.expectedRecordedAt).valueOf() !== new Date(original.recorded_at).valueOf()) {
+    throw new InputError("Der Zeiteintrag wurde zwischenzeitlich geändert.", 409, "stale_time_entry");
+  }
+  if (new Date(input.recordedAt).valueOf() > Date.now()) {
+    throw new InputError("Die neue Buchungszeit darf nicht in der Zukunft liegen.");
+  }
+  if (localDate(input.recordedAt, timeZone) !== input.workDate) {
+    throw new InputError("Zeitpunkt und ausgewählter Arbeitstag stimmen nicht überein.", 409, "time_edit_wrong_day");
+  }
+  const siteEntry = ["site_arrival", "site_departure", "next_site"].includes(original.entry_type);
+  if (siteEntry && !input.constructionSiteId) {
+    throw new InputError("Diese Buchung benötigt eine Baustelle.");
+  }
+  if (!siteEntry && input.constructionSiteId) {
+    throw new InputError("Diese Buchungsart darf keine Baustelle enthalten.");
+  }
+  if (input.travelMinutes !== undefined
+      && !["clock_in", "site_departure"].includes(original.entry_type)) {
+    throw new InputError("Eine Fahrzeit kann nur am Beginn eines Fahrtsegments korrigiert werden.");
+  }
+
+  if (siteEntry) {
+    await ensureEditableSite(
+      client,
+      context,
+      original.user_id,
+      input.workDate,
+      input.constructionSiteId,
+      administrator
+    );
+  }
+  const targetDay = await targetWorkDay(
+    client,
+    context.companyId,
+    original.user_id,
+    input.workDate
+  );
+  const controlled = ["approved", "locked"].includes(original.work_day_status)
+    || ["approved", "locked"].includes(targetDay.status);
+  if (controlled && administrator) {
+    await requireEmployeeLifecycleAdministrator(client, context);
+  }
+
+  const dayIds = [...new Set([original.work_day_id, targetDay.id])];
+  const allEntries = await effectiveEntriesForDays(
+    client,
+    context.companyId,
+    original.user_id,
+    dayIds
+  );
+  const sourceEntries = allEntries.filter((entry) => entry.work_day_id === original.work_day_id);
+  const selectedSiteIds = siteOccurrenceIds(sourceEntries, original.id);
+  const movingDay = input.workDate !== databaseDate(original.work_date);
+  const related = movingDay
+    ? enclosingWorkBlock(sourceEntries, original.id)
+    : sourceEntries.filter((entry) => (
+      entry.id === original.id
+      || (siteEntry && input.constructionSiteId !== original.construction_site_id
+          && selectedSiteIds.has(entry.id))
+    ));
+  if (related.length === 0) throw new InputError("Der Arbeitsblock konnte nicht aufgelöst werden.", 409, "time_block_missing");
+
+  const delta = new Date(input.recordedAt).valueOf() - new Date(original.recorded_at).valueOf();
+  const replacements = related.map((entry) => ({
+    ...entry,
+    work_day_id: targetDay.id,
+    recorded_at: entry.id === original.id
+      ? input.recordedAt
+      : movingDay
+        ? new Date(new Date(entry.recorded_at).valueOf() + delta).toISOString()
+        : entry.recorded_at,
+    construction_site_id: siteEntry && selectedSiteIds.has(entry.id)
+      ? input.constructionSiteId
+      : entry.construction_site_id,
+    activity_note: entry.id === original.id ? input.activityNote : entry.activity_note,
+    travel_minutes_override: entry.id === original.id && input.travelMinutes !== undefined
+      ? input.travelMinutes
+      : entry.travel_minutes_override
+  }));
+  for (const replacement of replacements) {
+    if (localDate(replacement.recorded_at, timeZone) !== input.workDate) {
+      throw new InputError(
+        "Der vollständige Arbeitsblock passt nach der Verschiebung nicht in den Zieltag.",
+        409,
+        "time_block_crosses_day"
+      );
+    }
+  }
+
+  const relatedIds = new Set(related.map((entry) => entry.id));
+  for (const dayId of dayIds) {
+    const proposed = allEntries
+      .filter((entry) => entry.work_day_id === dayId && !relatedIds.has(entry.id))
+      .concat(replacements.filter((entry) => entry.work_day_id === dayId));
+    assertEffectiveTimeline(proposed);
+  }
+
+  if (!controlled) {
+    for (const dayId of dayIds) {
+      await client.query(
+        `UPDATE work_days SET status = 'open'
+         WHERE company_id = $1 AND id = $2 AND status = 'submitted'`,
+        [context.companyId, dayId]
+      );
+    }
+  }
+
+  const operation = await client.query(
+    `INSERT INTO time_change_operations (
+       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [
+      context.companyId, original.user_id, input.clientChangeId, expectedAction,
+      input.reason, controlled ? "pending" : "applied", context.userId
+    ]
+  );
+  const insertedItems = [];
+  for (const replacement of replacements) {
+    const inserted = await client.query(
+      `INSERT INTO time_entries (
+         company_id,user_id,work_day_id,construction_site_id,entry_type,
+         recorded_at,client_entry_id,client_created_at,source,entered_by_user_id,
+         original_entry_id,correction_kind,correction_reason,activity_note,
+         travel_minutes_override,edit_operation_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,CURRENT_TIMESTAMP,$8,$9,$10,
+                 'replacement',$11,$12,$13,$14)
+       RETURNING *`,
+      [
+        context.companyId, original.user_id, replacement.work_day_id,
+        replacement.construction_site_id, replacement.entry_type, replacement.recorded_at,
+        randomUUID(), administrator ? "office" : "employee", context.userId,
+        replacement.id, input.reason, replacement.activity_note,
+        replacement.travel_minutes_override, operation.rows[0].id
+      ]
+    );
+    if (!controlled) {
+      await client.query(
+        `UPDATE time_entries SET correction_status = 'approved', reviewed_by_user_id = $2
+         WHERE company_id = $1 AND id = $3`,
+        [context.companyId, context.userId, inserted.rows[0].id]
+      );
+    }
+    const item = await client.query(
+      `INSERT INTO time_change_items (
+         company_id,operation_id,original_entry_id,replacement_entry_id,
+         item_action,old_value,new_value
+       ) VALUES ($1,$2,$3,$4,'replace',$5::JSONB,$6::JSONB) RETURNING *`,
+      [
+        context.companyId, operation.rows[0].id, replacement.id, inserted.rows[0].id,
+        JSON.stringify({
+          workDayId: original.work_day_id,
+          recordedAt: related.find((entry) => entry.id === replacement.id).recorded_at,
+          constructionSiteId: related.find((entry) => entry.id === replacement.id).construction_site_id,
+          activityNote: related.find((entry) => entry.id === replacement.id).activity_note,
+          travelMinutes: related.find((entry) => entry.id === replacement.id).travel_minutes_override
+        }),
+        JSON.stringify({
+          workDayId: replacement.work_day_id,
+          workDate: input.workDate,
+          recordedAt: replacement.recorded_at,
+          constructionSiteId: replacement.construction_site_id,
+          activityNote: replacement.activity_note,
+          travelMinutes: replacement.travel_minutes_override
+        })
+      ]
+    );
+    insertedItems.push(item.rows[0]);
+  }
+
+  if (input.breakMinutes !== undefined) {
+    const oldBreak = targetDay.break_minutes_override;
+    if (!controlled) {
+      await client.query(
+        `UPDATE work_days
+         SET break_minutes_override = $3,
+             break_override_reason = CASE WHEN $3::INTEGER IS NULL THEN NULL ELSE $4 END,
+             break_override_by_user_id = CASE WHEN $3::INTEGER IS NULL THEN NULL ELSE $5::UUID END
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, targetDay.id, input.breakMinutes, input.reason, context.userId]
+      );
+      await client.query(
+        "SELECT recalculate_work_day($1,$2,$3)",
+        [context.companyId, original.user_id, targetDay.id]
+      );
+    }
+    const item = await client.query(
+      `INSERT INTO time_change_items (
+         company_id,operation_id,item_action,old_value,new_value
+       ) VALUES ($1,$2,'break_override',$3::JSONB,$4::JSONB) RETURNING *`,
+      [
+        context.companyId, operation.rows[0].id,
+        JSON.stringify({ workDayId: targetDay.id, minutes: oldBreak }),
+        JSON.stringify({ workDayId: targetDay.id, minutes: input.breakMinutes })
+      ]
+    );
+    insertedItems.push(item.rows[0]);
+  }
+
+  return {
+    operation: timeChangeOperationDto(operation.rows[0], insertedItems),
+    idempotent: false
+  };
+}
+
+async function deleteTimeEntry(client, context, entryId, input, administrator = false) {
+  const streamUserId = await lockTimeEntryStream(client, context, entryId, administrator);
+  const idempotent = await existingTimeChange(
+    client, context.companyId, streamUserId, input.clientChangeId, "delete_entry"
+  );
+  if (idempotent) return { operation: idempotent, idempotent: true };
+  const original = await editableTimeEntry(client, context, entryId, administrator);
+  if (new Date(input.expectedRecordedAt).valueOf() !== new Date(original.recorded_at).valueOf()) {
+    throw new InputError("Der Zeiteintrag wurde zwischenzeitlich geändert.", 409, "stale_time_entry");
+  }
+  const sourceEntries = await effectiveEntriesForDays(
+    client,
+    context.companyId,
+    original.user_id,
+    [original.work_day_id]
+  );
+  const block = enclosingWorkBlock(sourceEntries, original.id);
+  if (block.length === 0) throw new InputError("Der Arbeitsblock wurde nicht gefunden.", 409, "time_block_missing");
+  const remaining = sourceEntries.filter((entry) => !block.some((item) => item.id === entry.id));
+  assertEffectiveTimeline(remaining);
+  const controlled = ["approved", "locked"].includes(original.work_day_status);
+  if (controlled && administrator) await requireEmployeeLifecycleAdministrator(client, context);
+  if (!controlled) {
+    await client.query(
+      `UPDATE work_days SET status = 'open'
+       WHERE company_id = $1 AND id = $2 AND status = 'submitted'`,
+      [context.companyId, original.work_day_id]
+    );
+  }
+  const operation = await client.query(
+    `INSERT INTO time_change_operations (
+       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id
+     ) VALUES ($1,$2,$3,'delete_entry',$4,$5,$6) RETURNING *`,
+    [context.companyId, original.user_id, input.clientChangeId, input.reason, controlled ? "pending" : "applied", context.userId]
+  );
+  const items = [];
+  for (const entry of block) {
+    const invalidation = await client.query(
+      `INSERT INTO time_entries (
+         company_id,user_id,work_day_id,construction_site_id,entry_type,
+         recorded_at,client_entry_id,client_created_at,source,entered_by_user_id,
+         original_entry_id,correction_kind,correction_reason,activity_note,
+         travel_minutes_override,edit_operation_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,CURRENT_TIMESTAMP,$8,$9,$10,
+                 'invalidation',$11,$12,$13,$14) RETURNING *`,
+      [
+        context.companyId, original.user_id, entry.work_day_id,
+        entry.construction_site_id, entry.entry_type, entry.recorded_at, randomUUID(),
+        administrator ? "office" : "employee", context.userId, entry.id,
+        input.reason, entry.activity_note, entry.travel_minutes_override, operation.rows[0].id
+      ]
+    );
+    if (!controlled) {
+      await client.query(
+        `UPDATE time_entries SET correction_status = 'approved', reviewed_by_user_id = $2
+         WHERE company_id = $1 AND id = $3`,
+        [context.companyId, context.userId, invalidation.rows[0].id]
+      );
+    }
+    const item = await client.query(
+      `INSERT INTO time_change_items (
+         company_id,operation_id,original_entry_id,replacement_entry_id,
+         item_action,old_value,new_value
+       ) VALUES ($1,$2,$3,$4,'invalidate',$5::JSONB,$6::JSONB) RETURNING *`,
+      [
+        context.companyId, operation.rows[0].id, entry.id, invalidation.rows[0].id,
+        JSON.stringify({
+          workDayId: entry.work_day_id, recordedAt: entry.recorded_at,
+          entryType: entry.entry_type, constructionSiteId: entry.construction_site_id,
+          activityNote: entry.activity_note, travelMinutes: entry.travel_minutes_override
+        }),
+        JSON.stringify({ deleted: true })
+      ]
+    );
+    items.push(item.rows[0]);
+  }
+  return { operation: timeChangeOperationDto(operation.rows[0], items), idempotent: false };
+}
+
+async function reviewTimeChangeOperation(client, context, operationId, input) {
+  await requireFullPlanner(client, context);
+  const operation = await client.query(
+    `SELECT * FROM time_change_operations
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, operationId]
+  );
+  if (operation.rowCount !== 1 || operation.rows[0].status !== "pending") {
+    throw new InputError("Die kontrollierte Korrektur wurde nicht gefunden oder bereits entschieden.", 409, "time_change_not_pending");
+  }
+  const items = await client.query(
+    `SELECT * FROM time_change_items
+     WHERE company_id = $1 AND operation_id = $2 ORDER BY created_at, id`,
+    [context.companyId, operationId]
+  );
+  const oldWorkDayIds = [...new Set(
+    items.rows.map((item) => item.old_value?.workDayId).filter(Boolean)
+  )];
+  const newWorkDayIds = [...new Set(
+    items.rows.map((item) => item.new_value?.workDayId).filter(Boolean)
+  )];
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`time-edit:${context.companyId}:${operation.rows[0].user_id}`]
+  );
+  if (input.decision === "approved") {
+    const workDayIds = [...new Set([...oldWorkDayIds, ...newWorkDayIds])];
+    const currentEntries = await effectiveEntriesForDays(
+      client,
+      context.companyId,
+      operation.rows[0].user_id,
+      workDayIds
+    );
+    const originalIds = new Set(
+      items.rows.map((item) => item.original_entry_id).filter(Boolean)
+    );
+    const pending = await client.query(
+      `SELECT id,work_day_id,entry_type,recorded_at,construction_site_id,
+              activity_note,travel_minutes_override,created_at,correction_kind
+       FROM time_entries
+       WHERE company_id = $1 AND edit_operation_id = $2
+         AND correction_status = 'pending'
+       ORDER BY recorded_at,created_at,id
+       FOR UPDATE`,
+      [context.companyId, operationId]
+    );
+    for (const workDayId of workDayIds) {
+      const proposed = currentEntries
+        .filter((entry) => entry.work_day_id === workDayId && !originalIds.has(entry.id))
+        .concat(pending.rows.filter((entry) => (
+          entry.work_day_id === workDayId && entry.correction_kind !== "invalidation"
+        )));
+      assertEffectiveTimeline(proposed);
+    }
+  }
+  await client.query(
+    "SELECT set_config('app.controlled_time_correction','on',TRUE)"
+  );
+  await client.query(
+    `UPDATE time_entries SET correction_status = $3, reviewed_by_user_id = $4
+     WHERE company_id = $1 AND edit_operation_id = $2 AND correction_status = 'pending'`,
+    [context.companyId, operationId, input.decision, context.userId]
+  );
+  if (input.decision === "approved") {
+    const movedToDayIds = newWorkDayIds.filter((workDayId) => !oldWorkDayIds.includes(workDayId));
+    if (movedToDayIds.length && oldWorkDayIds.length) {
+      const sourceStatus = await client.query(
+        `SELECT CASE WHEN BOOL_OR(status = 'locked') THEN 'locked'
+                     WHEN BOOL_OR(status = 'approved') THEN 'approved'
+                     ELSE NULL END AS final_status
+         FROM work_days WHERE company_id = $1 AND id = ANY($2::UUID[])`,
+        [context.companyId, oldWorkDayIds]
+      );
+      const finalStatus = sourceStatus.rows[0]?.final_status;
+      if (finalStatus) {
+        await client.query(
+          `UPDATE work_days SET
+             status = CASE WHEN status = 'locked' OR $3 = 'locked' THEN 'locked' ELSE 'approved' END,
+             approved_by_user_id = COALESCE(approved_by_user_id,$4),
+             locked_by_user_id = CASE
+               WHEN status = 'locked' OR $3 = 'locked' THEN COALESCE(locked_by_user_id,$4)
+               ELSE NULL END
+           WHERE company_id = $1 AND id = ANY($2::UUID[])`,
+          [context.companyId, movedToDayIds, finalStatus, context.userId]
+        );
+      }
+    }
+    for (const item of items.rows.filter((row) => row.item_action === "break_override")) {
+      const value = item.new_value;
+      await client.query(
+        `UPDATE work_days
+         SET break_minutes_override = $3,
+             break_override_reason = CASE WHEN $3::INTEGER IS NULL THEN NULL ELSE $4 END,
+             break_override_by_user_id = CASE WHEN $3::INTEGER IS NULL THEN NULL ELSE $5::UUID END
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, value.workDayId, value.minutes, operation.rows[0].reason, context.userId]
+      );
+      await client.query(
+        "SELECT recalculate_work_day($1,$2,$3)",
+        [context.companyId, operation.rows[0].user_id, value.workDayId]
+      );
+    }
+  }
+  const updated = await client.query(
+    `UPDATE time_change_operations
+     SET status = $3, reviewed_by_user_id = $4, reviewed_at = CURRENT_TIMESTAMP,
+         row_version = row_version + 1
+     WHERE company_id = $1 AND id = $2 RETURNING *`,
+    [context.companyId, operationId, input.decision, context.userId]
+  );
+  return timeChangeOperationDto(updated.rows[0], items.rows);
+}
+
 async function createTimeEntryCorrection(client, context, input, timeZone) {
   const requestedAt = new Date(input.requestedRecordedAt);
   if (requestedAt.valueOf() > Date.now()) {
@@ -8681,6 +9588,7 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
     `SELECT correction.id, correction.user_id, correction.work_day_id,
             day.work_date, correction.original_entry_id,
             correction.correction_kind,
+            correction.edit_operation_id,
             correction.entry_type,
             correction.recorded_at AS requested_recorded_at,
             original.recorded_at AS original_recorded_at,
@@ -8715,6 +9623,13 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
     );
   }
   const correction = correctionResult.rows[0];
+  if (correction.edit_operation_id) {
+    throw new InputError(
+      "Diese zusammenhängende Änderung muss als vollständiger Korrekturvorgang geprüft werden.",
+      409,
+      "time_change_operation_review_required"
+    );
+  }
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`time-correction:${context.companyId}:${correction.user_id}:${correction.work_day_id}`]
@@ -8746,7 +9661,91 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
   });
 }
 
+function sanitizedRequestPath(requestUrl) {
+  try {
+    return new URL(requestUrl, "http://api.local").pathname
+      .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ":id")
+      .replace(/\/\d{4}-\d{2}-\d{2}(?=\/|$)/g, "/:date")
+      .slice(0, 240);
+  } catch {
+    return "/unknown";
+  }
+}
+
+function clientRuntime(userAgent = "") {
+  const ua = String(userAgent).slice(0, 500);
+  const deviceClass = /ipad|tablet/i.test(ua)
+    ? "tablet"
+    : /mobile|android|iphone/i.test(ua) ? "mobile" : "desktop";
+  const browser = /edg\//i.test(ua) ? "Edge"
+    : /firefox\//i.test(ua) ? "Firefox"
+      : /chrome\//i.test(ua) ? "Chrome"
+        : /safari\//i.test(ua) ? "Safari" : "Unbekannt";
+  const operatingSystem = /android/i.test(ua) ? "Android"
+    : /iphone|ipad|ios/i.test(ua) ? "iOS/iPadOS"
+      : /windows/i.test(ua) ? "Windows"
+        : /mac os|macintosh/i.test(ua) ? "macOS"
+          : /linux/i.test(ua) ? "Linux" : "Unbekannt";
+  return { deviceClass, browser, operatingSystem };
+}
+
+async function recordUnhandledPlatformError(pool, request, requestId, error) {
+  const path = sanitizedRequestPath(request.url);
+  if (!path.startsWith("/api/")) return;
+  const safeCode = typeof error?.code === "string" && /^[A-Za-z0-9_]{1,80}$/.test(error.code)
+    ? error.code
+    : "internal_error";
+  const moduleName = path.startsWith("/api/v1/platform/")
+    ? "platform_administration"
+    : path.startsWith("/api/v1/vde/") ? "vde"
+      : path.includes("time") || path.includes("work-day") ? "time_tracking" : "web_api";
+  const fingerprint = createHash("sha256")
+    .update(`${safeCode}|${request.method}|${path}|${error?.name || "Error"}`)
+    .digest("hex");
+  const runtime = clientRuntime(request.headers["user-agent"]);
+  await withPlatformTransaction(pool, async (client) => {
+    const group = await client.query(
+      `INSERT INTO platform_error_groups (
+         fingerprint,error_code,severity,module,application_version,
+         sanitized_message,sanitized_details,first_seen_at,last_seen_at
+       ) VALUES ($1,$2,'error',$3,'0.42.0',$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       ON CONFLICT (fingerprint) DO UPDATE SET
+         occurrence_count = platform_error_groups.occurrence_count + 1,
+         last_seen_at = CURRENT_TIMESTAMP,
+         status = CASE WHEN platform_error_groups.status = 'resolved' THEN 'reopened'
+                       ELSE platform_error_groups.status END,
+         resolved_at = NULL
+       RETURNING id`,
+      [
+        fingerprint,
+        safeCode,
+        moduleName,
+        `Unbehandelte Serverausnahme bei ${request.method} ${path}`,
+        JSON.stringify({ method: request.method, path, errorType: error?.name || "Error" })
+      ]
+    );
+    await client.query(
+      `INSERT INTO platform_error_occurrences (
+         error_group_id,device_class,browser,operating_system,request_id,sanitized_context
+       ) VALUES ($1,$2,$3,$4,$5,$6::JSONB)`,
+      [
+        group.rows[0].id, runtime.deviceClass, runtime.browser,
+        runtime.operatingSystem, requestId, JSON.stringify({ method: request.method, path })
+      ]
+    );
+  });
+}
+
 export function createApp({ pool, config, limiter = new LoginRateLimiter(), logger = console }) {
+  const platformHandler = createPlatformHandler({ pool, config, limiter });
+  let runtimeCache = { validUntil: 0, value: null };
+  const runtimeState = async () => {
+    const now = Date.now();
+    if (runtimeCache.value && runtimeCache.validUntil > now) return runtimeCache.value;
+    const value = await readPlatformRuntimeState(pool);
+    runtimeCache = { validUntil: now + 2_000, value };
+    return value;
+  };
   return async function app(request, response) {
     const requestId = randomUUID();
     response.setHeader("X-Request-Id", requestId);
@@ -8763,7 +9762,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
         "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, X-Schaefchen-Version, X-Support-Access-Id",
         "Access-Control-Max-Age": "600"
       });
       return response.end();
@@ -8775,6 +9774,46 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       if (request.method === "GET" && url.pathname === "/health") {
         await pool.query("SELECT 1");
         return json(response, 200, { status: "ok" });
+      }
+
+      if (await platformHandler(request, response, url)) return;
+
+      if (!url.pathname.startsWith("/api/") && await serveStatic(
+        request,
+        response,
+        config.staticDirectory,
+        url.pathname
+      )) return;
+
+      const platformRuntime = await runtimeState();
+      if (request.method === "GET" && url.pathname === "/api/v1/runtime") {
+        return json(response, 200, { runtime: platformRuntime, requestId });
+      }
+      const logoutDuringBlock = request.method === "DELETE"
+        && url.pathname === "/api/v1/session";
+      if (platformRuntime.maintenanceEnabled && !logoutDuringBlock) {
+        return json(response, 503, {
+          error: {
+            code: "maintenance_mode",
+            message: "Schäfchen befindet sich im Wartungsmodus. Bitte versuchen Sie es in Kürze erneut."
+          },
+          requestId
+        }, { "Retry-After": "120" });
+      }
+      if (platformRuntime.mandatoryUpdate && platformRuntime.productionVersion
+          && !logoutDuringBlock) {
+        const clientVersion = request.headers["x-schaefchen-version"];
+        const comparison = compareApplicationVersions(clientVersion, platformRuntime.productionVersion);
+        if (comparison === null || comparison < 0) {
+          return json(response, 426, {
+            error: {
+              code: "mandatory_update",
+              message: `Für Schäfchen ist das verpflichtende Update ${platformRuntime.productionVersion} verfügbar.`
+            },
+            update: { requiredVersion: platformRuntime.productionVersion },
+            requestId
+          });
+        }
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/setup") {
@@ -8793,13 +9832,6 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           "Set-Cookie": sessionCookie(token, { secure: config.cookieSecure, maxAge: config.sessionTtlSeconds })
         });
       }
-
-      if (!url.pathname.startsWith("/api/") && await serveStatic(
-        request,
-        response,
-        config.staticDirectory,
-        url.pathname
-      )) return;
 
       const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
       if (!token || token.length < 40 || token.length > 128) {
@@ -8833,6 +9865,31 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => changeInitialPassword(client, context, input.newPassword)
         );
         return json(response, 200, { changed: true, session: view });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/announcements") {
+        const announcements = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getPlatformAnnouncements(client, context)
+        );
+        return json(response, 200, { announcements });
+      }
+
+      const announcementReadMatch = /^\/api\/v1\/announcements\/([^/]+)\/read$/.exec(
+        url.pathname
+      );
+      if (request.method === "POST" && announcementReadMatch) {
+        const announcement = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => markPlatformAnnouncementRead(
+            client,
+            context,
+            validateId(announcementReadMatch[1], "Mitteilungs-ID")
+          )
+        );
+        return json(response, 200, { announcement });
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/time-account") {
@@ -9513,6 +10570,30 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { employee });
       }
 
+      if (request.method === "DELETE" && adminEmployeeMatch) {
+        const employeeId = validateId(adminEmployeeMatch[1], "Mitarbeiter-ID");
+        const input = employeeLifecycleInput(await readJson(request));
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => removeEmployee(client, context, employeeId, input)
+        );
+        return json(response, 200, result);
+      }
+
+      const adminEmployeeReactivateMatch =
+        /^\/api\/v1\/admin\/employees\/([^/]+)\/reactivate$/.exec(url.pathname);
+      if (request.method === "POST" && adminEmployeeReactivateMatch) {
+        const employeeId = validateId(adminEmployeeReactivateMatch[1], "Mitarbeiter-ID");
+        const input = employeeLifecycleInput(await readJson(request));
+        const employee = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => reactivateEmployee(client, context, employeeId, input)
+        );
+        return json(response, 200, { employee });
+      }
+
       if (request.method === "POST" && url.pathname === "/api/v1/admin/customers") {
         const input = validateCustomer(await readJson(request));
         const customer = await withReadySession(
@@ -9709,7 +10790,59 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { timeCorrection: correction });
       }
 
+      const adminTimeEntryEditMatch =
+        /^\/api\/v1\/admin\/time-entries\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminTimeEntryEditMatch) {
+        const entryId = validateId(adminTimeEntryEditMatch[1], "Zeitbuchungs-ID");
+        const input = validateTimeEntryEdit(await readJson(request));
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => editTimeEntry(
+            client,
+            context,
+            entryId,
+            input,
+            config.timeZone,
+            true
+          )
+        );
+        return json(response, 200, result);
+      }
+      if (request.method === "DELETE" && adminTimeEntryEditMatch) {
+        const entryId = validateId(adminTimeEntryEditMatch[1], "Zeitbuchungs-ID");
+        const input = validateTimeEntryDelete(await readJson(request));
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => deleteTimeEntry(client, context, entryId, input, true)
+        );
+        return json(response, 200, result);
+      }
+
+      const adminTimeOperationMatch =
+        /^\/api\/v1\/admin\/time-change-operations\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && adminTimeOperationMatch) {
+        const operationId = validateId(adminTimeOperationMatch[1], "Zeitänderungs-ID");
+        const input = validateTimeEntryCorrectionDecision(await readJson(request));
+        const operation = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => reviewTimeChangeOperation(client, context, operationId, input)
+        );
+        return json(response, 200, { operation });
+      }
+
       const adminWorkDayMatch = /^\/api\/v1\/admin\/work-days\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "GET" && adminWorkDayMatch) {
+        const workDayId = validateId(adminWorkDayMatch[1], "Stundenzettel-ID");
+        const workDay = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getAdminWorkDayEntries(client, context, workDayId)
+        );
+        return json(response, 200, { workDay });
+      }
       if (request.method === "PATCH" && adminWorkDayMatch) {
         const workDayId = validateId(adminWorkDayMatch[1], "Stundenzettel-ID");
         const input = validateWorkDayDecision(await readJson(request));
@@ -9872,6 +11005,35 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, entry.idempotent ? 200 : 201, { timeEntry: entry });
       }
 
+      const ownTimeEntryEditMatch = /^\/api\/v1\/time-entries\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && ownTimeEntryEditMatch) {
+        const entryId = validateId(ownTimeEntryEditMatch[1], "Zeitbuchungs-ID");
+        const input = validateTimeEntryEdit(await readJson(request));
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => editTimeEntry(
+            client,
+            context,
+            entryId,
+            input,
+            config.timeZone,
+            false
+          )
+        );
+        return json(response, 200, result);
+      }
+      if (request.method === "DELETE" && ownTimeEntryEditMatch) {
+        const entryId = validateId(ownTimeEntryEditMatch[1], "Zeitbuchungs-ID");
+        const input = validateTimeEntryDelete(await readJson(request));
+        const result = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => deleteTimeEntry(client, context, entryId, input, false)
+        );
+        return json(response, 200, result);
+      }
+
       if (request.method === "POST" && url.pathname === "/api/v1/time-entry-corrections") {
         const input = validateTimeEntryCorrection(await readJson(request));
         const correction = await withReadySession(
@@ -9913,6 +11075,12 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, error.status, { error: { code: error.code, message: error.message }, requestId });
       }
       logger.error?.({ requestId, error: error?.message }, "API-Anfrage fehlgeschlagen");
+      await recordUnhandledPlatformError(pool, request, requestId, error).catch((recordError) => {
+        logger.error?.(
+          { requestId, error: recordError?.message },
+          "Plattformfehler konnte nicht gruppiert werden"
+        );
+      });
       return json(response, 500, {
         error: { code: "internal_error", message: "Die Anfrage konnte nicht verarbeitet werden." },
         requestId

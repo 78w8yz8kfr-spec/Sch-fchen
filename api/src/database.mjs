@@ -24,6 +24,11 @@ async function beginAsApi(client) {
   await client.query("SET LOCAL ROLE schaefchen_api");
 }
 
+async function beginAsPlatformApi(client) {
+  await client.query("BEGIN");
+  await client.query("SET LOCAL ROLE schaefchen_platform_api");
+}
+
 async function setTenant(client, companyId, userId) {
   await client.query(
     "SELECT set_config('app.current_company_id', $1, TRUE), set_config('app.current_user_id', $2, TRUE)",
@@ -44,6 +49,79 @@ export async function withApiTransaction(pool, callback) {
   } finally {
     client.release();
   }
+}
+
+export async function withPlatformTransaction(pool, callback) {
+  const client = await pool.connect();
+  try {
+    await beginAsPlatformApi(client);
+    const result = await callback(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function withPlatformSessionTransaction(pool, tokenHash, callback) {
+  return withPlatformTransaction(pool, async (client) => {
+    const resolved = await client.query(
+      "SELECT session_id, platform_user_id, expires_at FROM api_resolve_platform_session($1::CHAR(64))",
+      [tokenHash]
+    );
+    if (resolved.rowCount !== 1) {
+      throw new InputError("Die Plattformsitzung ist ungültig oder abgelaufen.", 401, "unauthorized");
+    }
+    const row = resolved.rows[0];
+    const context = {
+      sessionId: row.session_id,
+      platformUserId: row.platform_user_id,
+      expiresAt: row.expires_at
+    };
+    await client.query(
+      "SELECT set_config('app.current_platform_user_id', $1, TRUE)",
+      [context.platformUserId]
+    );
+    return callback(client, context);
+  });
+}
+
+export async function platformSessionView(client, context) {
+  const result = await client.query(
+    `SELECT account.id, account.first_name, account.last_name, account.email,
+            account.two_factor_enabled,
+            COALESCE(jsonb_agg(DISTINCT role.role_key ORDER BY role.role_key)
+              FILTER (WHERE role.id IS NOT NULL), '[]'::jsonb) AS roles,
+            COALESCE(jsonb_agg(DISTINCT permission.value ORDER BY permission.value)
+              FILTER (WHERE permission.value IS NOT NULL), '[]'::jsonb) AS permissions
+     FROM platform_users AS account
+     LEFT JOIN platform_user_roles AS assignment
+       ON assignment.platform_user_id = account.id AND assignment.revoked_at IS NULL
+     LEFT JOIN platform_roles AS role ON role.id = assignment.platform_role_id
+     LEFT JOIN LATERAL jsonb_array_elements_text(role.permissions) AS permission(value) ON TRUE
+     WHERE account.id = $1 AND account.status = 'active'
+     GROUP BY account.id`,
+    [context.platformUserId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Das Plattformkonto ist nicht mehr aktiv.", 401, "unauthorized");
+  }
+  const row = result.rows[0];
+  return {
+    expiresAt: new Date(context.expiresAt).toISOString(),
+    platformUser: {
+      id: row.id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      email: row.email,
+      twoFactorEnabled: row.two_factor_enabled,
+      roles: row.roles,
+      permissions: row.permissions
+    }
+  };
 }
 
 export async function withTenantTransaction(pool, context, callback) {

@@ -5,6 +5,7 @@ import {
   hashSessionToken,
   LoginRateLimiter,
   parseCookies,
+  platformSessionCookie,
   secretsEqual,
   sessionCookie
 } from "../src/security.mjs";
@@ -15,6 +16,16 @@ test("Sitzungstoken ist zufällig und wird als SHA-256-Hash gespeichert", () => 
   assert.notEqual(first, second);
   assert.match(first, /^[A-Za-z0-9_-]{43}$/);
   assert.match(hashSessionToken(first), /^[0-9a-f]{64}$/);
+});
+
+test("Plattformsitzung verwendet ein getrenntes, eng begrenztes Cookie", () => {
+  const cookie = platformSessionCookie("platform-token", { secure: true, maxAge: 900 });
+  assert.match(cookie, /^schaefchen_platform_session=platform-token;/);
+  assert.match(cookie, /Path=\/api\/v1\/platform/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /SameSite=Strict/);
+  assert.match(cookie, /Secure/);
+  assert.doesNotMatch(cookie, /^schaefchen_session=/);
 });
 
 test("Session-Cookie besitzt sichere Browserattribute", () => {

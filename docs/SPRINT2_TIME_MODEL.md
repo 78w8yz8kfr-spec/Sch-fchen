@@ -1,10 +1,10 @@
 # Sprint 2: Planung und Zeiterfassung
 
-Stand: 29.07.2026
-Technischer Stand: V0.38.0
+Stand: 01.08.2026
+Technischer Stand: V0.42.0
 
 Dieses Dokument beschreibt die verbindlichen Regeln der Migrationen 009 bis
-012 sowie 027, 031, 032, 033, 034 und 035. Der Sprint verbindet Wochenplanung,
+012 sowie 027, 031, 032, 033, 034, 035 und 042. Der Sprint verbindet Wochenplanung,
 Vorarbeiterverantwortung, Offline-Zeitereignisse, Abwesenheiten, Stundenkonto,
 Feiertagskalender und den berechneten Stundenzettel.
 
@@ -69,12 +69,14 @@ Freitag 360 Minuten und am Wochenende 0 Minuten. Beim Anlegen eines Arbeitstags
 wird das jeweilige Soll als unveränderlicher Tageswert übernommen.
 
 `work_days` ist die berechnete Tageszusammenfassung. Die derzeitige
-`calculation_version = 3` verwendet folgende Regeln:
+`calculation_version = 4` verwendet folgende Regeln:
 
 - ab 3 Stunden 30 Minuten Bruttozeit: 30 Minuten Pause,
 - ab 6 Stunden Bruttozeit: insgesamt 60 Minuten Pause,
 - ein weiterer Arbeitsbeginn nach Feierabend eröffnet einen neuen Arbeitsblock,
 - die Unterbrechung zwischen zwei Arbeitsblöcken zählt mindestens als Pause,
+- eine ausdrücklich begründete Pausenüberschreibung ersetzt für diesen Tag die
+  automatische Pause, ohne deren Historie zu verlieren,
 - Arbeitszeit = Bruttozeit minus Pause,
 - Fahrtzeit zählt zur Arbeitszeit,
 - Mehrarbeit = Arbeitszeit oberhalb des individuellen Tagessolls.
@@ -143,6 +145,22 @@ Migration 032 erweitert den Ablauf auf Ergänzungen und Ungültigmarkierungen.
 Originale werden niemals gelöscht. Eine genehmigte Ungültigmarkierung entwertet
 das Original nachvollziehbar; die Rechenregel Version 3 ignoriert ausschließlich
 genehmigte Ungültigmarkierungen und berechnet den Tag reproduzierbar neu.
+
+Migration 042 ergänzt die vollständige Bearbeitung einer wirksamen Buchung.
+Baustelle, Uhrzeit, Tätigkeit, Fahrt, Pause und Arbeitstag werden im selben
+Dialog mit Pflichtgrund geändert. Ein „Löschen“ markiert den vollständigen
+Arbeitsblock unwirksam. Jeder geänderte Wert entsteht als unveränderliche
+Ersatzbuchung; `time_change_operations` und `time_entry_change_audit` bewahren
+Aktion, Akteur, Zeitpunkt, alten und neuen Stand sowie Begründung.
+
+Offene und lediglich eingereichte Tage können nach Rollenprüfung unmittelbar
+ersetzt werden. Für `approved` und `locked` erzeugt dieselbe Aktion einen
+kontrollierten Antrag; erst eine berechtigte Entscheidung aktiviert die
+Ersatzkette. Advisory Lock je Mitarbeiter, erwarteter Änderungszeitpunkt,
+Idempotenz-ID, Eindeutigkeitsindizes und vollständige Zeitachsenprüfung
+verhindern parallele Dubletten, Überschneidungen und veraltete Änderungen.
+Beim Wechsel des Arbeitstags werden alter und neuer Tag atomar nach
+Rechenregel Version 4 neu berechnet.
 
 ## 033 `absence_requests`
 
@@ -251,6 +269,9 @@ Abwesenheitsberechnung, jahresbezogenen Urlaubsanspruch, unveränderliche
 Korrekturen, API-Rolle und Mandantentrennung. Migration 035 prüft
 Osterberechnung, Bundeslandregeln, Sollzeitwirkung, betriebliche freie Tage,
 Aufhebungshistorie, Versionsstände, API-Rolle und Mandantentrennung.
+Migration 042 prüft vollständige Ersatzketten, Baustellenwechsel,
+Pausenüberschreibung, Tagesverschiebung, Block-Ungültigmarkierung,
+Freigabegrenze, Konfliktschutz, Unveränderlichkeit und Neuberechnung.
 GitHub Actions wendet alle Migrationen zweimal an, prüft Backup und Restore und
 führt anschließend den echten Login-/Session-/Offline-Sync-Ablauf der Node-API
 gegen PostgreSQL aus.

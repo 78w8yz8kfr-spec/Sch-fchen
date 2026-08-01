@@ -1,7 +1,7 @@
 (() => {
   const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
   const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
-  const DOCUMENT_CACHE_VERSION = "v41";
+  const DOCUMENT_CACHE_VERSION = "v42";
   const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
   const queryMode = new URLSearchParams(window.location.search).get("mode");
   const demoMode = queryMode === "demo" || (
@@ -147,6 +147,8 @@
     employeeSiteVdeStart: document.querySelector("#employee-site-vde-start"),
     employeeSiteVdeInspections: document.querySelector("#employee-site-vde-inspections"),
     connectionState: document.querySelector("#connection-state"),
+    platformAnnouncements: document.querySelector("#platform-announcements"),
+    platformAnnouncementList: document.querySelector("#platform-announcement-list"),
     todayLabel: document.querySelector("#today-label"),
     weekStrip: document.querySelector("#week-strip"),
     weekPeriod: document.querySelector("#week-period"),
@@ -154,6 +156,8 @@
     weekCurrent: document.querySelector("#week-current"),
     weekNext: document.querySelector("#week-next"),
     weekTotalWork: document.querySelector("#week-total-work"),
+    weekTotalTarget: document.querySelector("#week-total-target"),
+    weekTotalDifference: document.querySelector("#week-total-difference"),
     weekTotalBreak: document.querySelector("#week-total-break"),
     weekTotalTravel: document.querySelector("#week-total-travel"),
     weekTotalOvertime: document.querySelector("#week-total-overtime"),
@@ -161,6 +165,9 @@
     weekTimesheetList: document.querySelector("#week-timesheet-list"),
     timeAccountPanel: document.querySelector("#time-account-panel"),
     timeAccountBalance: document.querySelector("#time-account-balance"),
+    timeAccountWeekBreak: document.querySelector("#time-account-week-break"),
+    timeAccountWeekTravel: document.querySelector("#time-account-week-travel"),
+    timeAccountWeekOvertime: document.querySelector("#time-account-week-overtime"),
     timeAccountStatus: document.querySelector("#time-account-status"),
     timeAccountTargetWork: document.querySelector("#time-account-target-work"),
     timeAccountVacationRemaining: document.querySelector("#time-account-vacation-remaining"),
@@ -171,6 +178,13 @@
     timeAccountHolidayList: document.querySelector("#time-account-holiday-list"),
     timeAccountMonths: document.querySelector("#time-account-months"),
     timeAccountMessage: document.querySelector("#time-account-message"),
+    nextHolidayCard: document.querySelector("#next-holiday-card"),
+    nextHolidaySummary: document.querySelector("#next-holiday-summary"),
+    weekNextAssignment: document.querySelector("#week-next-assignment"),
+    weekNextAssignmentName: document.querySelector("#week-next-assignment-name"),
+    weekNextAssignmentMeta: document.querySelector("#week-next-assignment-meta"),
+    weekOpenActions: document.querySelector("#week-open-actions"),
+    weekOpenActionsList: document.querySelector("#week-open-actions-list"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
     timeAccountAdminYear: document.querySelector("#time-account-admin-year"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
@@ -256,7 +270,14 @@
     timeCorrectionForm: document.querySelector("#time-correction-form"),
     timeCorrectionTitle: document.querySelector("#time-correction-title"),
     timeCorrectionOriginal: document.querySelector("#time-correction-original"),
+    timeCorrectionDate: document.querySelector("#time-correction-date"),
     timeCorrectionAt: document.querySelector("#time-correction-at"),
+    timeCorrectionSiteField: document.querySelector("#time-correction-site-field"),
+    timeCorrectionSite: document.querySelector("#time-correction-site"),
+    timeCorrectionActivity: document.querySelector("#time-correction-activity"),
+    timeCorrectionTravelField: document.querySelector("#time-correction-travel-field"),
+    timeCorrectionTravel: document.querySelector("#time-correction-travel"),
+    timeCorrectionBreak: document.querySelector("#time-correction-break"),
     timeCorrectionReason: document.querySelector("#time-correction-reason"),
     timeCorrectionSubmit: document.querySelector("#time-correction-submit"),
     timeInvalidationSubmit: document.querySelector("#time-invalidation-submit"),
@@ -281,17 +302,24 @@
     siteChoiceSubmit: document.querySelector("#site-choice-submit"),
     fieldSiteForm: document.querySelector("#field-site-form"),
     fieldSiteCustomer: document.querySelector("#field-site-customer"),
+    fieldSiteCustomerError: document.querySelector("#field-site-customer-error"),
     fieldSiteNewCustomer: document.querySelector("#field-site-new-customer"),
     fieldSiteCustomerName: document.querySelector("#field-site-customer-name"),
+    fieldSiteCustomerNameError: document.querySelector("#field-site-customer-name-error"),
     fieldSiteProject: document.querySelector("#field-site-project"),
     fieldSiteNewProject: document.querySelector("#field-site-new-project"),
     fieldSiteProjectName: document.querySelector("#field-site-project-name"),
     fieldSiteName: document.querySelector("#field-site-name"),
+    fieldSiteNameError: document.querySelector("#field-site-name-error"),
     fieldSiteShortText: document.querySelector("#field-site-short-text"),
     fieldSiteStreet: document.querySelector("#field-site-street"),
+    fieldSiteStreetError: document.querySelector("#field-site-street-error"),
     fieldSiteHouseNumber: document.querySelector("#field-site-house-number"),
+    fieldSiteHouseNumberError: document.querySelector("#field-site-house-number-error"),
     fieldSitePostalCode: document.querySelector("#field-site-postal-code"),
+    fieldSitePostalCodeError: document.querySelector("#field-site-postal-code-error"),
     fieldSiteCity: document.querySelector("#field-site-city"),
+    fieldSiteCityError: document.querySelector("#field-site-city-error"),
     fieldSiteSubmit: document.querySelector("#field-site-submit"),
     siteChoiceMessage: document.querySelector("#site-choice-message"),
     timesheetSection: document.querySelector("#timesheet-section"),
@@ -543,6 +571,9 @@
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
     employeeList: document.querySelector("#employee-list"),
+    archivedEmployeePanel: document.querySelector("#archived-employee-panel"),
+    archivedEmployeeCount: document.querySelector("#archived-employee-count"),
+    archivedEmployeeList: document.querySelector("#archived-employee-list"),
     employeePanel: document.querySelector("#employee-panel"),
     employeeEditForm: document.querySelector("#employee-edit-form"),
     employeeEditTitle: document.querySelector("#employee-edit-title"),
@@ -554,6 +585,7 @@
     employeeEditRole: document.querySelector("#employee-edit-role"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
+    employeeEditRemove: document.querySelector("#employee-edit-remove"),
     employeeEditMessage: document.querySelector("#employee-edit-message"),
     customerPanel: document.querySelector("#customer-panel"),
     customerForm: document.querySelector("#customer-form"),
@@ -730,10 +762,13 @@
   let absenceState = [];
   let timeAccountState = null;
   let timeAccountsState = null;
+  let announcementsState = [];
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
   let draggedAssignmentId = null;
   let correctingTimeEntryId = null;
+  let correctingTimeEntry = null;
+  let correctingTimeEntryAdministrator = false;
   let addingTimeEntryDate = null;
   let siteOptionsState = null;
   let openedCustomerId = null;
@@ -923,6 +958,7 @@
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
+          "X-Schaefchen-Version": "0.42.0",
           ...options.headers
         }
       });
@@ -937,6 +973,9 @@
       const error = new Error(body.error?.message || "Die Anfrage ist fehlgeschlagen.");
       error.status = response.status;
       error.code = body.error?.code;
+      if (error.code === "mandatory_update" && !demoMode) {
+        window.location.assign("./refresh.html");
+      }
       throw error;
     }
     return body;
@@ -945,7 +984,10 @@
   async function downloadFile(path, fallbackName) {
     let response;
     try {
-      response = await fetch(path, { credentials: "include" });
+      response = await fetch(path, {
+        credentials: "include",
+        headers: { "X-Schaefchen-Version": "0.42.0" }
+      });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
       error.network = true;
@@ -956,6 +998,9 @@
       const error = new Error(body.error?.message || "Die Datei konnte nicht erstellt werden.");
       error.status = response.status;
       error.code = body.error?.code;
+      if (error.code === "mandatory_update" && !demoMode) {
+        window.location.assign("./refresh.html");
+      }
       throw error;
     }
     const disposition = response.headers.get("content-disposition") || "";
@@ -987,7 +1032,7 @@
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.41.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -4137,6 +4182,7 @@
       days.forEach((day) => {
         const dayRow = document.createElement("article");
         const content = document.createElement("div");
+        const actions = document.createElement("div");
         const rowHeading = document.createElement("div");
         const date = document.createElement("strong");
         const status = document.createElement("span");
@@ -4147,6 +4193,7 @@
             ? "approved"
             : day.workflowStatus;
         dayRow.className = "work-day-review-day";
+        actions.className = "work-day-review-actions";
         date.textContent = shortDate(day.workDate);
         status.className = `work-day-review-status work-day-review-status--${statusKey}`;
         status.textContent = {
@@ -4166,6 +4213,71 @@
           content.append(warning);
         }
         dayRow.append(content);
+
+        const entriesAction = document.createElement("button");
+        entriesAction.type = "button";
+        entriesAction.className = "text-button work-day-review-action";
+        entriesAction.textContent = "Buchungen";
+        entriesAction.addEventListener("click", async () => {
+          const existing = dayRow.querySelector(".work-day-review-entries");
+          if (existing) {
+            existing.hidden = !existing.hidden;
+            entriesAction.textContent = existing.hidden ? "Buchungen" : "Schließen";
+            return;
+          }
+          entriesAction.disabled = true;
+          try {
+            const body = await requestJson(
+              `./api/v1/admin/work-days/${encodeURIComponent(day.id)}`
+            );
+            const details = document.createElement("div");
+            details.className = "work-day-review-entries";
+            body.workDay.entries.forEach((entry) => {
+              const row = document.createElement("button");
+              const copy = document.createElement("span");
+              const label = document.createElement("strong");
+              const meta = document.createElement("small");
+              row.type = "button";
+              row.className = "work-day-review-entry";
+              label.textContent = timeEntryTypeLabel(entry.entryType);
+              meta.textContent = `${timeFormatter.format(new Date(entry.recordedAt))}${
+                entry.constructionSiteName ? ` · ${entry.constructionSiteName}` : ""
+              }`;
+              copy.append(label, meta);
+              const action = document.createElement("span");
+              action.textContent = entry.pendingCorrection ? "Prüfung offen" : "Ändern";
+              row.append(copy, action);
+              row.disabled = Boolean(entry.pendingCorrection);
+              if (!row.disabled) row.addEventListener("click", () => openTimeCorrectionForm({
+                id: entry.id,
+                type: entry.entryType,
+                recordedAt: entry.recordedAt,
+                workDate: body.workDay.workDate,
+                constructionSiteId: entry.constructionSiteId,
+                activityNote: entry.activityNote,
+                travelMinutes: entry.travelMinutes,
+                breakMinutes: body.workDay.breakMinutesOverride ?? body.workDay.breakMinutes,
+                breakMinutesOverride: body.workDay.breakMinutesOverride,
+                pendingCorrection: entry.pendingCorrection,
+                pendingSync: false,
+                syncError: null
+              }, true));
+              details.append(row);
+            });
+            if (!body.workDay.entries.length) {
+              const empty = document.createElement("p");
+              empty.textContent = "Keine Buchungen vorhanden.";
+              details.append(empty);
+            }
+            dayRow.append(details);
+            entriesAction.textContent = "Schließen";
+          } catch (error) {
+            showToast(error.message);
+          } finally {
+            entriesAction.disabled = false;
+          }
+        });
+        actions.append(entriesAction);
 
         if (day.reviewable || day.status === "approved") {
           const action = document.createElement("button");
@@ -4197,8 +4309,9 @@
               showToast(error.message);
             }
           });
-          dayRow.append(action);
+          actions.append(action);
         }
+        dayRow.append(actions);
         dayList.append(dayRow);
       });
 
@@ -4208,7 +4321,13 @@
   }
 
   function renderTimeCorrections() {
-    const corrections = adminState?.timeCorrections || [];
+    const seenOperations = new Set();
+    const corrections = (adminState?.timeCorrections || []).filter((correction) => {
+      if (!correction.operationId) return true;
+      if (seenOperations.has(correction.operationId)) return false;
+      seenOperations.add(correction.operationId);
+      return true;
+    });
     elements.timeCorrectionReviewPanel.hidden = !canPlan();
     elements.timeCorrectionReviewCount.textContent = String(corrections.length);
     elements.timeCorrectionReviewList.replaceChildren();
@@ -4234,7 +4353,10 @@
         invalidation: "Ungültig-Markierung",
         replacement: "Zeitkorrektur"
       }[correction.correctionKind] || "Zeitkorrektur";
-      title.textContent = `${correction.employeeName} · ${kindLabel} · ${
+      const operationLabel = correction.operationAction === "delete_entry"
+        ? "Vollständige Löschung"
+        : correction.operationId ? "Zusammenhängende Zeitänderung" : kindLabel;
+      title.textContent = `${correction.employeeName} · ${operationLabel} · ${
         timeEntryTypeLabel(correction.entryType)
       }`;
       meta.textContent = correction.correctionKind === "addition"
@@ -4268,7 +4390,9 @@
         reject.disabled = true;
         try {
           await requestJson(
-            `./api/v1/admin/time-entry-corrections/${encodeURIComponent(correction.id)}`,
+            correction.operationId
+              ? `./api/v1/admin/time-change-operations/${encodeURIComponent(correction.operationId)}`
+              : `./api/v1/admin/time-entry-corrections/${encodeURIComponent(correction.id)}`,
             {
               method: "PATCH",
               body: JSON.stringify({ decision })
@@ -4694,6 +4818,10 @@
     );
 
     elements.employeeList.replaceChildren();
+    elements.archivedEmployeeList.replaceChildren();
+    const archivedEmployees = adminState.archivedEmployees || [];
+    elements.archivedEmployeeCount.textContent = String(archivedEmployees.length);
+    elements.archivedEmployeePanel.hidden = projectScoped;
     adminState.employees.forEach((employee) => {
       const roleLabels = {
         admin: "Administrator",
@@ -4720,6 +4848,52 @@
           : { label: "Bearbeiten", handler: () => openEmployeeEditor(employee) }
       );
     });
+    archivedEmployees.forEach((employee) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const reactivate = document.createElement("button");
+      title.textContent = `${employee.firstName} ${employee.lastName}`;
+      meta.textContent = [
+        employee.personnelNumber,
+        employee.archivedAt ? `archiviert ${shortDate(localDateKey(new Date(employee.archivedAt)))}` : null,
+        employee.archivedReason
+      ].filter(Boolean).join(" · ");
+      reactivate.type = "button";
+      reactivate.className = "text-button";
+      reactivate.textContent = "Reaktivieren";
+      reactivate.hidden = !adminState.canCreateManagementRoles;
+      reactivate.addEventListener("click", async () => {
+        const reason = window.prompt("Warum wird dieser Mitarbeiter reaktiviert?");
+        if (!reason || reason.trim().length < 3) return;
+        if (!window.confirm(`${employee.firstName} ${employee.lastName} wieder für Anmeldung und Planung freigeben?`)) return;
+        reactivate.disabled = true;
+        try {
+          await requestJson(
+            `./api/v1/admin/employees/${encodeURIComponent(employee.id)}/reactivate`,
+            {
+              method: "POST",
+              body: JSON.stringify({ reason, rowVersion: employee.rowVersion })
+            }
+          );
+          showToast("Mitarbeiter reaktiviert · Anmeldung und Planung sind wieder möglich.");
+          await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
+        } catch (error) {
+          showToast(error.message);
+          reactivate.disabled = false;
+        }
+      });
+      copy.append(title, meta);
+      item.append(copy, reactivate);
+      elements.archivedEmployeeList.append(item);
+    });
+    if (archivedEmployees.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = "Keine archivierten Mitarbeiter.";
+      elements.archivedEmployeeList.append(empty);
+    }
 
     renderCustomerList();
     renderProjectList();
@@ -6298,24 +6472,80 @@
 
   function closeTimeCorrectionForm() {
     correctingTimeEntryId = null;
+    correctingTimeEntry = null;
+    correctingTimeEntryAdministrator = false;
     elements.timeCorrectionForm.reset();
     elements.timeCorrectionMessage.textContent = "";
     if (elements.timeCorrectionDialog.open) elements.timeCorrectionDialog.close();
   }
 
-  function openTimeCorrectionForm(entry) {
+  async function populateTimeCorrectionSites(workDate, selectedSiteId) {
+    elements.timeCorrectionSite.replaceChildren();
+    if (!elements.timeCorrectionSiteField.hidden) {
+      const loading = document.createElement("option");
+      loading.textContent = "Baustellen werden geladen …";
+      loading.value = selectedSiteId || "";
+      elements.timeCorrectionSite.append(loading);
+      try {
+        const sites = correctingTimeEntryAdministrator
+          ? (adminState?.sites || []).filter((site) => (
+              ["planned", "active", "on_hold"].includes(site.status)
+            ))
+          : (await requestJson(
+              `./api/v1/time-tracking/site-options/${encodeURIComponent(workDate)}`
+            )).options?.sites || [];
+        elements.timeCorrectionSite.replaceChildren();
+        sites.forEach((site) => {
+          const option = document.createElement("option");
+          option.value = site.id;
+          option.textContent = `${site.name}${site.customerName ? ` · ${site.customerName}` : ""}`;
+          option.selected = site.id === selectedSiteId;
+          elements.timeCorrectionSite.append(option);
+        });
+        if (
+          selectedSiteId
+          && ![...elements.timeCorrectionSite.options].some((option) => option.value === selectedSiteId)
+        ) {
+          const current = document.createElement("option");
+          current.value = selectedSiteId;
+          current.textContent = "Bisherige Baustelle";
+          current.selected = true;
+          elements.timeCorrectionSite.prepend(current);
+        }
+      } catch (error) {
+        elements.timeCorrectionMessage.textContent = error.message;
+      }
+    }
+  }
+
+  function openTimeCorrectionForm(entry, administrator = false) {
     if (demoMode || entry.pendingSync || entry.syncError || entry.pendingCorrection) return;
     correctingTimeEntryId = entry.id;
+    correctingTimeEntry = entry;
+    correctingTimeEntryAdministrator = administrator;
     elements.timeCorrectionTitle.textContent =
-      `${timeEntryTypeLabel(entry.type)} korrigieren`;
+      `${timeEntryTypeLabel(entry.type)} bearbeiten`;
     elements.timeCorrectionOriginal.textContent =
       `Bisher: ${shortDate(localDateKey(new Date(entry.recordedAt)))} · ${
         timeFormatter.format(new Date(entry.recordedAt))
       } Uhr`;
-    elements.timeCorrectionAt.value = localDateTimeInputValue(entry.recordedAt);
+    const localValue = localDateTimeInputValue(entry.recordedAt);
+    elements.timeCorrectionDate.value = entry.workDate || localValue.slice(0, 10);
+    elements.timeCorrectionAt.value = localValue.slice(11, 16);
+    const needsSite = ["site_arrival", "site_departure", "next_site"].includes(entry.type);
+    elements.timeCorrectionSiteField.hidden = !needsSite;
+    elements.timeCorrectionSite.required = needsSite;
+    elements.timeCorrectionActivity.value = entry.activityNote || "";
+    const supportsTravel = ["clock_in", "site_departure"].includes(entry.type);
+    elements.timeCorrectionTravelField.hidden = !supportsTravel;
+    elements.timeCorrectionTravel.value = supportsTravel && entry.travelMinutes !== null
+      && entry.travelMinutes !== undefined ? String(entry.travelMinutes) : "";
+    elements.timeCorrectionBreak.value = entry.breakMinutes !== null
+      && entry.breakMinutes !== undefined ? String(entry.breakMinutes) : "";
     elements.timeCorrectionReason.value = "";
     elements.timeCorrectionMessage.textContent = "";
     elements.timeCorrectionDialog.showModal();
+    void populateTimeCorrectionSites(elements.timeCorrectionDate.value, entry.constructionSiteId);
     window.setTimeout(() => elements.timeCorrectionAt.focus(), 250);
   }
 
@@ -6594,6 +6824,7 @@
     elements.timeAccountMonths.replaceChildren();
     elements.timeAccountHolidayList.replaceChildren();
     if (!account) {
+      elements.nextHolidayCard.hidden = true;
       elements.timeAccountBalance.textContent = "±00:00";
       elements.timeAccountBalance.className = "time-account-balance";
       elements.timeAccountStatus.textContent = navigator.onLine
@@ -6643,9 +6874,29 @@
     elements.timeAccountHolidayStatus.textContent = holidayCalendar.configured
       ? `${holidayCalendar.year} · ${holidayCalendar.federalStateName} · Feiertage setzen das Tagessoll automatisch auf null.`
       : "Bundesweite Feiertage sind aktiv. Das Büro muss für die regionalen Feiertage noch das Bundesland festlegen.";
+    const futureHolidays = [...holidayCalendar.holidays]
+      .filter((holiday) => holiday.date >= localDateKey())
+      .sort((left, right) => left.date.localeCompare(right.date));
+    elements.nextHolidaySummary.replaceChildren();
+    futureHolidays.slice(0, 2).forEach((holiday, index) => {
+      const row = document.createElement("div");
+      const title = document.createElement("strong");
+      const date = document.createElement("span");
+      title.textContent = holiday.name;
+      date.textContent = `${index === 0 ? "Nächster · " : "Danach · "}${shortDate(holiday.date)}`;
+      row.append(title, date);
+      elements.nextHolidaySummary.append(row);
+    });
+    elements.nextHolidayCard.hidden = futureHolidays.length === 0;
+    elements.timeAccountHolidayStatus.textContent = futureHolidays.length
+      ? "An diesen Tagen wird die persönliche Sollarbeitszeit automatisch auf 00:00 gesetzt."
+      : "Für den restlichen Zeitraum ist kein weiterer Feiertag hinterlegt.";
     renderHolidayItems(
       elements.timeAccountHolidayList,
-      holidayCalendar.holidays,
+      [
+        ...futureHolidays,
+        ...holidayCalendar.holidays.filter((holiday) => holiday.date < localDateKey())
+      ],
       "Für dieses Jahr sind keine Feiertage hinterlegt."
     );
 
@@ -6871,6 +7122,9 @@
           id: entry.id,
           entryType: entry.type,
           recordedAt: entry.recordedAt,
+          constructionSiteId: entry.constructionSiteId,
+          activityNote: entry.activityNote || null,
+          travelMinutes: entry.travelMinutes ?? null,
           pendingCorrection: entry.pendingCorrection
         }))
       }
@@ -6898,16 +7152,61 @@
     } – ${periodEnd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
     elements.weekCurrent.disabled = weekStart === currentWeekStart(today);
     elements.weekNext.disabled = weekStart >= currentWeekStart(today);
-    elements.weekTotalWork.textContent = formatMinutes(visibleWeek.totals.workMinutes || 0);
+    const targetMinutes = visibleWeek.days.reduce(
+      (sum, { workDay }) => sum + Number(workDay?.targetWorkMinutes || 0),
+      0
+    );
+    const workMinutes = Number(visibleWeek.totals.workMinutes || 0);
+    const differenceMinutes = workMinutes - targetMinutes;
+    elements.weekTotalWork.textContent = formatMinutes(workMinutes);
+    elements.weekTotalTarget.textContent = formatMinutes(targetMinutes);
+    elements.weekTotalDifference.textContent = formatSignedMinutes(differenceMinutes);
+    elements.weekTotalDifference.className = differenceMinutes > 0
+      ? "time-account-balance--positive"
+      : differenceMinutes < 0 ? "time-account-balance--negative" : "";
     elements.weekTotalBreak.textContent = formatMinutes(visibleWeek.totals.breakMinutes || 0);
     elements.weekTotalTravel.textContent = formatMinutes(visibleWeek.totals.travelMinutes || 0);
     elements.weekTotalOvertime.textContent = formatMinutes(visibleWeek.totals.overtimeMinutes || 0);
+    elements.timeAccountWeekBreak.textContent = formatMinutes(visibleWeek.totals.breakMinutes || 0);
+    elements.timeAccountWeekTravel.textContent = formatMinutes(visibleWeek.totals.travelMinutes || 0);
+    elements.timeAccountWeekOvertime.textContent = formatSignedMinutes(visibleWeek.totals.overtimeMinutes || 0);
     elements.weekStrip.replaceChildren();
     elements.weekTimesheetList.replaceChildren();
     renderEmployeeTimesheetExport(visibleWeek);
     renderAbsences();
     renderTimeAccount();
     renderAdminTimeAccounts();
+
+    const selectedIsCurrentWeek = weekStart === currentWeekStart(today);
+    const nextAssignment = selectedIsCurrentWeek
+      ? assignments.find((assignment) => assignment.workDate >= localDateKey()) || assignments[0]
+      : null;
+    elements.weekNextAssignment.hidden = !nextAssignment;
+    if (nextAssignment) {
+      elements.weekNextAssignmentName.textContent = nextAssignment.constructionSite.name;
+      elements.weekNextAssignmentMeta.textContent = [
+        shortDate(nextAssignment.workDate),
+        nextAssignment.plannedStartTime ? `${nextAssignment.plannedStartTime.slice(0, 5)} Uhr` : null,
+        nextAssignment.comment || nextAssignment.constructionSite.shortText
+      ].filter(Boolean).join(" · ");
+    }
+
+    const openActions = [];
+    visibleWeek.days.forEach(({ workDate, workDay }) => {
+      (workDay?.warnings || []).forEach((warning) => {
+        openActions.push(`${shortDate(workDate)} · ${warning.message}`);
+      });
+      if (workDay?.hasPendingCorrection) {
+        openActions.push(`${shortDate(workDate)} · Zeitkorrektur wartet auf Freigabe`);
+      }
+    });
+    elements.weekOpenActionsList.replaceChildren();
+    [...new Set(openActions)].slice(0, 5).forEach((message) => {
+      const item = document.createElement("li");
+      item.textContent = message;
+      elements.weekOpenActionsList.append(item);
+    });
+    elements.weekOpenActions.hidden = openActions.length === 0;
 
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
@@ -6935,6 +7234,8 @@
         });
       });
       elements.weekStrip.append(item);
+
+      if (!workDay && !approvedAbsence) return;
 
       const dayCard = document.createElement("section");
       const heading = document.createElement("div");
@@ -6995,11 +7296,12 @@
         metrics.className = "week-day-metrics";
         [
           ["Soll", workDay.targetWorkMinutes],
-          ["Brutto", workDay.grossMinutes],
           ["Pause", workDay.breakMinutes],
           ["Fahrt", workDay.travelMinutes],
-          ["Mehrzeit", workDay.overtimeMinutes]
-        ].forEach(([labelText, minutes]) => {
+          Number(workDay.overtimeMinutes || 0) !== 0
+            ? ["Differenz", workDay.overtimeMinutes]
+            : null
+        ].filter(Boolean).forEach(([labelText, minutes]) => {
           const metric = document.createElement("span");
           metric.textContent = `${labelText} ${formatMinutes(minutes || 0)}`;
           metrics.append(metric);
@@ -7028,6 +7330,12 @@
               id: entry.id,
               type: entry.entryType,
               recordedAt: entry.recordedAt,
+              workDate,
+              constructionSiteId: entry.constructionSiteId,
+              activityNote: entry.activityNote,
+              travelMinutes: entry.travelMinutes,
+              breakMinutes: workDay.breakMinutesOverride ?? workDay.breakMinutes,
+              breakMinutesOverride: workDay.breakMinutesOverride,
               pendingCorrection: entry.pendingCorrection,
               pendingSync: false,
               syncError: null
@@ -7073,6 +7381,12 @@
       }
       elements.weekTimesheetList.append(dayCard);
     });
+    if (elements.weekTimesheetList.childElementCount === 0) {
+      const empty = document.createElement("p");
+      empty.className = "week-timesheet-day__empty week-timesheet-list__empty";
+      empty.textContent = "In dieser Woche sind noch keine Arbeitstage erfasst.";
+      elements.weekTimesheetList.append(empty);
+    }
   }
 
   function renderEmployeeTimesheetExport(visibleWeek) {
@@ -7107,7 +7421,58 @@
     renderTimes();
     renderEntries();
     renderWeek();
+    renderPlatformAnnouncements();
     updateConnectionState();
+  }
+
+  function renderPlatformAnnouncements() {
+    if (!elements.platformAnnouncements) return;
+    const unread = announcementsState.filter((announcement) => !announcement.readAt);
+    elements.platformAnnouncements.hidden = unread.length === 0;
+    elements.platformAnnouncementList.replaceChildren();
+    unread.forEach((announcement) => {
+      const article = document.createElement("article");
+      article.className = "platform-announcement";
+      article.dataset.type = announcement.type;
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const message = document.createElement("p");
+      title.textContent = announcement.title;
+      message.textContent = announcement.message;
+      copy.append(title, message);
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "platform-announcement__dismiss";
+      dismiss.textContent = "Gelesen";
+      dismiss.setAttribute("aria-label", `${announcement.title} als gelesen markieren`);
+      dismiss.addEventListener("click", async () => {
+        dismiss.disabled = true;
+        try {
+          await requestJson(`./api/v1/announcements/${encodeURIComponent(announcement.id)}/read`, {
+            method: "POST"
+          });
+          announcement.readAt = new Date().toISOString();
+          renderPlatformAnnouncements();
+        } catch (error) {
+          dismiss.disabled = false;
+          showToast(error.message);
+        }
+      });
+      article.append(copy, dismiss);
+      elements.platformAnnouncementList.append(article);
+    });
+  }
+
+  async function refreshPlatformAnnouncements() {
+    if (demoMode || !navigator.onLine) return;
+    try {
+      const body = await requestJson("./api/v1/announcements");
+      announcementsState = body.announcements || [];
+      renderPlatformAnnouncements();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) showToast(error.message);
+    }
   }
 
   function updateConnectionState() {
@@ -7210,6 +7575,11 @@
       type: entry.entryType,
       recordedAt: entry.recordedAt,
       constructionSiteId: entry.constructionSiteId,
+      constructionSiteName: entry.constructionSiteName || null,
+      activityNote: entry.activityNote || null,
+      travelMinutes: entry.travelMinutes ?? null,
+      breakMinutes: workDay?.breakMinutesOverride ?? workDay?.breakMinutes ?? null,
+      breakMinutesOverride: workDay?.breakMinutesOverride ?? null,
       siteIndex: siteIndexForId(entry.constructionSiteId),
       pendingCorrection: entry.pendingCorrection || null,
       pendingSync: false,
@@ -7386,6 +7756,7 @@
       absenceState = [];
       timeAccountState = null;
       timeAccountsState = null;
+      announcementsState = [];
       employeeSiteState = null;
     }
     session = sessionView;
@@ -7408,7 +7779,8 @@
       refreshAbsenceData(),
       refreshTimeAccountData(),
       refreshAdminTimeAccounts(),
-      refreshAdmin()
+      refreshAdmin(),
+      refreshPlatformAnnouncements()
     ]);
     await maybeOpenDeepLinkedSite();
     await syncPendingEntries();
@@ -7576,6 +7948,42 @@
     }
   });
   elements.employeeEditCancel.addEventListener("click", closeEmployeeEditor);
+  elements.employeeEditRemove.addEventListener("click", async () => {
+    const employee = adminState?.employees.find((item) => item.id === editingEmployeeId);
+    if (!employee) return;
+    const reason = window.prompt(
+      "Grund für Entfernung oder Archivierung (wird unveränderbar protokolliert):"
+    );
+    if (!reason || reason.trim().length < 3) return;
+    if (!window.confirm(
+      `${employee.firstName} ${employee.lastName} aus dem aktiven Betrieb entfernen? `
+      + "Ohne historische Daten wird das Konto gelöscht, andernfalls sicher archiviert."
+    )) return;
+    elements.employeeEditRemove.disabled = true;
+    elements.employeeEditSave.disabled = true;
+    elements.employeeEditCancel.disabled = true;
+    elements.employeeEditMessage.textContent = "Historische Verknüpfungen werden sicher geprüft …";
+    try {
+      const result = await requestJson(
+        `./api/v1/admin/employees/${encodeURIComponent(employee.id)}`,
+        {
+          method: "DELETE",
+          body: JSON.stringify({ reason, rowVersion: employee.rowVersion })
+        }
+      );
+      closeEmployeeEditor();
+      showToast(result.mode === "deleted"
+        ? "Mitarbeiter ohne historische Daten vollständig gelöscht."
+        : "Mitarbeiter archiviert · historische Nachweise bleiben erhalten.");
+      await Promise.all([refreshAdmin(), refreshLiveData(), refreshAdminTimeAccounts()]);
+    } catch (error) {
+      elements.employeeEditMessage.textContent = error.message;
+    } finally {
+      elements.employeeEditRemove.disabled = false;
+      elements.employeeEditSave.disabled = false;
+      elements.employeeEditCancel.disabled = false;
+    }
+  });
 
   elements.timeAccountProfileForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -9206,10 +9614,66 @@
   });
   elements.fieldSiteCustomer.addEventListener("change", updateFieldSiteHierarchy);
   elements.fieldSiteProject.addEventListener("change", updateFieldSiteProjectMode);
+  const fieldSiteValidation = [
+    [elements.fieldSiteCustomer, elements.fieldSiteCustomerError, "Bitte einen Kunden auswählen."],
+    [elements.fieldSiteCustomerName, elements.fieldSiteCustomerNameError, "Bitte den Namen des neuen Kunden eingeben."],
+    [elements.fieldSiteName, elements.fieldSiteNameError, "Bitte einen Baustellennamen eingeben."],
+    [elements.fieldSiteStreet, elements.fieldSiteStreetError, "Bitte die Straße eingeben."],
+    [elements.fieldSiteHouseNumber, elements.fieldSiteHouseNumberError, "Bitte die Hausnummer eingeben."],
+    [elements.fieldSitePostalCode, elements.fieldSitePostalCodeError, "Bitte die Postleitzahl eingeben."],
+    [elements.fieldSiteCity, elements.fieldSiteCityError, "Bitte den Ort eingeben."]
+  ];
+  function validateFieldSiteForm() {
+    const createsCustomer = elements.fieldSiteCustomer.value === "__new__";
+    elements.fieldSiteCustomerName.required = createsCustomer;
+    let firstInvalid = null;
+    fieldSiteValidation.forEach(([control, error, message]) => {
+      const isRelevant = control !== elements.fieldSiteCustomerName || createsCustomer;
+      const invalid = isRelevant && !control.checkValidity();
+      error.textContent = invalid ? message : "";
+      control.setAttribute("aria-invalid", invalid ? "true" : "false");
+      if (invalid && !firstInvalid) firstInvalid = control;
+    });
+    if (firstInvalid) {
+      firstInvalid.focus({ preventScroll: true });
+      firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    return true;
+  }
+  fieldSiteValidation.forEach(([control, error]) => {
+    control.addEventListener("input", () => {
+      error.textContent = "";
+      control.setAttribute("aria-invalid", "false");
+    });
+  });
+  elements.siteChoiceDialog.addEventListener("focusin", (event) => {
+    if (!event.target.matches("input, select, textarea")) return;
+    window.setTimeout(() => event.target.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    }), 120);
+  });
+  if (window.visualViewport) {
+    const updateSiteChoiceViewport = () => {
+      elements.siteChoiceDialog.style.setProperty(
+        "--site-choice-viewport-height",
+        `${Math.round(window.visualViewport.height)}px`
+      );
+    };
+    window.visualViewport.addEventListener("resize", updateSiteChoiceViewport);
+    window.visualViewport.addEventListener("scroll", updateSiteChoiceViewport);
+    updateSiteChoiceViewport();
+  }
   elements.fieldSiteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (demoMode) {
       elements.siteChoiceMessage.textContent = "Neue Baustellen werden nur in der Online-App gespeichert.";
+      return;
+    }
+    if (!validateFieldSiteForm()) {
+      elements.siteChoiceMessage.textContent =
+        "Bitte die markierten Felder prüfen. Deine Eingaben bleiben erhalten.";
       return;
     }
     const targetIndex = siteChoiceTargetIndex();
@@ -9304,37 +9768,70 @@
   });
   elements.timeCorrectionForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!correctingTimeEntryId) return;
+    if (!correctingTimeEntryId || !correctingTimeEntry) return;
     if (!navigator.onLine) {
       elements.timeCorrectionMessage.textContent =
         "Eine Korrektur kann gesendet werden, sobald wieder eine Verbindung besteht.";
       return;
     }
-    const requestedRecordedAt = new Date(elements.timeCorrectionAt.value);
+    const requestedRecordedAt = new Date(
+      `${elements.timeCorrectionDate.value}T${elements.timeCorrectionAt.value}`
+    );
     const reason = elements.timeCorrectionReason.value.trim();
     if (Number.isNaN(requestedRecordedAt.valueOf())) {
       elements.timeCorrectionMessage.textContent = "Bitte Datum und Uhrzeit vollständig eingeben.";
       return;
     }
-    if (reason.length < 5) {
+    if (reason.length < 3) {
       elements.timeCorrectionMessage.textContent = "Bitte einen kurzen Korrekturgrund eingeben.";
       return;
     }
+    const breakValue = elements.timeCorrectionBreak.value;
+    const displayedBreak = correctingTimeEntry.breakMinutes;
+    let breakMinutes;
+    if (breakValue === "") {
+      breakMinutes = correctingTimeEntry.breakMinutesOverride === null
+        || correctingTimeEntry.breakMinutesOverride === undefined
+        ? undefined
+        : null;
+    } else if (Number(breakValue) !== Number(displayedBreak)) {
+      breakMinutes = Number(breakValue);
+    }
     elements.timeCorrectionSubmit.disabled = true;
     elements.timeCorrectionCancel.disabled = true;
-    elements.timeCorrectionMessage.textContent = "Korrektur wird sicher eingereicht …";
+    elements.timeCorrectionMessage.textContent = "Änderung wird geprüft und neu berechnet …";
     try {
-      await requestJson("./api/v1/time-entry-corrections", {
-        method: "POST",
+      const result = await requestJson(
+        `./api/v1/${correctingTimeEntryAdministrator ? "admin/" : ""}time-entries/${
+          encodeURIComponent(correctingTimeEntryId)
+        }`,
+        {
+        method: "PATCH",
         body: JSON.stringify({
-          originalEntryId: correctingTimeEntryId,
-          requestedRecordedAt: requestedRecordedAt.toISOString(),
+          clientChangeId: createClientEntryId(),
+          expectedRecordedAt: correctingTimeEntry.recordedAt,
+          recordedAt: requestedRecordedAt.toISOString(),
+          workDate: elements.timeCorrectionDate.value,
+          constructionSiteId: elements.timeCorrectionSiteField.hidden
+            ? null
+            : elements.timeCorrectionSite.value,
+          activityNote: elements.timeCorrectionActivity.value.trim() || null,
+          travelMinutes: elements.timeCorrectionTravelField.hidden
+            ? undefined
+            : elements.timeCorrectionTravel.value === ""
+              ? null
+              : Number(elements.timeCorrectionTravel.value),
+          breakMinutes,
           reason
         })
       });
       closeTimeCorrectionForm();
       await Promise.all([refreshLiveData(), refreshWeekData(), refreshAdmin()]);
-      showToast("Änderung eingereicht · die bisherige Zeit bleibt bis zur Prüfung erhalten.");
+      showToast(
+        result.operation?.status === "pending"
+          ? "Kontrollierte Korrektur eingereicht · der bisherige Stand bleibt bis zur Freigabe erhalten."
+          : "Zeiteintrag gespeichert · Arbeitszeit und Zeitkonto wurden neu berechnet."
+      );
     } catch (error) {
       if (error.status === 401) showLogin();
       else elements.timeCorrectionMessage.textContent = error.message;
@@ -9344,29 +9841,40 @@
     }
   });
   elements.timeInvalidationSubmit.addEventListener("click", async () => {
-    if (!correctingTimeEntryId) return;
+    if (!correctingTimeEntryId || !correctingTimeEntry) return;
     const reason = elements.timeCorrectionReason.value.trim();
-    if (reason.length < 5) {
+    if (reason.length < 3) {
       elements.timeCorrectionMessage.textContent =
-        "Bitte zuerst einen kurzen Grund für die Ungültig-Markierung eingeben.";
+        "Bitte zuerst einen kurzen Löschgrund eingeben.";
       return;
     }
-    if (!window.confirm("Buchung als ungültig markieren? Sie bleibt in der Historie erhalten.")) return;
+    if (!window.confirm(
+      "Vollständigen Arbeitsblock löschen? Die Buchungen verschwinden aus der Arbeitszeit, bleiben aber unveränderbar im Audit erhalten."
+    )) return;
     elements.timeCorrectionSubmit.disabled = true;
     elements.timeInvalidationSubmit.disabled = true;
     elements.timeCorrectionCancel.disabled = true;
-    elements.timeCorrectionMessage.textContent = "Ungültig-Markierung wird eingereicht …";
+    elements.timeCorrectionMessage.textContent = "Arbeitsblock wird sicher entfernt …";
     try {
-      await requestJson("./api/v1/time-entry-invalidations", {
-        method: "POST",
+      const result = await requestJson(
+        `./api/v1/${correctingTimeEntryAdministrator ? "admin/" : ""}time-entries/${
+          encodeURIComponent(correctingTimeEntryId)
+        }`,
+        {
+        method: "DELETE",
         body: JSON.stringify({
-          originalEntryId: correctingTimeEntryId,
+          clientChangeId: createClientEntryId(),
+          expectedRecordedAt: correctingTimeEntry.recordedAt,
           reason
         })
       });
       closeTimeCorrectionForm();
       await Promise.all([refreshLiveData(), refreshWeekData(), refreshAdmin()]);
-      showToast("Ungültig-Markierung eingereicht · die Buchung bleibt bis zur Prüfung wirksam.");
+      showToast(
+        result.operation?.status === "pending"
+          ? "Löschung zur kontrollierten Freigabe eingereicht."
+          : "Arbeitsblock gelöscht · alle Summen wurden neu berechnet."
+      );
     } catch (error) {
       if (error.status === 401) showLogin();
       else elements.timeCorrectionMessage.textContent = error.message;
@@ -9377,6 +9885,14 @@
     }
   });
   elements.timeCorrectionCancel.addEventListener("click", closeTimeCorrectionForm);
+  elements.timeCorrectionDate.addEventListener("change", () => {
+    if (correctingTimeEntry && !elements.timeCorrectionSiteField.hidden) {
+      void populateTimeCorrectionSites(
+        elements.timeCorrectionDate.value,
+        correctingTimeEntry.constructionSiteId
+      );
+    }
+  });
   elements.timeCorrectionDialog.addEventListener("click", (event) => {
     if (event.target === elements.timeCorrectionDialog) closeTimeCorrectionForm();
   });

@@ -67,6 +67,8 @@ BEGIN
         RAISE EXCEPTION 'Benutzerdaten wurden nicht normalisiert';
     END IF;
 
+    PERFORM set_config('app.current_user_id', test_user_id::TEXT, TRUE);
+    PERFORM set_config('app.employee_lifecycle_reason', 'SQL-Benutzerdeaktivierung', TRUE);
     UPDATE users
     SET phone = '+49 000 000000'
     WHERE id = test_user_id

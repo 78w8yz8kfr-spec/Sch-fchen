@@ -1,7 +1,7 @@
 # Fahrplan-Abnahme
 
 Stand: 01.08.2026
-Geprüfter Produktstand: V0.41.0
+Geprüfter Produktstand: V0.42.0
 
 Dieses Dokument gleicht den Fahrplan
 `Schäfchen – Fahrplan von V0.35.0 bis V1.0` mit dem tatsächlich belegbaren
@@ -32,13 +32,37 @@ umzubenennen.
 VDE ist technisch bereits vorgezogen umgesetzt. Das ändert die verbindliche
 Reihenfolge nicht: DGUV bleibt ausdrücklich erst nach V1.0 vorgesehen.
 
+## Ergänzende Abnahme V0.42
+
+Die Plattformverwaltung und die vertieften Korrekturabläufe erweitern den
+ursprünglichen Fahrplan, ohne dessen noch offene reale Betriebsnachweise als
+erfüllt umzudeuten.
+
+| Kriterium | Status | Nachweis oder Restarbeit |
+| --- | --- | --- |
+| Vollständige Zeitbearbeitung ohne Dublette | CI-Gate | Migration/SQL-Test 042, PostgreSQL-Integration, API- und PWA-Test |
+| Freigabe- und Abrechnungsgrenze mit Audit | CI-Gate | `time_change_operations`, unveränderliches Audit, positive und negative SQL-Fälle |
+| Pausen-, Tages-, Wochen- und Zeitkontoneuberechnung | CI-Gate | Rechenregel 4, SQL-Test 042 und PostgreSQL-Integration |
+| Mobile Baustellenanlage bei kleinem Viewport | Erfüllt | PWA-Smoke-Test für Scrollcontainer, Safe Area, Fokus-Scroll, Sticky-Aktion und Inlinefehler |
+| Reale Bildschirmtastatur auf iOS/Android | Externe Abnahme | Je ein kleines und großes Telefon sowie Tablet mit geöffneter Tastatur protokollieren |
+| Mitarbeiter hart löschen, archivieren und reaktivieren | CI-Gate | Migration/SQL-Test 043 und PostgreSQL-Integration |
+| Ruhige Wochenstruktur, kompaktes Arbeitskonto und Feiertags-Disclosure | Erfüllt | Markup-/PWA-Smoke-Test; reale visuelle Geräteabnahme bleibt zusätzlich offen |
+| Systemadministrator ohne Firma und eigene Navigation | CI-Gate | Migration/SQL-Test 039/044 und Plattform-Anmeldeintegration |
+| Firmen-, Konto-, Tarif-, Modul- und Registrierungsverwaltung | CI-Gate | Migration/SQL-Test 039–041/044 und PostgreSQL-Integration |
+| Firmen können Spezialmodule nicht selbst aktivieren | CI-Gate | negativer Firmen-API-Fall und positiver Plattform-API-Fall |
+| Protokollierter, befristeter Supportmodus | CI-Gate | Supportstart, Kontext, Ende und Ablehnung eines beendeten Kontexts in der Integration |
+| Plattformrollen und unveränderliches Audit | CI-Gate | SQL-Tests 039/041 und negative API-Rechtefälle |
+| Wartungsmodus und verpflichtende App-Version | CI-Gate | Unit-Test des Versionsvergleichs und PostgreSQL-Laufzeittest |
+| Mandantentrennung einschließlich Direkt-IDs und RLS | CI-Gate | alle SQL-Tests sowie positive/negative PostgreSQL-Integration |
+| Produktionsbackup, Alarmierung und echte Wiederherstellung | Externe Abnahme | isolierte Zielinfrastruktur, Integritätsprüfung und Vier-Augen-Protokoll erforderlich |
+
 ## Etappe 0 – Bestandsbereinigung
 
 | Kriterium | Status | Nachweis oder Restarbeit |
 | --- | --- | --- |
 | V0.35.0 taggen und als Release festhalten | CI-Gate | Der idempotente Metadaten-Workflow veröffentlicht den belegten Commit `21997c1` nach dem Merge als Tag und GitHub-Release. |
-| Veröffentlichte Changelog-Einträge aus `Unreleased` lösen | Erfüllt | `CHANGELOG.md` besitzt getrennte Versionsabschnitte; V0.41.0 ist dokumentiert. |
-| Projektstatus korrigieren | Erfüllt | `docs/PROJECT_STATUS.md` nennt V0.41.0, trennt Demo und Produktion und verweist auf V0.50 statt DGUV. |
+| Veröffentlichte Changelog-Einträge aus `Unreleased` lösen | Erfüllt | `CHANGELOG.md` besitzt getrennte Versionsabschnitte; V0.42.0 ist dokumentiert. |
+| Projektstatus korrigieren | Erfüllt | `docs/PROJECT_STATUS.md` nennt V0.42.0, trennt Demo und Produktion und verweist auf V0.50 statt DGUV. |
 | Echten GitHub-Backlog anlegen | Erfüllt | Die öffentlichen Issues #11 bis #23 enthalten Priorität, Kategorien, Prüfumfang und Abschlussnachweis; `docs/BACKLOG.md` verlinkt sie. |
 | Einheitliche P0-P3-Prioritäten und Kategorien | Erfüllt | Definitionen und Kategorien stehen in `docs/BACKLOG.md`. |
 | Einheitliche Definition of Done | Erfüllt | Siehe Abschnitt „Definition of Done“ in `docs/BACKLOG.md`. |
@@ -162,7 +186,7 @@ Die VDE-Integration wurde technisch vorgezogen.
 | Kriterium | Status | Nachweis |
 | --- | --- | --- |
 | Gemeinsamer Login, Mandant und Stammdaten | CI-Gate | Gemeinsame API-Session und Referenzen |
-| Aktivierung nur Administration/Geschäftsführung | CI-Gate | Modulfreigabe mit Historie |
+| Aktivierung nur durch berechtigte Plattformrolle | CI-Gate | Plattform-Entitlement mit Historie und negativer Firmen-API-Fall |
 | Prüfung aus Baustelle, strukturierte Fachdaten und Plausibilität | CI-Gate | Migration 036, Editor und Tests |
 | Passende Schutzorganparameter und optionale Detailfelder | Erfüllt | Validierungs- und PWA-Tests |
 | Unterschrift, unveränderliche PDF und zentrale Ablage | CI-Gate | PDF-/Integrations-/SQL-Tests |
@@ -179,7 +203,7 @@ Die VDE-Integration wurde technisch vorgezogen.
 
 ## Freigaberegel
 
-V0.41.0 kann als Funktionsstand veröffentlicht werden, sobald der exakte Commit
+V0.42.0 kann als Funktionsstand veröffentlicht werden, sobald der exakte Commit
 die vollständige GitHub-CI einschließlich aller Migrationen, SQL-Tests und des
 PostgreSQL-Integrationstests bestanden hat. Diese Veröffentlichung ist keine
 Produktions- oder V1.0-Freigabe. Die als „Externe Abnahme“ oder „Offen“

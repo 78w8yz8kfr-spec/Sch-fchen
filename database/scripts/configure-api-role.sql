@@ -17,3 +17,4 @@ SELECT format(
 ) \gexec
 
 SELECT format('GRANT schaefchen_api TO %I', :'api_db_user') \gexec
+SELECT format('GRANT schaefchen_platform_api TO %I', :'api_db_user') \gexec
