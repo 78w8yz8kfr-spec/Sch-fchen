@@ -357,25 +357,25 @@ ALTER TABLE planning_team_history ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS planning_teams_tenant_isolation ON planning_teams;
 CREATE POLICY planning_teams_tenant_isolation ON planning_teams
-    USING (company_id = current_company_id())
-    WITH CHECK (company_id = current_company_id());
+    USING (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID)
+    WITH CHECK (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID);
 
 DROP POLICY IF EXISTS planning_team_members_tenant_isolation ON planning_team_members;
 CREATE POLICY planning_team_members_tenant_isolation ON planning_team_members
-    USING (company_id = current_company_id())
-    WITH CHECK (company_id = current_company_id());
+    USING (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID)
+    WITH CHECK (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID);
 
 DROP POLICY IF EXISTS planning_team_history_tenant_isolation ON planning_team_history;
 CREATE POLICY planning_team_history_tenant_isolation ON planning_team_history
-    USING (company_id = current_company_id())
-    WITH CHECK (company_id = current_company_id());
+    USING (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID)
+    WITH CHECK (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID);
 
 DROP POLICY IF EXISTS planning_team_member_events_tenant_isolation
     ON planning_team_member_events;
 CREATE POLICY planning_team_member_events_tenant_isolation
     ON planning_team_member_events
-    USING (company_id = current_company_id())
-    WITH CHECK (company_id = current_company_id());
+    USING (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID)
+    WITH CHECK (company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID);
 
 GRANT SELECT, INSERT, UPDATE ON planning_teams TO schaefchen_api;
 GRANT SELECT, INSERT, UPDATE ON planning_team_members TO schaefchen_api;
