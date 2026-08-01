@@ -8,6 +8,7 @@ DECLARE
     planner_id UUID;
     installer_id UUID;
     foreman_id UUID;
+    foreman_role_id UUID;
     target_customer_id UUID;
     target_location_id UUID;
     target_project_id UUID;
@@ -19,6 +20,13 @@ BEGIN
     INTO target_company_id
     FROM companies
     WHERE company_number = 'F-000001';
+
+    SELECT id
+    INTO foreman_role_id
+    FROM roles
+    WHERE company_id = target_company_id
+      AND role_key = 'foreman'
+      AND status = 'active';
 
     INSERT INTO users (
         company_id,
@@ -50,16 +58,26 @@ BEGIN
         company_id,
         personnel_number,
         first_name,
-        last_name,
-        is_foreman
+        last_name
     ) VALUES (
         target_company_id,
         'VOR-TEAM-38',
         'Vera',
-        'Vorarbeiterin',
-        TRUE
+        'Vorarbeiterin'
     )
     RETURNING id INTO foreman_id;
+
+    INSERT INTO user_roles (
+        company_id,
+        user_id,
+        role_id,
+        reason
+    ) VALUES (
+        target_company_id,
+        foreman_id,
+        foreman_role_id,
+        'SQL-Abnahme Migration 038'
+    );
 
     INSERT INTO planning_teams (
         company_id,
