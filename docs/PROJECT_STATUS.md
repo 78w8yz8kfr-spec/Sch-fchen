@@ -171,6 +171,13 @@ Technischer Stand: V0.42.0
   eingeschränkten Datenbankrollen `schaefchen_api` und
   `schaefchen_platform_api` geprüft, weil die Policies für den
   Tabelleneigentümer bewusst nicht erzwungen werden
+- die Plattformverwaltung ist im PostgreSQL-Integrationstest breit abgedeckt
+  (Firmen, Module, Tarife, Verträge, Plattformadministratoren, Firmenkonten,
+  Registrierungen, Support, Systemstatus, Fehlergruppierung, Versionen,
+  Mitteilungen, Backups, Datenschutzanfragen mit Zwei-Personen-Freigabe);
+  `api/src` erfüllt eine in der GitHub-Prüfung erzwungene Mindestabdeckung
+  von 81 Prozent Zeilen, 71 Prozent Zweigen und 91 Prozent Funktionen
+  (`make api-coverage`)
 - GitHub Pages aktiviert und öffentliche PWA erfolgreich veröffentlicht
 - Migration 009 `site_assignments` mit mehreren geordneten Baustellen pro Tag, Freigabe und Änderungshistorie
 - Migration 010 `site_supervisors` mit mehreren Vorarbeitern, Hauptverantwortung und automatischer Übergabe

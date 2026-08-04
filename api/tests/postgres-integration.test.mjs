@@ -4109,6 +4109,987 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal((await dayAfterOfficeDelete.json()).workDay.entries.length, 0);
   });
 
+  await t.test("Plattformverwaltung: Firmen, Konten, Tarife und Betrieb", async () => {
+    const platformSelfResponse = await fetch(`${baseUrl}/api/v1/platform/session`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(platformSelfResponse.status, 200);
+    const platformSelf = (await platformSelfResponse.json()).session.platformUser;
+
+    // Firmenverwaltung: Anlage, Stammdatenänderung, veraltete Datenversion und
+    // kritische Statusänderung mit Bestätigungspflicht.
+    const newCompanyResponse = await fetch(`${baseUrl}/api/v1/platform/companies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        legalName: `Filiale ${suffix} GmbH`,
+        displayName: `Filiale ${suffix}`,
+        contactName: "Fiona Filiale",
+        contactEmail: `filiale-${suffix.toLowerCase()}@example.test`,
+        status: "active",
+        reason: "Zweite Firma im PostgreSQL-Integrationstest anlegen"
+      })
+    });
+    assert.equal(newCompanyResponse.status, 201, await newCompanyResponse.clone().text());
+    const secondCompany = (await newCompanyResponse.json()).company;
+    assert.equal(secondCompany.status, "active");
+
+    const secondCompanyDetailResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
+      { headers: { Cookie: platformCookie } }
+    );
+    assert.equal(secondCompanyDetailResponse.status, 200, await secondCompanyDetailResponse.clone().text());
+    const secondCompanyDetail = await secondCompanyDetailResponse.json();
+    assert.equal(secondCompanyDetail.company.id, secondCompany.id);
+    assert.ok(Array.isArray(secondCompanyDetail.modules));
+
+    const staleCompanyUpdate = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          contactName: "Veraltete Version",
+          rowVersion: secondCompany.rowVersion + 1,
+          reason: "Firmenänderung mit veralteter Datenversion versuchen"
+        })
+      }
+    );
+    assert.equal(staleCompanyUpdate.status, 409);
+    assert.equal((await staleCompanyUpdate.json()).error.code, "stale_write");
+
+    const updateCompanyResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          contactName: "Fiona Filialleitung",
+          rowVersion: secondCompany.rowVersion,
+          reason: "Stammdaten der zweiten Firma im Integrationstest ändern"
+        })
+      }
+    );
+    assert.equal(updateCompanyResponse.status, 200, await updateCompanyResponse.clone().text());
+    let secondCompanyState = (await updateCompanyResponse.json()).company;
+    assert.equal(secondCompanyState.contactName, "Fiona Filialleitung");
+
+    const unconfirmedStatusChange = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "suspended",
+          rowVersion: secondCompanyState.rowVersion,
+          reason: "Kritische Statusänderung ohne Bestätigung versuchen"
+        })
+      }
+    );
+    assert.equal(unconfirmedStatusChange.status, 409);
+    assert.equal((await unconfirmedStatusChange.json()).error.code, "company_confirmation_required");
+
+    const confirmedStatusChange = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "suspended",
+          rowVersion: secondCompanyState.rowVersion,
+          confirmation: secondCompany.companyNumber,
+          reason: "Firma nach ausbleibender Zahlung im Integrationstest sperren"
+        })
+      }
+    );
+    assert.equal(confirmedStatusChange.status, 200, await confirmedStatusChange.clone().text());
+    secondCompanyState = (await confirmedStatusChange.json()).company;
+    assert.equal(secondCompanyState.status, "suspended");
+
+    const reactivateCompanyResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "active",
+          rowVersion: secondCompanyState.rowVersion,
+          reason: "Firma nach dem Sperrtest im Integrationstest reaktivieren"
+        })
+      }
+    );
+    assert.equal(reactivateCompanyResponse.status, 200, await reactivateCompanyResponse.clone().text());
+    secondCompanyState = (await reactivateCompanyResponse.json()).company;
+    assert.equal(secondCompanyState.status, "active");
+
+    // Modulkatalog und Modulfreigabe der zweiten Firma.
+    const moduleCatalogResponse = await fetch(`${baseUrl}/api/v1/platform/modules`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(moduleCatalogResponse.status, 200);
+    const moduleCatalog = (await moduleCatalogResponse.json()).modules;
+    assert.ok(moduleCatalog.some((entry) => entry.moduleKey === "vde"));
+
+    const moduleTrialStart = new Date().toISOString();
+    const moduleTrialEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const moduleUpdateResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}/modules/vde`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "trial",
+          startsAt: moduleTrialStart,
+          endsAt: moduleTrialEnd,
+          reason: "VDE-Testfreigabe für die zweite Firma im Integrationstest"
+        })
+      }
+    );
+    assert.equal(moduleUpdateResponse.status, 200, await moduleUpdateResponse.clone().text());
+    assert.equal((await moduleUpdateResponse.json()).entitlement.entitlementStatus, "trial");
+
+    // Tarif, Tarifversion und Vertragszuweisung mit Bestätigungspflicht.
+    const secondPlanResponse = await fetch(`${baseUrl}/api/v1/platform/plans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        key: `filiale_${suffix.toLowerCase()}`,
+        name: "Filialtarif",
+        status: "active",
+        description: "Tarif für Vertragszuweisung im Integrationstest",
+        reason: "Filialtarif für Vertragszuweisung anlegen"
+      })
+    });
+    assert.equal(secondPlanResponse.status, 201, await secondPlanResponse.clone().text());
+    const secondPlan = (await secondPlanResponse.json()).plan;
+
+    const plansListResponse = await fetch(`${baseUrl}/api/v1/platform/plans`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(plansListResponse.status, 200);
+    assert.ok((await plansListResponse.json()).plans.some((entry) => entry.id === secondPlan.id));
+
+    const planVersionResponse = await fetch(
+      `${baseUrl}/api/v1/platform/plans/${secondPlan.id}/versions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          monthlyPriceCents: 9900,
+          annualPriceCents: 99000,
+          userLimit: 25,
+          includedModules: ["vde"],
+          reason: "Erste Tarifversion für den Filialtarif anlegen"
+        })
+      }
+    );
+    assert.equal(planVersionResponse.status, 201, await planVersionResponse.clone().text());
+    const planVersion = (await planVersionResponse.json()).version;
+    assert.equal(planVersion.versionNumber, 1);
+
+    const missingConfirmationContract = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}/contracts`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          planVersionId: planVersion.id,
+          reason: "Vertragszuweisung ohne Bestätigung versuchen"
+        })
+      }
+    );
+    assert.equal(missingConfirmationContract.status, 409);
+    assert.equal((await missingConfirmationContract.json()).error.code, "contract_confirmation_required");
+
+    const contractResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}/contracts`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          planVersionId: planVersion.id,
+          confirmation: secondCompany.companyNumber,
+          status: "active",
+          reason: "Filialtarif der zweiten Firma im Integrationstest zuweisen"
+        })
+      }
+    );
+    assert.equal(contractResponse.status, 201, await contractResponse.clone().text());
+    const contract = (await contractResponse.json()).contract;
+    assert.equal(contract.monthlyPriceCents, 9900);
+
+    // Plattformadministratoren: Anlage, Rollenrechte und Kontoaktionen.
+    const supportAdminTemporaryPassword = "Plattform-Support-2026!";
+    const supportAdminEmail = `support-${suffix.toLowerCase()}@example.test`;
+    const createSupportAdminResponse = await fetch(`${baseUrl}/api/v1/platform/administrators`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        firstName: "Sven",
+        lastName: "Support",
+        email: supportAdminEmail,
+        roleKeys: ["support"],
+        temporaryPassword: supportAdminTemporaryPassword,
+        reason: "Support-Zugang im Integrationstest anlegen"
+      })
+    });
+    assert.equal(createSupportAdminResponse.status, 201, await createSupportAdminResponse.clone().text());
+    const supportAdmin = (await createSupportAdminResponse.json()).administrator;
+    assert.deepEqual(supportAdmin.roles, ["support"]);
+
+    const administratorListResponse = await fetch(`${baseUrl}/api/v1/platform/administrators`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(administratorListResponse.status, 200);
+    const administratorList = await administratorListResponse.json();
+    assert.ok(administratorList.administrators.some((entry) => entry.id === supportAdmin.id));
+    const supportRole = administratorList.roles.find((role) => role.roleKey === "support");
+    assert.ok(supportRole);
+
+    const supportLoginResponse = await fetch(`${baseUrl}/api/v1/platform/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: supportAdminEmail, password: supportAdminTemporaryPassword })
+    });
+    assert.equal(supportLoginResponse.status, 201, await supportLoginResponse.clone().text());
+    const supportCookie = supportLoginResponse.headers.get("set-cookie").split(";", 1)[0];
+    const supportSession = (await supportLoginResponse.json()).session;
+    assert.deepEqual(supportSession.platformUser.roles, ["support"]);
+
+    // Ohne Tarifverwaltung ist der Support-Rolle die Tarifanlage verwehrt.
+    const forbiddenPlanCreate = await fetch(`${baseUrl}/api/v1/platform/plans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: supportCookie },
+      body: JSON.stringify({
+        key: `verboten_${suffix.toLowerCase()}`,
+        name: "Nicht erlaubt",
+        reason: "Support darf keine Tarife anlegen"
+      })
+    });
+    assert.equal(forbiddenPlanCreate.status, 403);
+    assert.equal((await forbiddenPlanCreate.json()).error.code, "platform_permission_forbidden");
+
+    const rolePermissionsUpdate = await fetch(
+      `${baseUrl}/api/v1/platform/roles/${supportRole.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          permissions: [...supportRole.permissions, "errors.manage"],
+          rowVersion: supportRole.rowVersion,
+          confirmation: "support",
+          reason: "Support-Rolle im Integrationstest um Fehlerverwaltung erweitern"
+        })
+      }
+    );
+    assert.equal(rolePermissionsUpdate.status, 200, await rolePermissionsUpdate.clone().text());
+    assert.ok((await rolePermissionsUpdate.json()).role.permissions.includes("errors.manage"));
+
+    const selfDisableForbidden = await fetch(
+      `${baseUrl}/api/v1/platform/administrators/${platformSelf.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "disable",
+          confirmation: platformSelf.email,
+          reason: "Selbstdeaktivierung im Integrationstest versuchen"
+        })
+      }
+    );
+    assert.equal(selfDisableForbidden.status, 409);
+    assert.equal((await selfDisableForbidden.json()).error.code, "self_disable_forbidden");
+
+    const disableSupportAdmin = await fetch(
+      `${baseUrl}/api/v1/platform/administrators/${supportAdmin.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "disable",
+          confirmation: supportAdminEmail,
+          reason: "Support-Zugang im Integrationstest vorübergehend sperren"
+        })
+      }
+    );
+    assert.equal(disableSupportAdmin.status, 200, await disableSupportAdmin.clone().text());
+    assert.equal((await disableSupportAdmin.json()).administrator.status, "disabled");
+
+    const disabledAdminLoginResponse = await fetch(`${baseUrl}/api/v1/platform/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: supportAdminEmail, password: supportAdminTemporaryPassword })
+    });
+    assert.equal(disabledAdminLoginResponse.status, 401);
+
+    const enableSupportAdmin = await fetch(
+      `${baseUrl}/api/v1/platform/administrators/${supportAdmin.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "enable", reason: "Support-Zugang im Integrationstest wieder freigeben" })
+      }
+    );
+    assert.equal(enableSupportAdmin.status, 200, await enableSupportAdmin.clone().text());
+    assert.equal((await enableSupportAdmin.json()).administrator.status, "active");
+
+    const unlockSupportAdmin = await fetch(
+      `${baseUrl}/api/v1/platform/administrators/${supportAdmin.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "unlock", reason: "Sperrzähler im Integrationstest zurücksetzen" })
+      }
+    );
+    assert.equal(unlockSupportAdmin.status, 200, await unlockSupportAdmin.clone().text());
+    assert.equal((await unlockSupportAdmin.json()).administrator.failedLoginAttempts, 0);
+
+    const supportReLoginResponse = await fetch(`${baseUrl}/api/v1/platform/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: supportAdminEmail, password: supportAdminTemporaryPassword })
+    });
+    assert.equal(supportReLoginResponse.status, 201, await supportReLoginResponse.clone().text());
+    const supportSecondCookie = supportReLoginResponse.headers.get("set-cookie").split(";", 1)[0];
+
+    const endSupportSessions = await fetch(
+      `${baseUrl}/api/v1/platform/administrators/${supportAdmin.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "end_sessions", reason: "Sitzungen im Integrationstest beenden" })
+      }
+    );
+    assert.equal(endSupportSessions.status, 200, await endSupportSessions.clone().text());
+    const endedSupportSessionResponse = await fetch(`${baseUrl}/api/v1/platform/session`, {
+      headers: { Cookie: supportSecondCookie }
+    });
+    assert.equal(endedSupportSessionResponse.status, 401);
+
+    const assignRolesResponse = await fetch(
+      `${baseUrl}/api/v1/platform/administrators/${supportAdmin.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "assign_roles",
+          roleKeys: ["support", "technical"],
+          confirmation: supportAdminEmail,
+          reason: "Support-Konto im Integrationstest zusätzlich mit der Technik-Rolle ausstatten"
+        })
+      }
+    );
+    assert.equal(assignRolesResponse.status, 200, await assignRolesResponse.clone().text());
+    assert.deepEqual((await assignRolesResponse.json()).administrator.roles, ["support", "technical"]);
+
+    // Firmenkonten aus Sicht der Plattform: Suche, Korrektur und Kontoaktionen.
+    const invitedEmployeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        personnelNumber: `INV-${suffix}`,
+        firstName: "Ines",
+        lastName: "Einladung",
+        role: "installer",
+        temporaryPassword: "Einladung-Integration-2026!"
+      })
+    });
+    assert.equal(invitedEmployeeResponse.status, 201, await invitedEmployeeResponse.clone().text());
+    const invitedEmployee = (await invitedEmployeeResponse.json()).employee;
+    assert.equal(invitedEmployee.mustChangePassword, true);
+
+    const accountsListResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts?search=Mara&companyId=${tenantCompany.id}`,
+      { headers: { Cookie: platformCookie } }
+    );
+    assert.equal(accountsListResponse.status, 200, await accountsListResponse.clone().text());
+    const accountsList = await accountsListResponse.json();
+    assert.ok(accountsList.accounts.items.some((entry) => entry.id === employee.id));
+
+    const correctEmailResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${employee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "correct_email",
+          email: "mara.montage.korrigiert@example.test",
+          reason: "Falsch erfasste E-Mail-Adresse im Integrationstest korrigieren"
+        })
+      }
+    );
+    assert.equal(correctEmailResponse.status, 200, await correctEmailResponse.clone().text());
+    assert.equal((await correctEmailResponse.json()).account.email, "mara.montage.korrigiert@example.test");
+
+    const resendInvitationResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${invitedEmployee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "resend_invitation", reason: "Einladung im Integrationstest erneut versenden" })
+      }
+    );
+    assert.equal(resendInvitationResponse.status, 200, await resendInvitationResponse.clone().text());
+
+    const revokeInvitationDeniedResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${employee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "revoke_invitation", reason: "Einladung ohne offenen Status widerrufen versuchen" })
+      }
+    );
+    assert.equal(revokeInvitationDeniedResponse.status, 409);
+    assert.equal((await revokeInvitationDeniedResponse.json()).error.code, "invitation_not_pending");
+
+    const revokeInvitationResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${invitedEmployee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "revoke_invitation", reason: "Ungenutzte Einladung im Integrationstest widerrufen" })
+      }
+    );
+    assert.equal(revokeInvitationResponse.status, 200, await revokeInvitationResponse.clone().text());
+    assert.equal((await revokeInvitationResponse.json()).account.status, "inactive");
+
+    const unlockInactiveAccountResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${invitedEmployee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "unlock", reason: "Deaktiviertes Konto im Integrationstest entsperren versuchen" })
+      }
+    );
+    assert.equal(unlockInactiveAccountResponse.status, 409);
+    assert.equal((await unlockInactiveAccountResponse.json()).error.code, "account_not_locked");
+
+    const unlockActiveAccountResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${employee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "unlock", reason: "Sperrzähler im Integrationstest zurücksetzen" })
+      }
+    );
+    assert.equal(unlockActiveAccountResponse.status, 200, await unlockActiveAccountResponse.clone().text());
+
+    // Ein Konto mit fachlicher Historie darf nicht verschoben werden. Die
+    // Datenbankfunktion weist das mit einer rohen Ausnahme zurück, die als
+    // gruppierter Plattformfehler protokolliert wird statt als Validierungsfehler.
+    const reassignHistoricalEmployeeResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${employee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "reassign_company",
+          companyId: secondCompany.id,
+          reason: "Konto mit historischen Daten versehentlich verschieben"
+        })
+      }
+    );
+    assert.equal(reassignHistoricalEmployeeResponse.status, 500);
+    assert.equal((await reassignHistoricalEmployeeResponse.json()).error.code, "internal_error");
+
+    const reassignEmployeeResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${invitedEmployee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "reassign_company",
+          companyId: secondCompany.id,
+          reason: "Konto ohne historische Daten im Integrationstest verschieben"
+        })
+      }
+    );
+    assert.equal(reassignEmployeeResponse.status, 200, await reassignEmployeeResponse.clone().text());
+    assert.equal((await reassignEmployeeResponse.json()).account.companyId, secondCompany.id);
+
+    const reassignSameCompanyResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${invitedEmployee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "reassign_company",
+          companyId: secondCompany.id,
+          reason: "Konto erneut in dieselbe Firma verschieben versuchen"
+        })
+      }
+    );
+    assert.equal(reassignSameCompanyResponse.status, 400);
+
+    const endEmployeeSessionsResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${employee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ action: "end_sessions", reason: "Sitzungen im Integrationstest beenden" })
+      }
+    );
+    assert.equal(endEmployeeSessionsResponse.status, 200, await endEmployeeSessionsResponse.clone().text());
+    const employeeSessionAfterEnd = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: employeeCookie } });
+    assert.equal(employeeSessionAfterEnd.status, 401);
+
+    // Registrierungseinladungen: erneuter Versand, Freigabe und Ablehnung.
+    const secondRegistrationResponse = await fetch(`${baseUrl}/api/v1/platform/registrations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        legalName: `Selbstregistrierung ${suffix} GmbH`,
+        displayName: `Selbstregistrierung ${suffix}`,
+        contactName: "Rico Registrierung",
+        contactEmail: `selbst-${suffix.toLowerCase()}@example.test`,
+        planKey: "standard",
+        isTestCompany: true,
+        expiresInDays: 14,
+        reason: "Registrierung für Freigabetest im Integrationstest anlegen"
+      })
+    });
+    assert.equal(secondRegistrationResponse.status, 201, await secondRegistrationResponse.clone().text());
+    const secondRegistration = (await secondRegistrationResponse.json()).registration;
+
+    const registrationsListResponse = await fetch(`${baseUrl}/api/v1/platform/registrations`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(registrationsListResponse.status, 200);
+    assert.ok(
+      (await registrationsListResponse.json()).registrations.some((entry) => entry.id === secondRegistration.id)
+    );
+
+    const approveRegistrationResponse = await fetch(
+      `${baseUrl}/api/v1/platform/registrations/${secondRegistration.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "approve",
+          rowVersion: secondRegistration.rowVersion,
+          personnelNumber: "REG-0001",
+          firstName: "Rico",
+          lastName: "Registrierung",
+          temporaryPassword: "Registrierung-2026-Start!",
+          trialDays: 30,
+          reason: "Selbstregistrierung im Integrationstest freigeben"
+        })
+      }
+    );
+    assert.equal(approveRegistrationResponse.status, 200, await approveRegistrationResponse.clone().text());
+    const approvedRegistration = (await approveRegistrationResponse.json()).registration;
+    assert.equal(approvedRegistration.status, "approved");
+
+    const reapproveRegistrationResponse = await fetch(
+      `${baseUrl}/api/v1/platform/registrations/${secondRegistration.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "approve",
+          rowVersion: approvedRegistration.rowVersion,
+          personnelNumber: "REG-0002",
+          firstName: "Rico",
+          lastName: "Registrierung",
+          temporaryPassword: "Registrierung-2026-Start!",
+          reason: "Bereits freigegebene Registrierung erneut freigeben versuchen"
+        })
+      }
+    );
+    assert.equal(reapproveRegistrationResponse.status, 409);
+    assert.equal((await reapproveRegistrationResponse.json()).error.code, "registration_not_open");
+
+    const thirdRegistrationResponse = await fetch(`${baseUrl}/api/v1/platform/registrations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        legalName: `Abgelehnt ${suffix} GmbH`,
+        displayName: `Abgelehnt ${suffix}`,
+        contactName: "Rex Reject",
+        contactEmail: `abgelehnt-${suffix.toLowerCase()}@example.test`,
+        planKey: "standard",
+        reason: "Registrierung für Ablehnungstest im Integrationstest anlegen"
+      })
+    });
+    assert.equal(thirdRegistrationResponse.status, 201);
+    const thirdRegistration = (await thirdRegistrationResponse.json()).registration;
+
+    const rejectRegistrationResponse = await fetch(
+      `${baseUrl}/api/v1/platform/registrations/${thirdRegistration.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "reject",
+          rowVersion: thirdRegistration.rowVersion,
+          reason: "Registrierung im Integrationstest ablehnen"
+        })
+      }
+    );
+    assert.equal(rejectRegistrationResponse.status, 200, await rejectRegistrationResponse.clone().text());
+    assert.equal((await rejectRegistrationResponse.json()).registration.status, "rejected");
+
+    // Supportfall: Aktualisierung von Status, Priorität und Zuständigkeit.
+    const secondTicketResponse = await fetch(`${baseUrl}/api/v1/platform/support/tickets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        companyId: tenantCompany.id,
+        contactName: "Zweiter Supportfall",
+        contactEmail: "support-zwei@example.test",
+        category: "billing",
+        priority: "normal",
+        subject: "Rechnungsfrage im Integrationstest",
+        description: "Supportfall zum Testen der Aktualisierung anlegen.",
+        reason: "Supportfall für Aktualisierungstest anlegen"
+      })
+    });
+    assert.equal(secondTicketResponse.status, 201, await secondTicketResponse.clone().text());
+    const secondTicket = (await secondTicketResponse.json()).ticket;
+
+    const supportTicketsListResponse = await fetch(`${baseUrl}/api/v1/platform/support/tickets`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(supportTicketsListResponse.status, 200);
+    assert.ok((await supportTicketsListResponse.json()).tickets.some((entry) => entry.id === secondTicket.id));
+
+    const updateTicketResponse = await fetch(
+      `${baseUrl}/api/v1/platform/support/tickets/${secondTicket.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "in_progress",
+          priority: "high",
+          assigneeId: platformSelf.id,
+          rowVersion: secondTicket.rowVersion,
+          reason: "Supportfall im Integrationstest übernehmen"
+        })
+      }
+    );
+    assert.equal(updateTicketResponse.status, 200, await updateTicketResponse.clone().text());
+    const updatedTicket = (await updateTicketResponse.json()).ticket;
+    assert.equal(updatedTicket.status, "in_progress");
+    assert.equal(updatedTicket.assignedPlatformUserId, platformSelf.id);
+
+    const closeTicketResponse = await fetch(
+      `${baseUrl}/api/v1/platform/support/tickets/${secondTicket.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "closed",
+          rowVersion: updatedTicket.rowVersion,
+          reason: "Supportfall im Integrationstest abschließen"
+        })
+      }
+    );
+    assert.equal(closeTicketResponse.status, 200, await closeTicketResponse.clone().text());
+    assert.ok((await closeTicketResponse.json()).ticket.closedAt);
+
+    // Systemstatus: Beeinträchtigung melden und wieder aufheben.
+    const healthListResponse = await fetch(`${baseUrl}/api/v1/platform/health`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(healthListResponse.status, 200);
+    assert.ok((await healthListResponse.json()).components.some((entry) => entry.componentKey === "pdf"));
+
+    const degradeHealthResponse = await fetch(`${baseUrl}/api/v1/platform/health/pdf`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "degraded",
+        errorSummary: "PDF-Erstellung im Integrationstest testweise verlangsamt",
+        reason: "Systemstatus im Integrationstest auf beeinträchtigt setzen"
+      })
+    });
+    assert.equal(degradeHealthResponse.status, 200, await degradeHealthResponse.clone().text());
+    assert.equal((await degradeHealthResponse.json()).component.status, "degraded");
+
+    const recoverHealthResponse = await fetch(`${baseUrl}/api/v1/platform/health/pdf`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "available",
+        reason: "Systemstatus im Integrationstest wieder auf verfügbar setzen"
+      })
+    });
+    assert.equal(recoverHealthResponse.status, 200, await recoverHealthResponse.clone().text());
+    assert.equal((await recoverHealthResponse.json()).component.status, "available");
+
+    const unknownHealthComponentResponse = await fetch(`${baseUrl}/api/v1/platform/health/unbekannt`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({ status: "available", reason: "Unbekannte Komponente testen" })
+    });
+    assert.equal(unknownHealthComponentResponse.status, 404);
+    assert.equal((await unknownHealthComponentResponse.json()).error.code, "health_component_not_found");
+
+    // Der zuvor ausgelöste Plattformfehler wird gruppiert angezeigt und lässt
+    // sich untersuchen und beheben.
+    const errorsListResponse = await fetch(`${baseUrl}/api/v1/platform/errors`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(errorsListResponse.status, 200, await errorsListResponse.clone().text());
+    const platformErrors = (await errorsListResponse.json()).errors;
+    const reassignmentError = platformErrors.find((entry) => (
+      entry.sanitizedMessage?.includes("/api/v1/platform/accounts/")
+      && entry.module === "platform_administration"
+    ));
+    assert.ok(reassignmentError, "Der ausgelöste Plattformfehler wurde nicht gruppiert");
+    assert.ok(reassignmentError.occurrenceCount >= 1);
+
+    const investigateErrorResponse = await fetch(
+      `${baseUrl}/api/v1/platform/errors/${reassignmentError.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ status: "investigating", reason: "Ausgelösten Fehler im Integrationstest untersuchen" })
+      }
+    );
+    assert.equal(investigateErrorResponse.status, 200, await investigateErrorResponse.clone().text());
+
+    const resolveErrorResponse = await fetch(
+      `${baseUrl}/api/v1/platform/errors/${reassignmentError.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ status: "resolved", reason: "Ausgelösten Fehler im Integrationstest beheben" })
+      }
+    );
+    assert.equal(resolveErrorResponse.status, 200, await resolveErrorResponse.clone().text());
+    assert.ok((await resolveErrorResponse.json()).error.resolvedAt);
+
+    // Versionsverwaltung: eine weitere Version als Entwurf anlegen.
+    const draftVersionResponse = await fetch(`${baseUrl}/api/v1/platform/versions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        version: "0.43.0",
+        status: "draft",
+        changelog: "Entwurfsversion für den Integrationstest",
+        reason: "Entwurfsversion im Integrationstest anlegen"
+      })
+    });
+    assert.equal(draftVersionResponse.status, 201, await draftVersionResponse.clone().text());
+    assert.equal((await draftVersionResponse.json()).version.releaseStatus, "draft");
+
+    // Mitteilungen: Anlage mit Empfängerprüfung und Veröffentlichung.
+    const draftAnnouncementResponse = await fetch(`${baseUrl}/api/v1/platform/announcements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        title: "Wartungsfenster im Integrationstest",
+        message: "Geplante Wartung zum Testen der Mitteilungsverwaltung.",
+        type: "maintenance",
+        status: "draft",
+        targets: { scope: "companies", values: [tenantCompany.id] },
+        reason: "Mitteilung im Integrationstest anlegen"
+      })
+    });
+    assert.equal(draftAnnouncementResponse.status, 201, await draftAnnouncementResponse.clone().text());
+    const draftAnnouncement = (await draftAnnouncementResponse.json()).announcement;
+
+    const invalidTargetAnnouncementResponse = await fetch(`${baseUrl}/api/v1/platform/announcements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        title: "Ungültige Empfänger",
+        message: "Darf nicht angelegt werden.",
+        type: "update",
+        targets: { scope: "plans", values: ["kein_bekannter_tarif"] },
+        reason: "Unbekannte Empfängerwerte im Integrationstest prüfen"
+      })
+    });
+    assert.equal(invalidTargetAnnouncementResponse.status, 400);
+    assert.match((await invalidTargetAnnouncementResponse.json()).error.message, /Unbekannte Empfängerwerte/);
+
+    const publishAnnouncementResponse = await fetch(
+      `${baseUrl}/api/v1/platform/announcements/${draftAnnouncement.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          status: "published",
+          rowVersion: draftAnnouncement.rowVersion,
+          reason: "Mitteilung im Integrationstest veröffentlichen"
+        })
+      }
+    );
+    assert.equal(publishAnnouncementResponse.status, 200, await publishAnnouncementResponse.clone().text());
+    assert.equal((await publishAnnouncementResponse.json()).announcement.status, "published");
+
+    const announcementListResponse = await fetch(`${baseUrl}/api/v1/platform/announcements`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(announcementListResponse.status, 200);
+    assert.ok(
+      (await announcementListResponse.json()).announcements.some((entry) => entry.id === draftAnnouncement.id)
+    );
+
+    // Backups: Anstoß und Liste; eine Wiederherstellung setzt ein tatsächlich
+    // erfolgreiches, geprüftes Backup voraus, das nur die asynchrone
+    // Sicherungsverarbeitung liefert, nicht die API selbst.
+    const queueBackupResponse = await fetch(`${baseUrl}/api/v1/platform/backups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({ type: "manual", reason: "Backup im Integrationstest anstoßen" })
+    });
+    assert.equal(queueBackupResponse.status, 202, await queueBackupResponse.clone().text());
+    const queuedBackup = (await queueBackupResponse.json()).backup;
+    assert.equal(queuedBackup.status, "queued");
+
+    const backupListResponse = await fetch(`${baseUrl}/api/v1/platform/backups`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(backupListResponse.status, 200);
+    assert.ok((await backupListResponse.json()).backups.some((entry) => entry.id === queuedBackup.id));
+
+    const restoreWithoutSuccessfulBackupResponse = await fetch(`${baseUrl}/api/v1/platform/restores`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        type: "test",
+        backupId: queuedBackup.id,
+        reason: "Wiederherstellung aus einem noch nicht erfolgreichen Backup versuchen"
+      })
+    });
+    assert.equal(restoreWithoutSuccessfulBackupResponse.status, 409);
+    assert.equal((await restoreWithoutSuccessfulBackupResponse.json()).error.code, "backup_not_restorable");
+
+    // Datenschutzanfrage: vollständiger Ablauf über alle Phasen bis zum
+    // Abschluss, einschließlich der Zwei-Personen-Freigabe bei der
+    // endgültigen Bestätigung.
+    const privacyRequestResponse = await fetch(`${baseUrl}/api/v1/platform/privacy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        type: "user_export",
+        userId: invitedEmployee.id,
+        reason: "Auskunftsersuchen im Integrationstest anlegen"
+      })
+    });
+    assert.equal(privacyRequestResponse.status, 201, await privacyRequestResponse.clone().text());
+    let privacyRequest = (await privacyRequestResponse.json()).request;
+    assert.equal(privacyRequest.status, "recorded");
+    assert.equal(privacyRequest.companyId, secondCompany.id);
+
+    const advancePrivacy = async (status, reason) => {
+      const response = await fetch(`${baseUrl}/api/v1/platform/privacy/${privacyRequest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ status, rowVersion: privacyRequest.rowVersion, reason })
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      privacyRequest = (await response.json()).request;
+      return privacyRequest;
+    };
+
+    await advancePrivacy("retention_review", "Aufbewahrungsprüfung im Integrationstest starten");
+    assert.equal(privacyRequest.status, "retention_review");
+    await advancePrivacy("deactivated", "Konto im Integrationstest deaktivieren");
+    await advancePrivacy("archived", "Daten im Integrationstest archivieren");
+    await advancePrivacy("recovery_period", "Wiederherstellungsfrist im Integrationstest starten");
+    assert.equal(privacyRequest.status, "recovery_period");
+
+    const selfConfirmForbidden = await fetch(`${baseUrl}/api/v1/platform/privacy/${privacyRequest.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "confirmed",
+        rowVersion: privacyRequest.rowVersion,
+        reason: "Endgültige Bestätigung durch dieselbe Person versuchen"
+      })
+    });
+    assert.equal(selfConfirmForbidden.status, 403);
+    assert.equal((await selfConfirmForbidden.json()).error.code, "four_eyes_required");
+
+    const privacyAdminTemporaryPassword = "Plattform-Datenschutz-2026!";
+    const privacyAdminEmail = `datenschutz-${suffix.toLowerCase()}@example.test`;
+    const createPrivacyAdminResponse = await fetch(`${baseUrl}/api/v1/platform/administrators`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        firstName: "Petra",
+        lastName: "Datenschutz",
+        email: privacyAdminEmail,
+        roleKeys: ["privacy"],
+        temporaryPassword: privacyAdminTemporaryPassword,
+        reason: "Zweite berechtigte Person für die Datenschutzbestätigung anlegen"
+      })
+    });
+    assert.equal(createPrivacyAdminResponse.status, 201, await createPrivacyAdminResponse.clone().text());
+
+    const privacyAdminLoginResponse = await fetch(`${baseUrl}/api/v1/platform/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: privacyAdminEmail, password: privacyAdminTemporaryPassword })
+    });
+    assert.equal(privacyAdminLoginResponse.status, 201, await privacyAdminLoginResponse.clone().text());
+    const privacyAdminCookie = privacyAdminLoginResponse.headers.get("set-cookie").split(";", 1)[0];
+
+    const confirmPrivacyResponse = await fetch(`${baseUrl}/api/v1/platform/privacy/${privacyRequest.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: privacyAdminCookie },
+      body: JSON.stringify({
+        status: "confirmed",
+        rowVersion: privacyRequest.rowVersion,
+        reason: "Endgültige Bestätigung durch die zweite berechtigte Person"
+      })
+    });
+    assert.equal(confirmPrivacyResponse.status, 200, await confirmPrivacyResponse.clone().text());
+    privacyRequest = (await confirmPrivacyResponse.json()).request;
+    assert.equal(privacyRequest.status, "confirmed");
+
+    const processingResponse = await fetch(`${baseUrl}/api/v1/platform/privacy/${privacyRequest.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "processing",
+        rowVersion: privacyRequest.rowVersion,
+        reason: "Datenschutzanfrage im Integrationstest in Bearbeitung setzen"
+      })
+    });
+    assert.equal(processingResponse.status, 200, await processingResponse.clone().text());
+    privacyRequest = (await processingResponse.json()).request;
+
+    const completedResponse = await fetch(`${baseUrl}/api/v1/platform/privacy/${privacyRequest.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        status: "completed",
+        deletionLog: { export: "bereitgestellt" },
+        rowVersion: privacyRequest.rowVersion,
+        reason: "Datenschutzanfrage im Integrationstest abschließen"
+      })
+    });
+    assert.equal(completedResponse.status, 200, await completedResponse.clone().text());
+    assert.ok((await completedResponse.json()).request.completedAt);
+
+    const privacyListResponse = await fetch(`${baseUrl}/api/v1/platform/privacy`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(privacyListResponse.status, 200);
+    assert.ok((await privacyListResponse.json()).requests.some((entry) => entry.id === privacyRequest.id));
+
+    // Systemeinstellungen und der abschließende Blick ins Audit-Protokoll.
+    const settingsListResponse = await fetch(`${baseUrl}/api/v1/platform/settings`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(settingsListResponse.status, 200);
+    assert.ok(
+      (await settingsListResponse.json()).settings.some((entry) => entry.settingKey === "maintenance.enabled")
+    );
+
+    const finalAuditResponse = await fetch(`${baseUrl}/api/v1/platform/audit`, {
+      headers: { Cookie: platformCookie }
+    });
+    assert.equal(finalAuditResponse.status, 200);
+    const finalAudit = (await finalAuditResponse.json()).audit;
+    assert.ok(finalAudit.some((entry) => entry.action === "company.create"));
+    assert.ok(finalAudit.some((entry) => entry.action === "privacy.completed"));
+  });
+
   await t.test("Abmeldung und Sitzungsende", async () => {
 
     const logout = await fetch(`${baseUrl}/api/v1/session`, { method: "DELETE", headers: { Cookie: cookie } });

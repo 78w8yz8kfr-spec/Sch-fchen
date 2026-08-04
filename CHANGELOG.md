@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: Eine Vertragszuweisung (`POST /api/v1/platform/companies/:id/contracts`)
+  schlug immer mit einem unbehandelten Serverfehler fehl, sobald kein
+  Vertragsende übermittelt wurde. Ursache war ein einzelner Datenbankparameter,
+  der gleichzeitig für die Spalte `license_valid_until` (DATUM) und
+  `contract_ends_at` (ZEITSTEMPEL) verwendet wurde; PostgreSQL konnte dafür
+  keinen eindeutigen Typ ableiten. Der Endpunkt war zuvor vollständig ungetestet
+  und der Fehler entsprechend unbemerkt geblieben.
+- die Plattformverwaltung ist im PostgreSQL-Integrationstest jetzt breit
+  abgedeckt: Firmenanlage und kritische Statusänderung, Modulfreigabe,
+  Tarif- und Vertragszuweisung, Plattformadministratoren mit Rollenrechten
+  und Selbstschutz, Firmenkonten mit Kontoaktionen einschließlich
+  Firmenwechsel, Registrierungsfreigabe und -ablehnung, Supportfälle,
+  Systemstatus, gruppierte Plattformfehler, Versionsentwürfe, Mitteilungen
+  mit Empfängerprüfung, Backup-Anstoß, sowie eine vollständige
+  Datenschutzanfrage über alle Phasen mit Zwei-Personen-Freigabe
 - die GitHub-Prüfung misst die Testabdeckung von `api/src` und bricht ab, wenn
   sie 81 Prozent Zeilen, 71 Prozent Zweige oder 91 Prozent Funktionen
   unterschreitet; `make api-coverage` führt dieselbe Prüfung lokal aus
