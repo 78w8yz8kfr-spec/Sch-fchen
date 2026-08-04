@@ -7,6 +7,8 @@ DECLARE
     target_company_id UUID;
     target_user_id UUID;
     login_count INTEGER;
+    foreign_company_id UUID;
+    announcement_author_id UUID;
 BEGIN
     SELECT id INTO target_company_id
     FROM companies WHERE company_number = 'F-000001';
@@ -101,9 +103,71 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'Dynamische Pflichtupdate-Entscheidung konnte nicht gespeichert werden';
     END IF;
+
+    UPDATE companies SET status = 'active' WHERE id = target_company_id;
+
+    INSERT INTO companies (legal_name, display_name)
+    VALUES ('Mitteilungs Zweitfirma GmbH', 'Mitteilungs Zweitfirma')
+    RETURNING id INTO foreign_company_id;
+
+    INSERT INTO platform_users (first_name, last_name, email, password_hash)
+    VALUES ('Mitteilungs', 'Verfasser', 'mitteilung-044@example.invalid', 'test-hash')
+    RETURNING id INTO announcement_author_id;
+
+    INSERT INTO platform_announcements (
+        title, message, announcement_type, status, targets,
+        publish_at, created_by_platform_user_id
+    ) VALUES
+        ('Mitteilung an alle', 'Gilt für jede Firma', 'update', 'published',
+         '{"scope":"all"}'::JSONB, CURRENT_TIMESTAMP - INTERVAL '1 hour', announcement_author_id),
+        ('Mitteilung nur an Firma B', 'Darf Firma A nicht erreichen', 'update', 'published',
+         jsonb_build_object('scope', 'companies', 'values', jsonb_build_array(foreign_company_id::TEXT)),
+         CURRENT_TIMESTAMP - INTERVAL '1 hour', announcement_author_id),
+        ('Unveröffentlichter Entwurf', 'Darf niemanden erreichen', 'update', 'draft',
+         '{"scope":"all"}'::JSONB, NULL, announcement_author_id);
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    visible_titles TEXT[];
+BEGIN
+    SELECT COALESCE(ARRAY_AGG(title ORDER BY title), ARRAY[]::TEXT[])
+    INTO visible_titles
+    FROM platform_announcements;
+
+    IF NOT ('Mitteilung an alle' = ANY (visible_titles)) THEN
+        RAISE EXCEPTION 'Firmenrolle sieht die an alle gerichtete Mitteilung nicht';
+    END IF;
+
+    IF 'Mitteilung nur an Firma B' = ANY (visible_titles) THEN
+        RAISE EXCEPTION 'Firmenrolle sieht eine an eine fremde Firma gerichtete Mitteilung';
+    END IF;
+
+    IF 'Unveröffentlichter Entwurf' = ANY (visible_titles) THEN
+        RAISE EXCEPTION 'Firmenrolle sieht einen unveröffentlichten Mitteilungsentwurf';
+    END IF;
+
+    BEGIN
+        PERFORM COUNT(*) FROM platform_users;
+        RAISE EXCEPTION USING
+            ERRCODE = 'ZX441',
+            MESSAGE = 'Firmenrolle kann Plattformkonten lesen';
+    EXCEPTION
+        WHEN insufficient_privilege THEN NULL;
+    END;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 044_finalize_platform_security.sql erfolgreich getestet.'

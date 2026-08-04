@@ -117,9 +117,63 @@ BEGIN
     EXCEPTION
         WHEN SQLSTATE 'P0001' THEN NULL;
     END;
+
+    INSERT INTO customer_contacts (company_id, customer_id, first_name, last_name, email)
+    VALUES (company_b_id, customer_b_id, 'Fremder', 'Ansprechpartner', 'fremd@example.org');
+
+    PERFORM set_config('app.test_foreign_company_id', company_b_id::TEXT, TRUE);
+    PERFORM set_config('app.test_foreign_customer_id', customer_b_id::TEXT, TRUE);
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    tenant_a_id UUID := NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID;
+    foreign_company_id UUID := CURRENT_SETTING('app.test_foreign_company_id', TRUE)::UUID;
+    foreign_customer_id UUID := CURRENT_SETTING('app.test_foreign_customer_id', TRUE)::UUID;
+    own_contacts INTEGER;
+    foreign_contacts INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO own_contacts
+    FROM customer_contacts
+    WHERE company_id = tenant_a_id;
+
+    SELECT COUNT(*) INTO foreign_contacts
+    FROM customer_contacts
+    WHERE company_id <> tenant_a_id;
+
+    IF own_contacts = 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht die eigenen Ansprechpartner nicht';
+    END IF;
+
+    IF foreign_contacts <> 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht % firmenfremde Ansprechpartner', foreign_contacts;
+    END IF;
+
+    BEGIN
+        INSERT INTO customer_contacts (company_id, customer_id, first_name, last_name, email)
+        VALUES (
+            foreign_company_id, foreign_customer_id,
+            'Eingeschleuster', 'Kontakt', 'eingeschleust@example.org'
+        );
+        RAISE EXCEPTION USING
+            ERRCODE = 'ZX505',
+            MESSAGE = 'API-Rolle konnte einen Ansprechpartner für eine fremde Firma anlegen';
+    EXCEPTION
+        WHEN insufficient_privilege THEN NULL;
+    END;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 005_create_customer_contacts.sql erfolgreich getestet.'

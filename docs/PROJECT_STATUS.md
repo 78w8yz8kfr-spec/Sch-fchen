@@ -167,6 +167,10 @@ Technischer Stand: V0.42.0
 - Migration 008 `construction_sites` mit Jahresnummer, flachen Bereichen, Status „im Verzug“, QR-Code und Pinnwand
 - durchgehende Mandanten-Fremdschlüssel, erzwungene RLS-Regeln, Historie und Löschschutz für Migrationen 004 bis 008
 - SQL-Abnahmetests für jede Migration sowie automatischer Backup-/Restore-Test
+- Mandantenschutz und Rollentrennung werden in den SQL-Abnahmetests unter den
+  eingeschränkten Datenbankrollen `schaefchen_api` und
+  `schaefchen_platform_api` geprüft, weil die Policies für den
+  Tabelleneigentümer bewusst nicht erzwungen werden
 - GitHub Pages aktiviert und öffentliche PWA erfolgreich veröffentlicht
 - Migration 009 `site_assignments` mit mehreren geordneten Baustellen pro Tag, Freigabe und Änderungshistorie
 - Migration 010 `site_supervisors` mit mehreren Vorarbeitern, Hauptverantwortung und automatischer Übergabe

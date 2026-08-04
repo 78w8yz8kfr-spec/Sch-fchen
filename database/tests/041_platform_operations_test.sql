@@ -85,6 +85,66 @@ BEGIN
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+-- Der Betriebsbereich der Plattform bleibt für die Firmenrolle unerreichbar.
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    blocked_table TEXT;
+    reachable_tables TEXT[] := ARRAY[]::TEXT[];
+BEGIN
+    FOREACH blocked_table IN ARRAY ARRAY[
+        'company_registration_requests', 'support_tickets', 'support_ticket_events',
+        'support_ticket_attachments', 'support_access_sessions', 'support_access_events',
+        'system_health_components', 'background_process_runs', 'platform_error_groups',
+        'platform_error_occurrences', 'platform_backup_runs', 'platform_restore_requests',
+        'privacy_requests', 'platform_settings', 'platform_setting_history'
+    ] LOOP
+        BEGIN
+            EXECUTE format('SELECT COUNT(*) FROM %I', blocked_table);
+            reachable_tables := reachable_tables || blocked_table;
+        EXCEPTION
+            WHEN insufficient_privilege THEN NULL;
+        END;
+    END LOOP;
+
+    IF ARRAY_LENGTH(reachable_tables, 1) IS NOT NULL THEN
+        RAISE EXCEPTION 'Firmenrolle erreicht Plattformbetriebstabellen: %',
+            ARRAY_TO_STRING(reachable_tables, ', ');
+    END IF;
+END;
+$$;
+
+RESET ROLE;
+
+-- Die Plattformrolle bearbeitet den Betriebsbereich weiterhin vollständig.
+SET LOCAL ROLE schaefchen_platform_api;
+
+DO $$
+DECLARE
+    visible_tickets INTEGER;
+    visible_settings INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO visible_tickets FROM support_tickets;
+    SELECT COUNT(*) INTO visible_settings FROM platform_settings;
+
+    IF visible_tickets = 0 THEN
+        RAISE EXCEPTION 'Plattformrolle sieht keine Supportvorgänge';
+    END IF;
+
+    IF visible_settings = 0 THEN
+        RAISE EXCEPTION 'Plattformrolle sieht keine Plattformeinstellungen';
+    END IF;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 041_create_platform_operations.sql erfolgreich getestet.'

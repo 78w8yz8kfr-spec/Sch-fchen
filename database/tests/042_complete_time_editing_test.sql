@@ -15,6 +15,9 @@ DECLARE
     replacement_arrival_id UUID;
     target_operation_id UUID;
     target_item_id UUID;
+    foreign_company_id UUID;
+    foreign_employee_id UUID;
+    foreign_operation_id UUID;
 BEGIN
     SELECT id INTO target_company_id
     FROM companies WHERE company_number = 'F-000001';
@@ -176,9 +179,91 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         IF SQLERRM = 'Zeitkorrekturvorgang konnte gelöscht werden' THEN RAISE; END IF;
     END;
+
+    INSERT INTO companies (legal_name, display_name)
+    VALUES ('Zeitkorrektur Zweitfirma GmbH', 'Zeitkorrektur Zweitfirma')
+    RETURNING id INTO foreign_company_id;
+
+    INSERT INTO users (company_id, personnel_number, first_name, last_name)
+    VALUES (foreign_company_id, 'TIME-EDIT-042-B', 'Fremd', 'Korrektur')
+    RETURNING id INTO foreign_employee_id;
+
+    INSERT INTO time_change_operations (
+        company_id, user_id, client_change_id, action, reason, status, requested_by_user_id
+    ) VALUES (
+        foreign_company_id, foreign_employee_id, gen_random_uuid(), 'edit_entry',
+        'Fremder Korrekturvorgang', 'applied', foreign_employee_id
+    ) RETURNING id INTO foreign_operation_id;
+
+    INSERT INTO time_change_items (
+        company_id, operation_id, item_action, new_value
+    ) VALUES (
+        foreign_company_id, foreign_operation_id, 'replace', '{"quelle": "fremd"}'::JSONB
+    );
+
+    PERFORM set_config('app.test_foreign_company_id', foreign_company_id::TEXT, TRUE);
+    PERFORM set_config('app.test_foreign_user_id', foreign_employee_id::TEXT, TRUE);
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    tenant_a_id UUID := NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID;
+    foreign_company_id UUID := CURRENT_SETTING('app.test_foreign_company_id', TRUE)::UUID;
+    foreign_user_id UUID := CURRENT_SETTING('app.test_foreign_user_id', TRUE)::UUID;
+    own_operations INTEGER;
+    foreign_operations INTEGER;
+    foreign_items INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO own_operations
+    FROM time_change_operations
+    WHERE company_id = tenant_a_id;
+
+    SELECT COUNT(*) INTO foreign_operations
+    FROM time_change_operations
+    WHERE company_id <> tenant_a_id;
+
+    SELECT COUNT(*) INTO foreign_items
+    FROM time_change_items
+    WHERE company_id <> tenant_a_id;
+
+    IF own_operations = 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht die eigenen Zeitkorrekturvorgänge nicht';
+    END IF;
+
+    IF foreign_operations <> 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht % firmenfremde Zeitkorrekturvorgänge', foreign_operations;
+    END IF;
+
+    IF foreign_items <> 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht % firmenfremde Zeitkorrekturpositionen', foreign_items;
+    END IF;
+
+    BEGIN
+        INSERT INTO time_change_operations (
+            company_id, user_id, client_change_id, action, reason, status, requested_by_user_id
+        ) VALUES (
+            foreign_company_id, foreign_user_id, gen_random_uuid(), 'edit_entry',
+            'Eingeschleuster Korrekturvorgang', 'applied', foreign_user_id
+        );
+        RAISE EXCEPTION USING
+            ERRCODE = 'ZX421',
+            MESSAGE = 'API-Rolle konnte einen Zeitkorrekturvorgang für eine fremde Firma anlegen';
+    EXCEPTION
+        WHEN insufficient_privilege THEN NULL;
+    END;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 042_enable_complete_time_editing.sql erfolgreich getestet.'

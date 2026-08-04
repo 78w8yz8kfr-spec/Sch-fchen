@@ -107,6 +107,66 @@ BEGIN
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+-- Die Firmenrolle darf den Modulkatalog lesen, aber weder ändern noch die
+-- Tarif- und Vertragsverwaltung erreichen.
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    tenant_a_id UUID := NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID;
+    readable_modules INTEGER;
+    foreign_entitlements INTEGER;
+    blocked_table TEXT;
+    reachable_tables TEXT[] := ARRAY[]::TEXT[];
+BEGIN
+    SELECT COUNT(*) INTO readable_modules FROM module_catalog;
+    IF readable_modules = 0 THEN
+        RAISE EXCEPTION 'Firmenrolle kann den Modulkatalog nicht lesen';
+    END IF;
+
+    SELECT COUNT(*) INTO foreign_entitlements
+    FROM company_module_entitlements
+    WHERE company_id <> tenant_a_id;
+
+    IF foreign_entitlements <> 0 THEN
+        RAISE EXCEPTION 'Firmenrolle sieht % firmenfremde Modulfreischaltungen', foreign_entitlements;
+    END IF;
+
+    FOREACH blocked_table IN ARRAY ARRAY[
+        'license_plans', 'license_plan_versions', 'company_contracts',
+        'company_contract_history', 'company_module_entitlement_history'
+    ] LOOP
+        BEGIN
+            EXECUTE format('SELECT COUNT(*) FROM %I', blocked_table);
+            reachable_tables := reachable_tables || blocked_table;
+        EXCEPTION
+            WHEN insufficient_privilege THEN NULL;
+        END;
+    END LOOP;
+
+    IF ARRAY_LENGTH(reachable_tables, 1) IS NOT NULL THEN
+        RAISE EXCEPTION 'Firmenrolle erreicht Tarif- und Vertragstabellen: %',
+            ARRAY_TO_STRING(reachable_tables, ', ');
+    END IF;
+
+    BEGIN
+        UPDATE module_catalog SET name = 'Manipuliert';
+        RAISE EXCEPTION USING
+            ERRCODE = 'ZX401',
+            MESSAGE = 'Firmenrolle konnte den Modulkatalog verändern';
+    EXCEPTION
+        WHEN insufficient_privilege THEN NULL;
+    END;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 040_create_platform_catalogs.sql erfolgreich getestet.'

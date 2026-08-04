@@ -4,7 +4,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
-- keine noch nicht zugeordnete Produktänderung
+- die SQL-Abnahmetests der Migrationen 005, 006, 007, 042 und 043 prüfen den
+  Mandantenschutz jetzt unter der eingeschränkten Datenbankrolle
+  `schaefchen_api`; da alle Tabellen `NO FORCE ROW LEVEL SECURITY` verwenden,
+  blieben die Mandanten-Policies bisher wirkungslos, solange die Tests als
+  Eigentümer liefen
+- die SQL-Abnahmetests der Migrationen 039, 040 und 041 belegen die Trennung
+  zwischen Firmen- und Plattformrolle am Verhalten: die Firmenrolle erreicht
+  weder Plattformkonten noch Tarif-, Vertrags- und Betriebstabellen, während
+  die Plattformrolle firmenübergreifend arbeitet
+- der SQL-Abnahmetest der Migration 044 prüft die Empfängerbegrenzung
+  systemweiter Mitteilungen am tatsächlichen Leseergebnis statt am Text der
+  Policy; eine an eine fremde Firma gerichtete oder unveröffentlichte
+  Mitteilung darf die Firmenrolle nicht erreichen
 
 ## [0.42.0] – Plattformverwaltung, sichere Zeitkorrekturen und ruhige Woche
 

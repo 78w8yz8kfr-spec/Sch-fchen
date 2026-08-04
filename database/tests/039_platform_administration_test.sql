@@ -82,9 +82,74 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'Plattform- oder Firmen-RLS fehlt';
     END IF;
+
+    PERFORM set_config(
+        'app.test_total_companies',
+        (SELECT COUNT(*) FROM companies)::TEXT,
+        TRUE
+    );
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+-- Die Firmenrolle darf die Plattformverwaltung weder lesen noch beschreiben.
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    blocked_table TEXT;
+    reachable_tables TEXT[] := ARRAY[]::TEXT[];
+BEGIN
+    FOREACH blocked_table IN ARRAY ARRAY[
+        'platform_roles', 'platform_users', 'platform_user_roles',
+        'platform_sessions', 'platform_audit_log'
+    ] LOOP
+        BEGIN
+            EXECUTE format('SELECT COUNT(*) FROM %I', blocked_table);
+            reachable_tables := reachable_tables || blocked_table;
+        EXCEPTION
+            WHEN insufficient_privilege THEN NULL;
+        END;
+    END LOOP;
+
+    IF ARRAY_LENGTH(reachable_tables, 1) IS NOT NULL THEN
+        RAISE EXCEPTION 'Firmenrolle erreicht Plattformtabellen: %',
+            ARRAY_TO_STRING(reachable_tables, ', ');
+    END IF;
+END;
+$$;
+
+RESET ROLE;
+
+-- Die Plattformrolle arbeitet ohne Firmenkontext und über alle Firmen hinweg.
+SET LOCAL ROLE schaefchen_platform_api;
+
+DO $$
+DECLARE
+    visible_platform_users INTEGER;
+    visible_companies INTEGER;
+    total_companies INTEGER := CURRENT_SETTING('app.test_total_companies', TRUE)::INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO visible_platform_users FROM platform_users;
+    SELECT COUNT(*) INTO visible_companies FROM companies;
+
+    IF visible_platform_users = 0 THEN
+        RAISE EXCEPTION 'Plattformrolle sieht keine Plattformkonten';
+    END IF;
+
+    IF visible_companies <> total_companies THEN
+        RAISE EXCEPTION 'Plattformrolle sieht % statt % Firmen',
+            visible_companies, total_companies;
+    END IF;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 039_create_platform_administration.sql erfolgreich getestet.'
