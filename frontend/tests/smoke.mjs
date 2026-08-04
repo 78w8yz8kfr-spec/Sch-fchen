@@ -67,6 +67,22 @@ for (const erfunden of ["site_reports", "site_documents"]) {
 }
 // Der Kern ist kein abschaltbarer Bereich.
 assert.doesNotMatch(app, /moduleEnabled\("time_tracking"\)/);
+// Ein direkt uebergebener Handler bekommt das Ereignis als ersten Wert. Nimmt
+// die Funktion dort etwas anderes entgegen, arbeitet sie mit dem Ereignis
+// weiter. So brach die Baustellenakte ab: openEmployeeSiteWorkspace hielt den
+// PointerEvent fuer den angeforderten Einsatz und meldete, es sei keine
+// Baustelle freigegeben.
+const handlerBezuege = [...app.matchAll(/addEventListener\(\s*"[a-z]+",\s*([A-Za-z_$][\w$]*)\s*\)/g)];
+assert.ok(handlerBezuege.length > 0, "Es gibt direkt uebergebene Handler");
+for (const [, name] of handlerBezuege) {
+  const deklaration = new RegExp(`(?:async\\s+)?function ${name}\\(([^)]*)\\)`).exec(app);
+  if (!deklaration) continue;
+  assert.equal(
+    deklaration[1].trim(),
+    "",
+    `${name} wird direkt als Handler uebergeben und bekaeme das Ereignis als ersten Wert`
+  );
+}
 assert.match(html, /id="time-account-panel"/);
 assert.match(html, /id="time-account-balance"/);
 assert.match(html, /id="time-account-months"/);

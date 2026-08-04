@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: die Baustellenakte ließ sich vom Einsatz aus nicht öffnen. Der
+  Knopf war sichtbar, meldete aber „Für heute ist keine Baustelle freigegeben“,
+  obwohl ein Einsatz vorlag. Der Klick wurde unmittelbar an die Funktion
+  weitergereicht, die daraufhin das Klickereignis für den angeforderten Einsatz
+  hielt. Ein Vorarbeiter kam damit gar nicht an Aufgaben, Berichte, Fotos,
+  Dokumente, Material und Notizen seiner Baustelle. Ein Test prüft jetzt jeden
+  unmittelbar übergebenen Ereignisbehandler auf diesen Fehler.
+
 - die Bereiche der App lassen sich firmenweit abschalten: Montageberichte,
   Bautagesberichte, Dokumentenverwaltung, Materialverwaltung, Abwesenheiten,
   Baustellenlink und QR sowie VDE-Prüfprotokolle. Ein abgeschalteter Bereich

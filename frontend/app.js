@@ -9617,7 +9617,11 @@ import {
   });
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
   elements.secondaryAction.addEventListener("click", () => addEntry("clock_out"));
-  elements.assignmentDetails.addEventListener("click", openEmployeeSiteWorkspace);
+  // Ohne die eigene Funktion bekaeme openEmployeeSiteWorkspace das Klickereignis
+  // als angeforderten Einsatz. Es ist wahr, hat aber keine Baustelle: die Akte
+  // brach dann mit "Für heute ist keine Baustelle freigegeben" ab, obwohl ein
+  // Einsatz vorlag.
+  elements.assignmentDetails.addEventListener("click", () => openEmployeeSiteWorkspace());
   elements.assignmentReport.addEventListener("click", () => {
     const assignment = assignments[currentSiteIndex()];
     if (assignment) void openMobileReportForm(assignment, { leaveAfterSave: false });
