@@ -51,6 +51,27 @@ assert.match(html, /id="time-account-admin-list"/);
 assert.match(html, /id="time-account-profile-form"/);
 assert.match(html, /id="time-account-adjustment-submit"/);
 assert.match(html, /id="time-account-holiday-list"/);
+assert.match(html, /id="time-correction-policy-admin"/);
+assert.match(html, /id="time-correction-policy-form"/);
+assert.match(html, /id="time-correction-policy-reason"/);
+// Die Regel gehört in die Verwaltung, nicht in die Wochenansicht: sie steht
+// innerhalb des Verwaltungsbereichs und nicht im Wochenabschnitt.
+const adminSection = html.slice(html.indexOf('id="admin-section"'));
+assert.ok(
+  adminSection.includes('id="time-correction-policy-admin"'),
+  "Die Korrekturregel muss im Verwaltungsbereich stehen"
+);
+assert.equal(
+  [...html.matchAll(/name="time-correction-policy"/g)].length,
+  3,
+  "Genau die drei vorgesehenen Regeln stehen zur Auswahl"
+);
+for (const value of ["review_required", "same_day", "immediate"]) {
+  assert.ok(html.includes(`value="${value}"`), `Die Regel ${value} fehlt in der Auswahl`);
+}
+assert.match(app, /\.\/api\/v1\/admin\/time-correction-policy/);
+assert.match(styles, /\.time-correction-policy-option/);
+assert.match(styles, /\.visually-hidden/);
 assert.match(html, /id="holiday-calendar-form"/);
 assert.match(html, /id="holiday-calendar-state"/);
 assert.match(html, /id="holiday-calendar-list"/);

@@ -4,6 +4,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die Regel für eigene Zeitkorrekturen lässt sich jetzt in der Verwaltung
+  auswählen: drei erklärte Möglichkeiten, Begründungsfeld und sofort sichtbarer
+  Stand. Lesen darf die Planung, ändern nur Administration und
+  Geschäftsführung; die Oberfläche bildet das ab, statt eine Schaltfläche zu
+  zeigen, die der Server anschließend verweigert.
+
 - Fehler behoben: Zeitbuchungen auf einer Baustelle, für die der Mitarbeiter
   nicht eingeplant war, wurden abgewiesen. Live durfte er die Baustelle
   längst selbst wählen; beim Nachtragen und beim Berichtigen fehlte diese

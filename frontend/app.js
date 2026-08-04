@@ -216,6 +216,13 @@ import {
     timeAccountAdjustmentType: document.querySelector("#time-account-adjustment-type"),
     timeAccountAdjustmentNote: document.querySelector("#time-account-adjustment-note"),
     timeAccountAdjustmentSubmit: document.querySelector("#time-account-adjustment-submit"),
+    timeCorrectionPolicyAdmin: document.querySelector("#time-correction-policy-admin"),
+    timeCorrectionPolicyState: document.querySelector("#time-correction-policy-state"),
+    timeCorrectionPolicyStatus: document.querySelector("#time-correction-policy-status"),
+    timeCorrectionPolicyForm: document.querySelector("#time-correction-policy-form"),
+    timeCorrectionPolicyReason: document.querySelector("#time-correction-policy-reason"),
+    timeCorrectionPolicySave: document.querySelector("#time-correction-policy-save"),
+    timeCorrectionPolicyMessage: document.querySelector("#time-correction-policy-message"),
     holidayCalendarAdmin: document.querySelector("#holiday-calendar-admin"),
     holidayCalendarYear: document.querySelector("#holiday-calendar-year"),
     holidayCalendarStatus: document.querySelector("#holiday-calendar-status"),
@@ -776,6 +783,7 @@ import {
   let absenceState = [];
   let timeAccountState = null;
   let timeAccountsState = null;
+  let timeCorrectionPolicyState = null;
   let announcementsState = [];
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
@@ -4940,6 +4948,7 @@ import {
       adminState = body.overview;
       elements.assignmentDate.value = adminState.date;
       renderAdmin();
+      await refreshTimeCorrectionPolicy();
     } catch (error) {
       if (error.status === 401) showLogin();
       else if (!error.network) showToast(error.message);
@@ -6835,6 +6844,48 @@ import {
     });
   }
 
+  const TIME_CORRECTION_POLICY_LABELS = {
+    review_required: "Immer prüfen",
+    same_day: "Am selben Tag frei",
+    immediate: "Sofort wirksam"
+  };
+
+  function renderTimeCorrectionPolicy() {
+    // Lesen darf die Planung, ändern nur Administration und Geschäftsführung.
+    // Die Oberfläche bildet genau das ab, damit niemand auf eine Schaltfläche
+    // trifft, die der Server anschließend verweigert.
+    const canManage = Boolean(adminState?.canCreateManagementRoles);
+    elements.timeCorrectionPolicyAdmin.hidden = !canPlan();
+    elements.timeCorrectionPolicyForm.hidden = !canManage;
+    if (!timeCorrectionPolicyState) {
+      elements.timeCorrectionPolicyState.textContent = navigator.onLine
+        ? "wird geladen …"
+        : "offline nicht verfügbar";
+      return;
+    }
+    const active = timeCorrectionPolicyState.policy;
+    elements.timeCorrectionPolicyState.textContent =
+      TIME_CORRECTION_POLICY_LABELS[active] || active;
+    for (const option of elements.timeCorrectionPolicyForm.querySelectorAll(
+      "input[name='time-correction-policy']"
+    )) {
+      option.checked = option.value === active;
+      option.disabled = !navigator.onLine;
+    }
+    elements.timeCorrectionPolicySave.disabled = !navigator.onLine;
+  }
+
+  async function refreshTimeCorrectionPolicy() {
+    if (demoMode || !canPlan()) return;
+    try {
+      const body = await requestJson("./api/v1/admin/time-correction-policy");
+      timeCorrectionPolicyState = body.timeCorrectionPolicy;
+    } catch (error) {
+      if (!error.network) timeCorrectionPolicyState = null;
+    }
+    renderTimeCorrectionPolicy();
+  }
+
   function renderHolidayCalendarAdmin(calendar, requestedYear) {
     elements.holidayCalendarYear.textContent = String(requestedYear);
     elements.holidayCalendarList.replaceChildren();
@@ -8000,6 +8051,40 @@ import {
     } finally {
       elements.timeAccountAdjustmentSubmit.disabled = !navigator.onLine;
       elements.timeAccountProfileSave.disabled = false;
+    }
+  });
+
+  elements.timeCorrectionPolicyForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const chosen = elements.timeCorrectionPolicyForm.querySelector(
+      "input[name='time-correction-policy']:checked"
+    );
+    const reason = elements.timeCorrectionPolicyReason.value.trim();
+    if (!chosen) {
+      elements.timeCorrectionPolicyMessage.textContent = "Bitte eine Regel auswählen.";
+      return;
+    }
+    if (reason.length < 3) {
+      elements.timeCorrectionPolicyMessage.textContent =
+        "Bitte kurz begründen, warum die Regel geändert wird.";
+      return;
+    }
+    elements.timeCorrectionPolicySave.disabled = true;
+    elements.timeCorrectionPolicyMessage.textContent = "Regel wird gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/admin/time-correction-policy", {
+        method: "PATCH",
+        body: JSON.stringify({ policy: chosen.value, reason })
+      });
+      timeCorrectionPolicyState = body.timeCorrectionPolicy;
+      elements.timeCorrectionPolicyMessage.textContent = "";
+      elements.timeCorrectionPolicyReason.value = "";
+      showToast(`Regel gespeichert · ${TIME_CORRECTION_POLICY_LABELS[body.timeCorrectionPolicy.policy]}`);
+      renderTimeCorrectionPolicy();
+    } catch (error) {
+      elements.timeCorrectionPolicyMessage.textContent = error.message;
+    } finally {
+      elements.timeCorrectionPolicySave.disabled = !navigator.onLine;
     }
   });
 

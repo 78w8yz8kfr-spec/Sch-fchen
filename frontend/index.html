@@ -2248,6 +2248,70 @@
               <ul id="admin-assignment-list" class="admin-list" aria-label="Freigegebene Einsätze"></ul>
             </details>
 
+            <section
+              id="time-correction-policy-admin"
+              class="holiday-calendar-admin"
+              aria-labelledby="time-correction-policy-title"
+            >
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Regel des Betriebs</p>
+                  <h4 id="time-correction-policy-title">Eigene Zeitkorrekturen</h4>
+                </div>
+                <span id="time-correction-policy-state" class="site-list-summary">wird geladen …</span>
+              </div>
+              <p id="time-correction-policy-status" class="time-account-status">
+                Legt fest, ob Mitarbeiter ihre eigenen Zeiten selbst berichtigen dürfen,
+                bevor das Büro den Arbeitstag freigibt.
+              </p>
+              <form id="time-correction-policy-form" class="holiday-calendar-form" novalidate hidden>
+                <fieldset class="time-correction-policy-options">
+                  <legend class="visually-hidden">Regel für eigene Zeitkorrekturen</legend>
+                  <label class="time-correction-policy-option">
+                    <input type="radio" name="time-correction-policy" value="review_required">
+                    <span>
+                      <strong>Immer prüfen</strong>
+                      Jede Änderung und Löschung geht als Antrag ans Büro und wirkt erst
+                      nach der Freigabe.
+                    </span>
+                  </label>
+                  <label class="time-correction-policy-option">
+                    <input type="radio" name="time-correction-policy" value="same_day">
+                    <span>
+                      <strong>Am selben Tag frei</strong>
+                      Der laufende Tag bleibt frei berichtigbar. Zurückliegende Tage gehen
+                      ans Büro.
+                    </span>
+                  </label>
+                  <label class="time-correction-policy-option">
+                    <input type="radio" name="time-correction-policy" value="immediate">
+                    <span>
+                      <strong>Sofort wirksam</strong>
+                      Berichtigungen wirken ohne Prüfung, bis das Büro den Arbeitstag
+                      freigibt.
+                    </span>
+                  </label>
+                </fieldset>
+                <label for="time-correction-policy-reason">Begründung für die Umstellung</label>
+                <textarea
+                  id="time-correction-policy-reason"
+                  maxlength="500"
+                  rows="2"
+                  placeholder="Warum wird die Regel geändert?"
+                ></textarea>
+                <button
+                  id="time-correction-policy-save"
+                  class="button button--secondary"
+                  type="submit"
+                >Regel speichern</button>
+                <p id="time-correction-policy-message" class="form-message" role="status"></p>
+                <p class="absence-flow-note">
+                  Die Regel gilt nur für die eigenen Zeiten. Das Büro berichtigt fremde
+                  Zeiten unabhängig davon.
+                </p>
+              </form>
+            </section>
+
           </section>
 
           <dialog id="report-return-dialog" class="time-correction-dialog" aria-labelledby="report-return-title">
