@@ -9,7 +9,7 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp, platformHtml, platformStyles, platformApp] = await Promise.all([
+const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp, platformHtml, platformStyles, platformApp, workTimeCore] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
   readFrontendFile("app.js"),
@@ -26,7 +26,8 @@ const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, ma
   readFrontendFile("vde/app.js"),
   readFrontendFile("platform-admin.html"),
   readFrontendFile("platform-admin.css"),
-  readFrontendFile("platform-admin.js")
+  readFrontendFile("platform-admin.js"),
+  readFrontendFile("core/work-time.js")
 ]);
 
 const manifest = JSON.parse(manifestSource);
@@ -371,7 +372,7 @@ assert.match(app, /\.\/api\/v1\/account\/initial-password/);
 assert.match(app, /\.\/api\/v1\/admin\/employees/);
 assert.match(app, /openEmployeeEditor/);
 assert.match(app, /renderDispatchSummary/);
-assert.match(app, /durationHoursToMinutes/);
+assert.match(workTimeCore, /export function durationHoursToMinutes/);
 assert.match(app, /plannedDurationMinutes/);
 assert.match(app, /collectMobileReportPersonnel/);
 assert.match(app, /saveMobileReportDraft/);
@@ -458,12 +459,12 @@ assert.match(app, /canCreateManagementRoles/);
 assert.match(app, /user\.roles/);
 assert.match(app, /window\.location\.hostname\.endsWith\("github\.io"\)/);
 assert.match(app, /window\.localStorage\.removeItem\(ONLINE_STORAGE_KEY\)/);
-assert.match(app, /gross >= 360 \? 60 : gross >= 210 \? 30/);
+assert.match(workTimeCore, /gross >= 360 \? 60 : gross >= 210 \? 30/);
 assert.match(app, /Arbeitstag erneut starten/);
 assert.match(app, /latest\.type === "clock_out"\) addEntry\("clock_in"\)/);
 assert.match(app, /Nächste Baustelle wählen/);
 assert.match(app, /newOccurrence/);
-assert.match(app, /const explicitPause = Math\.max\(gross - recordedWork, 0\)/);
+assert.match(workTimeCore, /const explicitPause = Math\.max\(gross - recordedWork, 0\)/);
 assert.match(app, /liveDuration\.textContent = formatMinutes\(times\.work\)/);
 assert.match(app, /\.\/api\/v1\/work-weeks\//);
 assert.doesNotMatch(app, /work-days\/\$\{encodeURIComponent\(workDate\)\}\/submit/);
@@ -516,7 +517,20 @@ for (const asset of [
 }
 assert.ok(worker.includes('"./styles.css?v=0.42.0"'));
 assert.ok(worker.includes('"./app.js?v=0.42.0"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.0"'));
 assert.ok(worker.includes('"./version.js?v=0.42.0"'));
+
+// app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
+// gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
+// Import im App-Shell-Cache und die PWA bricht offline.
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.0"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.0";/);
+assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
+assert.doesNotMatch(
+  app,
+  /^\s{2}function (calculateTimes|formatMinutes|durationMinutes|localDateKey)\(/m,
+  "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
+);
 assert.ok(worker.includes('"./platform-admin.html"'));
 assert.ok(worker.includes('"./platform-admin.css?v=0.42.0"'));
 assert.ok(worker.includes('"./platform-admin.js?v=0.42.0"'));

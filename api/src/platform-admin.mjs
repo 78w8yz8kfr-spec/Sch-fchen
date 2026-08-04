@@ -1387,9 +1387,12 @@ async function assignCompanyContract(client, context, permissions, request, comp
   await client.query(
     `UPDATE companies SET license_plan = $2, license_valid_until = $3,
        user_limit = COALESCE($4,user_limit), storage_limit_bytes = COALESCE($5,storage_limit_bytes),
-       trial_ends_at = $6, contract_ends_at = $3
+       trial_ends_at = $6, contract_ends_at = $7
      WHERE id = $1`,
-    [companyId, plan.plan_key, endsAt, contract.rows[0].user_limit, contract.rows[0].storage_limit_bytes, contract.rows[0].trial_ends_at]
+    [
+      companyId, plan.plan_key, endsAt, contract.rows[0].user_limit,
+      contract.rows[0].storage_limit_bytes, contract.rows[0].trial_ends_at, endsAt
+    ]
   );
   await audit(client, context, request, {
     action: "contract.assign", targetType: "company_contract", targetId: contract.rows[0].id,

@@ -106,7 +106,7 @@ jobs:
       - name: Produktionsimage bauen
         run: docker build --file Dockerfile.production --tag schaefchen-online:test .
 
-      - name: API-Unit- und PostgreSQL-Integrationstests ausführen
+      - name: API-Unit- und PostgreSQL-Integrationstests mit Mindestabdeckung ausführen
         env:
           API_INTEGRATION_TEST: "true"
           POSTGRES_HOST: 127.0.0.1
@@ -116,7 +116,7 @@ jobs:
           POSTGRES_PASSWORD: ci_only_password
           API_DB_USER: schaefchen_api_login
           API_DB_PASSWORD: ci_only_api_password
-        run: npm --prefix api test
+        run: npm --prefix api run test:coverage
 
       - name: Backup und Restore prüfen
         env:

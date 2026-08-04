@@ -4,7 +4,68 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
-- keine noch nicht zugeordnete Produktänderung
+- der Service Worker wird im Betrieb geprüft statt im Quelltext: zehn Tests
+  fahren die Ereignisbehandlungen aus und belegen unter anderem, dass offline
+  ausschließlich der Dokumentencache des eigenen Kontos gelesen wird und dass
+  Offline-Dokumente ein App-Update überstehen
+- die Zeitberechnung des Stundenzettels liegt jetzt in `frontend/core/work-time.js`
+  und wird von der App importiert; damit ist die Rechnung unabhängig von der
+  Oberfläche prüfbar. `frontend/index.html` lädt `app.js` als Modul, der
+  Service Worker legt den Kern mit in der App-Shell ab
+- die Mindestpause bleibt unverändert bei 30 Minuten ab 3,5 Stunden und
+  60 Minuten ab 6 Stunden Bruttozeit; sie ist jetzt an sieben Beispielen
+  festgeschrieben, ebenso die Deckelung der Fahrzeit auf die Arbeitszeit
+- Fehler behoben: Eine Vertragszuweisung (`POST /api/v1/platform/companies/:id/contracts`)
+  schlug immer mit einem unbehandelten Serverfehler fehl, sobald kein
+  Vertragsende übermittelt wurde. Ursache war ein einzelner Datenbankparameter,
+  der gleichzeitig für die Spalte `license_valid_until` (DATUM) und
+  `contract_ends_at` (ZEITSTEMPEL) verwendet wurde; PostgreSQL konnte dafür
+  keinen eindeutigen Typ ableiten. Der Endpunkt war zuvor vollständig ungetestet
+  und der Fehler entsprechend unbemerkt geblieben.
+- die Plattformverwaltung ist im PostgreSQL-Integrationstest jetzt breit
+  abgedeckt: Firmenanlage und kritische Statusänderung, Modulfreigabe,
+  Tarif- und Vertragszuweisung, Plattformadministratoren mit Rollenrechten
+  und Selbstschutz, Firmenkonten mit Kontoaktionen einschließlich
+  Firmenwechsel, Registrierungsfreigabe und -ablehnung, Supportfälle,
+  Systemstatus, gruppierte Plattformfehler, Versionsentwürfe, Mitteilungen
+  mit Empfängerprüfung, Backup-Anstoß, sowie eine vollständige
+  Datenschutzanfrage über alle Phasen mit Zwei-Personen-Freigabe
+- die GitHub-Prüfung misst die Testabdeckung von `api/src` und bricht ab, wenn
+  sie 81 Prozent Zeilen, 71 Prozent Zweige oder 91 Prozent Funktionen
+  unterschreitet; `make api-coverage` führt dieselbe Prüfung lokal aus
+- die Schwelle fängt vor allem den Fall ab, dass die PostgreSQL-Integrationstests
+  unbemerkt nicht mehr laufen: die Abdeckung fällt dann von 81,80 auf 26,78
+  Prozent und die Prüfung schlägt fehl
+- der PostgreSQL-Integrationstest ist in zwölf benannte Abschnitte von der
+  Ersteinrichtung bis zum Sitzungsende aufgeteilt; bisher war er eine einzige
+  Prüfung über rund 4.000 Zeilen, bei der ein Fehler in der Mitte alles
+  Nachfolgende stillschweigend ausfallen ließ, ohne dass das Ergebnis es zeigte
+- ein Fehler wird jetzt dem verursachenden Abschnitt zugeordnet und die
+  übrigen Abschnitte laufen weiter; die Abschnitte teilen sich weiterhin
+  bewusst ihren Datenbestand, weil ein Stundenzettel den Einsatz und der
+  Einsatz die Baustelle voraussetzt
+- die Zeitbearbeitung aus V0.42 ist automatisiert abgedeckt: die
+  Ungültigkeitserklärung einer eigenen Buchung, die Bearbeitung und Löschung
+  fremder Buchungen durch das Büro sowie der Stundenzettelabruf des Büros
+  werden gegen PostgreSQL geprüft, einschließlich unbekannter Buchung,
+  wartender Zweitänderung, veraltetem Zeitstand, fehlender Planungsberechtigung
+  und nicht zugeordneter Baustelle
+- die Prüfungen für `validateTimeEntryEdit`, `validateTimeEntryDelete` und
+  `validateId` sind ergänzt; `validateId` sichert 45 Pfadparameter der API ab
+  und war bisher nicht direkt geprüft
+- die SQL-Abnahmetests der Migrationen 005, 006, 007, 042 und 043 prüfen den
+  Mandantenschutz jetzt unter der eingeschränkten Datenbankrolle
+  `schaefchen_api`; da alle Tabellen `NO FORCE ROW LEVEL SECURITY` verwenden,
+  blieben die Mandanten-Policies bisher wirkungslos, solange die Tests als
+  Eigentümer liefen
+- die SQL-Abnahmetests der Migrationen 039, 040 und 041 belegen die Trennung
+  zwischen Firmen- und Plattformrolle am Verhalten: die Firmenrolle erreicht
+  weder Plattformkonten noch Tarif-, Vertrags- und Betriebstabellen, während
+  die Plattformrolle firmenübergreifend arbeitet
+- der SQL-Abnahmetest der Migration 044 prüft die Empfängerbegrenzung
+  systemweiter Mitteilungen am tatsächlichen Leseergebnis statt am Text der
+  Policy; eine an eine fremde Firma gerichtete oder unveröffentlichte
+  Mitteilung darf die Firmenrolle nicht erreichen
 
 ## [0.42.0] – Plattformverwaltung, sichere Zeitkorrekturen und ruhige Woche
 

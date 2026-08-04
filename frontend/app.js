@@ -1,3 +1,17 @@
+import {
+  addIsoDays,
+  addIsoMonths,
+  assignmentDurationLabel,
+  assignmentStartMinutes,
+  calculateTimes,
+  currentWeekStart,
+  durationHoursToMinutes,
+  durationMinutes,
+  formatMinutes,
+  formatSignedMinutes,
+  localDateKey
+} from "./core/work-time.js?v=0.42.0";
+
 (() => {
   const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
   const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
@@ -865,21 +879,6 @@
     elements.siteReportCustomerSignatureClear
   );
 
-  function localDateKey(date = new Date()) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  function currentWeekStart(date = new Date()) {
-    const weekday = date.getDay() || 7;
-    const monday = new Date(date);
-    monday.setHours(12, 0, 0, 0);
-    monday.setDate(date.getDate() - weekday + 1);
-    return localDateKey(monday);
-  }
-
   function initialState() {
     return {
       version: 1,
@@ -1183,19 +1182,6 @@
     );
   }
 
-  function addIsoDays(date, days) {
-    const value = new Date(`${date}T00:00:00Z`);
-    value.setUTCDate(value.getUTCDate() + days);
-    return value.toISOString().slice(0, 10);
-  }
-
-  function addIsoMonths(date, months) {
-    const [year, month] = date.slice(0, 7).split("-").map(Number);
-    return new Date(Date.UTC(year, month - 1 + months, 1))
-      .toISOString()
-      .slice(0, 10);
-  }
-
   function dateFromIso(date) {
     return new Date(`${date}T12:00:00`);
   }
@@ -1206,28 +1192,6 @@
       day: "2-digit",
       month: "2-digit"
     });
-  }
-
-  function assignmentDurationLabel(minutes) {
-    if (!Number.isFinite(Number(minutes)) || Number(minutes) <= 0) return "";
-    const totalMinutes = Math.round(Number(minutes));
-    const hours = Math.floor(totalMinutes / 60);
-    const remainder = totalMinutes % 60;
-    if (hours && remainder) return `${hours} Std. ${remainder} Min.`;
-    if (hours) return `${hours} Std.`;
-    return `${remainder} Min.`;
-  }
-
-  function durationHoursToMinutes(value) {
-    if (value === "" || value === null || value === undefined) return null;
-    const hours = Number(value);
-    return Number.isFinite(hours) ? Math.round(hours * 60) : null;
-  }
-
-  function assignmentStartMinutes(value) {
-    if (!value) return null;
-    const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
-    return hours * 60 + minutes;
   }
 
   function arrayBufferToBase64(buffer) {
@@ -6365,59 +6329,8 @@
     elements.assignmentCard.classList.toggle("assignment-card--active", Boolean(latest) && latest.type !== "clock_out");
   }
 
-  function durationMinutes(milliseconds) {
-    return Math.max(0, Math.floor(milliseconds / 60000));
-  }
-
-  function formatMinutes(minutes) {
-    const safeMinutes = Math.max(0, Math.floor(minutes));
-    return `${String(Math.floor(safeMinutes / 60)).padStart(2, "0")}:${String(safeMinutes % 60).padStart(2, "0")}`;
-  }
-
-  function formatSignedMinutes(minutes) {
-    const safeMinutes = Number.isFinite(Number(minutes)) ? Math.trunc(Number(minutes)) : 0;
-    const sign = safeMinutes > 0 ? "+" : safeMinutes < 0 ? "−" : "±";
-    const absolute = Math.abs(safeMinutes);
-    return `${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${
-      String(absolute % 60).padStart(2, "0")
-    }`;
-  }
-
   function calculatedTimes() {
-    const now = new Date();
-    const clockIn = state.events.find((entry) => entry.type === "clock_in");
-    const latest = lastEvent();
-    const endTime = latest?.type === "clock_out" ? new Date(latest.recordedAt) : now;
-    const gross = clockIn ? durationMinutes(endTime - new Date(clockIn.recordedAt)) : 0;
-    let recordedWork = 0;
-    let activeStart = null;
-
-    state.events.forEach((entry) => {
-      if (entry.type === "clock_in") {
-        activeStart = new Date(entry.recordedAt);
-      } else if (entry.type === "clock_out" && activeStart) {
-        recordedWork += durationMinutes(new Date(entry.recordedAt) - activeStart);
-        activeStart = null;
-      }
-    });
-    if (activeStart) recordedWork += durationMinutes(now - activeStart);
-
-    const explicitPause = Math.max(gross - recordedWork, 0);
-    const requiredPause = gross >= 360 ? 60 : gross >= 210 ? 30 : 0;
-    const pause = Math.max(explicitPause, requiredPause);
-    const work = Math.max(gross - pause, 0);
-    let travel = 0;
-
-    state.events.forEach((entry, index) => {
-      if (!["clock_in", "site_departure"].includes(entry.type)) return;
-      const destination = state.events
-        .slice(index + 1)
-        .find((candidate) => ["site_arrival", "clock_out"].includes(candidate.type));
-      const segmentEnd = destination ? new Date(destination.recordedAt) : endTime;
-      travel += durationMinutes(segmentEnd - new Date(entry.recordedAt));
-    });
-
-    return { gross, pause, work, travel: Math.min(travel, work) };
+    return calculateTimes(state.events, new Date());
   }
 
   function renderTimes() {

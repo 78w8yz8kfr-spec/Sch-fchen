@@ -133,9 +133,72 @@ BEGIN
     EXCEPTION
         WHEN SQLSTATE 'P0001' THEN NULL;
     END;
+
+    INSERT INTO customer_locations (
+        company_id, customer_id, location_number, name, street,
+        house_number, postal_code, city
+    )
+    VALUES (
+        company_b_id, customer_b_id, NULL, 'Fremdstandort',
+        'Fremdweg', '9', '54321', 'Fremdort'
+    );
+
+    PERFORM set_config('app.test_foreign_company_id', company_b_id::TEXT, TRUE);
+    PERFORM set_config('app.test_foreign_customer_id', customer_b_id::TEXT, TRUE);
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    tenant_a_id UUID := NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID;
+    foreign_company_id UUID := CURRENT_SETTING('app.test_foreign_company_id', TRUE)::UUID;
+    foreign_customer_id UUID := CURRENT_SETTING('app.test_foreign_customer_id', TRUE)::UUID;
+    own_locations INTEGER;
+    foreign_locations INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO own_locations
+    FROM customer_locations
+    WHERE company_id = tenant_a_id;
+
+    SELECT COUNT(*) INTO foreign_locations
+    FROM customer_locations
+    WHERE company_id <> tenant_a_id;
+
+    IF own_locations = 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht die eigenen Standorte nicht';
+    END IF;
+
+    IF foreign_locations <> 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht % firmenfremde Standorte', foreign_locations;
+    END IF;
+
+    BEGIN
+        INSERT INTO customer_locations (
+            company_id, customer_id, location_number, name, street,
+            house_number, postal_code, city
+        )
+        VALUES (
+            foreign_company_id, foreign_customer_id, NULL, 'Eingeschleuster Standort',
+            'Fremdweg', '10', '54321', 'Fremdort'
+        );
+        RAISE EXCEPTION USING
+            ERRCODE = 'ZX604',
+            MESSAGE = 'API-Rolle konnte einen Standort für eine fremde Firma anlegen';
+    EXCEPTION
+        WHEN insufficient_privilege THEN NULL;
+    END;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 006_create_customer_locations.sql erfolgreich getestet.'

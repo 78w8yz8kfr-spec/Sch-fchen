@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' --test-coverage-lines=81 --test-coverage-branches=71 --test-coverage-functions=91 tests/*.test.mjs"
   },
   "dependencies": {
     "fflate": "0.8.2",

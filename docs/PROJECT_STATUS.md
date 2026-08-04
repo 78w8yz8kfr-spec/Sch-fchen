@@ -167,6 +167,20 @@ Technischer Stand: V0.42.0
 - Migration 008 `construction_sites` mit Jahresnummer, flachen Bereichen, Status „im Verzug“, QR-Code und Pinnwand
 - durchgehende Mandanten-Fremdschlüssel, erzwungene RLS-Regeln, Historie und Löschschutz für Migrationen 004 bis 008
 - SQL-Abnahmetests für jede Migration sowie automatischer Backup-/Restore-Test
+- Mandantenschutz und Rollentrennung werden in den SQL-Abnahmetests unter den
+  eingeschränkten Datenbankrollen `schaefchen_api` und
+  `schaefchen_platform_api` geprüft, weil die Policies für den
+  Tabelleneigentümer bewusst nicht erzwungen werden
+- der Service Worker und die Zeitberechnung der PWA sind zu 100 Prozent durch
+  ausgeführte Tests abgedeckt; die Zeitberechnung liegt als gemeinsamer Kern in
+  `frontend/core/work-time.js` und wird von `app.js` als Modul importiert
+- die Plattformverwaltung ist im PostgreSQL-Integrationstest breit abgedeckt
+  (Firmen, Module, Tarife, Verträge, Plattformadministratoren, Firmenkonten,
+  Registrierungen, Support, Systemstatus, Fehlergruppierung, Versionen,
+  Mitteilungen, Backups, Datenschutzanfragen mit Zwei-Personen-Freigabe);
+  `api/src` erfüllt eine in der GitHub-Prüfung erzwungene Mindestabdeckung
+  von 81 Prozent Zeilen, 71 Prozent Zweigen und 91 Prozent Funktionen
+  (`make api-coverage`)
 - GitHub Pages aktiviert und öffentliche PWA erfolgreich veröffentlicht
 - Migration 009 `site_assignments` mit mehreren geordneten Baustellen pro Tag, Freigabe und Änderungshistorie
 - Migration 010 `site_supervisors` mit mehreren Vorarbeitern, Hauptverantwortung und automatischer Übergabe

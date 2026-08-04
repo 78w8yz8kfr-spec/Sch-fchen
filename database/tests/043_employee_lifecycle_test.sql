@@ -12,6 +12,8 @@ DECLARE
     disposable_employee_id UUID;
     target_site_id UUID;
     removal_result VARCHAR;
+    foreign_company_id UUID;
+    foreign_employee_id UUID;
 BEGIN
     SELECT id INTO target_company_id
     FROM companies WHERE company_number = 'F-000001';
@@ -97,9 +99,76 @@ BEGIN
        ) THEN
         RAISE EXCEPTION 'Mitarbeiter ohne Historie wurde nicht sicher hart gelöscht';
     END IF;
+
+    INSERT INTO companies (legal_name, display_name)
+    VALUES ('Lebenszyklus Zweitfirma GmbH', 'Lebenszyklus Zweitfirma')
+    RETURNING id INTO foreign_company_id;
+
+    INSERT INTO users (company_id,personnel_number,first_name,last_name)
+    VALUES (foreign_company_id,'ACTOR-043-B','Fremd','Lebenszyklus')
+    RETURNING id INTO foreign_employee_id;
+
+    INSERT INTO employee_lifecycle_events (
+        company_id, employee_id, actor_user_id, action, reason
+    ) VALUES (
+        foreign_company_id, foreign_employee_id, foreign_employee_id,
+        'archived', 'Fremder Lebenszyklusvorgang'
+    );
+
+    PERFORM set_config('app.test_foreign_company_id', foreign_company_id::TEXT, TRUE);
+    PERFORM set_config('app.test_foreign_user_id', foreign_employee_id::TEXT, TRUE);
 END;
 $$;
 
+SELECT id AS tenant_a_id
+FROM companies
+WHERE company_number = 'F-000001'
+\gset
+
+SET LOCAL ROLE schaefchen_api;
+SELECT set_config('app.current_company_id', :'tenant_a_id', TRUE);
+
+DO $$
+DECLARE
+    tenant_a_id UUID := NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID;
+    foreign_company_id UUID := CURRENT_SETTING('app.test_foreign_company_id', TRUE)::UUID;
+    foreign_user_id UUID := CURRENT_SETTING('app.test_foreign_user_id', TRUE)::UUID;
+    own_events INTEGER;
+    foreign_events INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO own_events
+    FROM employee_lifecycle_events
+    WHERE company_id = tenant_a_id;
+
+    SELECT COUNT(*) INTO foreign_events
+    FROM employee_lifecycle_events
+    WHERE company_id <> tenant_a_id;
+
+    IF own_events = 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht die eigene Lebenszyklushistorie nicht';
+    END IF;
+
+    IF foreign_events <> 0 THEN
+        RAISE EXCEPTION 'API-Rolle sieht % firmenfremde Lebenszyklusereignisse', foreign_events;
+    END IF;
+
+    BEGIN
+        INSERT INTO employee_lifecycle_events (
+            company_id, employee_id, actor_user_id, action, reason
+        ) VALUES (
+            foreign_company_id, foreign_user_id, foreign_user_id,
+            'archived', 'Eingeschleuster Lebenszyklusvorgang'
+        );
+        RAISE EXCEPTION USING
+            ERRCODE = 'ZX431',
+            MESSAGE = 'API-Rolle konnte ein Lebenszyklusereignis für eine fremde Firma anlegen';
+    EXCEPTION
+        WHEN insufficient_privilege THEN NULL;
+    END;
+END;
+$$;
+
+RESET ROLE;
 ROLLBACK;
 
 \echo 'Migration 043_add_employee_lifecycle.sql erfolgreich getestet.'

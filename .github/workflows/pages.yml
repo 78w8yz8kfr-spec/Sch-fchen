@@ -40,6 +40,9 @@ jobs:
       - name: PWA-Smoke-Test ausführen
         run: node frontend/tests/smoke.mjs
 
+      - name: Service-Worker-Verhalten prüfen
+        run: node --test frontend/tests/*.test.mjs
+
   deploy:
     name: GitHub Pages veröffentlichen
     if: github.event_name != 'pull_request'
