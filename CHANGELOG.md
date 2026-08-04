@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die Firma wählt, wie mit eigenen Zeitkorrekturen vor der Freigabe des
+  Arbeitstags umgegangen wird: `review_required` macht jede Änderung und
+  Löschung zum prüfpflichtigen Antrag, `same_day` lässt den laufenden
+  Kalendertag frei und verlangt für zurückliegende Tage eine Prüfung,
+  `immediate` entspricht dem bisherigen Verhalten
+- **Verhaltensänderung:** Voreinstellung ist `review_required`, auch für
+  bestehende Firmen. Bisher wurde jede eigene Korrektur an einem noch nicht
+  freigegebenen Arbeitstag sofort wirksam, ohne dass das Büro davon erfuhr.
+  Wer das beibehalten will, stellt die Regel auf `immediate`.
+- die Regel ändert nur die Selbstkorrektur. Die Bearbeitung fremder Zeiten
+  durch das Büro folgt weiterhin allein dem Status des Arbeitstags. Lesen darf
+  die Regel die Planung, ändern nur Administration und Geschäftsführung.
 - Fehler behoben: Eine Zeitkorrektur, die ohne Beteiligung des Büros sofort
   wirksam wurde, trug den Mitarbeiter selbst als Prüfer ein. Das Protokoll
   behauptete damit eine Freigabe, die es nie gegeben hat. Migration 045 führt

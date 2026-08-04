@@ -77,6 +77,7 @@ import {
   validateSiteBundle,
   validateTimeEntry,
   validateTimeEntryAddition,
+  validateTimeCorrectionPolicy,
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
   validateTimeEntryDelete,
@@ -1548,6 +1549,51 @@ async function requireModuleAdministrator(client, context) {
     );
   }
   return roles;
+}
+
+// Regel der Firma für eigene Zeitkorrekturen vor der Freigabe des Arbeitstags.
+// Die Bearbeitung fremder Zeiten durch das Büro bleibt davon unberührt.
+async function companyTimeCorrectionPolicy(client, context) {
+  const result = await client.query(
+    "SELECT time_correction_policy FROM companies WHERE id = $1",
+    [context.companyId]
+  );
+  return result.rows[0]?.time_correction_policy || "review_required";
+}
+
+function ownCorrectionNeedsReview(policy, workDate, timeZone) {
+  if (policy === "immediate") return false;
+  if (policy === "same_day") {
+    return workDate !== localDate(new Date().toISOString(), timeZone);
+  }
+  return true;
+}
+
+async function getTimeCorrectionPolicy(client, context) {
+  await requirePlanner(client, context);
+  return {
+    policy: await companyTimeCorrectionPolicy(client, context),
+    options: ["review_required", "same_day", "immediate"]
+  };
+}
+
+async function updateTimeCorrectionPolicy(client, context, input) {
+  await requireTimeAccountAdministrator(client, context);
+  const before = await companyTimeCorrectionPolicy(client, context);
+  const updated = await client.query(
+    `UPDATE companies SET time_correction_policy = $2
+     WHERE id = $1
+     RETURNING time_correction_policy`,
+    [context.companyId, input.policy]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError("Die Firma wurde nicht gefunden.", 404, "company_not_found");
+  }
+  return {
+    policy: updated.rows[0].time_correction_policy,
+    previousPolicy: before,
+    options: ["review_required", "same_day", "immediate"]
+  };
 }
 
 async function requireTimeAccountAdministrator(client, context) {
@@ -8896,9 +8942,14 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
     original.user_id,
     input.workDate
   );
-  const controlled = ["approved", "locked"].includes(original.work_day_status)
+  const lockedDay = ["approved", "locked"].includes(original.work_day_status)
     || ["approved", "locked"].includes(targetDay.status);
-  if (controlled && administrator) {
+  const policy = administrator ? null : await companyTimeCorrectionPolicy(client, context);
+  const controlled = lockedDay
+    || (!administrator && ownCorrectionNeedsReview(
+      policy, databaseDate(original.work_date), timeZone
+    ));
+  if (lockedDay && administrator) {
     await requireEmployeeLifecycleAdministrator(client, context);
   }
 
@@ -9067,7 +9118,7 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
   };
 }
 
-async function deleteTimeEntry(client, context, entryId, input, administrator = false) {
+async function deleteTimeEntry(client, context, entryId, input, timeZone, administrator = false) {
   const streamUserId = await lockTimeEntryStream(client, context, entryId, administrator);
   const idempotent = await existingTimeChange(
     client, context.companyId, streamUserId, input.clientChangeId, "delete_entry"
@@ -9087,8 +9138,13 @@ async function deleteTimeEntry(client, context, entryId, input, administrator = 
   if (block.length === 0) throw new InputError("Der Arbeitsblock wurde nicht gefunden.", 409, "time_block_missing");
   const remaining = sourceEntries.filter((entry) => !block.some((item) => item.id === entry.id));
   assertEffectiveTimeline(remaining);
-  const controlled = ["approved", "locked"].includes(original.work_day_status);
-  if (controlled && administrator) await requireEmployeeLifecycleAdministrator(client, context);
+  const lockedDay = ["approved", "locked"].includes(original.work_day_status);
+  const policy = administrator ? null : await companyTimeCorrectionPolicy(client, context);
+  const controlled = lockedDay
+    || (!administrator && ownCorrectionNeedsReview(
+      policy, databaseDate(original.work_date), timeZone
+    ));
+  if (lockedDay && administrator) await requireEmployeeLifecycleAdministrator(client, context);
   if (!controlled) {
     await client.query(
       `UPDATE work_days SET status = 'open'
@@ -10249,6 +10305,25 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { holidayCalendar });
       }
 
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/time-correction-policy") {
+        const timeCorrectionPolicy = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getTimeCorrectionPolicy(client, context)
+        );
+        return json(response, 200, { timeCorrectionPolicy });
+      }
+
+      if (request.method === "PATCH" && url.pathname === "/api/v1/admin/time-correction-policy") {
+        const input = validateTimeCorrectionPolicy(await readJson(request));
+        const timeCorrectionPolicy = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateTimeCorrectionPolicy(client, context, input)
+        );
+        return json(response, 200, { timeCorrectionPolicy });
+      }
+
       if (request.method === "PATCH" && url.pathname === "/api/v1/admin/holiday-calendar") {
         const input = validateHolidayCalendar(await readJson(request));
         const holidayCalendar = await withReadySession(
@@ -10826,7 +10901,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const result = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => deleteTimeEntry(client, context, entryId, input, true)
+          (client, context) => deleteTimeEntry(client, context, entryId, input, config.timeZone, true)
         );
         return json(response, 200, result);
       }
@@ -11040,7 +11115,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const result = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => deleteTimeEntry(client, context, entryId, input, false)
+          (client, context) => deleteTimeEntry(client, context, entryId, input, config.timeZone, false)
         );
         return json(response, 200, result);
       }

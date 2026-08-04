@@ -3224,6 +3224,20 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
 
   await t.test("Zeiterfassung, Korrekturen und Stundenzettel", async () => {
+    // Dieser Abschnitt prüft die sofort wirksame Selbstkorrektur. Seit
+    // Migration 046 ist das nicht mehr die Voreinstellung, sondern eine von der
+    // Firma wählbare Regel; sie wird hier ausdrücklich gesetzt und am Ende
+    // wieder auf die geprüfte Voreinstellung zurückgestellt.
+    const immediatePolicy = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        policy: "immediate",
+        reason: "Sofort wirksame Selbstkorrektur im Integrationstest prüfen"
+      })
+    });
+    assert.equal(immediatePolicy.status, 200, await immediatePolicy.clone().text());
+
     const siteOptionsResponse = await fetch(
       `${baseUrl}/api/v1/time-tracking/site-options/${assignmentDate}`,
       { headers: { Cookie: cookie } }
@@ -3790,6 +3804,16 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(finalEntries.length, 2);
     assert.equal(finalEntries[0].entryType, "clock_in");
     assert.equal(finalEntries[1].entryType, "clock_out");
+
+    const restoredPolicy = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        policy: "review_required",
+        reason: "Geprüfte Voreinstellung nach dem Abschnitt wiederherstellen"
+      })
+    });
+    assert.equal(restoredPolicy.status, 200, await restoredPolicy.clone().text());
   });
 
   await t.test("Mitarbeiterlebenszyklus", async () => {
@@ -4139,6 +4163,205 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     );
     assert.equal(dayAfterOfficeDelete.status, 200);
     assert.equal((await dayAfterOfficeDelete.json()).workDay.entries.length, 0);
+  });
+
+  await t.test("Wählbare Regel für eigene Zeitkorrekturen", async () => {
+    // Voreinstellung ist die geprüfte Variante: eine eigene Korrektur wird zum
+    // Antrag und wirkt erst nach Freigabe durch das Büro.
+    const initial = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(initial.status, 200, await initial.clone().text());
+    const initialPolicy = (await initial.json()).timeCorrectionPolicy;
+    assert.equal(initialPolicy.policy, "review_required");
+    assert.deepEqual(initialPolicy.options, ["review_required", "same_day", "immediate"]);
+
+    const setPolicy = async (policy) => {
+      const response = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ policy, reason: "Korrekturregel im Integrationstest umstellen" })
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      return (await response.json()).timeCorrectionPolicy;
+    };
+
+    // Für jede Regel ein eigener Mitarbeiter mit eigenem Arbeitstag, damit sich
+    // die Fälle nicht gegenseitig beeinflussen.
+    const bookOwnDay = async (label) => {
+      const personnelNumber = `POL-${label}-${suffix}`;
+      const temporary = "Korrekturregel-Integration-2026!";
+      const created = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({
+          personnelNumber, firstName: "Rita", lastName: `Regel${label}`,
+          role: "foreman", temporaryPassword: temporary
+        })
+      });
+      assert.equal(created.status, 201, await created.clone().text());
+      const login = await fetch(`${baseUrl}/api/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+        body: JSON.stringify({ companyNumber: "F-000001", personnelNumber, password: temporary })
+      });
+      assert.equal(login.status, 201);
+      const ownCookie = login.headers.get("set-cookie").split(";", 1)[0];
+      const change = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: ownCookie },
+        body: JSON.stringify({ newPassword: `${temporary}-Neu` })
+      });
+      assert.equal(change.status, 200);
+
+      const startedAt = new Date(Date.now() - 9000).toISOString();
+      const endedAt = new Date(Date.now() - 5000).toISOString();
+      for (const [entryType, recordedAt] of [["clock_in", startedAt], ["clock_out", endedAt]]) {
+        const booking = await fetch(`${baseUrl}/api/v1/time-entries`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: ownCookie },
+          body: JSON.stringify({ clientEntryId: randomUUID(), entryType, recordedAt, clientCreatedAt: recordedAt })
+        });
+        assert.equal(booking.status, 201, await booking.clone().text());
+      }
+      const ownWorkDate = localDate(startedAt, config.timeZone);
+      const day = await fetch(`${baseUrl}/api/v1/work-days/${ownWorkDate}`, { headers: { Cookie: ownCookie } });
+      return { ownCookie, ownWorkDate, entry: (await day.json()).workDay.entries[0] };
+    };
+
+    const correctOwnStart = async ({ ownCookie, ownWorkDate, entry }) => {
+      const shifted = new Date(new Date(entry.recordedAt).valueOf() - 3_600_000).toISOString();
+      const response = await fetch(`${baseUrl}/api/v1/time-entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: ownCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: entry.recordedAt,
+          recordedAt: shifted,
+          workDate: ownWorkDate,
+          reason: "Arbeitsbeginn war früher als gebucht"
+        })
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      const operation = (await response.json()).operation;
+      const day = await fetch(`${baseUrl}/api/v1/work-days/${ownWorkDate}`, { headers: { Cookie: ownCookie } });
+      const workDay = (await day.json()).workDay;
+      return { operation, workDay, shifted };
+    };
+
+    // Geprüfte Variante: nichts ändert sich, bis das Büro entscheidet.
+    const reviewed = await bookOwnDay("REV");
+    const reviewedResult = await correctOwnStart(reviewed);
+    assert.equal(reviewedResult.operation.status, "pending");
+    assert.equal(reviewedResult.workDay.hasPendingCorrection, true);
+    assert.notEqual(
+      reviewedResult.workDay.entries[0].recordedAt,
+      reviewedResult.shifted,
+      "Die Zeit darf sich vor der Freigabe nicht ändern"
+    );
+
+    // Sofort wirksam: die Zeit steht unmittelbar im Stundenzettel.
+    await setPolicy("immediate");
+    const immediate = await bookOwnDay("SOF");
+    const immediateResult = await correctOwnStart(immediate);
+    assert.equal(immediateResult.operation.status, "applied");
+    assert.equal(immediateResult.workDay.hasPendingCorrection, false);
+    assert.equal(immediateResult.workDay.entries[0].recordedAt, immediateResult.shifted);
+
+    // Am selben Tag frei: der laufende Tag bleibt frei korrigierbar.
+    const sameDayPolicy = await setPolicy("same_day");
+    assert.equal(sameDayPolicy.policy, "same_day");
+    assert.equal(sameDayPolicy.previousPolicy, "immediate");
+    const sameDay = await bookOwnDay("TAG");
+    const sameDayResult = await correctOwnStart(sameDay);
+    assert.equal(sameDayResult.operation.status, "applied");
+    assert.equal(sameDayResult.workDay.entries[0].recordedAt, sameDayResult.shifted);
+
+    // Derselbe Mitarbeiter, ein zurückliegender Arbeitstag: jetzt greift die
+    // Prüfpflicht. Der Tag wird unmittelbar angelegt, weil die App für
+    // vergangene Tage keine Buchung anbietet.
+    const pastDate = localDate(new Date(Date.now() - 3 * 86_400_000).toISOString(), config.timeZone);
+    const pastEmployee = await inspectionPool.query(
+      "SELECT id, company_id FROM users WHERE personnel_number = $1",
+      [`POL-TAG-${suffix}`]
+    );
+    const pastDay = await inspectionPool.query(
+      `INSERT INTO work_days (company_id, user_id, work_date, target_work_minutes)
+       VALUES ($1, $2, $3, 480) RETURNING id`,
+      [pastEmployee.rows[0].company_id, pastEmployee.rows[0].id, pastDate]
+    );
+    const pastEntry = await inspectionPool.query(
+      `INSERT INTO time_entries (
+         company_id, user_id, work_day_id, entry_type, recorded_at,
+         client_entry_id, client_created_at, source, entered_by_user_id
+       ) VALUES ($1,$2,$3,'clock_in',$4::DATE + TIME '08:00', gen_random_uuid(),
+                 CURRENT_TIMESTAMP, 'employee', $2)
+       RETURNING id, recorded_at`,
+      [pastEmployee.rows[0].company_id, pastEmployee.rows[0].id, pastDay.rows[0].id, pastDate]
+    );
+    await inspectionPool.query(
+      `INSERT INTO time_entries (
+         company_id, user_id, work_day_id, entry_type, recorded_at,
+         client_entry_id, client_created_at, source, entered_by_user_id
+       ) VALUES ($1,$2,$3,'clock_out',$4::DATE + TIME '16:00', gen_random_uuid(),
+                 CURRENT_TIMESTAMP, 'employee', $2)`,
+      [pastEmployee.rows[0].company_id, pastEmployee.rows[0].id, pastDay.rows[0].id, pastDate]
+    );
+
+    const pastCorrection = await fetch(
+      `${baseUrl}/api/v1/time-entries/${pastEntry.rows[0].id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: sameDay.ownCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: new Date(pastEntry.rows[0].recorded_at).toISOString(),
+          recordedAt: new Date(new Date(pastEntry.rows[0].recorded_at).valueOf() - 3_600_000).toISOString(),
+          workDate: pastDate,
+          reason: "Nachträgliche Korrektur eines zurückliegenden Arbeitstags"
+        })
+      }
+    );
+    assert.equal(pastCorrection.status, 200, await pastCorrection.clone().text());
+    assert.equal(
+      (await pastCorrection.json()).operation.status,
+      "pending",
+      "Bei same_day muss ein zurückliegender Tag geprüft werden"
+    );
+
+    // Ohne Planungsrechte bleibt die Regel unerreichbar, lesend wie schreibend.
+    const foremanRead = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      headers: { Cookie: sameDay.ownCookie }
+    });
+    assert.equal(foremanRead.status, 403);
+    const foremanWrite = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: sameDay.ownCookie },
+      body: JSON.stringify({ policy: "immediate", reason: "Vorarbeiter stellt sich die Regel selbst um" })
+    });
+    assert.equal(foremanWrite.status, 403);
+    assert.equal((await foremanWrite.json()).error.code, "time_account_administration_forbidden");
+
+    // Auch die Planung ohne Administrationsrechte darf die Regel nur lesen.
+    const plannerRead = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      headers: { Cookie: plannerCookie }
+    });
+    assert.equal(plannerRead.status, 200);
+    const plannerWrite = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ policy: "immediate", reason: "Planung stellt die Regel um" })
+    });
+    assert.equal(plannerWrite.status, 403);
+
+    const unknownPolicy = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ policy: "niemals", reason: "Unbekannte Regel setzen" })
+    });
+    assert.equal(unknownPolicy.status, 400);
+
+    await setPolicy("review_required");
   });
 
   await t.test("Plattformverwaltung: Firmen, Konten, Tarife und Betrieb", async () => {

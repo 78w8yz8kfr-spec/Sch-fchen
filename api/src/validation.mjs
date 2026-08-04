@@ -1962,3 +1962,14 @@ export function expectedNextTypes(previousType) {
     clock_out: ["clock_in"]
   }[previousType ?? "empty"] ?? [];
 }
+
+const TIME_CORRECTION_POLICIES = new Set(["review_required", "same_day", "immediate"]);
+
+export function validateTimeCorrectionPolicy(body) {
+  rejectTenantFields(body);
+  const policy = text(body.policy, "Korrekturregel", 8, 20).toLowerCase();
+  if (!TIME_CORRECTION_POLICIES.has(policy)) {
+    throw new InputError("Die Korrekturregel ist ungültig.");
+  }
+  return { policy, reason: text(body.reason, "Begründung", 3, 500) };
+}

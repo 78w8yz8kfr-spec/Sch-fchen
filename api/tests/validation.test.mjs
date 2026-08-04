@@ -42,6 +42,7 @@ import {
   validateSpontaneousSiteSelection,
   validateSiteBundle,
   validateId,
+  validateTimeCorrectionPolicy,
   validateTimeEntry,
   validateTimeEntryAddition,
   validateTimeEntryCorrection,
@@ -1390,4 +1391,31 @@ test("Pfadkennungen werden vor jeder Datenbankabfrage als UUID geprüft", () => 
   ]) {
     assert.throws(() => validateId(attack, "Zeitbuchungs-ID"), /Zeitbuchungs-ID/);
   }
+});
+
+test("Die Korrekturregel der Firma erlaubt nur die drei vorgesehenen Werte", () => {
+  assert.deepEqual(
+    validateTimeCorrectionPolicy({ policy: "SAME_DAY", reason: "Umstellung nach Absprache" }),
+    { policy: "same_day", reason: "Umstellung nach Absprache" }
+  );
+  for (const policy of ["review_required", "same_day", "immediate"]) {
+    assert.equal(
+      validateTimeCorrectionPolicy({ policy, reason: "Betriebliche Entscheidung" }).policy,
+      policy
+    );
+  }
+  assert.throws(
+    () => validateTimeCorrectionPolicy({ policy: "niemals", reason: "Unbekannte Regel" }),
+    /Korrekturregel/
+  );
+  assert.throws(
+    () => validateTimeCorrectionPolicy({ policy: "same_day" }),
+    /Begründung/
+  );
+  assert.throws(
+    () => validateTimeCorrectionPolicy({
+      policy: "same_day", reason: "Test", companyId: "11111111-1111-4111-8111-111111111111"
+    }),
+    /ausschließlich vom Server/
+  );
 });
