@@ -200,7 +200,7 @@ import {
     weekOpenActions: document.querySelector("#week-open-actions"),
     weekOpenActionsList: document.querySelector("#week-open-actions-list"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
-    timeAccountAdminYear: document.querySelector("#time-account-admin-year"),
+    adminYear: document.querySelector("#admin-year"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
     timeAccountAdminMessage: document.querySelector("#time-account-admin-message"),
     timeAccountProfileForm: document.querySelector("#time-account-profile-form"),
@@ -784,6 +784,10 @@ import {
   let timeAccountState = null;
   let timeAccountsState = null;
   let timeCorrectionPolicyState = null;
+  // Die Verwaltung wertet ein Kalenderjahr aus. Frueher folgte sie der
+  // gewaehlten Woche des Monteurs; seit die Bereiche getrennt sind, waere das
+  // nicht mehr nachvollziehbar.
+  let adminYear = new Date().getFullYear();
   let announcementsState = [];
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
@@ -7012,13 +7016,28 @@ import {
     elements.timeAccountProfileForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  function renderAdminYearOptions() {
+    const current = new Date().getFullYear();
+    const years = [current + 1, current, current - 1, current - 2];
+    if (elements.adminYear.options.length !== years.length) {
+      elements.adminYear.replaceChildren(...years.map((year) => {
+        const option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = String(year);
+        return option;
+      }));
+    }
+    elements.adminYear.value = String(adminYear);
+  }
+
   function renderAdminTimeAccounts() {
+    renderAdminYearOptions();
     const visible = canPlan() && !isProjectScopedSession();
     elements.timeAccountAdminPanel.hidden = !visible;
+    elements.holidayCalendarAdmin.hidden = !visible;
     if (!visible) return;
-    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const requestedYear = adminYear;
     const overview = timeAccountsState?.year === requestedYear ? timeAccountsState : null;
-    elements.timeAccountAdminYear.textContent = String(requestedYear);
     elements.timeAccountAdminList.replaceChildren();
     renderHolidayCalendarAdmin(overview?.holidayCalendar || null, requestedYear);
     if (!overview) {
@@ -7648,10 +7667,10 @@ import {
       renderAdminTimeAccounts();
       return;
     }
-    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const requestedYear = adminYear;
     try {
       const body = await requestJson(`./api/v1/admin/time-accounts?year=${requestedYear}`);
-      if (requestedYear !== Number(selectedWeekStart.slice(0, 4))) return;
+      if (requestedYear !== adminYear) return;
       timeAccountsState = body.timeAccounts;
       elements.timeAccountAdminMessage.textContent = "";
       renderAdminTimeAccounts();
@@ -8088,9 +8107,16 @@ import {
     }
   });
 
+  elements.adminYear.addEventListener("change", async () => {
+    const chosen = Number(elements.adminYear.value);
+    if (!Number.isInteger(chosen) || chosen === adminYear) return;
+    adminYear = chosen;
+    await refreshAdminTimeAccounts();
+  });
+
   elements.holidayCalendarForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const requestedYear = adminYear;
     const calendar = timeAccountsState?.year === requestedYear
       ? timeAccountsState.holidayCalendar
       : null;
@@ -8126,7 +8152,7 @@ import {
 
   elements.holidayClosureForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const requestedYear = selectedWeekStart.slice(0, 4);
+    const requestedYear = String(adminYear);
     const holidayDate = elements.holidayClosureDate.value;
     const name = elements.holidayClosureName.value.trim();
     const note = elements.holidayClosureNote.value.trim();

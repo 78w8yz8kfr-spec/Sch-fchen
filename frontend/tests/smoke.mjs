@@ -51,6 +51,43 @@ assert.match(html, /id="time-account-admin-list"/);
 assert.match(html, /id="time-account-profile-form"/);
 assert.match(html, /id="time-account-adjustment-submit"/);
 assert.match(html, /id="time-account-holiday-list"/);
+// Die Bueroverwaltung liegt vollstaendig im Verwaltungsbereich und nicht mehr
+// hinter einem Aufklapper in der Wochenansicht.
+assert.match(html, /id="admin-year"/);
+assert.doesNotMatch(html, /week-advanced-panel--admin/);
+const weekSection = html.slice(
+  html.indexOf('id="week-section"'),
+  html.indexOf('id="admin-section"')
+);
+for (const buried of ["time-account-admin-panel", "holiday-calendar-admin", "time-correction-policy-admin"]) {
+  assert.ok(
+    !weekSection.includes(`id="${buried}"`),
+    `${buried} gehoert in die Verwaltung, nicht in die Wochenansicht`
+  );
+}
+// Die drei Verwaltungsbereiche stehen gleichrangig nebeneinander. Frueher steckte
+// der Feiertagskalender in der Karte der Jahreskonten und war dort schwer zu finden.
+const kontenPanel = html.slice(
+  html.indexOf('id="time-account-admin-panel"'),
+  html.indexOf('id="holiday-calendar-admin"')
+);
+assert.ok(
+  kontenPanel.includes("</section>"),
+  "Der Feiertagskalender steht neben den Jahreskonten und nicht in ihnen"
+);
+// Das frueher genutzte Jahres-Element gibt es nicht mehr. Solange app.js noch
+// darauf schreibt, bricht die Darstellung der Verwaltung ab.
+assert.doesNotMatch(html, /id="time-account-admin-year"/);
+assert.doesNotMatch(app, /timeAccountAdminYear/);
+// Als eigener Bereich braucht der Feiertagskalender eine eigene Sichtbarkeit.
+assert.match(app, /elements\.holidayCalendarAdmin\.hidden = !visible/);
+assert.match(app, /let adminYear = new Date\(\)\.getFullYear\(\)/);
+assert.doesNotMatch(
+  app,
+  /function renderAdminTimeAccounts\(\)[\s\S]{0,400}selectedWeekStart/,
+  "Die Jahreskonten folgen nicht mehr der gewaehlten Woche"
+);
+assert.match(styles, /\.admin-year-select/);
 assert.match(html, /id="time-correction-policy-admin"/);
 assert.match(html, /id="time-correction-policy-form"/);
 assert.match(html, /id="time-correction-policy-reason"/);

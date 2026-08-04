@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die Büroverwaltung liegt vollständig im Bereich „Mehr“ und nicht mehr hinter
+  einem Aufklapper in der Wochenansicht. Jahreskonten, Feiertagskalender und
+  die Regel für eigene Zeitkorrekturen stehen dort gleichrangig nebeneinander;
+  der Feiertagskalender war zuvor in der Karte der Jahreskonten versteckt. Die
+  Wochenansicht zeigt nur noch das eigene Stundenkonto.
+- die Auswertung der Verwaltung folgt einer eigenen Jahresauswahl statt der in
+  der Wochenansicht gewählten Woche. Das Jahr galt bisher für Jahreskonten und
+  Feiertage gleichermaßen, ließ sich aber nur über einen Wochenwechsel
+  verstellen.
+
 - die Regel für eigene Zeitkorrekturen lässt sich jetzt in der Verwaltung
   auswählen: drei erklärte Möglichkeiten, Begründungsfeld und sofort sichtbarer
   Stand. Lesen darf die Planung, ändern nur Administration und

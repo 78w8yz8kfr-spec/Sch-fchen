@@ -5692,3 +5692,27 @@ select:focus-visible {
   font-size: 0.88rem;
   font-weight: 800;
 }
+
+.admin-year-picker {
+  display: flex;
+  align-items: center;
+}
+
+/* Die drei Verwaltungsbereiche liegen gleichrangig nebeneinander.
+   Der Abstand haelt die Ueberschrift beim Springen unter der festen Kopfzeile frei. */
+#time-account-admin-panel,
+#holiday-calendar-admin,
+#time-correction-policy-admin {
+  scroll-margin-top: 112px;
+}
+
+.admin-year-select {
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
