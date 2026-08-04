@@ -1,5 +1,6 @@
 import pg from "pg";
 import { InputError } from "./validation.mjs";
+import { loadCompanyModules } from "./company-modules.mjs";
 
 const { Pool } = pg;
 
@@ -187,8 +188,12 @@ export async function sessionView(client, context) {
     throw new InputError("Das Benutzerkonto ist nicht mehr aktiv.", 401, "unauthorized");
   }
   const row = result.rows[0];
+  // Abgeschaltete Bereiche muss auch ein Monteur kennen, damit die App sie gar
+  // nicht erst anbietet. Sonst fuehrte jede Bedienung ins Leere.
+  const modules = await loadCompanyModules(client, context);
   return {
     expiresAt: new Date(context.expiresAt).toISOString(),
+    modules: Object.fromEntries(modules.map((module) => [module.key, module.enabled])),
     company: {
       number: row.company_number,
       displayName: row.display_name,

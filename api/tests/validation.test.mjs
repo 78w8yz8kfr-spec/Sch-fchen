@@ -226,15 +226,24 @@ test("Abwesenheiten prüfen Art Zeitraum Halbtage und Entscheidungen", () => {
   }), /Begründung/);
 });
 
-test("Elektro-Module verlangen bekannten Schlüssel Status und Versionsstand", () => {
+test("Abschaltbare Bereiche verlangen bekannten Schlüssel Status und Versionsstand", () => {
   assert.deepEqual(
     validateCompanyModuleUpdate("VDE", { enabled: true, rowVersion: 0 }),
     { moduleKey: "vde", enabled: true, rowVersion: 0 }
   );
-  assert.throws(
-    () => validateCompanyModuleUpdate("lwl", { enabled: true, rowVersion: 0 }),
-    /Elektro-Spezialmodul/
-  );
+  for (const bereich of ["site_reports", "site_documents", "absences", "site_qr"]) {
+    assert.deepEqual(
+      validateCompanyModuleUpdate(bereich, { enabled: false, rowVersion: 3 }),
+      { moduleKey: bereich, enabled: false, rowVersion: 3 }
+    );
+  }
+  // Der Kern ist kein abschaltbarer Bereich.
+  for (const kern of ["time_tracking", "employees", "lwl"]) {
+    assert.throws(
+      () => validateCompanyModuleUpdate(kern, { enabled: true, rowVersion: 0 }),
+      /nicht zum Abschalten vorgesehen/
+    );
+  }
   assert.throws(
     () => validateCompanyModuleUpdate("vde", { enabled: "ja", rowVersion: 0 }),
     /Modulstatus/

@@ -4,6 +4,25 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die Bereiche der App lassen sich firmenweit abschalten: Baustellenberichte,
+  Baustellenakte, Abwesenheiten, Baustellenlink und QR sowie das VDE-Modul. Ein
+  abgeschalteter Bereich verschwindet aus der Oberfläche und wird auch über die
+  Schnittstelle abgewiesen; vorhandene Daten bleiben erhalten und sind nach dem
+  Wiedereinschalten unverändert da. Jede Umstellung steht mit Zeitpunkt und
+  handelnder Person in der Historie.
+- Fehler behoben: der Schalter für Module war ohne Wirkung. Die Verwaltung zeigte
+  ihn bedienbar, doch jeder Versuch endete mit „Spezialmodule werden
+  ausschließlich durch die Plattformverwaltung freigeschaltet“. Die zugehörige
+  Funktion war ein Platzhalter, der ausnahmslos abwies. Die beiden Ebenen sind
+  jetzt getrennt: die Plattform gibt ein Spezialmodul frei, die Firma schaltet
+  es zusätzlich ein oder aus.
+- Zeiterfassung, Mitarbeiter und Baustellen sind bewusst nicht abschaltbar; ohne
+  sie ist Schäfchen kein Arbeitszeitnachweis mehr. Einsatzplanung und
+  Stundenkonten bleiben ebenfalls fest, weil die Sollzeit am Feiertagskalender
+  und die Zeiterfassung an der Baustellenzuordnung hängt.
+- der Schalter für DGUV ist entfernt. Das Modul war nicht gebaut, ließ sich aber
+  in der Verwaltung anwählen.
+
 - Fehler behoben (Datenverlust): offline erfasste Buchungen und Berichte gingen
   beim Tageswechsel verloren. Der gespeicherte Stand wurde nur wiederhergestellt,
   wenn er vom selben Kalendertag stammte; wer abends ohne Verbindung buchte und

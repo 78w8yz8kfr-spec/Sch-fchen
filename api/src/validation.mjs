@@ -44,7 +44,12 @@ const SITE_TASK_STATUSES = new Set(["open", "in_progress", "done", "archived"]);
 const SITE_MATERIAL_STATUSES = new Set(["planned", "ordered", "available", "used", "archived"]);
 const SITE_REPORT_TYPES = new Set(["montage", "daily"]);
 const SITE_REPORT_SOURCES = new Set(["digital", "photo", "speech"]);
-const ELECTRICAL_MODULE_KEYS = new Set(["vde", "dguv"]);
+// Bereiche, die ein Betrieb selbst abschalten kann. Der Kern gehoert bewusst
+// nicht dazu: ohne Zeiterfassung, Mitarbeiter und Baustellen ist Schaefchen
+// kein Arbeitszeitnachweis mehr.
+const SWITCHABLE_MODULE_KEYS = new Set([
+  "vde", "site_reports", "site_documents", "absences", "site_qr"
+]);
 const VDE_SOURCE_MODES = new Set(["integrated", "legacy_v15"]);
 const VDE_NETWORK_TYPES = new Set(["TN-S", "TN-C-S", "TN-C", "TT", "IT"]);
 const VDE_CHECK_RESULTS = new Set(["ok", "not_ok", "not_checked"]);
@@ -843,8 +848,8 @@ export function validateDocumentStatusUpdate(body) {
 export function validateCompanyModuleUpdate(moduleKey, body) {
   rejectTenantFields(body);
   const normalizedKey = text(moduleKey, "Modul", 3, 30).toLowerCase();
-  if (!ELECTRICAL_MODULE_KEYS.has(normalizedKey)) {
-    throw new InputError("Das Elektro-Spezialmodul ist ungültig.");
+  if (!SWITCHABLE_MODULE_KEYS.has(normalizedKey)) {
+    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.");
   }
   const rowVersion = Number(body.rowVersion);
   if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {

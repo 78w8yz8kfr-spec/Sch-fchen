@@ -32,6 +32,10 @@ import { buildFinalReportPdf } from "./report-pdf.mjs";
 import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
+import {
+  COMPANY_MODULES,
+  loadCompanyModules
+} from "./company-modules.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import {
   expectedNextTypes,
@@ -131,20 +135,6 @@ const ABSENCE_OFFICE_REVIEW_ROLES = new Set([
   "executive_assistant"
 ]);
 const ABSENCE_MANAGEMENT_APPROVAL_ROLES = new Set(["managing_director"]);
-const ELECTRICAL_MODULES = [
-  {
-    key: "vde",
-    name: "VDE",
-    description: "Prüfungen elektrischer Anlagen und Betriebsmittel",
-    integrated: true
-  },
-  {
-    key: "dguv",
-    name: "DGUV",
-    description: "Wiederkehrende Prüfungen elektrischer Betriebsmittel",
-    integrated: false
-  }
-];
 const FEDERAL_STATE_NAMES = new Map([
   ["BW", "Baden-Württemberg"],
   ["BY", "Bayern"],
@@ -1792,44 +1782,18 @@ function absenceRequestDto(row) {
   };
 }
 
-function companyModuleDto(definition, row) {
-  const enabled = row?.entitlement_status === "permanent"
-    || (
-      row?.entitlement_status === "trial"
-      && (!row.starts_at || new Date(row.starts_at) <= new Date())
-      && (!row.ends_at || new Date(row.ends_at) > new Date())
-    );
-  return {
-    key: definition.key,
-    name: definition.name,
-    description: definition.description,
-    available: definition.integrated,
-    enabled: definition.integrated && enabled,
-    status: row?.entitlement_status || "inactive",
-    availableOnRequest: !enabled,
-    rowVersion: row ? Number(row.row_version) : 0,
-    changedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null,
-    changedByName: row ? "Plattformverwaltung" : null,
-    startsAt: row?.starts_at ? new Date(row.starts_at).toISOString() : null,
-    endsAt: row?.ends_at ? new Date(row.ends_at).toISOString() : null
-  };
-}
-
-async function loadCompanyModules(client, context) {
-  const result = await client.query(
-    `SELECT catalog.module_key, entitlement.entitlement_status,
-            entitlement.row_version, entitlement.updated_at,
-            entitlement.starts_at, entitlement.ends_at
-     FROM module_catalog AS catalog
-     LEFT JOIN company_module_entitlements AS entitlement
-       ON entitlement.module_id = catalog.id AND entitlement.company_id = $1
-     WHERE catalog.module_key IN ('vde','dguv')`,
-    [context.companyId]
+// Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
+// Sonst bliebe er ueber die Schnittstelle weiter bedienbar und der Schalter
+// waere eine reine Anzeige.
+async function requireEnabledModule(client, context, moduleKey) {
+  const modules = await loadCompanyModules(client, context);
+  const module = modules.find((entry) => entry.key === moduleKey);
+  if (module?.enabled) return module;
+  throw new InputError(
+    `Der Bereich „${module?.name || moduleKey}" ist für diese Firma abgeschaltet.`,
+    409,
+    "module_disabled"
   );
-  const rows = new Map(result.rows.map((row) => [row.module_key, row]));
-  return ELECTRICAL_MODULES.map((definition) => (
-    companyModuleDto(definition, rows.get(definition.key))
-  ));
 }
 
 async function getCompanyModules(client, context) {
@@ -1882,11 +1846,43 @@ async function markPlatformAnnouncementRead(client, context, announcementId) {
 
 async function updateCompanyModule(client, context, input) {
   await requireModuleAdministrator(client, context);
-  throw new InputError(
-    "Spezialmodule werden ausschließlich durch die Plattformverwaltung freigeschaltet. Das Modul kann auf Anfrage bereitgestellt werden.",
-    403,
-    "platform_module_administration_required"
+  const definition = COMPANY_MODULES.find((entry) => entry.key === input.moduleKey);
+  if (!definition) {
+    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.", 404, "module_not_found");
+  }
+  const vorher = (await loadCompanyModules(client, context))
+    .find((entry) => entry.key === input.moduleKey);
+
+  // Einschalten kann die Firma nur, was die Plattform ihr freigegeben hat.
+  if (input.enabled && !vorher.available) {
+    throw new InputError(
+      "Dieser Bereich ist für die Firma nicht freigegeben. Die Plattformverwaltung stellt ihn auf Anfrage bereit.",
+      403,
+      "module_not_entitled"
+    );
+  }
+  if (vorher.rowVersion !== input.rowVersion) {
+    throw new InputError(
+      "Der Bereich wurde zwischenzeitlich geändert. Bitte die Ansicht neu laden.",
+      409,
+      "module_row_version_conflict"
+    );
+  }
+  if (vorher.enabled === input.enabled) return vorher;
+
+  // Ein fehlender Eintrag bedeutet eingeschaltet. Beim ersten Abschalten
+  // entsteht die Zeile, danach wird sie fortgeschrieben. Die Historie fuehrt
+  // der Trigger der Tabelle.
+  await client.query(
+    `INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (company_id, module_key) DO UPDATE
+       SET is_enabled = EXCLUDED.is_enabled,
+           changed_by_user_id = EXCLUDED.changed_by_user_id`,
+    [context.companyId, input.moduleKey, input.enabled, context.userId]
   );
+  return (await loadCompanyModules(client, context))
+    .find((entry) => entry.key === input.moduleKey);
 }
 
 function vdeInspectionDto(row, includeProtocol = false) {
@@ -1948,18 +1944,12 @@ const VDE_INSPECTION_SELECT = `
 `;
 
 async function requireVdeModuleEnabled(client, context) {
-  const result = await client.query(
-    `SELECT 1
-     FROM company_module_entitlements AS entitlement
-     JOIN module_catalog AS catalog ON catalog.id = entitlement.module_id
-     WHERE entitlement.company_id = $1
-       AND catalog.module_key = 'vde'
-       AND entitlement.entitlement_status IN ('permanent','trial')
-       AND (entitlement.starts_at IS NULL OR entitlement.starts_at <= CURRENT_TIMESTAMP)
-       AND (entitlement.ends_at IS NULL OR entitlement.ends_at > CURRENT_TIMESTAMP)`,
-    [context.companyId]
-  );
-  if (result.rowCount !== 1) {
+  // Die Plattform gibt das Modul frei, die Firma kann es zusaetzlich
+  // abschalten. Beides fuehrt zur selben Antwort, damit sich der bisherige
+  // Vertrag der Schnittstelle nicht aendert.
+  const modules = await loadCompanyModules(client, context);
+  const vde = modules.find((module) => module.key === "vde");
+  if (!vde?.enabled) {
     throw new InputError(
       "Das VDE-Modul ist für diese Firma nicht aktiviert.",
       404,
@@ -3038,6 +3028,7 @@ async function listOwnAbsenceRequests(client, context, { from, to }) {
 }
 
 async function createAbsenceRequest(client, context, input) {
+  await requireEnabledModule(client, context, "absences");
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`absence:${context.companyId}:${context.userId}`]
@@ -5222,6 +5213,7 @@ async function getSiteTaskRecord(client, context, taskId) {
 }
 
 async function createSiteTask(client, context, input) {
+  await requireEnabledModule(client, context, "site_documents");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5468,6 +5460,7 @@ async function storeSiteNote(client, context, input) {
 }
 
 async function createAdminSiteNote(client, context, input) {
+  await requireEnabledModule(client, context, "site_documents");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5642,6 +5635,7 @@ function structuredReportData(input, personnel, photos = []) {
 }
 
 async function createSiteReport(client, context, input) {
+  await requireEnabledModule(client, context, "site_reports");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5695,6 +5689,7 @@ async function createSiteReport(client, context, input) {
 }
 
 async function createMobileSiteReport(client, context, input) {
+  await requireEnabledModule(client, context, "site_reports");
   const duplicate = await client.query(
     `SELECT id, author_user_id, construction_site_id, work_date, report_type,
             source_mode, summary, details, structured_data

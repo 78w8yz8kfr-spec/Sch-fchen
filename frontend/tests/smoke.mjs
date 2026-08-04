@@ -51,6 +51,18 @@ assert.match(html, /id="week-current" class="week-navigation__today"/);
 // Die Plantafel heisst auf jedem Geraet gleich. "Desktop-Plantafel" stand auch
 // dann ueber der Ansicht, wenn sie auf dem Handy geoeffnet wurde.
 assert.doesNotMatch(html, /Desktop-Plantafel/);
+// Die Bereiche der App lassen sich firmenweit abschalten. Der Schalter war
+// frueher auf die Elektro-Spezialmodule beschraenkt und wies jeden Versuch ab.
+assert.match(html, /<h3 id="electrical-module-admin-title">Bereiche der App<\/h3>/);
+assert.doesNotMatch(html, /Elektro-Spezialmodule/);
+assert.match(html, /id="absence-area"/);
+assert.match(app, /function moduleEnabled\(key\)/);
+assert.match(app, /function applyModuleVisibility\(\)/);
+for (const bereich of ["absences", "site_reports", "site_documents", "site_qr"]) {
+  assert.ok(app.includes(`"${bereich}"`), `Der Bereich ${bereich} fehlt in der Oberflaeche`);
+}
+// Der Kern ist kein abschaltbarer Bereich.
+assert.doesNotMatch(app, /moduleEnabled\("time_tracking"\)/);
 assert.match(html, /id="time-account-panel"/);
 assert.match(html, /id="time-account-balance"/);
 assert.match(html, /id="time-account-months"/);

@@ -2392,10 +2392,22 @@ import {
     return status === "completed" ? "Abgeschlossen" : "Entwurf";
   }
 
+  // Ist ein Bereich für diese Firma eingeschaltet?
+  //
+  // Die Sitzung führt den Stand für jeden Angemeldeten mit, damit auch ein
+  // Monteur einen abgeschalteten Bereich gar nicht erst angeboten bekommt.
+  // Die Verwaltung kennt zusätzlich die ausführliche Liste. Ohne Angabe gilt
+  // ein Bereich als eingeschaltet, sonst verschwände er beim ersten Start,
+  // bevor die Sitzung steht.
+  function moduleEnabled(key) {
+    const ausDerVerwaltung = adminState?.modules?.find((module) => module.key === key);
+    if (ausDerVerwaltung) return Boolean(ausDerVerwaltung.enabled);
+    const ausDerSitzung = session?.modules?.[key];
+    return ausDerSitzung === undefined ? true : Boolean(ausDerSitzung);
+  }
+
   function vdeModuleEnabled() {
-    return Boolean(adminState?.modules?.some((module) => (
-      module.key === "vde" && module.enabled
-    )));
+    return moduleEnabled("vde");
   }
 
   function vdeEditorUrl(siteId, inspectionId = null, date = null) {
@@ -2587,17 +2599,17 @@ import {
       const connected = Boolean(module.available);
       title.textContent = module.name;
       description.textContent = connected
-        ? `${module.description} · aus der Baustelle startbar`
-        : `${module.description} · noch nicht fachlich angebunden`;
+        ? module.description
+        : `${module.description} · auf Anfrage über die Plattformverwaltung`;
       content.append(title, description);
       control.className = "electrical-module-toggle";
       toggle.type = "checkbox";
       toggle.checked = connected && module.enabled;
       toggle.disabled = !connected;
-      toggle.setAttribute("aria-label", `${module.name} firmenweit aktivieren`);
+      toggle.setAttribute("aria-label", `${module.name} firmenweit ein- oder ausschalten`);
       stateLabel.textContent = connected
-        ? (module.enabled ? "Aktiv" : "Inaktiv")
-        : "Vorbereitet";
+        ? (module.enabled ? "Aktiv" : "Abgeschaltet")
+        : "Nicht freigegeben";
       control.append(toggle, stateLabel);
       item.append(content, control);
 
@@ -2605,8 +2617,9 @@ import {
         toggle.addEventListener("change", async () => {
           const requested = toggle.checked;
           toggle.disabled = true;
-          elements.electricalModuleMessage.textContent =
-            requested ? "VDE-Modul wird aktiviert …" : "VDE-Modul wird deaktiviert …";
+          elements.electricalModuleMessage.textContent = requested
+            ? `${module.name} wird eingeschaltet …`
+            : `${module.name} wird abgeschaltet …`;
           try {
             const body = await requestJson(
               `./api/v1/admin/modules/${encodeURIComponent(module.key)}`,
@@ -2624,8 +2637,8 @@ import {
             await refreshAdmin(adminState.date);
             showToast(
               requested
-                ? "VDE-Modul ist für die Firma aktiviert."
-                : "VDE-Modul ist deaktiviert; vorhandene Prüfungen bleiben erhalten."
+                ? `${module.name}: eingeschaltet.`
+                : `${module.name}: abgeschaltet. Vorhandene Daten bleiben erhalten.`
             );
           } catch (error) {
             toggle.checked = !requested;
@@ -4380,7 +4393,7 @@ import {
     ));
     const approved = absences.filter((absence) => absence.status === "approved");
     const visible = [...pending, ...approved];
-    elements.absenceReviewPanel.hidden = !canPlan();
+    elements.absenceReviewPanel.hidden = !canPlan() || !moduleEnabled("absences");
     elements.absenceReviewCount.textContent = String(pending.length);
     elements.absenceReviewList.replaceChildren();
 
@@ -4660,6 +4673,10 @@ import {
 
   function renderAdmin() {
     if (!adminState) return;
+    // Die Verwaltung kennt den Modulstand genauer als die Sitzung. Nach dem
+    // Umschalten muss die Oberflaeche sofort folgen, nicht erst beim naechsten
+    // vollstaendigen Durchlauf.
+    applyModuleVisibility();
     const projectScoped = Boolean(adminState.projectScopeRestricted);
     elements.assignmentImportPanel.hidden = projectScoped;
     elements.siteImportPanel.hidden = projectScoped;
@@ -7343,7 +7360,50 @@ import {
     elements.employeeTimesheetExportPdfSubmit.disabled = !navigator.onLine;
   }
 
+  // Abgeschaltete Bereiche werden aus der Oberflaeche genommen. Der Server
+  // weist sie ohnehin ab; eine Schaltflaeche, die nur einen Fehler erzeugt,
+  // waere schlechter als gar keine.
+  const MODULBEREICHE = [
+    { key: "absences", knoten: ["#absence-area", "#absence-review-panel"] },
+    { key: "site_reports", knoten: ["#report-center"], reiter: ["reports"] },
+    {
+      key: "site_documents",
+      knoten: [],
+      reiter: ["tasks", "photos", "documents", "materials", "notes"]
+    },
+    { key: "site_qr", knoten: ["#site-dashboard-copy-link"] }
+  ];
+
+  // Merkt sich, dass dieser Knoten wegen eines abgeschalteten Bereichs
+  // verborgen wurde. Nur dann darf er beim Wiedereinschalten zurueckkommen:
+  // ob er dann wirklich sichtbar wird, entscheidet weiterhin die jeweilige
+  // Ansicht anhand von Rolle, Reiter und Auswahl.
+  function verstecke(knoten, eingeschaltet) {
+    if (!knoten) return;
+    if (!eingeschaltet) {
+      knoten.dataset.moduleHidden = "true";
+      knoten.hidden = true;
+      return;
+    }
+    if (knoten.dataset.moduleHidden === "true") {
+      delete knoten.dataset.moduleHidden;
+      knoten.hidden = false;
+    }
+  }
+
+  function applyModuleVisibility() {
+    for (const bereich of MODULBEREICHE) {
+      const an = moduleEnabled(bereich.key);
+      for (const auswahl of bereich.knoten) verstecke(document.querySelector(auswahl), an);
+      for (const reiter of bereich.reiter || []) {
+        verstecke(document.querySelector(`[data-site-dashboard-section-button="${reiter}"]`), an);
+        verstecke(document.querySelector(`[data-site-dashboard-section="${reiter}"]`), an);
+      }
+    }
+  }
+
   function render() {
+    applyModuleVisibility();
     renderAction();
     renderAssignment();
     renderTimes();
@@ -7463,7 +7523,7 @@ import {
     if (canPlan()) {
       elements.assignmentPlanningShell.hidden = pane !== "assignments";
       elements.sitePlanningShell.hidden = pane !== "sites";
-      elements.reportCenter.hidden = pane !== "sites";
+      elements.reportCenter.hidden = pane !== "sites" || !moduleEnabled("site_reports");
       elements.employeePanel.hidden = pane !== "more" || isProjectScopedSession();
       elements.adminSummary.hidden = pane === "more";
       elements.dispatchSummary.hidden = pane !== "assignments";
