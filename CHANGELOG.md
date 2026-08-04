@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- der PostgreSQL-Integrationstest ist in zwölf benannte Abschnitte von der
+  Ersteinrichtung bis zum Sitzungsende aufgeteilt; bisher war er eine einzige
+  Prüfung über rund 4.000 Zeilen, bei der ein Fehler in der Mitte alles
+  Nachfolgende stillschweigend ausfallen ließ, ohne dass das Ergebnis es zeigte
+- ein Fehler wird jetzt dem verursachenden Abschnitt zugeordnet und die
+  übrigen Abschnitte laufen weiter; die Abschnitte teilen sich weiterhin
+  bewusst ihren Datenbestand, weil ein Stundenzettel den Einsatz und der
+  Einsatz die Baustelle voraussetzt
 - die Zeitbearbeitung aus V0.42 ist automatisiert abgedeckt: die
   Ungültigkeitserklärung einer eigenen Buchung, die Bearbeitung und Löschung
   fremder Buchungen durch das Büro sowie der Stundenzettelabruf des Büros
