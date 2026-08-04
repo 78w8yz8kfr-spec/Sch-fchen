@@ -1,6 +1,6 @@
 COMPOSE := docker compose --env-file .env
 
-.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-api-role db-seed db-test api-up api-test backup restore backup-restore-test frontend-test frontend-serve
+.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-api-role db-seed db-test api-up api-test api-coverage backup restore backup-restore-test frontend-test frontend-serve
 
 check-env:
 	@test -f .env || (echo "Fehler: .env fehlt. Zuerst 'cp .env.example .env' ausführen." && exit 1)
@@ -27,6 +27,13 @@ api-up: check-env
 api-test:
 	npm --prefix api ci --ignore-scripts
 	npm --prefix api test
+
+# Prüft zusätzlich die Mindestabdeckung von api/src. Verlangt eine erreichbare
+# Datenbank und API_INTEGRATION_TEST=true, sonst bleiben die Integrationstests
+# aus und die Abdeckung unterschreitet die Schwelle.
+api-coverage:
+	npm --prefix api ci --ignore-scripts
+	npm --prefix api run test:coverage
 
 dev-init: check-env
 	$(MAKE) dev-up

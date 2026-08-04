@@ -39,3 +39,9 @@ make db-test
 ```
 
 Wenn Docker lokal nicht verfügbar ist, muss die GitHub-Datenbankprüfung erfolgreich sein, bevor der Stand als getestet gilt.
+
+Die GitHub-Prüfung erzwingt zusätzlich eine Mindestabdeckung von `api/src`
+(`make api-coverage`, aktuell 81 Prozent Zeilen, 71 Prozent Zweige, 91 Prozent
+Funktionen). Die Schwelle ist ein Boden gegen grobe Rückschritte, vor allem
+gegen stillschweigend nicht mehr laufende Integrationstests. Sie ersetzt keine
+Prüfung im Einzelfall: neuer Code ohne eigenen Test kann die Schwelle halten.

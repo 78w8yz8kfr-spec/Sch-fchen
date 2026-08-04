@@ -4,6 +4,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die GitHub-Prüfung misst die Testabdeckung von `api/src` und bricht ab, wenn
+  sie 81 Prozent Zeilen, 71 Prozent Zweige oder 91 Prozent Funktionen
+  unterschreitet; `make api-coverage` führt dieselbe Prüfung lokal aus
+- die Schwelle fängt vor allem den Fall ab, dass die PostgreSQL-Integrationstests
+  unbemerkt nicht mehr laufen: die Abdeckung fällt dann von 81,80 auf 26,78
+  Prozent und die Prüfung schlägt fehl
 - der PostgreSQL-Integrationstest ist in zwölf benannte Abschnitte von der
   Ersteinrichtung bis zum Sitzungsende aufgeteilt; bisher war er eine einzige
   Prüfung über rund 4.000 Zeilen, bei der ein Fehler in der Mitte alles
