@@ -10,7 +10,11 @@ DECLARE
     fassung BIGINT;
     ereignisse INTEGER;
 BEGIN
-    SELECT id INTO firma_id FROM companies WHERE company_number = 'F-000001';
+    -- Eigene Firma: der Test darf nicht daran scheitern, dass ein frueherer
+    -- Lauf oder die Anwendung selbst schon Schalter gesetzt hat.
+    INSERT INTO companies (legal_name, display_name)
+    VALUES ('Modultest 047 GmbH', 'Modultest 047')
+    RETURNING id INTO firma_id;
 
     -- Der Test bringt seinen eigenen Benutzer mit und haengt nicht an Daten,
     -- die zufaellig aus einem frueheren Lauf stammen.
@@ -20,9 +24,9 @@ BEGIN
 
     -- Die neuen abschaltbaren Bereiche lassen sich eintragen.
     INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
-    VALUES (firma_id, 'site_reports', TRUE, benutzer_id);
+    VALUES (firma_id, 'assembly_reports', TRUE, benutzer_id);
     INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
-    VALUES (firma_id, 'site_documents', TRUE, benutzer_id);
+    VALUES (firma_id, 'documents', TRUE, benutzer_id);
     INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
     VALUES (firma_id, 'absences', TRUE, benutzer_id);
     INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
@@ -43,11 +47,11 @@ BEGIN
     -- Abschalten schreibt Zeitpunkt und Fassung fort.
     UPDATE company_modules
     SET is_enabled = FALSE, changed_by_user_id = benutzer_id
-    WHERE company_id = firma_id AND module_key = 'site_reports';
+    WHERE company_id = firma_id AND module_key = 'assembly_reports';
 
     SELECT is_enabled, row_version INTO stand, fassung
     FROM company_modules
-    WHERE company_id = firma_id AND module_key = 'site_reports';
+    WHERE company_id = firma_id AND module_key = 'assembly_reports';
 
     IF stand THEN
         RAISE EXCEPTION 'Der Bereich wurde nicht abgeschaltet';
@@ -59,7 +63,7 @@ BEGIN
     -- Jede Umstellung steht in der Historie.
     SELECT COUNT(*) INTO ereignisse
     FROM company_module_events
-    WHERE company_id = firma_id AND module_key = 'site_reports';
+    WHERE company_id = firma_id AND module_key = 'assembly_reports';
 
     IF ereignisse <> 2 THEN
         RAISE EXCEPTION 'Die Historie zählt % statt 2 Umstellungen', ereignisse;
@@ -70,7 +74,7 @@ BEGIN
     BEGIN
         UPDATE company_modules
         SET is_enabled = FALSE, changed_by_user_id = benutzer_id
-        WHERE company_id = firma_id AND module_key = 'site_reports';
+        WHERE company_id = firma_id AND module_key = 'assembly_reports';
         RAISE EXCEPTION USING
             ERRCODE = 'ZX472',
             MESSAGE = 'Eine Umstellung ohne Änderung wurde akzeptiert';

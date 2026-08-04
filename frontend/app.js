@@ -7365,13 +7365,17 @@ import {
   // waere schlechter als gar keine.
   const MODULBEREICHE = [
     { key: "absences", knoten: ["#absence-area", "#absence-review-panel"] },
-    { key: "site_reports", knoten: ["#report-center"], reiter: ["reports"] },
+    { key: "documents", knoten: [], reiter: ["tasks", "photos", "documents", "notes"] },
+    { key: "materials", knoten: [], reiter: ["materials"] },
+    { key: "site_qr", knoten: ["#site-dashboard-copy-link"] },
+    // Montage- und Tagesberichte sind getrennte Bereiche. Die Berichtsansicht
+    // faellt erst weg, wenn beide abgeschaltet sind.
     {
-      key: "site_documents",
-      knoten: [],
-      reiter: ["tasks", "photos", "documents", "materials", "notes"]
-    },
-    { key: "site_qr", knoten: ["#site-dashboard-copy-link"] }
+      key: "site_daily_reports",
+      knoten: ["#report-center"],
+      reiter: ["reports"],
+      zusammen: ["assembly_reports"]
+    }
   ];
 
   // Merkt sich, dass dieser Knoten wegen eines abgeschalteten Bereichs
@@ -7394,10 +7398,13 @@ import {
   function applyModuleVisibility() {
     for (const bereich of MODULBEREICHE) {
       const an = moduleEnabled(bereich.key);
-      for (const auswahl of bereich.knoten) verstecke(document.querySelector(auswahl), an);
+      const wirksam = bereich.zusammen
+        ? an || bereich.zusammen.some((weitere) => moduleEnabled(weitere))
+        : an;
+      for (const auswahl of bereich.knoten) verstecke(document.querySelector(auswahl), wirksam);
       for (const reiter of bereich.reiter || []) {
-        verstecke(document.querySelector(`[data-site-dashboard-section-button="${reiter}"]`), an);
-        verstecke(document.querySelector(`[data-site-dashboard-section="${reiter}"]`), an);
+        verstecke(document.querySelector(`[data-site-dashboard-section-button="${reiter}"]`), wirksam);
+        verstecke(document.querySelector(`[data-site-dashboard-section="${reiter}"]`), wirksam);
       }
     }
   }
@@ -7523,7 +7530,8 @@ import {
     if (canPlan()) {
       elements.assignmentPlanningShell.hidden = pane !== "assignments";
       elements.sitePlanningShell.hidden = pane !== "sites";
-      elements.reportCenter.hidden = pane !== "sites" || !moduleEnabled("site_reports");
+      elements.reportCenter.hidden = pane !== "sites"
+        || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
       elements.employeePanel.hidden = pane !== "more" || isProjectScopedSession();
       elements.adminSummary.hidden = pane === "more";
       elements.dispatchSummary.hidden = pane !== "assignments";

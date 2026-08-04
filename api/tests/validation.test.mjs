@@ -231,17 +231,18 @@ test("Abschaltbare Bereiche verlangen bekannten Schlüssel Status und Versionsst
     validateCompanyModuleUpdate("VDE", { enabled: true, rowVersion: 0 }),
     { moduleKey: "vde", enabled: true, rowVersion: 0 }
   );
-  for (const bereich of ["site_reports", "site_documents", "absences", "site_qr"]) {
+  for (const bereich of ["assembly_reports", "documents", "absences", "site_qr"]) {
     assert.deepEqual(
       validateCompanyModuleUpdate(bereich, { enabled: false, rowVersion: 3 }),
       { moduleKey: bereich, enabled: false, rowVersion: 3 }
     );
   }
-  // Der Kern ist kein abschaltbarer Bereich.
-  for (const kern of ["time_tracking", "employees", "lwl"]) {
+  // Die Pruefung hier betrifft nur die Schluesselform. Ob ein Bereich wirklich
+  // abschaltbar ist, entscheidet der Modulkatalog und nicht eine zweite Liste.
+  for (const ungueltig of ["Gross Buchstaben", "mit-strich", "1ziffer"]) {
     assert.throws(
-      () => validateCompanyModuleUpdate(kern, { enabled: true, rowVersion: 0 }),
-      /nicht zum Abschalten vorgesehen/
+      () => validateCompanyModuleUpdate(ungueltig, { enabled: true, rowVersion: 0 }),
+      /ungültig/
     );
   }
   assert.throws(

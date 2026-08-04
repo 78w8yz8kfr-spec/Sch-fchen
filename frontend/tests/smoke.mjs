@@ -58,8 +58,12 @@ assert.doesNotMatch(html, /Elektro-Spezialmodule/);
 assert.match(html, /id="absence-area"/);
 assert.match(app, /function moduleEnabled\(key\)/);
 assert.match(app, /function applyModuleVisibility\(\)/);
-for (const bereich of ["absences", "site_reports", "site_documents", "site_qr"]) {
+// Die Bereiche tragen die Schluessel des Plattformkatalogs, nicht eigene.
+for (const bereich of ["absences", "assembly_reports", "site_daily_reports", "documents", "materials", "site_qr"]) {
   assert.ok(app.includes(`"${bereich}"`), `Der Bereich ${bereich} fehlt in der Oberflaeche`);
+}
+for (const erfunden of ["site_reports", "site_documents"]) {
+  assert.ok(!app.includes(`"${erfunden}"`), `${erfunden} steht nicht im Modulkatalog`);
 }
 // Der Kern ist kein abschaltbarer Bereich.
 assert.doesNotMatch(app, /moduleEnabled\("time_tracking"\)/);

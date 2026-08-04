@@ -4,22 +4,29 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
-- die Bereiche der App lassen sich firmenweit abschalten: Baustellenberichte,
-  Baustellenakte, Abwesenheiten, Baustellenlink und QR sowie das VDE-Modul. Ein
-  abgeschalteter Bereich verschwindet aus der Oberfläche und wird auch über die
-  Schnittstelle abgewiesen; vorhandene Daten bleiben erhalten und sind nach dem
+- die Bereiche der App lassen sich firmenweit abschalten: Montageberichte,
+  Bautagesberichte, Dokumentenverwaltung, Materialverwaltung, Abwesenheiten,
+  Baustellenlink und QR sowie VDE-Prüfprotokolle. Ein abgeschalteter Bereich
+  verschwindet aus der Oberfläche und wird auch über die Schnittstelle
+  abgewiesen; vorhandene Daten bleiben erhalten und sind nach dem
   Wiedereinschalten unverändert da. Jede Umstellung steht mit Zeitpunkt und
   handelnder Person in der Historie.
+- die abschaltbaren Bereiche kommen aus `module_catalog`, dem Katalog der
+  Plattformverwaltung. Er ist die einzige Quelle: `category = 'core'` markiert
+  den unverzichtbaren Kern, `is_special` das, was die Plattform zuerst
+  freigeben muss. Wer dort ein Modul ergänzt, muss nichts weiter nachziehen.
+  Abwesenheiten und Baustellenlink fehlten im Katalog und sind ergänzt.
 - Fehler behoben: der Schalter für Module war ohne Wirkung. Die Verwaltung zeigte
   ihn bedienbar, doch jeder Versuch endete mit „Spezialmodule werden
   ausschließlich durch die Plattformverwaltung freigeschaltet“. Die zugehörige
   Funktion war ein Platzhalter, der ausnahmslos abwies. Die beiden Ebenen sind
   jetzt getrennt: die Plattform gibt ein Spezialmodul frei, die Firma schaltet
   es zusätzlich ein oder aus.
-- Zeiterfassung, Mitarbeiter und Baustellen sind bewusst nicht abschaltbar; ohne
-  sie ist Schäfchen kein Arbeitszeitnachweis mehr. Einsatzplanung und
-  Stundenkonten bleiben ebenfalls fest, weil die Sollzeit am Feiertagskalender
-  und die Zeiterfassung an der Baustellenzuordnung hängt.
+- die Zeiterfassung ist im Katalog als Kern gekennzeichnet und damit nicht
+  abschaltbar; ohne sie ist Schäfchen kein Arbeitszeitnachweis mehr. Die
+  Einsatzplanung bleibt ebenfalls fest, weil die Zeiterfassung an der
+  Baustellenzuordnung hängt. Bereiche, die noch nicht gebaut sind, erscheinen
+  gar nicht erst als Schalter.
 - der Schalter für DGUV ist entfernt. Das Modul war nicht gebaut, ließ sich aber
   in der Verwaltung anwählen.
 

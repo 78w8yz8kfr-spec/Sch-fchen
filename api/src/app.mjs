@@ -32,10 +32,7 @@ import { buildFinalReportPdf } from "./report-pdf.mjs";
 import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
-import {
-  COMPANY_MODULES,
-  loadCompanyModules
-} from "./company-modules.mjs";
+import { loadCompanyModules } from "./company-modules.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import {
   expectedNextTypes,
@@ -1782,6 +1779,12 @@ function absenceRequestDto(row) {
   };
 }
 
+// Montage- und Tagesberichte stehen im Katalog als eigene Bereiche. Ein Betrieb
+// kann den einen fuehren und den anderen abschalten.
+function siteReportModuleKey(reportType) {
+  return reportType === "daily" ? "site_daily_reports" : "assembly_reports";
+}
+
 // Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
 // Sonst bliebe er ueber die Schnittstelle weiter bedienbar und der Schalter
 // waere eine reine Anzeige.
@@ -1846,12 +1849,11 @@ async function markPlatformAnnouncementRead(client, context, announcementId) {
 
 async function updateCompanyModule(client, context, input) {
   await requireModuleAdministrator(client, context);
-  const definition = COMPANY_MODULES.find((entry) => entry.key === input.moduleKey);
-  if (!definition) {
-    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.", 404, "module_not_found");
-  }
   const vorher = (await loadCompanyModules(client, context))
     .find((entry) => entry.key === input.moduleKey);
+  if (!vorher) {
+    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.", 404, "module_not_found");
+  }
 
   // Einschalten kann die Firma nur, was die Plattform ihr freigegeben hat.
   if (input.enabled && !vorher.available) {
@@ -5213,7 +5215,7 @@ async function getSiteTaskRecord(client, context, taskId) {
 }
 
 async function createSiteTask(client, context, input) {
-  await requireEnabledModule(client, context, "site_documents");
+  await requireEnabledModule(client, context, "documents");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5460,7 +5462,7 @@ async function storeSiteNote(client, context, input) {
 }
 
 async function createAdminSiteNote(client, context, input) {
-  await requireEnabledModule(client, context, "site_documents");
+  await requireEnabledModule(client, context, "documents");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5635,7 +5637,7 @@ function structuredReportData(input, personnel, photos = []) {
 }
 
 async function createSiteReport(client, context, input) {
-  await requireEnabledModule(client, context, "site_reports");
+  await requireEnabledModule(client, context, siteReportModuleKey(input.reportType));
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5689,7 +5691,7 @@ async function createSiteReport(client, context, input) {
 }
 
 async function createMobileSiteReport(client, context, input) {
-  await requireEnabledModule(client, context, "site_reports");
+  await requireEnabledModule(client, context, siteReportModuleKey(input.reportType));
   const duplicate = await client.query(
     `SELECT id, author_user_id, construction_site_id, work_date, report_type,
             source_mode, summary, details, structured_data

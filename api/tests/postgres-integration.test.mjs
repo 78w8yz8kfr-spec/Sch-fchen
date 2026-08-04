@@ -503,10 +503,15 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     });
     assert.equal(initialModulesResponse.status, 200);
     const initialModules = (await initialModulesResponse.json()).modules;
+    // Die Bereiche stammen aus dem Modulkatalog der Plattform. Der Kern und
+    // Bereiche, die es noch nicht gibt, stehen nicht darin.
     assert.deepEqual(
-      initialModules.map((module) => module.key),
-      ["vde", "site_reports", "site_documents", "absences", "site_qr"]
+      initialModules.map((module) => module.key).sort(),
+      ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
     );
+    assert.ok(!initialModules.some((module) => module.key === "time_tracking"));
+    assert.ok(!initialModules.some((module) => module.key === "scheduling"));
+    assert.ok(!initialModules.some((module) => module.key === "dguv"));
     // Regulaere Bereiche gehoeren zum Umfang und sind ohne Zutun eingeschaltet.
     // Das Spezialmodul VDE braucht zuerst die Freigabe der Plattform.
     assert.equal(initialModules.find((module) => module.key === "vde").enabled, false);
@@ -526,7 +531,9 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
         body: JSON.stringify({ enabled: false, rowVersion: 0 })
       }
     );
-    assert.equal(forbiddenCoreResponse.status, 400, await forbiddenCoreResponse.clone().text());
+    // Der Kern steht gar nicht erst unter den abschaltbaren Bereichen.
+    assert.equal(forbiddenCoreResponse.status, 404, await forbiddenCoreResponse.clone().text());
+    assert.equal((await forbiddenCoreResponse.json()).error.code, "module_not_found");
 
     const forbiddenModuleAdministration = await fetch(`${baseUrl}/api/v1/admin/modules`, {
       headers: { Cookie: plannerCookie }
@@ -4448,7 +4455,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
     const module = await leseModule();
     const schluessel = module.map((eintrag) => eintrag.key).sort();
-    assert.deepEqual(schluessel, ["absences", "site_documents", "site_qr", "site_reports", "vde"]);
+    assert.deepEqual(
+      schluessel,
+      ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
+    );
     // Der Kern taucht bewusst nicht als abschaltbarer Bereich auf.
     assert.ok(!schluessel.includes("time_tracking"));
     // Regulaere Bereiche gehoeren zum Umfang und sind ohne Zutun eingeschaltet.
@@ -4510,12 +4520,16 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(erlaubt.status, 201, await erlaubt.clone().text());
 
     // Ein unbekannter Bereich wird abgewiesen.
-    const unbekannt = await fetch(`${baseUrl}/api/v1/admin/modules/time_tracking`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({ enabled: false, rowVersion: 0 })
-    });
-    assert.equal(unbekannt.status, 400, await unbekannt.clone().text());
+    // Der Kern und die Einsatzplanung stehen nicht unter den abschaltbaren
+    // Bereichen: sie tragen die Zeitberechnung.
+    for (const fest of ["time_tracking", "scheduling"]) {
+      const unbekannt = await fetch(`${baseUrl}/api/v1/admin/modules/${fest}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ enabled: false, rowVersion: 0 })
+      });
+      assert.equal(unbekannt.status, 404, await unbekannt.clone().text());
+    }
   });
 
   await t.test("Plattformverwaltung: Firmen, Konten, Tarife und Betrieb", async () => {

@@ -44,12 +44,9 @@ const SITE_TASK_STATUSES = new Set(["open", "in_progress", "done", "archived"]);
 const SITE_MATERIAL_STATUSES = new Set(["planned", "ordered", "available", "used", "archived"]);
 const SITE_REPORT_TYPES = new Set(["montage", "daily"]);
 const SITE_REPORT_SOURCES = new Set(["digital", "photo", "speech"]);
-// Bereiche, die ein Betrieb selbst abschalten kann. Der Kern gehoert bewusst
-// nicht dazu: ohne Zeiterfassung, Mitarbeiter und Baustellen ist Schaefchen
-// kein Arbeitszeitnachweis mehr.
-const SWITCHABLE_MODULE_KEYS = new Set([
-  "vde", "site_reports", "site_documents", "absences", "site_qr"
-]);
+// Schluesselform des Modulkatalogs. Ob ein Bereich tatsaechlich abschaltbar
+// ist, entscheidet der Katalog selbst und nicht eine zweite Liste hier.
+const MODULE_KEY_SHAPE = /^[a-z][a-z0-9_]*$/;
 const VDE_SOURCE_MODES = new Set(["integrated", "legacy_v15"]);
 const VDE_NETWORK_TYPES = new Set(["TN-S", "TN-C-S", "TN-C", "TT", "IT"]);
 const VDE_CHECK_RESULTS = new Set(["ok", "not_ok", "not_checked"]);
@@ -848,8 +845,8 @@ export function validateDocumentStatusUpdate(body) {
 export function validateCompanyModuleUpdate(moduleKey, body) {
   rejectTenantFields(body);
   const normalizedKey = text(moduleKey, "Modul", 3, 30).toLowerCase();
-  if (!SWITCHABLE_MODULE_KEYS.has(normalizedKey)) {
-    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.");
+  if (!MODULE_KEY_SHAPE.test(normalizedKey)) {
+    throw new InputError("Der Bereich ist ungültig.");
   }
   const rowVersion = Number(body.rowVersion);
   if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {

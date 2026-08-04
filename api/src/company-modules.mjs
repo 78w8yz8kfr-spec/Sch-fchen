@@ -1,76 +1,70 @@
 // Bereiche, die ein Betrieb selbst an- und abschalten kann.
 //
-// `platformGated` trennt die beiden Ebenen: ein Spezialmodul muss zuerst von
-// der Plattform freigegeben werden und laesst sich danach von der Firma
-// zusaetzlich abschalten. Ein regulaerer Bereich gehoert zum Umfang und ist
-// eingeschaltet, solange die Firma ihn nicht abschaltet.
+// Die Liste kommt aus `module_catalog`, dem Katalog der Plattformverwaltung.
+// Er ist die einzige Quelle: wer dort ein Modul ergaenzt, muss nichts weiter
+// nachziehen. Zwei Merkmale des Katalogs steuern das Verhalten:
 //
-// Der Kern fehlt hier bewusst. Zeiterfassung, Mitarbeiter, Baustellen und
-// Anmeldung sind keine Module. Einsatzplanung und Stundenkonten bleiben
-// ebenfalls draussen: die Sollzeit haengt am Feiertagskalender und die
-// Zeiterfassung an der Baustellenzuordnung: ein Schalter dort wuerde die
-// Zeitberechnung veraendern statt nur eine Ansicht auszublenden.
-export const COMPANY_MODULES = [
-  {
-    key: "vde",
-    name: "VDE-Prüfungen",
-    description: "Prüfungen elektrischer Anlagen und Betriebsmittel",
-    integrated: true,
-    platformGated: true
-  },
-  {
-    key: "site_reports",
-    name: "Baustellenberichte",
-    description: "Tages- und Abnahmeberichte mit Unterschrift auf der Baustelle",
-    integrated: true,
-    platformGated: false
-  },
-  {
-    key: "site_documents",
-    name: "Baustellenakte",
-    description: "Fotos, Dokumente, Material und Notizen je Baustelle",
-    integrated: true,
-    platformGated: false
-  },
-  {
-    key: "absences",
-    name: "Abwesenheiten",
-    description: "Urlaub und Abwesenheit beantragen und freigeben",
-    integrated: true,
-    platformGated: false
-  },
-  {
-    key: "site_qr",
-    name: "Baustellenlink und QR",
-    description: "Zugang zu einer Baustelle über Link oder QR-Code",
-    integrated: true,
-    platformGated: false
-  }
-];
+//   category = 'core'  gehoert zum unverzichtbaren Kern und ist niemals
+//                      abschaltbar. Ohne Zeiterfassung ist Schaefchen kein
+//                      Arbeitszeitnachweis mehr.
+//   is_special = TRUE  muss zuerst von der Plattform freigegeben werden. Die
+//                      Firma kann es danach zusaetzlich abschalten.
+//
+// Ein regulaerer Bereich gehoert zum Umfang und ist eingeschaltet, solange die
+// Firma ihn nicht abschaltet.
+
+// Bereiche, die im Katalog stehen, aber noch nicht fachlich angebunden sind.
+// Sie erscheinen als nicht freigegeben und lassen sich nicht einschalten,
+// damit kein Schalter etwas verspricht, was es nicht gibt.
+const NICHT_ANGEBUNDEN = new Set([
+  "dguv",
+  "electrical_special",
+  "fleet",
+  "apprentice_reports",
+  "advanced_exports",
+  "integrations"
+]);
+
+// Bereiche, deren Abschalten die Zeitberechnung veraendern wuerde statt nur
+// eine Ansicht auszublenden: die Zeiterfassung haengt an der
+// Baustellenzuordnung. Sie bleiben fest, obwohl sie im Katalog stehen.
+const RECHNET_MIT = new Set(["scheduling"]);
+
+export function isSwitchable(row) {
+  return row.category !== "core"
+    && row.status === "active"
+    && !RECHNET_MIT.has(row.module_key);
+}
+
+export function isIntegrated(moduleKey) {
+  return !NICHT_ANGEBUNDEN.has(moduleKey);
+}
 
 // Gibt die Plattform den Bereich frei? Nur Spezialmodule brauchen das.
-export function platformGrantsModule(definition, entitlement) {
-  if (!definition.platformGated) return true;
+export function platformGrantsModule(row, entitlement) {
+  if (!row.is_special) return true;
   if (entitlement?.entitlement_status === "permanent") return true;
   return entitlement?.entitlement_status === "trial"
     && (!entitlement.starts_at || new Date(entitlement.starts_at) <= new Date())
     && (!entitlement.ends_at || new Date(entitlement.ends_at) > new Date());
 }
 
-export function companyModuleDto(definition, entitlement, companySwitch) {
-  const granted = platformGrantsModule(definition, entitlement);
+export function companyModuleDto(row, entitlement, companySwitch) {
+  const integrated = isIntegrated(row.module_key);
+  const granted = platformGrantsModule(row, entitlement);
   // Ohne eigenen Eintrag gilt der Bereich als eingeschaltet. Ein Betrieb, der
   // den Schalter nie angefasst hat, soll alles nutzen koennen, was ihm zusteht.
   const switchedOn = companySwitch ? companySwitch.is_enabled : true;
   return {
-    key: definition.key,
-    name: definition.name,
-    description: definition.description,
-    available: definition.integrated && granted,
-    enabled: definition.integrated && granted && switchedOn,
-    platformGated: definition.platformGated,
-    status: entitlement?.entitlement_status || (definition.platformGated ? "inactive" : "included"),
-    availableOnRequest: definition.platformGated && !granted,
+    key: row.module_key,
+    name: row.name,
+    description: row.description || "",
+    category: row.category,
+    available: integrated && granted,
+    enabled: integrated && granted && switchedOn,
+    platformGated: Boolean(row.is_special),
+    status: entitlement?.entitlement_status || (row.is_special ? "inactive" : "included"),
+    availableOnRequest: integrated && Boolean(row.is_special) && !granted,
     rowVersion: companySwitch ? Number(companySwitch.row_version) : 0,
     changedAt: companySwitch?.updated_at ? new Date(companySwitch.updated_at).toISOString() : null,
     startsAt: entitlement?.starts_at ? new Date(entitlement.starts_at).toISOString() : null,
@@ -79,27 +73,22 @@ export function companyModuleDto(definition, entitlement, companySwitch) {
 }
 
 export async function loadCompanyModules(client, context) {
-  const [entitlements, switches] = await Promise.all([
-    client.query(
-      `SELECT catalog.module_key, entitlement.entitlement_status,
-              entitlement.starts_at, entitlement.ends_at
-       FROM module_catalog AS catalog
-       LEFT JOIN company_module_entitlements AS entitlement
-         ON entitlement.module_id = catalog.id AND entitlement.company_id = $1`,
-      [context.companyId]
-    ),
-    client.query(
-      `SELECT module_key, is_enabled, row_version, updated_at
-       FROM company_modules
-       WHERE company_id = $1`,
-      [context.companyId]
-    )
-  ]);
-  const freigaben = new Map(entitlements.rows.map((row) => [row.module_key, row]));
-  const schalter = new Map(switches.rows.map((row) => [row.module_key, row]));
-  return COMPANY_MODULES.map((definition) => companyModuleDto(
-    definition,
-    freigaben.get(definition.key),
-    schalter.get(definition.key)
-  ));
+  const result = await client.query(
+    `SELECT catalog.module_key, catalog.name, catalog.description,
+            catalog.category, catalog.status, catalog.is_special,
+            entitlement.entitlement_status, entitlement.starts_at, entitlement.ends_at,
+            company_switch.is_enabled, company_switch.row_version, company_switch.updated_at
+     FROM module_catalog AS catalog
+     LEFT JOIN company_module_entitlements AS entitlement
+       ON entitlement.module_id = catalog.id AND entitlement.company_id = $1
+     LEFT JOIN company_modules AS company_switch
+       ON company_switch.company_id = $1 AND company_switch.module_key = catalog.module_key
+     ORDER BY catalog.category, catalog.name`,
+    [context.companyId]
+  );
+  // Nur Bereiche zeigen, die es in dieser Fassung wirklich gibt. Ein Schalter
+  // fuer etwas Ungebautes verspricht mehr, als die App halten kann.
+  return result.rows
+    .filter((row) => isSwitchable(row) && isIntegrated(row.module_key))
+    .map((row) => companyModuleDto(row, row, row.is_enabled === null ? null : row));
 }
