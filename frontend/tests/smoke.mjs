@@ -43,6 +43,14 @@ assert.match(html, /id="week-total-overtime"/);
 assert.match(html, /id="week-previous"/);
 assert.match(html, /id="week-current"/);
 assert.match(html, /id="week-next"/);
+// Der Wochenwechsel nutzt dieselbe Schaltflaeche wie die Plantafel. Vorher war
+// er als kleiner Textknopf ausgefuehrt und mit dem Finger schwer zu treffen.
+assert.match(html, /id="week-previous" class="week-button"/);
+assert.match(html, /id="week-next" class="week-button"/);
+assert.match(html, /id="week-current" class="week-navigation__today"/);
+// Die Plantafel heisst auf jedem Geraet gleich. "Desktop-Plantafel" stand auch
+// dann ueber der Ansicht, wenn sie auf dem Handy geoeffnet wurde.
+assert.doesNotMatch(html, /Desktop-Plantafel/);
 assert.match(html, /id="time-account-panel"/);
 assert.match(html, /id="time-account-balance"/);
 assert.match(html, /id="time-account-months"/);

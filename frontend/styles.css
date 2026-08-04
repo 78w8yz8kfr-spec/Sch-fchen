@@ -564,7 +564,8 @@ select:focus-visible {
 
 .platform-announcement__dismiss {
   flex: 0 0 auto;
-  padding: 6px 8px;
+  min-height: 40px;
+  padding: 6px 14px;
   border: 0;
   border-radius: 8px;
   color: var(--ink-soft);
@@ -1596,9 +1597,19 @@ select:focus-visible {
   font-weight: 750;
 }
 
+/* Die vier Felder des Stundenexports hatten keine eigene Gestaltung und fielen
+   auf die Vorgabe des Browsers zurueck: 21 bis 24 Pixel hoch, ohne Rahmen. Sie
+   folgen jetzt denselben Massen wie die uebrigen Auswahlfelder der App. */
 .timesheet-export-form input,
 .timesheet-export-form select {
   width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 0.72rem;
 }
 
 .timesheet-export-actions {
@@ -1805,21 +1816,6 @@ select:focus-visible {
 }
 
 @media (max-width: 520px) {
-  .work-day-review-day {
-    align-items: start;
-  }
-
-  .week-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .week-heading__controls {
-    width: 100%;
-    justify-items: start;
-  }
-
   .form-grid--two {
     grid-template-columns: 1fr;
   }
@@ -2415,23 +2411,29 @@ select:focus-visible {
   gap: 5px;
 }
 
-.week-navigation .text-button {
-  min-height: 30px;
-  padding: 4px 8px;
-  border-radius: 9px;
-  color: var(--muted);
-  background: #f4f4f4;
-  font-size: 0.61rem;
+/* Der Wochenwechsel sieht hier aus wie auf der Plantafel. Vorher waren die
+   Pfeile 30 Pixel gross und grau, waehrend dieselbe Bedienung im Einsatzbereich
+   44 Pixel und farbig war. Mit einem Finger war die kleine Fassung kaum sicher
+   zu treffen. */
+.week-navigation .week-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 1.3rem;
 }
 
-.week-navigation .text-button:first-child,
-.week-navigation .text-button:last-child {
-  min-width: 30px;
-  padding: 2px 8px;
-  font-size: 1rem;
+.week-navigation__today {
+  min-height: 40px;
+  padding: 4px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
-.week-navigation .text-button:disabled {
+.week-navigation button:disabled {
   opacity: 0.38;
 }
 
@@ -5715,4 +5717,24 @@ select:focus-visible {
   color: var(--ink);
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+/* Anpassungen fuer Handybreite stehen bewusst am Dateiende. Weiter oben wurden
+   sie von spaeteren Grundregeln gleicher Spezifitaet ueberschrieben und blieben
+   wirkungslos, obwohl die Medienabfrage zutraf. */
+@media (max-width: 520px) {
+  .work-day-review-day {
+    align-items: start;
+  }
+
+  .week-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .week-heading__controls {
+    width: 100%;
+    justify-items: start;
+  }
 }

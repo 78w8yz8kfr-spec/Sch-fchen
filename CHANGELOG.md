@@ -4,6 +4,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: die Anpassung der Wochenansicht an schmale Geräte blieb
+  wirkungslos. Die Medienabfrage traf zu, wurde aber von einer weiter unten
+  stehenden Regel gleicher Spezifität wieder aufgehoben; der Kopfbereich stand
+  auf dem Handy deshalb rechtsbündig. Ein Test prüft jetzt alle Stylesheets auf
+  solche überschriebenen Anpassungen.
+- der Wochenwechsel sieht aus wie dieselbe Bedienung auf der Plantafel und ist
+  mit dem Finger sicher zu treffen: vorher 30 Pixel groß und grau, jetzt 40
+  Pixel und farbig. Die Felder des Stundenexports waren ohne eigene Gestaltung
+  nur rund 22 Pixel hoch und folgen jetzt den Maßen der übrigen Auswahlfelder;
+  gleiches gilt für „Gelesen“ an den Mitteilungen.
+- die Plantafel heißt auf jedem Gerät „Plantafel“. Die Überschrift lautete
+  „Desktop-Plantafel“, auch wenn sie auf dem Handy geöffnet wurde.
+
 - die Büroverwaltung liegt vollständig im Bereich „Mehr“ und nicht mehr hinter
   einem Aufklapper in der Wochenansicht. Jahreskonten, Feiertagskalender und
   die Regel für eigene Zeitkorrekturen stehen dort gleichrangig nebeneinander;

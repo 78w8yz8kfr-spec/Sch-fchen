@@ -1,0 +1,96 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const stylesheets = ["styles.css", "vde/styles.css", "platform-admin.css"];
+
+// Zerlegt ein Stylesheet grob in Regeln. Verschachtelte Angaben sind in diesem
+// Projekt nicht gebraeuchlich, deshalb genuegt ein flacher Durchlauf, der sich
+// die zuletzt geoeffnete Medienabfrage merkt.
+function leseRegeln(quelltext) {
+  // Kommentare durch Leerzeichen gleicher Laenge ersetzen: so bleiben die
+  // Zeilennummern erhalten, ohne dass Kommentartext in einen Selektor rutscht.
+  const css = quelltext.replace(/\/\*[\s\S]*?\*\//g, (treffer) =>
+    treffer.replace(/[^\n]/g, " "));
+  const regeln = [];
+  const stapel = [];
+  const muster = /([^{}]+)\{([^{}]*)\}|@[a-z-]+[^{;]*\{|\}/g;
+  let treffer;
+  while ((treffer = muster.exec(css))) {
+    if (treffer[0].endsWith("{") && treffer[0].startsWith("@")) {
+      stapel.push(treffer[0].slice(1, -1).trim());
+      continue;
+    }
+    if (treffer[0] === "}") {
+      stapel.pop();
+      continue;
+    }
+    const selektor = treffer[1].trim().replace(/\s+/g, " ");
+    if (!selektor || selektor.startsWith("@")) continue;
+    const eigenschaften = new Map();
+    for (const angabe of treffer[2].split(";")) {
+      const trenner = angabe.indexOf(":");
+      if (trenner < 1) continue;
+      eigenschaften.set(angabe.slice(0, trenner).trim(), angabe.slice(trenner + 1).trim());
+    }
+    regeln.push({
+      position: treffer.index,
+      zeile: css.slice(0, treffer.index).split("\n").length,
+      selektor,
+      eigenschaften,
+      umgebung: stapel[stapel.length - 1] ?? null
+    });
+  }
+  return regeln;
+}
+
+test("Keine Anpassung fuer schmale Geraete wird von einer spaeteren Grundregel aufgehoben", async () => {
+  const befunde = [];
+  for (const datei of stylesheets) {
+    const css = await readFile(resolve(frontendDirectory, datei), "utf8");
+    const regeln = leseRegeln(css);
+    const inMedien = regeln.filter((regel) => regel.umgebung?.startsWith("media"));
+    const grundregeln = regeln.filter((regel) => regel.umgebung === null);
+    for (const regel of inMedien) {
+      for (const spaeter of grundregeln) {
+        if (spaeter.position < regel.position || spaeter.selektor !== regel.selektor) continue;
+        for (const [name, wert] of regel.eigenschaften) {
+          if (!spaeter.eigenschaften.has(name)) continue;
+          if (spaeter.eigenschaften.get(name) === wert) continue;
+          befunde.push(
+            `${datei}:${regel.zeile} "${regel.selektor} { ${name} }" aus @${regel.umgebung}`
+            + ` wird in Zeile ${spaeter.zeile} wieder ueberschrieben`
+          );
+        }
+      }
+    }
+  }
+  // Bei gleicher Spezifitaet gewinnt die zuletzt notierte Regel. Eine
+  // Medienabfrage weiter oben in der Datei bleibt deshalb wirkungslos, obwohl
+  // sie zutrifft: genau so war die Wochenansicht auf dem Handy rechtsbuendig
+  // geblieben. Anpassungen fuer schmale Geraete gehoeren ans Dateiende.
+  assert.deepEqual([...new Set(befunde)], []);
+});
+
+test("Bedienelemente sind gross genug zum Antippen", async () => {
+  const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
+  const regeln = leseRegeln(css);
+  const hoehe = (selektor, name = "min-height") => {
+    const regel = regeln.findLast((eintrag) => eintrag.selektor === selektor);
+    assert.ok(regel, `Regel ${selektor} fehlt`);
+    const wert = regel.eigenschaften.get(name);
+    assert.ok(wert, `${selektor} legt ${name} nicht fest`);
+    return Number.parseFloat(wert);
+  };
+  // Die Felder des Stundenexports hatten keine eigene Gestaltung und waren in
+  // der Vorgabe des Browsers nur rund 22 Pixel hoch.
+  assert.ok(hoehe(".timesheet-export-form input, .timesheet-export-form select") >= 40);
+  // Der Wochenwechsel war 30 Pixel gross, waehrend dieselbe Bedienung auf der
+  // Plantafel 44 Pixel misst.
+  assert.ok(hoehe(".week-navigation .week-button", "height") >= 40);
+  assert.ok(hoehe(".week-navigation__today") >= 40);
+  assert.ok(hoehe(".platform-announcement__dismiss") >= 40);
+});
