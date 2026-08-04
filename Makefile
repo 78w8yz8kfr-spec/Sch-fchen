@@ -73,6 +73,7 @@ frontend-test:
 	node --check frontend/vde/app.js
 	node --check frontend/sw.js
 	node frontend/tests/smoke.mjs
+	node --test frontend/tests/*.test.mjs
 
 frontend-serve:
 	python3 -m http.server 4173 --directory frontend
