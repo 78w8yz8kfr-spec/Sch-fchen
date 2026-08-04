@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die Zeitbearbeitung aus V0.42 ist automatisiert abgedeckt: die
+  Ungültigkeitserklärung einer eigenen Buchung, die Bearbeitung und Löschung
+  fremder Buchungen durch das Büro sowie der Stundenzettelabruf des Büros
+  werden gegen PostgreSQL geprüft, einschließlich unbekannter Buchung,
+  wartender Zweitänderung, veraltetem Zeitstand, fehlender Planungsberechtigung
+  und nicht zugeordneter Baustelle
+- die Prüfungen für `validateTimeEntryEdit`, `validateTimeEntryDelete` und
+  `validateId` sind ergänzt; `validateId` sichert 45 Pfadparameter der API ab
+  und war bisher nicht direkt geprüft
 - die SQL-Abnahmetests der Migrationen 005, 006, 007, 042 und 043 prüfen den
   Mandantenschutz jetzt unter der eingeschränkten Datenbankrolle
   `schaefchen_api`; da alle Tabellen `NO FORCE ROW LEVEL SECURITY` verwenden,

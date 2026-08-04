@@ -41,10 +41,13 @@ import {
   validateSiteTaskUpdate,
   validateSpontaneousSiteSelection,
   validateSiteBundle,
+  validateId,
   validateTimeEntry,
   validateTimeEntryAddition,
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
+  validateTimeEntryDelete,
+  validateTimeEntryEdit,
   validateTimeEntryInvalidation,
   validateTimeAccountAdjustment,
   validateTimeAccountProfile,
@@ -1254,4 +1257,137 @@ test("lokales Arbeitsdatum und Schrittfolge sind eindeutig", () => {
   assert.deepEqual(expectedNextTypes("clock_out"), ["clock_in"]);
   assert.equal(validateWorkDate("2026-07-17"), "2026-07-17");
   assert.throws(() => validateWorkDate("2026-02-30"), /ungültig/);
+});
+
+test("Zeitbearbeitung prüft Zeitpunkte, Minutenwerte und Begründung", () => {
+  const changeId = "33333333-3333-4333-8333-333333333333";
+  const siteId = "44444444-4444-4444-8444-444444444444";
+  assert.deepEqual(validateTimeEntryEdit({
+    clientChangeId: changeId,
+    expectedRecordedAt: "2026-07-17T08:00:00+02:00",
+    recordedAt: "2026-07-17T08:15:00+02:00",
+    workDate: "2026-07-17",
+    constructionSiteId: siteId,
+    activityNote: "  Verteilung erneuern  ",
+    travelMinutes: 30,
+    breakMinutes: 0,
+    reason: "Arbeitsbeginn wurde zu früh gebucht"
+  }), {
+    clientChangeId: changeId,
+    expectedRecordedAt: "2026-07-17T08:00:00+02:00",
+    recordedAt: "2026-07-17T08:15:00+02:00",
+    workDate: "2026-07-17",
+    constructionSiteId: siteId,
+    activityNote: "Verteilung erneuern",
+    travelMinutes: 30,
+    breakMinutes: 0,
+    reason: "Arbeitsbeginn wurde zu früh gebucht"
+  });
+
+  const valid = {
+    clientChangeId: changeId,
+    expectedRecordedAt: "2026-07-17T08:00:00+02:00",
+    recordedAt: "2026-07-17T08:15:00+02:00",
+    workDate: "2026-07-17",
+    reason: "Arbeitsbeginn wurde zu früh gebucht"
+  };
+
+  // Nicht gesetzte Minutenangaben bleiben unbestimmt, ausdrücklich geleerte
+  // Angaben werden zurückgesetzt.
+  const untouched = validateTimeEntryEdit({ ...valid });
+  assert.equal(untouched.travelMinutes, undefined);
+  assert.equal(untouched.breakMinutes, undefined);
+  assert.equal(validateTimeEntryEdit({ ...valid, breakMinutes: null }).breakMinutes, null);
+  assert.equal(validateTimeEntryEdit({ ...valid, breakMinutes: "" }).breakMinutes, null);
+
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, breakMinutes: 1441 }),
+    /zwischen 0 und 1440 Minuten/
+  );
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, travelMinutes: -1 }),
+    /zwischen 0 und 1440 Minuten/
+  );
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, travelMinutes: 12.5 }),
+    /zwischen 0 und 1440 Minuten/
+  );
+  // Ein Zeitpunkt ohne Zeitzone ist mehrdeutig und wird abgewiesen: zu kurze
+  // Angaben scheitern bereits an der Länge, vollständige an der Zeitzone.
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, recordedAt: "2026-07-17T08:15:00" }),
+    /Neuer Zeitpunkt hat eine ungültige Länge/
+  );
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, recordedAt: "2026-07-17T08:15:00.000" }),
+    /Datum, Uhrzeit und Zeitzone/
+  );
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, expectedRecordedAt: "2026-07-17T99:99:00+02:00" }),
+    /Datum, Uhrzeit und Zeitzone/
+  );
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, reason: "zu" }),
+    /Änderungsgrund/
+  );
+  assert.throws(
+    () => validateTimeEntryEdit({ ...valid, companyId: "11111111-1111-4111-8111-111111111111" }),
+    /ausschließlich vom Server/
+  );
+});
+
+test("Zeitlöschung verlangt Änderungs-ID, bisherigen Zeitpunkt und Löschgrund", () => {
+  const changeId = "55555555-5555-4555-8555-555555555555";
+  assert.deepEqual(validateTimeEntryDelete({
+    clientChangeId: changeId,
+    expectedRecordedAt: "2026-07-17T08:00:00Z",
+    reason: "Arbeitsblock wurde doppelt erfasst"
+  }), {
+    clientChangeId: changeId,
+    expectedRecordedAt: "2026-07-17T08:00:00Z",
+    reason: "Arbeitsblock wurde doppelt erfasst"
+  });
+  assert.throws(
+    () => validateTimeEntryDelete({
+      clientChangeId: "kein-uuid",
+      expectedRecordedAt: "2026-07-17T08:00:00Z",
+      reason: "Arbeitsblock wurde doppelt erfasst"
+    }),
+    /Änderungs-ID/
+  );
+  assert.throws(
+    () => validateTimeEntryDelete({
+      clientChangeId: changeId,
+      expectedRecordedAt: "2026-07-17T08:00:00Z",
+      reason: "  "
+    }),
+    /Löschgrund/
+  );
+  assert.throws(
+    () => validateTimeEntryDelete({
+      clientChangeId: changeId,
+      expectedRecordedAt: "2026-07-17T08:00:00Z",
+      reason: "Arbeitsblock wurde doppelt erfasst",
+      userId: "11111111-1111-4111-8111-111111111111"
+    }),
+    /ausschließlich vom Server/
+  );
+});
+
+test("Pfadkennungen werden vor jeder Datenbankabfrage als UUID geprüft", () => {
+  const id = "66666666-6666-4666-8666-666666666666";
+  assert.equal(validateId(id, "Zeitbuchungs-ID"), id);
+  assert.equal(validateId(id.toUpperCase(), "Zeitbuchungs-ID"), id);
+  for (const attack of [
+    "../../etc/passwd",
+    "1 OR 1=1",
+    "66666666-6666-4666-8666-666666666666'; DROP TABLE users; --",
+    "",
+    null,
+    undefined,
+    12345,
+    "66666666666646668666666666666666"
+  ]) {
+    assert.throws(() => validateId(attack, "Zeitbuchungs-ID"), /Zeitbuchungs-ID/);
+  }
 });

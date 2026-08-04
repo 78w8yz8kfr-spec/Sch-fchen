@@ -3814,6 +3814,261 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   assert.equal(deleteEmployeeResponse.status, 200, await deleteEmployeeResponse.clone().text());
   assert.equal((await deleteEmployeeResponse.json()).mode, "deleted");
 
+  // V0.42: Ungültigkeitserklärung durch den Mitarbeiter sowie Bearbeitung und
+  // Löschung fremder Zeitbuchungen durch das Büro. Der Arbeitstag gehört einem
+  // eigenen Mitarbeiter, damit die vorher geprüften Stundenzettel unberührt
+  // bleiben.
+  const timeEmployeePersonnelNumber = `TIME-${suffix}`;
+  const timeEmployeeTemporaryPassword = "Zeitkorrektur-Integration-2026!";
+  const timeEmployeeResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      personnelNumber: timeEmployeePersonnelNumber,
+      firstName: "Timo",
+      lastName: "Zeitkorrektur",
+      role: "installer",
+      temporaryPassword: timeEmployeeTemporaryPassword
+    })
+  });
+  assert.equal(timeEmployeeResponse.status, 201, await timeEmployeeResponse.clone().text());
+  const timeEmployee = (await timeEmployeeResponse.json()).employee;
+
+  const timeEmployeeLogin = await fetch(`${baseUrl}/api/v1/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+    body: JSON.stringify({
+      companyNumber: "F-000001",
+      personnelNumber: timeEmployeePersonnelNumber,
+      password: timeEmployeeTemporaryPassword
+    })
+  });
+  assert.equal(timeEmployeeLogin.status, 201);
+  const timeCookie = timeEmployeeLogin.headers.get("set-cookie").split(";", 1)[0];
+  const timeEmployeePasswordChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: timeCookie },
+    body: JSON.stringify({ newPassword: "Zeitkorrektur-Integration-2026-Neu!" })
+  });
+  assert.equal(timeEmployeePasswordChange.status, 200);
+
+  const editableClockInAt = new Date(Date.now() - 4000).toISOString();
+  const editableClockOutAt = new Date(Date.now() - 3000).toISOString();
+  const editableWorkDate = localDate(editableClockInAt, config.timeZone);
+  for (const [entryType, recordedAt] of [
+    ["clock_in", editableClockInAt],
+    ["clock_out", editableClockOutAt]
+  ]) {
+    const created = await fetch(`${baseUrl}/api/v1/time-entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: timeCookie },
+      body: JSON.stringify({
+        clientEntryId: randomUUID(),
+        entryType,
+        recordedAt,
+        clientCreatedAt: recordedAt
+      })
+    });
+    assert.equal(created.status, 201, await created.clone().text());
+  }
+
+  const editableDayResponse = await fetch(
+    `${baseUrl}/api/v1/work-days/${editableWorkDate}`,
+    { headers: { Cookie: timeCookie } }
+  );
+  assert.equal(editableDayResponse.status, 200);
+  const editableDay = (await editableDayResponse.json()).workDay;
+  assert.equal(editableDay.entries.length, 2);
+  const editableClockIn = editableDay.entries[0];
+  const editableClockOut = editableDay.entries[1];
+  assert.equal(editableClockOut.entryType, "clock_out");
+
+  const unknownInvalidation = await fetch(`${baseUrl}/api/v1/time-entry-invalidations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: timeCookie },
+    body: JSON.stringify({
+      originalEntryId: randomUUID(),
+      reason: "Unbekannte Buchung darf nicht für ungültig erklärt werden"
+    })
+  });
+  assert.equal(unknownInvalidation.status, 404);
+  assert.equal((await unknownInvalidation.json()).error.code, "time_entry_not_found");
+
+  const invalidationResponse = await fetch(`${baseUrl}/api/v1/time-entry-invalidations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: timeCookie },
+    body: JSON.stringify({
+      originalEntryId: editableClockOut.id,
+      reason: "Feierabend wurde im Integrationstest versehentlich gebucht"
+    })
+  });
+  assert.equal(invalidationResponse.status, 201, await invalidationResponse.clone().text());
+  const invalidation = (await invalidationResponse.json()).timeCorrection;
+  assert.equal(invalidation.correctionKind, "invalidation");
+  assert.equal(invalidation.status, "pending");
+  assert.equal(invalidation.originalEntryId, editableClockOut.id);
+
+  // Solange die erste Ungültigkeitserklärung auf Prüfung wartet, darf keine
+  // zweite für dieselbe Buchung entstehen.
+  const repeatedInvalidation = await fetch(`${baseUrl}/api/v1/time-entry-invalidations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: timeCookie },
+    body: JSON.stringify({
+      originalEntryId: editableClockOut.id,
+      reason: "Zweite Ungültigkeitserklärung für dieselbe Buchung"
+    })
+  });
+  assert.equal(repeatedInvalidation.status, 409);
+  assert.equal((await repeatedInvalidation.json()).error.code, "time_correction_pending");
+
+  const approveInvalidation = await fetch(
+    `${baseUrl}/api/v1/admin/time-entry-corrections/${invalidation.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ decision: "approved" })
+    }
+  );
+  assert.equal(approveInvalidation.status, 200, await approveInvalidation.clone().text());
+  assert.equal((await approveInvalidation.json()).timeCorrection.status, "approved");
+
+  const dayAfterInvalidation = await fetch(
+    `${baseUrl}/api/v1/work-days/${editableWorkDate}`,
+    { headers: { Cookie: timeCookie } }
+  );
+  const remainingEntries = (await dayAfterInvalidation.json()).workDay.entries;
+  assert.equal(remainingEntries.length, 1);
+  assert.equal(remainingEntries[0].entryType, "clock_in");
+
+  // Das Büro berichtigt die fremde Buchung; der Arbeitstag ist offen, die
+  // Änderung wirkt daher sofort und wird als Bürobuchung geführt.
+  const officeEditChangeId = randomUUID();
+  const officeEditedAt = new Date(new Date(editableClockInAt).valueOf() + 1000).toISOString();
+  const officeEditBody = JSON.stringify({
+    clientChangeId: officeEditChangeId,
+    expectedRecordedAt: editableClockIn.recordedAt,
+    recordedAt: officeEditedAt,
+    workDate: editableWorkDate,
+    reason: "Arbeitsbeginn wurde vom Büro im Integrationstest berichtigt"
+  });
+  const officeEdit = await fetch(
+    `${baseUrl}/api/v1/admin/time-entries/${editableClockIn.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: officeEditBody
+    }
+  );
+  assert.equal(officeEdit.status, 200, await officeEdit.clone().text());
+  const officeEditResult = await officeEdit.json();
+  assert.equal(officeEditResult.idempotent, false);
+  assert.equal(officeEditResult.operation.status, "applied");
+  assert.equal(officeEditResult.operation.action, "edit_entry");
+
+  const repeatedOfficeEdit = await fetch(
+    `${baseUrl}/api/v1/admin/time-entries/${editableClockIn.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: officeEditBody
+    }
+  );
+  assert.equal(repeatedOfficeEdit.status, 200, await repeatedOfficeEdit.clone().text());
+  assert.equal((await repeatedOfficeEdit.json()).idempotent, true);
+
+  const dayAfterOfficeEdit = await fetch(
+    `${baseUrl}/api/v1/work-days/${editableWorkDate}`,
+    { headers: { Cookie: timeCookie } }
+  );
+  const editedEntries = (await dayAfterOfficeEdit.json()).workDay.entries;
+  assert.equal(editedEntries.length, 1);
+  assert.equal(editedEntries[0].recordedAt, officeEditedAt);
+
+  // Eine Bearbeitung gegen einen veralteten Zeitstand wird abgewiesen.
+  const staleOfficeEdit = await fetch(
+    `${baseUrl}/api/v1/admin/time-entries/${editedEntries[0].id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        clientChangeId: randomUUID(),
+        expectedRecordedAt: editableClockIn.recordedAt,
+        recordedAt: officeEditedAt,
+        workDate: editableWorkDate,
+        reason: "Bearbeitung gegen einen veralteten Zeitstand"
+      })
+    }
+  );
+  assert.equal(staleOfficeEdit.status, 409);
+  assert.equal((await staleOfficeEdit.json()).error.code, "stale_time_entry");
+
+  // Ohne firmenweite Planungsrechte bleibt die Bürobearbeitung gesperrt.
+  const forbiddenOfficeEdit = await fetch(
+    `${baseUrl}/api/v1/admin/time-entries/${editedEntries[0].id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: timeCookie },
+      body: JSON.stringify({
+        clientChangeId: randomUUID(),
+        expectedRecordedAt: officeEditedAt,
+        recordedAt: officeEditedAt,
+        workDate: editableWorkDate,
+        reason: "Monteur versucht die Bürobearbeitung zu verwenden"
+      })
+    }
+  );
+  assert.equal(forbiddenOfficeEdit.status, 403);
+
+  // Eine nachgetragene Baustellenbuchung verlangt einen freigegebenen Einsatz.
+  const unassignedAddition = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: timeCookie },
+    body: JSON.stringify({
+      workDate: editableWorkDate,
+      entryType: "site_arrival",
+      recordedAt: officeEditedAt,
+      constructionSiteId: structuredSite.id,
+      reason: "Ankunft auf einer nicht zugeordneten Baustelle nachtragen"
+    })
+  });
+  assert.equal(unassignedAddition.status, 403);
+  assert.equal((await unassignedAddition.json()).error.code, "site_not_assigned");
+
+  // Das Büro liest den Stundenzettel des fremden Mitarbeiters vollständig.
+  const officeWorkDayResponse = await fetch(
+    `${baseUrl}/api/v1/admin/work-days/${editableDay.id}`,
+    { headers: { Cookie: plannerCookie } }
+  );
+  assert.equal(officeWorkDayResponse.status, 200, await officeWorkDayResponse.clone().text());
+  const officeWorkDay = (await officeWorkDayResponse.json()).workDay;
+  assert.equal(officeWorkDay.employeeId, timeEmployee.id);
+  assert.equal(officeWorkDay.entries.length, 1);
+  assert.equal(officeWorkDay.entries[0].recordedAt, officeEditedAt);
+
+  const officeDelete = await fetch(
+    `${baseUrl}/api/v1/admin/time-entries/${editedEntries[0].id}`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        clientChangeId: randomUUID(),
+        expectedRecordedAt: officeEditedAt,
+        reason: "Restlichen Arbeitsblock im Integrationstest vom Büro entfernen"
+      })
+    }
+  );
+  assert.equal(officeDelete.status, 200, await officeDelete.clone().text());
+  const officeDeleteResult = await officeDelete.json();
+  assert.equal(officeDeleteResult.operation.status, "applied");
+  assert.equal(officeDeleteResult.operation.action, "delete_entry");
+
+  const dayAfterOfficeDelete = await fetch(
+    `${baseUrl}/api/v1/work-days/${editableWorkDate}`,
+    { headers: { Cookie: timeCookie } }
+  );
+  assert.equal(dayAfterOfficeDelete.status, 200);
+  assert.equal((await dayAfterOfficeDelete.json()).workDay.entries.length, 0);
+
   const logout = await fetch(`${baseUrl}/api/v1/session`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(logout.status, 200);
   const rejected = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });
