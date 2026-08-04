@@ -4,6 +4,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: Zeitbuchungen auf einer Baustelle, für die der Mitarbeiter
+  nicht eingeplant war, wurden abgewiesen. Live durfte er die Baustelle
+  längst selbst wählen; beim Nachtragen und beim Berichtigen fehlte diese
+  Möglichkeit, und für zurückliegende Tage ließ sich die Baustelle überhaupt
+  nicht mehr wählen. Der fehlende Einsatz wird jetzt überall gleich behandelt
+  und als Auswahl des Mitarbeiters angelegt. Die Planung erkennt am Grund
+  „Spontane Auswahl durch den Mitarbeiter“, dass er nicht von ihr stammt.
+- Fehler behoben: Administration, Geschäftsführung und Projektleitung ließen
+  sich nicht auf Baustellen einplanen; Einsätze waren auf Monteure und
+  Vorarbeiter beschränkt. In kleinen Betrieben arbeiten sie regelmäßig mit.
+  Jeder aktive Mitarbeiter kann jetzt eingeplant und in eine Teamvorlage
+  aufgenommen werden. Die Berichtsverantwortung bleibt dem Vorarbeiter
+  vorbehalten.
 - die Firma wählt, wie mit eigenen Zeitkorrekturen vor der Freigabe des
   Arbeitstags umgegangen wird: `review_required` macht jede Änderung und
   Löschung zum prüfpflichtigen Antrag, `same_day` lässt den laufenden

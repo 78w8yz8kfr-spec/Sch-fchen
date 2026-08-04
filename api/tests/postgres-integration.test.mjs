@@ -68,7 +68,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   let setup, cookie, session, platformCookie;
   let tenantCompany, assignmentDate, employeePersonnelNumber, employeeTemporaryPassword;
   let employeePassword, foremanPersonnelNumber, foremanTemporaryPassword, foremanPassword;
-  let plannerCookie, directorCookie, activatedVde, projectManager;
+  let plannerCookie, directorCookie, activatedVde, projectManager, director;
   let projectManagerCookie, employee, foreman, updatedEditableEmployee;
   let customer, updatedCustomer, project, updatedProject;
   let structuredSite, foremanCookie, clientReportId, mobileReport;
@@ -478,6 +478,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       })
     });
     assert.equal(directorResponse.status, 201, await directorResponse.clone().text());
+    director = (await directorResponse.clone().json()).employee;
 
     const directorLogin = await fetch(`${baseUrl}/api/v1/session`, {
       method: "POST",
@@ -933,6 +934,45 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const foremanAssignment = (await foremanAssignmentResponse.json()).assignment;
     assert.equal(foremanAssignment.reportResponsible, true);
     assert.equal(foremanAssignment.reportResponsibilitySource, "manual");
+
+    // In kleinen Betrieben arbeiten Geschäftsführung und Administration selbst
+    // mit. Sie müssen sich einplanen lassen, ohne dafür zusätzlich die Rolle
+    // Monteur zu bekommen.
+    const directorAssignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: director.id,
+        constructionSiteId: structuredSite.id,
+        workDate: assignmentDate,
+        plannedStartTime: "13:00",
+        comment: "Geschäftsführung arbeitet auf der Baustelle mit"
+      })
+    });
+    assert.equal(
+      directorAssignmentResponse.status,
+      201,
+      await directorAssignmentResponse.clone().text()
+    );
+
+    // Die Berichtsverantwortung bleibt dem Vorarbeiter vorbehalten.
+    const directorReportResponsibility = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: director.id,
+        constructionSiteId: structuredSite.id,
+        workDate: nextBusinessDate(assignmentDate),
+        plannedStartTime: "13:00",
+        comment: "Geschäftsführung soll den Bericht übernehmen",
+        reportResponsible: true
+      })
+    });
+    assert.equal(directorReportResponsibility.status, 400);
+    assert.match(
+      (await directorReportResponsibility.json()).error.message,
+      /Vorarbeiter/
+    );
 
     const foremanLogin = await fetch(`${baseUrl}/api/v1/session`, {
       method: "POST",
@@ -4115,19 +4155,58 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(forbiddenOfficeEdit.status, 403);
 
     // Eine nachgetragene Baustellenbuchung verlangt einen freigegebenen Einsatz.
+    // Eine nachgetragene Baustellenbuchung legt den fehlenden Einsatz selbst an.
+    // Der Monteur stand auf einer Baustelle, für die ihn niemand eingeplant
+    // hatte; live durfte er sie schon immer selbst wählen, beim Nachtragen
+    // wurde die Buchung früher abgewiesen.
+    const unassignedArrivalAt = new Date(new Date(officeEditedAt).valueOf() + 1000).toISOString();
     const unassignedAddition = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: timeCookie },
       body: JSON.stringify({
         workDate: editableWorkDate,
         entryType: "site_arrival",
-        recordedAt: officeEditedAt,
+        recordedAt: unassignedArrivalAt,
         constructionSiteId: structuredSite.id,
         reason: "Ankunft auf einer nicht zugeordneten Baustelle nachtragen"
       })
     });
-    assert.equal(unassignedAddition.status, 403);
-    assert.equal((await unassignedAddition.json()).error.code, "site_not_assigned");
+    assert.equal(unassignedAddition.status, 201, await unassignedAddition.clone().text());
+
+    const createdAssignment = await inspectionPool.query(
+      `SELECT status, last_change_reason, created_by_user_id, comment
+       FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+         AND work_date = $4`,
+      [tenantCompany.id, timeEmployee.id, structuredSite.id, editableWorkDate]
+    );
+    assert.equal(createdAssignment.rowCount, 1, "Der fehlende Einsatz wurde nicht angelegt");
+    assert.equal(createdAssignment.rows[0].status, "released");
+    assert.equal(
+      createdAssignment.rows[0].created_by_user_id,
+      timeEmployee.id,
+      "Der selbst gewählte Einsatz muss dem Mitarbeiter zugeschrieben sein"
+    );
+    assert.match(
+      createdAssignment.rows[0].last_change_reason,
+      /Spontane Auswahl durch den Mitarbeiter/,
+      "Die Planung muss erkennen, dass der Einsatz nicht von ihr stammt"
+    );
+
+    // Eine unbekannte oder abgeschlossene Baustelle bleibt abgewiesen.
+    const unknownSiteAddition = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: timeCookie },
+      body: JSON.stringify({
+        workDate: editableWorkDate,
+        entryType: "site_arrival",
+        recordedAt: unassignedArrivalAt,
+        constructionSiteId: randomUUID(),
+        reason: "Ankunft auf einer unbekannten Baustelle nachtragen"
+      })
+    });
+    assert.equal(unknownSiteAddition.status, 404);
+    assert.equal((await unknownSiteAddition.json()).error.code, "site_not_found");
 
     // Das Büro liest den Stundenzettel des fremden Mitarbeiters vollständig.
     const officeWorkDayResponse = await fetch(

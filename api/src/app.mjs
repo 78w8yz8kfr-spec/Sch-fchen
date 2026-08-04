@@ -969,6 +969,62 @@ async function getTimeTrackingSiteOptions(client, context, date) {
   };
 }
 
+// Stellt sicher, dass der eigene Einsatz auf einer Baustelle besteht, und legt
+// ihn sonst als Auswahl des Mitarbeiters an.
+//
+// Ein Monteur landet regelmäßig auf einer Baustelle, für die ihn niemand
+// eingeplant hat: kurzfristige Umleitung, Notdienst, Aushilfe auf einer
+// fremden Baustelle. Live konnte er die Baustelle deshalb schon immer selbst
+// wählen. Beim Nachtragen und beim Berichtigen fehlte diese Möglichkeit, und
+// die Buchung wurde abgewiesen, obwohl derselbe Vorgang live erlaubt ist.
+// Der Einsatz wird daher überall gleich behandelt und bei Bedarf angelegt.
+//
+// Die Prüfungen bleiben: Die Baustelle muss zur Firma gehören, aktiv sein und
+// für projektgebundene Rollen zugänglich sein.
+async function ensureOwnSiteAssignment(client, context, workDate, constructionSiteId, comment) {
+  const existing = await client.query(
+    `SELECT id, report_responsible FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+       AND work_date = $4 AND status IN ('released', 'completed')
+     ORDER BY report_responsible DESC, sequence_number`,
+    [context.companyId, context.userId, constructionSiteId, workDate]
+  );
+  if (existing.rowCount > 0) return existing.rows[0];
+
+  const roles = await activeRoleKeys(client, context);
+  if (hasProjectScopedAccess(roles)) {
+    await requireConstructionSiteAccess(client, context, constructionSiteId, roles);
+  }
+  const site = await client.query(
+    `SELECT id, name FROM construction_sites
+     WHERE company_id = $1 AND id = $2
+       AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId, constructionSiteId]
+  );
+  if (site.rowCount !== 1) {
+    throw new InputError(
+      "Die Baustelle wurde nicht gefunden oder ist nicht mehr offen.",
+      404,
+      "site_not_found"
+    );
+  }
+  await createEmployeeSelectedAssignment(
+    client,
+    context,
+    workDate,
+    constructionSiteId,
+    `${comment} · ${site.rows[0].name}`
+  );
+  const created = await client.query(
+    `SELECT id, report_responsible FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+       AND work_date = $4 AND status IN ('released', 'completed')
+     ORDER BY report_responsible DESC, sequence_number`,
+    [context.companyId, context.userId, constructionSiteId, workDate]
+  );
+  return created.rows[0];
+}
+
 function requireToday(workDate, timeZone) {
   const today = localDate(new Date().toISOString(), timeZone);
   if (workDate !== today) {
@@ -7563,30 +7619,22 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
   }
 }
 
+// Eine Teamvorlage darf jeden aktiven Mitarbeiter enthalten, weil auch jeder
+// aktive Mitarbeiter einzeln eingeplant werden kann. Alles andere wäre für die
+// Planung nicht nachvollziehbar: derselbe Mensch wäre einzeln planbar, im Team
+// aber nicht.
 async function assertPlanningTeamEmployees(client, context, memberIds) {
   const result = await client.query(
     `SELECT account.id
      FROM users AS account
      WHERE account.company_id = $1
        AND account.id = ANY($2::UUID[])
-       AND account.status = 'active'
-       AND EXISTS (
-         SELECT 1
-         FROM user_roles AS assignment
-         JOIN roles AS role
-           ON role.company_id = assignment.company_id
-          AND role.id = assignment.role_id
-         WHERE assignment.company_id = account.company_id
-           AND assignment.user_id = account.id
-           AND assignment.revoked_at IS NULL
-           AND role.status = 'active'
-           AND role.role_key IN ('installer', 'foreman')
-       )`,
+       AND account.status = 'active'`,
     [context.companyId, memberIds]
   );
   if (result.rowCount !== memberIds.length) {
     throw new InputError(
-      "Teamvorlagen dürfen nur aktive Monteure und Vorarbeiter enthalten.",
+      "Teamvorlagen dürfen nur aktive Mitarbeiter der eigenen Firma enthalten.",
       409,
       "planning_team_member_conflict"
     );
@@ -7904,19 +7952,7 @@ async function createAssignment(client, context, input) {
   await assertNoApprovedFullDayAbsence(client, context, input.employeeId, input.workDate);
   const [employee, site] = await Promise.all([
     client.query(
-      `SELECT account.is_foreman,
-              EXISTS (
-                SELECT 1
-                FROM user_roles AS assignment
-                JOIN roles AS role
-                  ON role.company_id = assignment.company_id
-                 AND role.id = assignment.role_id
-                WHERE assignment.company_id = account.company_id
-                  AND assignment.user_id = account.id
-                  AND assignment.revoked_at IS NULL
-                  AND role.status = 'active'
-                  AND role.role_key IN ('installer', 'foreman')
-              ) AS is_field_employee
+      `SELECT account.is_foreman
        FROM users AS account
        WHERE account.company_id = $1
          AND account.id = $2
@@ -7930,14 +7966,12 @@ async function createAssignment(client, context, input) {
       [context.companyId, input.constructionSiteId]
     )
   ]);
+  // Jeder aktive Mitarbeiter kann auf eine Baustelle eingeplant werden. In
+  // kleinen Betrieben arbeiten Administration, Geschäftsführung und
+  // Projektleitung regelmäßig selbst mit; die frühere Beschränkung auf Monteure
+  // und Vorarbeiter sperrte sie ohne Ausweg aus. Wer eingeplant wird,
+  // entscheidet die Planung, nicht die Rollenzuordnung.
   if (employee.rowCount !== 1) throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
-  if (!employee.rows[0].is_field_employee) {
-    throw new InputError(
-      "Einsätze können nur Monteuren oder Vorarbeitern zugewiesen werden.",
-      409,
-      "assignment_employee_role_conflict"
-    );
-  }
   if (site.rowCount !== 1) throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
   if (input.reportResponsible && !employee.rows[0].is_foreman) {
     throw new InputError("Nur ein Mitarbeiter mit der Rolle Vorarbeiter kann den Baustellenbericht übernehmen.");
@@ -8441,17 +8475,13 @@ async function insertTimeEntry(client, context, input, timeZone) {
 
   let matchedAssignment = null;
   if (input.constructionSiteId) {
-    const assignment = await client.query(
-      `SELECT id, report_responsible FROM site_assignments
-       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released', 'completed')
-       ORDER BY report_responsible DESC, sequence_number`,
-      [context.companyId, context.userId, input.constructionSiteId, workDate]
+    matchedAssignment = await ensureOwnSiteAssignment(
+      client,
+      context,
+      workDate,
+      input.constructionSiteId,
+      "Selbst gewählt bei der Buchung"
     );
-    if (assignment.rowCount === 0) {
-      throw new InputError("Die Baustelle ist für diesen Arbeitstag nicht freigegeben.", 403, "site_not_assigned");
-    }
-    matchedAssignment = assignment.rows[0];
   }
 
   if (input.entryType === "site_departure" && matchedAssignment?.report_responsible) {
@@ -8859,16 +8889,18 @@ async function ensureEditableSite(client, context, userId, workDate, siteId, adm
   if (site.rowCount !== 1) {
     throw new InputError("Die Zielbaustelle wurde nicht gefunden oder ist nicht aktiv.", 404, "site_not_found");
   }
-  if (!administrator) {
-    const assignment = await client.query(
-      `SELECT 1 FROM site_assignments
-       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released','completed')`,
-      [context.companyId, userId, siteId, workDate]
+  // Beim Berichtigen der eigenen Zeiten gilt dieselbe Regel wie beim Buchen:
+  // Fehlt der Einsatz auf der Zielbaustelle, wird er als Auswahl des
+  // Mitarbeiters angelegt statt die Korrektur abzuweisen. Das Büro bearbeitet
+  // fremde Zeiten ohnehin ohne diese Einschränkung.
+  if (!administrator && userId === context.userId) {
+    await ensureOwnSiteAssignment(
+      client,
+      context,
+      workDate,
+      siteId,
+      "Selbst gewählt beim Berichtigen"
     );
-    if (assignment.rowCount === 0) {
-      throw new InputError("Die Zielbaustelle ist für diesen Arbeitstag nicht freigegeben.", 403, "site_not_assigned");
-    }
   }
 }
 
@@ -9474,21 +9506,13 @@ async function createTimeEntryAddition(client, context, input, timeZone) {
   const day = dayResult.rows[0];
 
   if (input.constructionSiteId) {
-    const assignment = await client.query(
-      `SELECT 1
-       FROM site_assignments
-       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released', 'completed')
-       LIMIT 1`,
-      [context.companyId, context.userId, input.constructionSiteId, input.workDate]
+    await ensureOwnSiteAssignment(
+      client,
+      context,
+      input.workDate,
+      input.constructionSiteId,
+      "Selbst gewählt beim Nachtragen"
     );
-    if (assignment.rowCount !== 1) {
-      throw new InputError(
-        "Die Baustelle war diesem Arbeitstag nicht zugeordnet.",
-        403,
-        "site_not_assigned"
-      );
-    }
   }
 
   await client.query(
