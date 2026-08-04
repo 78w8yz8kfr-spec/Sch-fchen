@@ -19,6 +19,13 @@ import {
   syncErrorMessage,
   timeEntriesMayFollow
 } from "./core/sync-queue.js?v=0.42.0";
+import {
+  canAdministerModules as canAdministerModulesFor,
+  canPlan as canPlanFor,
+  employeeRoleLabel,
+  isProjectScopedSession as isProjectScopedSessionFor,
+  plannableEmployees
+} from "./core/permissions.js?v=0.42.0";
 
 (() => {
   const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
@@ -1168,38 +1175,15 @@ import {
   }
 
   function canPlan() {
-    const planningRoles = new Set([
-      "admin",
-      "managing_director",
-      "dispatch_office",
-      "office",
-      "planner",
-      "project_manager",
-      "executive_assistant"
-    ]);
-    return !demoMode && Boolean(session?.user.roles?.some((role) => planningRoles.has(role)));
+    return canPlanFor(session, { demoMode });
   }
 
   function isProjectScopedSession() {
-    const roles = session?.user?.roles || [];
-    const fullPlanningRoles = new Set([
-      "admin",
-      "managing_director",
-      "dispatch_office",
-      "office",
-      "planner",
-      "executive_assistant"
-    ]);
-    return roles.includes("project_manager")
-      && !roles.some((role) => fullPlanningRoles.has(role));
+    return isProjectScopedSessionFor(session);
   }
 
   function canAdministerModules() {
-    return !demoMode && Boolean(
-      session?.user.roles?.some((role) => (
-        role === "admin" || role === "managing_director"
-      ))
-    );
+    return canAdministerModulesFor(session, { demoMode });
   }
 
   function dateFromIso(date) {
@@ -3532,9 +3516,7 @@ import {
   }
 
   function fieldPlanningEmployees() {
-    return (adminState?.employees || []).filter((employee) => (
-      employee.roles.some((role) => ["installer", "foreman"].includes(role))
-    ));
+    return plannableEmployees(adminState?.employees);
   }
 
   function populatePlanningFilter(select, items, allLabel, label) {
@@ -3558,7 +3540,7 @@ import {
     const employees = fieldPlanningEmployees();
     if (employees.length === 0) {
       const empty = document.createElement("p");
-      empty.textContent = "Noch keine Monteure oder Vorarbeiter angelegt.";
+      empty.textContent = "Noch keine Mitarbeiter angelegt.";
       container.append(empty);
       return;
     }
@@ -4061,7 +4043,7 @@ import {
       row.className = "planning-board-row";
       identity.className = "planning-board-employee";
       name.textContent = `${employee.firstName} ${employee.lastName}`;
-      role.textContent = employee.roles.includes("foreman") ? "Vorarbeiter" : "Monteur";
+      role.textContent = employeeRoleLabel(employee.roles);
       identity.append(name, role);
       row.append(identity);
       let employeeCount = 0;
@@ -4625,9 +4607,7 @@ import {
 
   function renderDispatchSummary() {
     const date = adminState.date;
-    const fieldEmployees = adminState.employees.filter((employee) => (
-      employee.roles.some((role) => ["installer", "foreman"].includes(role))
-    ));
+    const fieldEmployees = fieldPlanningEmployees();
     const dayAssignments = adminState.assignments.filter((assignment) => assignment.workDate === date);
     const plannedEmployeeIds = new Set(dayAssignments.map((assignment) => assignment.employeeId));
     const dayAbsences = (adminState.absences || []).filter((absence) => (
@@ -4675,9 +4655,9 @@ import {
         (employee) => `${employee.firstName} ${employee.lastName}`
       ).join(", ")}`);
     } else if (fieldEmployees.length) {
-      notes.push("Alle Monteure und Vorarbeiter sind eingeplant");
+      notes.push("Alle Mitarbeiter sind eingeplant");
     } else {
-      notes.push("Noch keine Monteure oder Vorarbeiter angelegt");
+      notes.push("Noch keine Mitarbeiter angelegt");
     }
     if (reviews.length) {
       notes.push(`Zeit prüfen: ${reviews.map((day) => day.employeeName).join(", ")}`);
@@ -5014,14 +4994,6 @@ import {
     } finally {
       submit.disabled = false;
     }
-  }
-
-  function employeeRoleLabel(roles = []) {
-    if (roles.includes("foreman")) return "Vorarbeiter";
-    if (roles.some((role) => ["admin", "managing_director", "dispatch_office", "project_manager"].includes(role))) {
-      return "Planung";
-    }
-    return "Monteur";
   }
 
   function appendEmployeeSiteEmpty(list, message) {

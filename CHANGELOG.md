@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: Administration, Geschäftsführung und Projektleitung ließen
+  sich weiterhin nicht einplanen, obwohl die Schnittstelle sie längst zulässt.
+  Die Plantafel, die Einzelzuweisung und die Teamvorlagen zeigten nur Monteure
+  und Vorarbeiter, sodass die übrigen Rollen gar nicht erst zur Auswahl standen.
+  Jeder aktive Mitarbeiter steht jetzt in allen drei Listen. Die Tageslage zählt
+  dieselbe Menge.
+- auf der Plantafel stand hinter jedem Namen entweder „Vorarbeiter“ oder
+  „Monteur“; eine Geschäftsführerin erschien damit als Monteurin. Die
+  Bezeichnung stammt jetzt überall aus derselben Stelle und lautet für
+  planende Rollen „Planung“.
+- die Rollenlogik der Oberfläche liegt in `frontend/core/permissions.js` und
+  ist ohne Browser prüfbar. Die Liste der Planungsrollen stand vorher zweimal
+  fast gleich in `app.js`; die Fassung für die eingeschränkte Projektsicht
+  leitet sich nun aus der vollen Liste ab und kann nicht mehr abweichen.
+
 - Fehler behoben: ein offline geschriebener Bericht ging verloren, wenn die
   Sitzung während der Übertragung ablief. Der Bericht wurde dauerhaft als
   fehlerhaft vermerkt und nach dem erneuten Anmelden nie wieder versucht. Bei

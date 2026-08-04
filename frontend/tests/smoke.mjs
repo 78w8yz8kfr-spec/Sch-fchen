@@ -595,6 +595,16 @@ assert.match(workTimeCore, /export function calculateTimes\(events, now = new Da
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
 // greift. Die Pruefung gilt fuer alle Kernmodule, nicht nur die bekannten.
+// Die Rollenlisten stehen nur noch im Kernmodul. Vorher lagen zwei fast
+// gleiche Fassungen in app.js, die sich beim Ergaenzen einer Rolle
+// auseinanderentwickeln konnten.
+assert.doesNotMatch(app, /const planningRoles = new Set/);
+assert.doesNotMatch(app, /const fullPlanningRoles = new Set/);
+assert.doesNotMatch(app, /function employeeRoleLabel/);
+// Die Plantafel bietet jeden aktiven Mitarbeiter an. Sie war auf Monteure und
+// Vorarbeiter gefiltert, obwohl die Schnittstelle alle Rollen einplant.
+assert.doesNotMatch(app, /\["installer", "foreman"\]\.includes/);
+assert.match(app, /return plannableEmployees\(adminState\?\.employees\)/);
 const eingebundeneKerne = [...app.matchAll(/from "(\.\/core\/[^"]+)"/g)].map((treffer) => treffer[1]);
 assert.ok(eingebundeneKerne.length >= 2, "app.js bindet die Kernmodule ein");
 for (const modul of eingebundeneKerne) {
