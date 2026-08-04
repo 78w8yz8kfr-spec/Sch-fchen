@@ -811,6 +811,13 @@ async function getAssignments(client, context, date) {
        assignment.comment,
        assignment.report_responsible,
        assignment.report_responsibility_source,
+       -- Die Berichtsverantwortung gehoert dem Menschen fuer diese Baustelle an
+       -- diesem Tag, nicht einem einzelnen Einsatzeintrag. Wer nach der Mittags-
+       -- pause zurueckkehrt, bekommt einen zweiten Eintrag; ohne diese
+       -- Zusammenfassung verlor er dabei den Zugang zum Bericht.
+       BOOL_OR(assignment.report_responsible) OVER (
+         PARTITION BY assignment.construction_site_id
+       ) AS responsible_for_site,
        report.id AS mobile_report_id,
        report.report_number AS mobile_report_number,
        report.status AS mobile_report_status,
@@ -851,7 +858,7 @@ async function getAssignments(client, context, date) {
     plannedDurationMinutes: row.planned_duration_minutes,
     status: row.status,
     comment: row.comment,
-    reportResponsible: row.report_responsible,
+    reportResponsible: row.responsible_for_site,
     reportResponsibilitySource: row.report_responsibility_source,
     mobileReport: row.mobile_report_id ? {
       id: row.mobile_report_id,
@@ -7553,7 +7560,7 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
     [`assignment-report:${context.companyId}:${constructionSiteId}:${workDate}`]
   );
   const result = await client.query(
-    `SELECT assignment.id, assignment.report_responsible,
+    `SELECT assignment.id, assignment.user_id, assignment.report_responsible,
             assignment.report_responsibility_source,
             EXISTS (
               SELECT 1
@@ -7575,10 +7582,20 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
     assignment.report_responsible
     && assignment.report_responsibility_source === "manual"
   ));
+  // Entscheidend ist, wie viele Menschen auf der Baustelle sind, nicht wie
+  // viele Einsatzzeilen es gibt. Wer nach einer Unterbrechung zurueckkehrt,
+  // bekommt einen zweiten Eintrag und galt dadurch faelschlich als Team: die
+  // automatische Vorarbeiterfunktion wurde ihm wieder entzogen, obwohl er
+  // weiterhin allein arbeitete.
+  const menschenAufDerBaustelle = new Set(
+    assignmentsForSite.map((assignment) => assignment.user_id)
+  );
 
-  if (assignmentsForSite.length === 1 && !manualResponsible) {
-    const [assignment] = assignmentsForSite;
-    if (!assignment.report_responsible && !assignment.has_mobile_report) {
+  if (menschenAufDerBaustelle.size === 1 && !manualResponsible) {
+    const traegt = assignmentsForSite.some((assignment) => assignment.report_responsible);
+    const hatBericht = assignmentsForSite.some((assignment) => assignment.has_mobile_report);
+    if (!traegt && !hatBericht) {
+      const [assignment] = assignmentsForSite;
       await client.query(
         `UPDATE site_assignments
          SET report_responsible = TRUE,
@@ -7592,7 +7609,7 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
     return;
   }
 
-  if (assignmentsForSite.length !== 1) {
+  if (menschenAufDerBaustelle.size !== 1) {
     await client.query(
       `UPDATE site_assignments AS assignment
        SET report_responsible = FALSE,

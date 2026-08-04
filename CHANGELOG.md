@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: wer nach einer Unterbrechung auf dieselbe Baustelle
+  zurückkehrte, verlor die Berichtsverantwortung. Die automatische
+  Vorarbeiterfunktion zählte Einsatzzeilen statt Menschen: die Rückkehr legt
+  einen zweiten Eintrag an, und der galt als Teambelegung. Der allein
+  Arbeitende wurde dadurch zum Monteur zurückgestuft, obwohl niemand
+  hinzugekommen war. Gezählt werden jetzt die Menschen auf der Baustelle.
+- die Berichtsverantwortung gilt für den Mitarbeiter auf dieser Baustelle an
+  diesem Tag, nicht für einen einzelnen Einsatzeintrag. Bei mehreren Fahrten
+  zur selben Baustelle trug nur die erste die Verantwortung, sodass der
+  Zugang zum Bericht nach der Rückkehr verschwand.
+
 - Fehler behoben: die Baustellenakte ließ sich vom Einsatz aus nicht öffnen. Der
   Knopf war sichtbar, meldete aber „Für heute ist keine Baustelle freigegeben“,
   obwohl ein Einsatz vorlag. Der Klick wurde unmittelbar an die Funktion
