@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- der Service Worker wird im Betrieb geprüft statt im Quelltext: zehn Tests
+  fahren die Ereignisbehandlungen aus und belegen unter anderem, dass offline
+  ausschließlich der Dokumentencache des eigenen Kontos gelesen wird und dass
+  Offline-Dokumente ein App-Update überstehen
+- die Zeitberechnung des Stundenzettels liegt jetzt in `frontend/core/work-time.js`
+  und wird von der App importiert; damit ist die Rechnung unabhängig von der
+  Oberfläche prüfbar. `frontend/index.html` lädt `app.js` als Modul, der
+  Service Worker legt den Kern mit in der App-Shell ab
+- die Mindestpause bleibt unverändert bei 30 Minuten ab 3,5 Stunden und
+  60 Minuten ab 6 Stunden Bruttozeit; sie ist jetzt an sieben Beispielen
+  festgeschrieben, ebenso die Deckelung der Fahrzeit auf die Arbeitszeit
 - Fehler behoben: Eine Vertragszuweisung (`POST /api/v1/platform/companies/:id/contracts`)
   schlug immer mit einem unbehandelten Serverfehler fehl, sobald kein
   Vertragsende übermittelt wurde. Ursache war ein einzelner Datenbankparameter,

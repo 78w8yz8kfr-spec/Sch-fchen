@@ -171,6 +171,9 @@ Technischer Stand: V0.42.0
   eingeschränkten Datenbankrollen `schaefchen_api` und
   `schaefchen_platform_api` geprüft, weil die Policies für den
   Tabelleneigentümer bewusst nicht erzwungen werden
+- der Service Worker und die Zeitberechnung der PWA sind zu 100 Prozent durch
+  ausgeführte Tests abgedeckt; die Zeitberechnung liegt als gemeinsamer Kern in
+  `frontend/core/work-time.js` und wird von `app.js` als Modul importiert
 - die Plattformverwaltung ist im PostgreSQL-Integrationstest breit abgedeckt
   (Firmen, Module, Tarife, Verträge, Plattformadministratoren, Firmenkonten,
   Registrierungen, Support, Systemstatus, Fehlergruppierung, Versionen,
