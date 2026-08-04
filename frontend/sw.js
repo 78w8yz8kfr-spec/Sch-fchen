@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./styles.css?v=0.42.0",
   "./app.js?v=0.42.0",
   "./core/work-time.js?v=0.42.0",
+  "./core/sync-queue.js?v=0.42.0",
   "./version.js?v=0.42.0",
   "./platform-admin.html",
   "./platform-admin.css?v=0.42.0",

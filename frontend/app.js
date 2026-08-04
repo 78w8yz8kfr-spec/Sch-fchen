@@ -11,6 +11,14 @@ import {
   formatSignedMinutes,
   localDateKey
 } from "./core/work-time.js?v=0.42.0";
+import {
+  buildReportPayload,
+  buildTimeEntryPayload,
+  classifySyncError,
+  selectPendingWork,
+  syncErrorMessage,
+  timeEntriesMayFollow
+} from "./core/sync-queue.js?v=0.42.0";
 
 (() => {
   const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
@@ -6105,8 +6113,7 @@ import {
       syncRequested = true;
       return;
     }
-    const pendingReports = (state.reports || []).filter((report) => report.pendingSync && !report.syncError);
-    const pending = state.events.filter((entry) => entry.pendingSync && !entry.syncError);
+    const { reports: pendingReports, entries: pending } = selectPendingWork(state);
     if (pendingReports.length === 0 && pending.length === 0) return;
     syncing = true;
     updateConnectionState();
@@ -6116,23 +6123,7 @@ import {
       try {
         const body = await requestJson("./api/v1/site-reports", {
           method: "POST",
-          body: JSON.stringify({
-            clientReportId: report.clientReportId,
-            constructionSiteId: report.constructionSiteId,
-            reportType: report.reportType,
-            workDate: report.workDate,
-            sourceMode: "digital",
-            summary: report.summary,
-            details: report.details,
-            workPerformed: report.workPerformed || report.details || report.summary,
-            obstructions: report.obstructions || null,
-            openItems: report.openItems || null,
-            weather: report.weather || null,
-            materialsAndEquipment: report.materialsAndEquipment || null,
-            agreements: report.agreements || null,
-            incidents: report.incidents || null,
-            personnel: report.personnel
-          })
+          body: JSON.stringify(buildReportPayload(report))
         });
         report.id = body.siteReport.id;
         report.number = body.siteReport.number;
@@ -6145,9 +6136,10 @@ import {
           status: report.status
         };
       } catch (error) {
-        if (!error.network) report.syncError = error.message;
-        if (error.status === 401) showLogin();
-        showToast(error.network ? "Bericht wartet auf Verbindung." : error.message);
+        const behandlung = classifySyncError(error);
+        if (behandlung.vermerken) report.syncError = error.message;
+        if (behandlung.anmeldenNoetig) showLogin();
+        showToast(syncErrorMessage(behandlung.grund, error.message));
         reportSyncFailed = true;
         break;
       }
@@ -6155,30 +6147,20 @@ import {
       render();
     }
 
-    const reportStillPending = (state.reports || []).some((report) => report.pendingSync);
-    for (const entry of reportSyncFailed || reportStillPending ? [] : pending) {
+    const zeitenDuerfenFolgen = !reportSyncFailed && timeEntriesMayFollow(state.reports);
+    for (const entry of zeitenDuerfenFolgen ? pending : []) {
       try {
         const body = await requestJson("./api/v1/time-entries", {
           method: "POST",
-          body: JSON.stringify({
-            clientEntryId: entry.clientEntryId,
-            entryType: entry.type,
-            recordedAt: entry.recordedAt,
-            clientCreatedAt: entry.clientCreatedAt,
-            ...(entry.constructionSiteId ? { constructionSiteId: entry.constructionSiteId } : {})
-          })
+          body: JSON.stringify(buildTimeEntryPayload(entry))
         });
         entry.id = body.timeEntry.id;
         entry.pendingSync = false;
       } catch (error) {
-        if (error.network) break;
-        if (error.status === 401) {
-          showLogin();
-          showToast("Bitte erneut anmelden.");
-          break;
-        }
-        entry.syncError = error.message;
-        showToast(error.message);
+        const behandlung = classifySyncError(error);
+        if (behandlung.vermerken) entry.syncError = error.message;
+        if (behandlung.anmeldenNoetig) showLogin();
+        showToast(syncErrorMessage(behandlung.grund, error.message));
         break;
       }
       saveState();

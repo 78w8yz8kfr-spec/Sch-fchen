@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: ein offline geschriebener Bericht ging verloren, wenn die
+  Sitzung während der Übertragung ablief. Der Bericht wurde dauerhaft als
+  fehlerhaft vermerkt und nach dem erneuten Anmelden nie wieder versucht. Bei
+  Zeitbuchungen war derselbe Fall bereits richtig behandelt. Eine abgelaufene
+  Sitzung, ein Ausfall des Servers und eine fehlende Verbindung führen jetzt
+  einheitlich zu einem neuen Versuch; nur eine inhaltliche Zurückweisung des
+  Servers hält den Datensatz an, weil dann ein Mensch hinsehen muss.
+- die Regeln der Offline-Warteschlange liegen in `frontend/core/sync-queue.js`
+  und sind ohne Browser prüfbar. Welcher Fehler wie behandelt wird, stand
+  vorher zweimal in `app.js` und wich zwischen Berichten und Zeitbuchungen
+  voneinander ab.
+
 - Fehler behoben: die Anpassung der Wochenansicht an schmale Geräte blieb
   wirkungslos. Die Medienabfrage traf zu, wurde aber von einer weiter unten
   stehenden Regel gleicher Spezifität wieder aufgehoben; der Kopfbereich stand

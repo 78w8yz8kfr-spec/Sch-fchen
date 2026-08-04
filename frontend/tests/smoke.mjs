@@ -592,6 +592,18 @@ assert.ok(worker.includes('"./version.js?v=0.42.0"'));
 assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.0"><\/script>/);
 assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.0";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
+// Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
+// Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
+// greift. Die Pruefung gilt fuer alle Kernmodule, nicht nur die bekannten.
+const eingebundeneKerne = [...app.matchAll(/from "(\.\/core\/[^"]+)"/g)].map((treffer) => treffer[1]);
+assert.ok(eingebundeneKerne.length >= 2, "app.js bindet die Kernmodule ein");
+for (const modul of eingebundeneKerne) {
+  assert.ok(
+    worker.includes(`"${modul}"`),
+    `${modul} fehlt im App-Shell-Cache des Service Workers`
+  );
+  assert.match(modul, /\?v=0\.42\.0$/, `${modul} braucht dieselbe Fassungsnummer`);
+}
 assert.doesNotMatch(
   app,
   /^\s{2}function (calculateTimes|formatMinutes|durationMinutes|localDateKey)\(/m,
