@@ -595,6 +595,12 @@ assert.match(workTimeCore, /export function calculateTimes\(events, now = new Da
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
 // greift. Die Pruefung gilt fuer alle Kernmodule, nicht nur die bekannten.
+// Der Zustandsspeicher liegt im Kernmodul. Die Schluessel und die Regel fuer
+// den Tageswechsel duerfen nicht zusaetzlich in app.js stehen.
+assert.doesNotMatch(app, /const DEMO_STORAGE_KEY = "/);
+assert.doesNotMatch(app, /const ONLINE_STORAGE_KEY = "/);
+assert.doesNotMatch(app, /saved\.workDate === localDateKey\(\)/);
+assert.match(app, /restoreState\(saved, \{ today: localDateKey\(\), demoMode \}\)/);
 // Die Rollenlisten stehen nur noch im Kernmodul. Vorher lagen zwei fast
 // gleiche Fassungen in app.js, die sich beim Ergaenzen einer Rolle
 // auseinanderentwickeln konnten.

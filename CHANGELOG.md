@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben (Datenverlust): offline erfasste Buchungen und Berichte gingen
+  beim Tageswechsel verloren. Der gespeicherte Stand wurde nur wiederhergestellt,
+  wenn er vom selben Kalendertag stammte; wer abends ohne Verbindung buchte und
+  die App am nächsten Morgen öffnete, verlor die Arbeit des Vortags
+  stillschweigend, und der nächste Speichervorgang überschrieb sie endgültig.
+  Der Arbeitstag beginnt jetzt neu, nimmt aber alles mit, was noch nicht beim
+  Server ist. Der Mitarbeiter wird darauf hingewiesen. Die Kennung des
+  Mitarbeiters wird dabei zwingend mitgeführt, damit übernommene Arbeit nicht
+  einem anderen Konto zugeordnet werden kann.
+- der Zustandsspeicher liegt in `frontend/core/state-store.js` und ist ohne
+  Browser prüfbar.
+
 - Fehler behoben: Administration, Geschäftsführung und Projektleitung ließen
   sich weiterhin nicht einplanen, obwohl die Schnittstelle sie längst zulässt.
   Die Plantafel, die Einzelzuweisung und die Teamvorlagen zeigten nur Monteure

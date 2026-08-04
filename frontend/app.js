@@ -26,10 +26,16 @@ import {
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
 } from "./core/permissions.js?v=0.42.0";
+import {
+  ONLINE_STORAGE_KEY,
+  carriedOverMessage,
+  initialState as freshState,
+  restoreState,
+  serializeState,
+  storageKey
+} from "./core/state-store.js?v=0.42.0";
 
 (() => {
-  const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
-  const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
   const DOCUMENT_CACHE_VERSION = "v42";
   const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
   const queryMode = new URLSearchParams(window.location.search).get("mode");
@@ -831,6 +837,9 @@ import {
   let editingTimeAccountId = null;
   let speechRecognition = null;
   let cachedUserId = null;
+  // Hinweis auf Arbeit, die aus einem frueheren Tag mitgenommen wurde. Er wird
+  // erst gezeigt, wenn die Oberflaeche steht.
+  let pendingCarryOverNotice = null;
   let employeeSiteState = null;
   let employeeSiteSection = "overview";
   let siteDashboardSection = "overview";
@@ -907,38 +916,21 @@ import {
   );
 
   function initialState() {
-    return {
-      version: 1,
-      workDate: localDateKey(),
-      workDayStatus: null,
-      events: [],
-      reports: [],
-      reportDraft: null,
-      siteWorkspace: null
-    };
+    return freshState(localDateKey());
   }
 
   function loadState() {
-    const key = demoMode ? DEMO_STORAGE_KEY : ONLINE_STORAGE_KEY;
     try {
-      const saved = JSON.parse(window.localStorage.getItem(key));
-      if (saved?.version === 1 && saved.workDate === localDateKey() && Array.isArray(saved.events)) {
-        if (!demoMode) {
-          if (Array.isArray(saved.assignments)) assignments = saved.assignments;
-          cachedUserId = typeof saved.userId === "string" ? saved.userId : null;
-        }
-        return {
-          version: 1,
-          workDate: saved.workDate,
-          workDayStatus: saved.workDayStatus || null,
-          events: saved.events,
-          reports: Array.isArray(saved.reports) ? saved.reports : [],
-          reportDraft: saved.reportDraft && typeof saved.reportDraft === "object"
-            ? saved.reportDraft
-            : null,
-          siteWorkspace: saved.siteWorkspace || null
-        };
+      const saved = JSON.parse(window.localStorage.getItem(storageKey(demoMode)));
+      const wiederhergestellt = restoreState(saved, { today: localDateKey(), demoMode });
+      if (wiederhergestellt.assignments) assignments = wiederhergestellt.assignments;
+      if (wiederhergestellt.userId) cachedUserId = wiederhergestellt.userId;
+      // Arbeit aus einem frueheren Tag kam mit. Der Mitarbeiter muss erfahren,
+      // dass sie noch aussteht, sonst haelt er sie fuer laengst uebertragen.
+      if (wiederhergestellt.carriedOver) {
+        pendingCarryOverNotice = carriedOverMessage(wiederhergestellt.carriedOver);
       }
+      return wiederhergestellt.state;
     } catch {
       // Ein blockierter Speicher darf die App nicht unbenutzbar machen.
     }
@@ -946,13 +938,12 @@ import {
   }
 
   function saveState() {
-    const key = demoMode ? DEMO_STORAGE_KEY : ONLINE_STORAGE_KEY;
     try {
-      window.localStorage.setItem(key, JSON.stringify({
-        ...state,
-        assignments: demoMode ? undefined : assignments,
-        userId: demoMode ? undefined : (session?.user.id || cachedUserId)
-      }));
+      window.localStorage.setItem(storageKey(demoMode), JSON.stringify(serializeState(state, {
+        assignments,
+        userId: session?.user.id || cachedUserId,
+        demoMode
+      })));
     } catch {
       showToast("Lokaler Speicher ist in diesem Browser blockiert.");
     }
@@ -10061,6 +10052,10 @@ import {
   configureModeCopy();
   updateConnectionState();
   render();
+  if (pendingCarryOverNotice) {
+    showToast(pendingCarryOverNotice);
+    pendingCarryOverNotice = null;
+  }
   window.setInterval(renderTimes, 15000);
   window.addEventListener("online", () => {
     updateConnectionState();
