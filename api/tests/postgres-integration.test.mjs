@@ -45,12 +45,21 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     }
   };
   const apiPool = createPool(config.database);
+  // Getrennter Lesezugang mit Eigentümerrechten. Die API-Rolle greift nur
+  // innerhalb ihrer Transaktionen mit Mandantenkontext; für die Prüfung des
+  // Protokolls wird dagegen unmittelbar in die Tabellen geschaut.
+  const inspectionPool = createPool({
+    ...config.database,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
   const server = createServer(createApp({ pool: apiPool, config, logger: { error() {} } }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => {
     await new Promise((resolve) => server.close(resolve));
     await apiPool.end();
+    await inspectionPool.end();
   });
 
   // Bindungen, die spätere Abschnitte weiterverwenden. Die Abschnitte
@@ -4003,6 +4012,29 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(officeEditResult.idempotent, false);
     assert.equal(officeEditResult.operation.status, "applied");
     assert.equal(officeEditResult.operation.action, "edit_entry");
+
+    // Eine ohne Prüfung wirksame Korrektur trägt keinen Prüfer. Das Protokoll
+    // darf keine Freigabe behaupten, die es nicht gegeben hat.
+    const unreviewed = await inspectionPool.query(
+      `SELECT operation.status, operation.applied_without_review,
+              operation.reviewed_by_user_id,
+              entry.applied_without_review AS entry_applied_without_review,
+              entry.reviewed_by_user_id AS entry_reviewed_by_user_id,
+              entry.reviewed_at AS entry_reviewed_at
+       FROM time_change_operations AS operation
+       JOIN time_change_items AS item ON item.operation_id = operation.id
+       JOIN time_entries AS entry ON entry.id = item.replacement_entry_id
+       WHERE operation.id = $1`,
+      [officeEditResult.operation.id]
+    );
+    assert.ok(unreviewed.rowCount >= 1);
+    for (const row of unreviewed.rows) {
+      assert.equal(row.applied_without_review, true);
+      assert.equal(row.reviewed_by_user_id, null);
+      assert.equal(row.entry_applied_without_review, true);
+      assert.equal(row.entry_reviewed_by_user_id, null, "Der Bearbeiter darf nicht als Prüfer erscheinen");
+      assert.ok(row.entry_reviewed_at, "Der Zeitpunkt der Wirksamkeit fehlt");
+    }
 
     const repeatedOfficeEdit = await fetch(
       `${baseUrl}/api/v1/admin/time-entries/${editableClockIn.id}`,

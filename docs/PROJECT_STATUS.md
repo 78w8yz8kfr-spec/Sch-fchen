@@ -46,6 +46,10 @@ Technischer Stand: V0.42.0
   parallele Änderungen
 - kontrollierter Korrekturantrag statt stiller Änderung bei freigegebenen oder
   abgerechneten Tagen
+- Migration 045 unterscheidet die geprüfte von der ungeprüft wirksamen
+  Korrektur: wird eine Korrektur ohne Beteiligung des Büros wirksam, bleibt das
+  Prüferfeld leer und der Vorgang ist ausdrücklich als ungeprüft gekennzeichnet.
+  Der Zustand lässt sich nachträglich nicht abstreifen.
 - Migration 043 entscheidet anhand sämtlicher historischer Referenzen zwischen
   sicherer Hartlöschung und Archivierung, widerruft Sitzungen und künftige
   Planung und ermöglicht protokollierte Reaktivierung

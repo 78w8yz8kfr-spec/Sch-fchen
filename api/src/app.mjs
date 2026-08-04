@@ -8968,11 +8968,12 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
 
   const operation = await client.query(
     `INSERT INTO time_change_operations (
-       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id,
+       applied_without_review
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
     [
       context.companyId, original.user_id, input.clientChangeId, expectedAction,
-      input.reason, controlled ? "pending" : "applied", context.userId
+      input.reason, controlled ? "pending" : "applied", context.userId, !controlled
     ]
   );
   const insertedItems = [];
@@ -8995,10 +8996,13 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
       ]
     );
     if (!controlled) {
+      // Ohne Prüfung wirksam: kein Prüfer, sondern die ausdrückliche
+      // Kennzeichnung, dass das Büro nicht beteiligt war.
       await client.query(
-        `UPDATE time_entries SET correction_status = 'approved', reviewed_by_user_id = $2
-         WHERE company_id = $1 AND id = $3`,
-        [context.companyId, context.userId, inserted.rows[0].id]
+        `UPDATE time_entries
+         SET correction_status = 'approved', applied_without_review = TRUE
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, inserted.rows[0].id]
       );
     }
     const item = await client.query(
@@ -9094,9 +9098,13 @@ async function deleteTimeEntry(client, context, entryId, input, administrator = 
   }
   const operation = await client.query(
     `INSERT INTO time_change_operations (
-       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id
-     ) VALUES ($1,$2,$3,'delete_entry',$4,$5,$6) RETURNING *`,
-    [context.companyId, original.user_id, input.clientChangeId, input.reason, controlled ? "pending" : "applied", context.userId]
+       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id,
+       applied_without_review
+     ) VALUES ($1,$2,$3,'delete_entry',$4,$5,$6,$7) RETURNING *`,
+    [
+      context.companyId, original.user_id, input.clientChangeId, input.reason,
+      controlled ? "pending" : "applied", context.userId, !controlled
+    ]
   );
   const items = [];
   for (const entry of block) {
@@ -9116,10 +9124,13 @@ async function deleteTimeEntry(client, context, entryId, input, administrator = 
       ]
     );
     if (!controlled) {
+      // Ohne Prüfung wirksam: kein Prüfer, sondern die ausdrückliche
+      // Kennzeichnung, dass das Büro nicht beteiligt war.
       await client.query(
-        `UPDATE time_entries SET correction_status = 'approved', reviewed_by_user_id = $2
-         WHERE company_id = $1 AND id = $3`,
-        [context.companyId, context.userId, invalidation.rows[0].id]
+        `UPDATE time_entries
+         SET correction_status = 'approved', applied_without_review = TRUE
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, invalidation.rows[0].id]
       );
     }
     const item = await client.query(

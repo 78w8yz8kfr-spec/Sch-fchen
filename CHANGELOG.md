@@ -4,6 +4,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: Eine Zeitkorrektur, die ohne Beteiligung des Büros sofort
+  wirksam wurde, trug den Mitarbeiter selbst als Prüfer ein. Das Protokoll
+  behauptete damit eine Freigabe, die es nie gegeben hat. Migration 045 führt
+  diesen Fall als eigenen Zustand: wirksam, ausdrücklich ungeprüft und ohne
+  Prüfer. Bereits gespeicherte Einträge bleiben unverändert, weil eine
+  nachträgliche Umschrift selbst eine Verfälschung der Historie wäre.
 - der Service Worker wird im Betrieb geprüft statt im Quelltext: zehn Tests
   fahren die Ereignisbehandlungen aus und belegen unter anderem, dass offline
   ausschließlich der Dokumentencache des eigenen Kontos gelesen wird und dass
