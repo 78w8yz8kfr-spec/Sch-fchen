@@ -62,6 +62,30 @@ assert.doesNotMatch(app, /admin\/modules/);
 assert.doesNotMatch(app, /canAdministerModules/);
 assert.match(html, /id="absence-area"/);
 
+// Karten, die nur die Planung sehen darf, liegen in der Wochenansicht - also
+// in einem Bereich, den jeder sieht. Ihre Sichtbarkeit wurde ausschliesslich
+// in renderAdmin() gesetzt, und renderAdmin() laeuft fuer einen Monteur nie:
+// meldete sich auf einem Geraet nach dem Buero ein Monteur an, blieben
+// Stundenzettel-Export, Stundenzettel pruefen, offene Korrekturen und
+// Abwesenheiten pruefen stehen - mit den Namen und Zeiten der vorherigen
+// Sitzung. Deshalb wird die Sichtbarkeit bei jedem Zeichnen erzwungen und der
+// Inhalt beim Abmelden geleert.
+assert.match(app, /function applyPlannerOnlyVisibility\(\)/);
+assert.match(app, /function clearPlannerData\(\)/);
+const renderRumpf = app.slice(app.indexOf("function render() {"), app.indexOf("function renderPlatformAnnouncements"));
+assert.match(renderRumpf, /applyPlannerOnlyVisibility\(\);/);
+const anmeldeRumpf = app.slice(app.indexOf("function showLogin() {"), app.indexOf("function showSetup("));
+assert.match(anmeldeRumpf, /clearPlannerData\(\);/);
+
+// Urlaub beantragen ist fuer einen Monteur eine der wenigen Handlungen der
+// App. Sie steckte hinter einem zugeklappten Aufklapper weit unten, hinter
+// Arbeitskonto, Wochentagen und Feiertagskarte.
+assert.match(html, /<details id="absence-area" class="week-advanced-panel" open>/);
+assert.ok(
+  html.indexOf('id="absence-area"') < html.indexOf('id="week-days-section"'),
+  "Die Abwesenheit steht vor den erfassten Arbeitstagen"
+);
+
 // Die Bueroverwaltung gehoert unter "Mehr". Sie lag im gemeinsamen
 // Verwaltungsbereich ohne eigene Zuordnung und stand deshalb in allen drei
 // Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten dieselben drei
@@ -421,9 +445,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.5/);
-assert.match(html, /app\.js\?v=0\.42\.5/);
-assert.match(html, /version\.js\?v=0\.42\.5/);
+assert.match(html, /styles\.css\?v=0\.42\.6/);
+assert.match(html, /app\.js\?v=0\.42\.6/);
+assert.match(html, /version\.js\?v=0\.42\.6/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -715,16 +739,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.5"'));
-assert.ok(worker.includes('"./app.js?v=0.42.5"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.5"'));
-assert.ok(worker.includes('"./version.js?v=0.42.5"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.6"'));
+assert.ok(worker.includes('"./app.js?v=0.42.6"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.6"'));
+assert.ok(worker.includes('"./version.js?v=0.42.6"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.5"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.5";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.6"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.6";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -752,7 +776,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.5$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.6$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -760,11 +784,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.5"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.5"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.6"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.6"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.5"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.5"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.6"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.6"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -801,8 +825,18 @@ assert.match(vdeHtml, /id="signature-pad"/);
 assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
 assert.match(vdeHtml, /V15-Bestand importieren/);
 assert.match(vdeHtml, /id="legacy-local-import"/);
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.5/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.5/);
+// Ohne die Fassungsangabe gilt ein Aufrufer als veraltet, sobald die Plattform
+// ein Pflichtupdate setzt: der Server kann eine fehlende Fassung nicht von
+// einer zu alten unterscheiden. Das VDE-Modul waere als einziges vollstaendig
+// ausgefallen - und zwar erst dann, wenn es niemand mehr erwartet.
+for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platform-admin.js", platformApp]]) {
+  assert.ok(
+    quelle.includes('"X-Schaefchen-Version"'),
+    `${datei} nennt dem Server seine Fassung nicht`
+  );
+}
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.6/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.6/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

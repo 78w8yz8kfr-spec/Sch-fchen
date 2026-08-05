@@ -130,6 +130,47 @@ test("Auf der Einsatzkarte stehen Text und Schaltflaechen nicht nebeneinander", 
   assert.ok(Number.parseFloat(knopf.eigenschaften.get("min-height")) >= 44);
 });
 
+test("Die Tagesspalten der Plantafel rasten neben der Mitarbeiterspalte ein", async () => {
+  // Ohne Einrasten blieb auf dem Handy fast immer eine Tagesspalte halb unter
+  // der klebenden Mitarbeiterspalte stehen; die Karte darunter war zur Haelfte
+  // verdeckt. Einrasten wirkt aber nur, wenn eine Spalte neben die klebende
+  // Spalte passt - ist sie breiter als der Platz daneben, laesst der Browser
+  // es fallen. Deshalb setzt app.js die beiden Breiten auf schmalen Geraeten.
+  const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
+  const app = await readFile(resolve(frontendDirectory, "app.js"), "utf8");
+  const regeln = leseRegeln(css);
+
+  const brett = regeln.findLast((regel) =>
+    regel.umgebung === null && regel.selektor.includes("planning-week-board")
+    && regel.eigenschaften.has("scroll-padding-left"));
+  assert.ok(brett, "Die Plantafel haelt keinen Abstand fuer die klebende Spalte frei");
+  assert.match(brett.eigenschaften.get("scroll-padding-left"), /--plan-employee/);
+
+  const scroller = regeln.find((regel) =>
+    regel.umgebung === null && regel.selektor.includes("planning-week-board")
+    && regel.eigenschaften.has("scroll-snap-type"));
+  assert.ok(scroller, "Die Plantafel rastet nicht ein");
+  assert.match(scroller.eigenschaften.get("scroll-snap-type"), /^x /);
+
+  const zelle = regeln.findLast((regel) =>
+    regel.umgebung === null && regel.selektor.includes("planning-board-cell")
+    && regel.eigenschaften.has("scroll-snap-align"));
+  assert.ok(zelle, "Die Tagesspalten sind keine Rastpunkte");
+
+  assert.match(app, /function applyPlanningBoardWidths\(\)/);
+  assert.match(app, /--plan-employee/);
+  assert.match(app, /--plan-day/);
+
+  // Die Kopfzeile muss dieselbe klebende Spalte haben wie die Zeilen darunter.
+  // Sonst rutscht beim Schieben der Tag der vorherigen Spalte ueber die
+  // Mitarbeiterspalte, und ueber ihr steht ein anderes Datum als daneben.
+  const kopf = regeln.findLast((regel) =>
+    regel.umgebung === null
+    && regel.selektor === ".planning-board-row--header > *:first-child");
+  assert.ok(kopf, "Die Kopfzeile der Plantafel klebt nicht mit");
+  assert.equal(kopf.eigenschaften.get("position"), "sticky");
+});
+
 test("Bedienelemente sind gross genug zum Antippen", async () => {
   const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
   const regeln = leseRegeln(css);

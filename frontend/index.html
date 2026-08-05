@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.5">
-    <script type="module" src="./app.js?v=0.42.5"></script>
-    <script src="./version.js?v=0.42.5" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.6">
+    <script type="module" src="./app.js?v=0.42.6"></script>
+    <script src="./version.js?v=0.42.6" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.5</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.6</p>
         </div>
       </section>
 
@@ -561,44 +561,7 @@
               <p id="time-account-message" class="form-message" aria-live="polite"></p>
             </section>
 
-            <section id="week-next-assignment" class="week-focus-card" aria-labelledby="week-next-assignment-title" hidden>
-              <p class="eyebrow">Heute oder als Nächstes</p>
-              <h3 id="week-next-assignment-title">Nächster Einsatz</h3>
-              <strong id="week-next-assignment-name"></strong>
-              <p id="week-next-assignment-meta"></p>
-            </section>
-
-            <section id="week-days-section" class="week-content-section" aria-labelledby="week-days-title">
-              <div class="week-section-title">
-                <div>
-                  <p class="eyebrow">Erfasste Arbeitstage</p>
-                  <h3 id="week-days-title">Diese Woche</h3>
-                </div>
-              </div>
-              <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
-            </section>
-
-            <section id="week-open-actions" class="week-focus-card week-open-actions" aria-labelledby="week-open-actions-title" hidden>
-              <p class="eyebrow">Noch zu erledigen</p>
-              <h3 id="week-open-actions-title">Offene Hinweise</h3>
-              <ul id="week-open-actions-list"></ul>
-            </section>
-
-            <section id="next-holiday-card" class="week-focus-card next-holiday-card" aria-labelledby="next-holiday-title" hidden>
-              <p class="eyebrow">Sollzeit im Blick</p>
-              <h3 id="next-holiday-title">Nächster Feiertag</h3>
-              <div id="next-holiday-summary" class="next-holiday-summary"></div>
-              <p id="time-account-holiday-status" class="time-account-status">
-                Feiertagskalender wird geladen …
-              </p>
-              <details class="time-account-months-panel holiday-calendar-details">
-                <summary>Alle Feiertage anzeigen</summary>
-                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
-              </details>
-            </section>
-
-
-            <details id="absence-area" class="week-advanced-panel">
+            <details id="absence-area" class="week-advanced-panel" open>
               <summary>Abwesenheit und Urlaub</summary>
             <section id="absence-panel" class="week-review-panel absence-panel" aria-labelledby="absence-title">
               <div class="site-management-panel__heading">
@@ -654,6 +617,43 @@
               <ul id="absence-list" class="absence-list" aria-label="Eigene Abwesenheitsanträge"></ul>
             </section>
             </details>
+
+            <section id="week-next-assignment" class="week-focus-card" aria-labelledby="week-next-assignment-title" hidden>
+              <p class="eyebrow">Heute oder als Nächstes</p>
+              <h3 id="week-next-assignment-title">Nächster Einsatz</h3>
+              <strong id="week-next-assignment-name"></strong>
+              <p id="week-next-assignment-meta"></p>
+            </section>
+
+            <section id="week-days-section" class="week-content-section" aria-labelledby="week-days-title">
+              <div class="week-section-title">
+                <div>
+                  <p class="eyebrow">Erfasste Arbeitstage</p>
+                  <h3 id="week-days-title">Diese Woche</h3>
+                </div>
+              </div>
+              <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
+            </section>
+
+            <section id="week-open-actions" class="week-focus-card week-open-actions" aria-labelledby="week-open-actions-title" hidden>
+              <p class="eyebrow">Noch zu erledigen</p>
+              <h3 id="week-open-actions-title">Offene Hinweise</h3>
+              <ul id="week-open-actions-list"></ul>
+            </section>
+
+            <section id="next-holiday-card" class="week-focus-card next-holiday-card" aria-labelledby="next-holiday-title" hidden>
+              <p class="eyebrow">Sollzeit im Blick</p>
+              <h3 id="next-holiday-title">Nächster Feiertag</h3>
+              <div id="next-holiday-summary" class="next-holiday-summary"></div>
+              <p id="time-account-holiday-status" class="time-account-status">
+                Feiertagskalender wird geladen …
+              </p>
+              <details class="time-account-months-panel holiday-calendar-details">
+                <summary>Alle Feiertage anzeigen</summary>
+                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
+              </details>
+            </section>
+
 
             <section id="employee-timesheet-export-panel" class="week-review-panel employee-timesheet-export-panel" aria-labelledby="employee-timesheet-export-title" hidden>
               <div class="site-management-panel__heading">

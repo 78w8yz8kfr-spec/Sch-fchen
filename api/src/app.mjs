@@ -165,7 +165,7 @@ function json(response, status, body, headers = {}) {
 // Fassung dieses Servers. Sie stand frueher als Zeichenkette mitten in der
 // Fehleraufzeichnung und wurde beim Ausliefern regelmaessig vergessen; ein
 // Fehlerbericht nannte dann eine Fassung, die es laengst nicht mehr gab.
-export const APPLICATION_VERSION = "0.42.5";
+export const APPLICATION_VERSION = "0.42.6";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")

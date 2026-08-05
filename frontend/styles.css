@@ -3086,12 +3086,28 @@ select:focus-visible {
 .planning-month-board {
   display: block;
   overflow-x: auto;
+  /* Tagesspalten rasten ein. Ohne das blieb auf dem Handy fast immer eine
+     Spalte halb unter der klebenden Mitarbeiterspalte stehen - die Karte
+     darunter war dann zur Haelfte verdeckt und liess sich nicht antippen. */
+  scroll-snap-type: x mandatory;
+}
+
+/* Die Mitarbeiterspalte klebt links und ist 170 Pixel breit. Ohne diesen
+   Abstand raste eine Tagesspalte genau unter ihr ein. */
+.planning-week-board {
+  scroll-padding-left: var(--plan-employee, 170px);
+}
+
+.planning-board-cell,
+.planning-month-day {
+  scroll-snap-align: start;
 }
 
 .planning-board-row {
   display: grid;
-  grid-template-columns: 170px repeat(5, minmax(180px, 1fr));
-  min-width: 1070px;
+  grid-template-columns:
+    var(--plan-employee, 170px) repeat(5, var(--plan-day, 180px));
+  min-width: calc(var(--plan-employee, 170px) + 5 * var(--plan-day, 180px));
   border-bottom: 1px solid var(--line);
 }
 
@@ -3121,6 +3137,16 @@ select:focus-visible {
 
 .planning-board-row--header > * {
   padding: 10px;
+}
+
+/* Die Mitarbeiterspalte klebt links - in der Kopfzeile aber nicht. Beim
+   waagerechten Schieben rutschte deshalb der Tag der vorherigen Spalte ueber
+   die Mitarbeiterspalte, und ueber ihr stand ein anderes Datum als daneben. */
+.planning-board-row--header > *:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #f4f4f4;
 }
 
 .planning-board-employee {

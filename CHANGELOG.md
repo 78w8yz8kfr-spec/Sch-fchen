@@ -4,6 +4,34 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Fehler behoben: nach einem Benutzerwechsel auf demselben Gerät sah ein
+  Monteur die Büroansichten der vorherigen Sitzung** — Stundenzettel-Export für
+  alle Mitarbeiter, „Stundenzettel prüfen“, „Offene Korrekturen“ und
+  „Abwesenheiten prüfen“, samt der Namen, Arbeitszeiten und Anträge anderer
+  Leute. Diese vier Karten liegen in der Wochenansicht, also in einem Bereich,
+  den jeder sieht; ihre Sichtbarkeit wurde aber ausschließlich in
+  `renderAdmin()` gesetzt — und das läuft für einen Monteur nie. Meldete sich
+  das Büro ab und ein Monteur an, blieben sie stehen. Die Sichtbarkeit wird
+  jetzt bei jedem Zeichnen erzwungen, und beim Abmelden werden die Listen
+  geleert.
+- Die Abwesenheitserfassung steht weiter oben und ist aufgeklappt: statt
+  1300 Pixel tief hinter einem zugeklappten Aufklapper beginnt sie bei
+  925 Pixeln, direkt nach dem Arbeitskonto. Urlaub beantragen ist für einen
+  Monteur eine der wenigen Handlungen der App.
+- Die Tagesspalten der Plantafel rasten ein. Vorher blieb fast immer eine
+  Spalte halb unter der klebenden Mitarbeiterspalte stehen, und die Karte
+  darunter war zur Hälfte verdeckt. Einrasten wirkt nur, wenn eine Spalte neben
+  die klebende Spalte passt — deshalb ist die Mitarbeiterspalte auf schmalen
+  Geräten 110 statt 170 Pixel breit und eine Tagesspalte genau so breit wie der
+  Rest. Die Kopfzeile klebt jetzt mit; vorher stand über der
+  Mitarbeiterspalte der Tag der vorherigen Spalte.
+- Das VDE-Modul nennt dem Server seine Fassung. Ohne diese Angabe gilt ein
+  Aufrufer als veraltet, sobald die Plattform ein Pflichtupdate setzt — der
+  Server kann eine fehlende Fassung nicht von einer zu alten unterscheiden. Das
+  VDE-Modul wäre als einziges vollständig ausgefallen, und zwar erst dann, wenn
+  es niemand mehr erwartet.
+- Fassung 0.42.6, Speicher `schaefchen-online-v48`, Migration 055.
+
 - Plantafel: eine Zelle zeigt höchstens zwei Karten, der Rest lässt sich mit
   „+2 weitere“ aufklappen. Alle Zellen einer Zeile liegen in derselben
   Rasterzeile — die höchste bestimmt die Höhe aller. Ein Mitarbeiter mit vier

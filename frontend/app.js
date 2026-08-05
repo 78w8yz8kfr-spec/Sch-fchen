@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.5";
+} from "./core/work-time.js?v=0.42.6";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,13 +18,13 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.5";
+} from "./core/sync-queue.js?v=0.42.6";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
-} from "./core/permissions.js?v=0.42.5";
+} from "./core/permissions.js?v=0.42.6";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -35,7 +35,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.5";
+} from "./core/state-store.js?v=0.42.6";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1046,7 +1046,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.5",
+          "X-Schaefchen-Version": "0.42.6",
           ...options.headers
         }
       });
@@ -1074,7 +1074,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.5" }
+        headers: { "X-Schaefchen-Version": "0.42.6" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1121,7 +1121,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.5 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.6 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1183,6 +1183,7 @@ import {
     elements.loginView.hidden = false;
     elements.setupForm.hidden = true;
     elements.loginForm.hidden = false;
+    clearPlannerData();
     configureModeCopy();
     applyLoginCompanyIdentity();
     document.title = "Schäfchen";
@@ -3938,6 +3939,25 @@ import {
     });
   }
 
+  // Eine Tagesspalte rastet nur ein, wenn sie neben die klebende
+  // Mitarbeiterspalte passt. Ist sie breiter als der Platz daneben, laesst der
+  // Browser das Einrasten fallen - auf dem Handy blieb deshalb fast immer eine
+  // Spalte halb unter der Mitarbeiterspalte stehen und die Karte darunter war
+  // zur Haelfte verdeckt. Auf schmalen Geraeten ist eine Tagesspalte deshalb
+  // genau so breit wie der verbleibende Platz.
+  function applyPlanningBoardWidths() {
+    const brett = elements.adminWeekBoard;
+    const platz = brett.clientWidth;
+    if (!platz) return;
+    const schmal = platz < 620;
+    const mitarbeiter = schmal ? 110 : 170;
+    brett.style.setProperty("--plan-employee", `${mitarbeiter}px`);
+    brett.style.setProperty(
+      "--plan-day",
+      `${schmal ? Math.max(150, platz - mitarbeiter) : 180}px`
+    );
+  }
+
   function renderAdminWeek() {
     const view = elements.planningBoardView.value;
     const filters = planningFilters();
@@ -4135,6 +4155,7 @@ import {
       }
       elements.adminWeekBoard.append(row);
     });
+    applyPlanningBoardWidths();
     elements.planningBoardSummary.textContent =
       `${visibleAssignments} sichtbare Einsätze · ${unassignedEmployees} nicht eingeplante Mitarbeiter · Karten lassen sich per Drag-and-drop verschieben`;
   }
@@ -7477,8 +7498,44 @@ import {
     }
   }
 
+  // Karten, die nur die Planung sehen darf: Stundenzettel-Export fuer alle,
+  // Stundenzettel pruefen, offene Korrekturen und Abwesenheiten pruefen.
+  //
+  // Sie liegen in der Wochenansicht, also in einem Bereich, den jeder sieht.
+  // Ihre Sichtbarkeit wurde bisher ausschliesslich in renderAdmin() gesetzt -
+  // und renderAdmin() laeuft fuer einen Monteur nie. Meldete sich auf einem
+  // Geraet nach dem Buero ein Monteur an, blieben die Karten stehen: mit den
+  // Namen, Arbeitszeiten und Antraegen der vorherigen Sitzung. Deshalb wird
+  // die Sichtbarkeit jetzt bei jedem Zeichnen erzwungen und der Inhalt beim
+  // Abmelden geleert.
+  const PLANNER_ONLY_PANELS = () => [
+    elements.timesheetExportPanel,
+    elements.workDayReviewPanel,
+    elements.timeCorrectionReviewPanel,
+    elements.absenceReviewPanel
+  ];
+
+  function applyPlannerOnlyVisibility() {
+    if (canPlan()) return;
+    PLANNER_ONLY_PANELS().forEach((panel) => {
+      panel.hidden = true;
+    });
+  }
+
+  function clearPlannerData() {
+    PLANNER_ONLY_PANELS().forEach((panel) => {
+      panel.hidden = true;
+    });
+    [
+      elements.workDayReviewList,
+      elements.timeCorrectionReviewList,
+      elements.absenceReviewList
+    ].forEach((liste) => liste.replaceChildren());
+  }
+
   function render() {
     applyModuleVisibility();
+    applyPlannerOnlyVisibility();
     renderAction();
     renderAssignment();
     renderTimes();
@@ -7624,6 +7681,9 @@ import {
       }
       renderAdminTimeAccounts();
       renderTimeCorrectionPolicy();
+      // Erst jetzt hat die Plantafel eine Breite: gezeichnet wird sie, waehrend
+      // ihr Bereich noch verborgen ist, und dort misst sie null.
+      applyPlanningBoardWidths();
     }
 
     const activeButton = {
@@ -10256,6 +10316,7 @@ import {
     void refreshAbsenceData();
   });
   window.addEventListener("offline", updateConnectionState);
+  window.addEventListener("resize", applyPlanningBoardWidths);
 
   if (!demoMode) void initialiseOnline();
 
