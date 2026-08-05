@@ -3295,9 +3295,14 @@ select:focus-visible {
   gap: 7px;
 }
 
+/* Text oben, Handlungen darunter - nicht nebeneinander.
+   Zwei Schaltflaechen zu je 44 Pixel brauchen zusammen 113 Pixel. In einer
+   Spalte der Plantafel ist die Karte rund 163 Pixel breit; fuer den Text
+   blieben damit 20 Pixel. Baustellenname, Hinweis und das Kennzeichen des
+   Vorarbeiters liefen aus dieser Spalte heraus und lagen unter den
+   Schaltflaechen. */
 .week-assignment {
   display: grid;
-  grid-template-columns: 1fr auto;
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--line);
@@ -3385,6 +3390,9 @@ select:focus-visible {
 
 .week-assignment .foreman-duty {
   width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin-top: 3px;
   padding: 3px 7px;
   border-radius: 999px;
@@ -3406,6 +3414,7 @@ select:focus-visible {
 
 .week-assignment .week-assignment__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: start;
   gap: 5px;
 }

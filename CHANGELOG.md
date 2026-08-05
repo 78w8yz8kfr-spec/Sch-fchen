@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: auf den Karten der Plantafel lagen die Schaltflächen
+  „Ändern“ und „Kopieren“ über dem Text. Gemessen auf dem Handy: die Karte ist
+  163 Pixel breit, die beiden Schaltflächen brauchen zusammen 113 davon — jede
+  muss mindestens 44 Pixel messen, damit man sie treffen kann. Nebeneinander
+  blieben für den Text 20 Pixel; Baustellenname, Hinweis und das Kennzeichen
+  des Vorarbeiters liefen aus ihrer Spalte heraus und lagen unter den
+  Schaltflächen. Die Karte hat jetzt eine Spalte: Text oben, Schaltflächen
+  darunter. Ein Test hält fest, dass beides nicht wieder in eine Zeile gerät.
+- Fassung 0.42.4, Speicher `schaefchen-online-v46`, Migration 053.
+
 - Die Bereiche der App gehören der Plattformverwaltung. Eine Firma konnte sie
   bisher selbst abschalten — der verkaufte Umfang lag damit in der Hand des
   Kunden, und ein abgeschalteter Bereich ließ sich ohne fremde Hilfe nicht

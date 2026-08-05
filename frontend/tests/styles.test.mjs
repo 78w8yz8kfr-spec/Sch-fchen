@@ -102,6 +102,34 @@ test("Firmenzeichen und Firmenname stehen im Kopf nebeneinander", async () => {
   }
 });
 
+test("Auf der Einsatzkarte stehen Text und Schaltflaechen nicht nebeneinander", async () => {
+  // Gemessen auf dem Handy: eine Karte der Plantafel ist 163 Pixel breit. Die
+  // beiden Schaltflaechen "Aendern" und "Kopieren" brauchen zusammen 113 davon,
+  // denn jede muss mindestens 44 Pixel messen. Nebeneinander blieben fuer den
+  // Text 20 Pixel - Baustellenname, Hinweis und das Kennzeichen des
+  // Vorarbeiters liefen aus ihrer Spalte heraus und lagen unter den
+  // Schaltflaechen. Die Karte hat deshalb genau eine Spalte.
+  const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
+  const regeln = leseRegeln(css);
+  const karte = regeln.findLast((regel) =>
+    regel.umgebung === null && regel.selektor === ".week-assignment");
+  assert.ok(karte, "Die Einsatzkarte hat keine eigene Regel");
+  assert.equal(karte.eigenschaften.get("display"), "grid");
+  assert.equal(
+    karte.eigenschaften.has("grid-template-columns"),
+    false,
+    "Die Einsatzkarte darf Text und Schaltflaechen nicht in eine Zeile zwingen"
+  );
+
+  // Die Schaltflaechen bleiben gross genug zum Antippen - das ist der Grund,
+  // warum sie eine eigene Zeile brauchen, und darf nicht als Ausweg schrumpfen.
+  const knopf = regeln.findLast((regel) =>
+    regel.umgebung === null && regel.selektor === ".week-assignment button");
+  assert.ok(knopf, "Die Schaltflaechen der Einsatzkarte haben keine eigene Regel");
+  assert.ok(Number.parseFloat(knopf.eigenschaften.get("min-width")) >= 44);
+  assert.ok(Number.parseFloat(knopf.eigenschaften.get("min-height")) >= 44);
+});
+
 test("Bedienelemente sind gross genug zum Antippen", async () => {
   const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
   const regeln = leseRegeln(css);
