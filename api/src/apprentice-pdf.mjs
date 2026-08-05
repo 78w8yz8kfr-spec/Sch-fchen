@@ -128,29 +128,13 @@ function layoutRows(zeilen, font, size, textWidth) {
   });
 }
 
-export async function buildApprenticeReportPdf({
-  report,
-  apprentice,
-  company,
-  companyLogo = null,
-  printedAt = new Date()
-}) {
-  const document = await PDFDocument.create();
-  const regular = await document.embedFont(StandardFonts.Helvetica);
-  const bold = await document.embedFont(StandardFonts.HelveticaBold);
-  const italic = await document.embedFont(StandardFonts.HelveticaOblique);
-
+// Eine Woche zeichnen: ein Blatt, im Ausnahmefall zwei. Die Funktion haengt
+// ihre Seiten an die uebergebene Liste an, damit ein Heft ueber mehrere Wochen
+// am Ende durchgezaehlt werden kann.
+function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, company }) {
+  const { regular, bold, italic } = fonts;
   const { week, year } = isoWeekNumber(report.weekStart);
-  const titel = `Berichtsheft Woche ${week} / ${year}`;
-  document.setTitle(titel);
-  document.setAuthor(company.legalName || company.displayName);
-  document.setSubject(`Ausbildungsnachweis ${apprentice.name}`);
-  document.setCreator("Schäfchen");
-  document.setProducer("Schäfchen");
-  document.setCreationDate(printedAt);
-  document.setModificationDate(printedAt);
 
-  const seiten = [];
   const neueSeite = () => {
     const seite = document.addPage(A4);
     seiten.push(seite);
@@ -159,15 +143,6 @@ export async function buildApprenticeReportPdf({
 
   let page = neueSeite();
   let y = A4[1] - MARGIN;
-
-  let logoImage = null;
-  if (companyLogo) {
-    try {
-      logoImage = await document.embedPng(companyLogo);
-    } catch {
-      logoImage = null;
-    }
-  }
 
   if (logoImage) {
     const skala = Math.min(132 / logoImage.width, 62 / logoImage.height);
@@ -199,9 +174,15 @@ export async function buildApprenticeReportPdf({
   );
 
   // Kopfdaten
+  //
+  // Das Lehrjahr wird je Woche gerechnet: ein Heft ueber zwei Lehrjahre truege
+  // sonst auf allen Blaettern dasselbe.
+  const lehrjahr = trainingYear(apprentice.startedOn, report.weekStart)
+    ?? apprentice.trainingYear
+    ?? null;
   const kopfZeilen = [
     ["Azubi:", apprentice.name],
-    ["Lehrjahr:", apprentice.trainingYear ? `${apprentice.trainingYear}. Lehrjahr` : "–"],
+    ["Lehrjahr:", lehrjahr ? `${lehrjahr}. Lehrjahr` : "–"],
     ["Ausbildungsberuf:", apprentice.occupation || "–"],
     ["Berichtsheft-Intervall:", "wöchentlich"]
   ];
@@ -353,7 +334,11 @@ export async function buildApprenticeReportPdf({
     MARGIN + 280, "Ausbilder (Unterschrift)",
     report.trainerSignatureName, report.reviewedAt?.slice(0, 10)
   );
+}
 
+// Die Fusszeile kommt zuletzt: erst wenn alle Wochen gezeichnet sind, steht
+// fest, wie viele Blaetter es geworden sind.
+function stampFooters(seiten, regular) {
   seiten.forEach((blatt, index) => {
     blatt.drawText(
       "Dieses Berichtsheft wurde digital erstellt und ist ohne Unterschriften ungültig.",
@@ -365,6 +350,82 @@ export async function buildApprenticeReportPdf({
       y: FOOTER_Y, size: 7.5, font: regular, color: MUTED
     });
   });
+}
 
+function weekLabel(weekStart) {
+  const { week, year } = isoWeekNumber(weekStart);
+  return `Woche ${week} / ${year}`;
+}
+
+async function renderReportBook({
+  reports,
+  apprentice,
+  company,
+  companyLogo = null,
+  printedAt = new Date(),
+  title
+}) {
+  const document = await PDFDocument.create();
+  const fonts = {
+    regular: await document.embedFont(StandardFonts.Helvetica),
+    bold: await document.embedFont(StandardFonts.HelveticaBold),
+    italic: await document.embedFont(StandardFonts.HelveticaOblique)
+  };
+
+  document.setTitle(title);
+  document.setAuthor(company.legalName || company.displayName);
+  document.setSubject(`Ausbildungsnachweis ${apprentice.name}`);
+  document.setCreator("Schäfchen");
+  document.setProducer("Schäfchen");
+  document.setCreationDate(printedAt);
+  document.setModificationDate(printedAt);
+
+  // Das Logo wird einmal eingebettet und auf jedem Blatt derselben Datei
+  // verwendet. Je Woche neu eingebettet wuerde ein Lehrjahr das Bild
+  // vierzigmal mitschleppen.
+  let logoImage = null;
+  if (companyLogo) {
+    try {
+      logoImage = await document.embedPng(companyLogo);
+    } catch {
+      logoImage = null;
+    }
+  }
+
+  const seiten = [];
+  for (const report of reports) {
+    drawWeek({ document, seiten, fonts, logoImage, report, apprentice, company });
+  }
+  stampFooters(seiten, fonts.regular);
   return Buffer.from(await document.save());
+}
+
+// Eine Woche, ein Blatt.
+export function buildApprenticeReportPdf({ report, apprentice, ...rest }) {
+  return renderReportBook({
+    reports: [report],
+    apprentice,
+    ...rest,
+    title: `Berichtsheft ${weekLabel(report.weekStart)}`
+  });
+}
+
+// Mehrere Wochen am Stueck, etwa ein ganzes Lehrjahr: eine Datei, eine Seite
+// je Woche. Woche fuer Woche einzeln zu laden und von Hand zu heften ist genau
+// die Arbeit, die diese App abnehmen soll.
+//
+// Das Lehrjahr steht je Woche im Kopf und wird deshalb je Bericht gerechnet -
+// ein Heft ueber zwei Lehrjahre traegt sonst auf allen Blaettern dasselbe.
+export function buildApprenticeReportBookPdf({ reports, apprentice, ...rest }) {
+  const sortiert = [...reports].sort((links, rechts) =>
+    links.weekStart.localeCompare(rechts.weekStart));
+  const spanne = sortiert.length > 1
+    ? `${weekLabel(sortiert[0].weekStart)} bis ${weekLabel(sortiert.at(-1).weekStart)}`
+    : weekLabel(sortiert[0].weekStart);
+  return renderReportBook({
+    reports: sortiert,
+    apprentice,
+    ...rest,
+    title: `Berichtsheft ${spanne}`
+  });
 }

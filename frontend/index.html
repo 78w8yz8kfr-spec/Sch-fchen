@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.9">
-    <script type="module" src="./app.js?v=0.42.9"></script>
-    <script src="./version.js?v=0.42.9" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.10">
+    <script type="module" src="./app.js?v=0.42.10"></script>
+    <script src="./version.js?v=0.42.10" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.9</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.10</p>
         </div>
       </section>
 
@@ -657,6 +657,10 @@
               </div>
               <p id="apprentice-week" class="apprentice-week">Woche</p>
               <p id="apprentice-return" class="apprentice-return" hidden></p>
+              <div id="apprentice-missing" class="apprentice-missing" hidden>
+                <p id="apprentice-missing-text"></p>
+                <div id="apprentice-missing-weeks" class="apprentice-missing__weeks"></div>
+              </div>
               <form id="apprentice-form" class="apprentice-form" novalidate>
                 <div id="apprentice-days" class="apprentice-days"></div>
                 <label for="apprentice-week-remark">Bemerkungen zur Woche</label>
@@ -664,7 +668,8 @@
                   placeholder="Besonderes in dieser Woche"></textarea>
                 <div class="apprentice-actions">
                   <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
-                  <button id="apprentice-print" class="button button--secondary" type="button">Wochenbericht drucken</button>
+                  <button id="apprentice-print" class="button button--secondary" type="button">Woche drucken</button>
+                  <button id="apprentice-print-book" class="button button--secondary" type="button">Ganzes Jahr drucken</button>
                   <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
                 </div>
               </form>
@@ -680,6 +685,7 @@
                 </div>
                 <span id="apprentice-review-count" class="site-list-summary" aria-live="polite">0</span>
               </div>
+              <ul id="apprentice-gap-list" class="apprentice-gap-list" aria-label="Fehlende Wochenberichte"></ul>
               <ul id="apprentice-review-list" class="apprentice-review-list" aria-label="Eingereichte Wochenberichte"></ul>
               <div class="apprentice-actions">
                 <button id="apprentice-approve-all" class="button button--primary" type="button">Alle freigeben</button>

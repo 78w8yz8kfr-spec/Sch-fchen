@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.9";
+} from "./core/work-time.js?v=0.42.10";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.9";
+} from "./core/sync-queue.js?v=0.42.10";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.9";
+} from "./core/permissions.js?v=0.42.10";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.9";
+} from "./core/state-store.js?v=0.42.10";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -203,6 +203,11 @@ import {
     apprenticeWeekRemark: document.querySelector("#apprentice-week-remark"),
     apprenticeSave: document.querySelector("#apprentice-save"),
     apprenticePrint: document.querySelector("#apprentice-print"),
+    apprenticePrintBook: document.querySelector("#apprentice-print-book"),
+    apprenticeMissing: document.querySelector("#apprentice-missing"),
+    apprenticeMissingText: document.querySelector("#apprentice-missing-text"),
+    apprenticeMissingWeeks: document.querySelector("#apprentice-missing-weeks"),
+    apprenticeGapList: document.querySelector("#apprentice-gap-list"),
     apprenticeSubmit: document.querySelector("#apprentice-submit"),
     apprenticeMessage: document.querySelector("#apprentice-message"),
     apprenticeHistory: document.querySelector("#apprentice-history"),
@@ -849,7 +854,9 @@ import {
   // sie je Tag und traegt das Datum nicht in den einzelnen Einsatz ein.
   let assignmentsDate = null;
   let apprenticeState = null;
+  let apprenticeMissingState = [];
   let apprenticeReviewState = null;
+  let apprenticeGapState = [];
   // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
   const expandedPlanningCells = new Set();
   let deviceCompany = null;
@@ -1081,7 +1088,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.9",
+          "X-Schaefchen-Version": "0.42.10",
           ...options.headers
         }
       });
@@ -1109,7 +1116,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.9" }
+        headers: { "X-Schaefchen-Version": "0.42.10" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1156,7 +1163,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.9 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.10 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -7861,6 +7868,7 @@ import {
         `./api/v1/apprentice/reports?from=${jahr}-01-01&to=${jahr}-12-31`
       );
       apprenticeState = body.reports;
+      apprenticeMissingState = body.missingWeeks || [];
     } catch (error) {
       if (error.status === 401) return showLogin();
       apprenticeState = apprenticeState || [];
@@ -7876,6 +7884,7 @@ import {
     try {
       const body = await requestJson("./api/v1/admin/apprentice-reports");
       apprenticeReviewState = body.reports;
+      apprenticeGapState = body.gaps || [];
     } catch (error) {
       if (error.status === 401) return showLogin();
       apprenticeReviewState = apprenticeReviewState || [];
@@ -7925,6 +7934,9 @@ import {
     elements.apprenticeSave.hidden = !offen;
     elements.apprenticeSubmit.hidden = !offen;
     elements.apprenticePrint.hidden = !bericht;
+    elements.apprenticePrintBook.hidden = (apprenticeState || []).length === 0;
+    elements.apprenticePrintBook.textContent = `Jahr ${selectedWeekStart.slice(0, 4)} drucken`;
+    renderApprenticeMissing();
 
     elements.apprenticeHistory.replaceChildren();
     for (const eintrag of (apprenticeState || []).slice(0, 12)) {
@@ -7937,6 +7949,32 @@ import {
       } h`;
       zeile.append(woche, zustand);
       elements.apprenticeHistory.append(zeile);
+    }
+  }
+
+  // Fehlende Wochen. Am Ende der Ausbildung ist eine Luecke teuer, und bis
+  // dahin faellt sie niemandem auf - deshalb steht sie hier, mit einem Weg
+  // direkt in die betreffende Woche.
+  function renderApprenticeMissing() {
+    const wochen = (apprenticeMissingState || []).filter((montag) => montag !== selectedWeekStart);
+    elements.apprenticeMissing.hidden = wochen.length === 0;
+    if (elements.apprenticeMissing.hidden) return;
+    elements.apprenticeMissingText.textContent = wochen.length === 1
+      ? "Eine Woche fehlt noch:"
+      : `${wochen.length} Wochen fehlen noch:`;
+    elements.apprenticeMissingWeeks.replaceChildren();
+    // Hoechstens acht Schaltflaechen: eine laengere Reihe liest niemand, und
+    // die aelteste Luecke steht ohnehin zuletzt.
+    for (const montag of wochen.slice(0, 8)) {
+      const knopf = document.createElement("button");
+      knopf.type = "button";
+      knopf.className = "button button--secondary apprentice-missing__week";
+      knopf.textContent = `ab ${shortDate(montag)}`;
+      knopf.addEventListener("click", () => {
+        selectedWeekStart = montag;
+        void refreshWeekData();
+      });
+      elements.apprenticeMissingWeeks.append(knopf);
     }
   }
 
@@ -8010,6 +8048,24 @@ import {
       .filter((zeile) => zeile.activities.trim());
   }
 
+  // Was der Ausbilder sonst nie saehe: Wochen, in denen gearbeitet wurde, zu
+  // denen aber nichts eingereicht ist. Ein Bericht, den niemand abgibt, faellt
+  // in einer Liste eingereichter Berichte nicht auf.
+  function renderApprenticeGaps() {
+    elements.apprenticeGapList.replaceChildren();
+    for (const luecke of apprenticeGapState || []) {
+      const zeile = document.createElement("li");
+      const name = document.createElement("strong");
+      const wochen = document.createElement("span");
+      name.textContent = luecke.apprenticeName;
+      wochen.textContent = luecke.weeks.length === 1
+        ? `Eine Woche offen: ab ${shortDate(luecke.weeks[0])}`
+        : `${luecke.weeks.length} Wochen offen, älteste ab ${shortDate(luecke.weeks.at(-1))}`;
+      zeile.append(name, wochen);
+      elements.apprenticeGapList.append(zeile);
+    }
+  }
+
   function renderApprenticeReviews() {
     elements.apprenticeReviewPanel.hidden = !mayReviewApprentices();
     if (elements.apprenticeReviewPanel.hidden) return;
@@ -8018,6 +8074,7 @@ import {
     elements.apprenticeReviewCount.textContent = `${offene.length} offen`;
     elements.apprenticeApproveAll.hidden = offene.length === 0;
     elements.apprenticeReviewList.replaceChildren();
+    renderApprenticeGaps();
 
     if (berichte.length === 0) {
       const leer = document.createElement("li");
@@ -8104,6 +8161,22 @@ import {
       feld.textContent = "";
     } catch (error) {
       feld.textContent = error.message;
+    }
+  }
+
+  // Das ganze Jahr in einer Datei. Am Ende der Ausbildung sind das gut
+  // hundertfuenfzig Blaetter - Woche fuer Woche einzeln zu laden und von Hand
+  // zu heften ist genau die Arbeit, die diese App abnehmen soll.
+  async function printApprenticeYear(jahr) {
+    elements.apprenticeMessage.textContent = "Das Berichtsheft wird erstellt …";
+    try {
+      await downloadFile(
+        `./api/v1/apprentice/reports/pdf?from=${jahr}-01-01&to=${jahr}-12-31`,
+        `Berichtsheft-${jahr}.pdf`
+      );
+      elements.apprenticeMessage.textContent = "";
+    } catch (error) {
+      elements.apprenticeMessage.textContent = error.message;
     }
   }
 
@@ -10304,6 +10377,9 @@ import {
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
   elements.apprenticePrint.addEventListener("click", () => printApprenticeReport(selectedWeekStart));
+  elements.apprenticePrintBook.addEventListener(
+    "click", () => printApprenticeYear(selectedWeekStart.slice(0, 4))
+  );
   elements.apprenticeForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void saveApprenticeReport(true);

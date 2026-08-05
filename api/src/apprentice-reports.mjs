@@ -179,6 +179,91 @@ export async function listOwnApprenticeReports(client, context, { from, to }) {
   return result.rows.map(apprenticeReportDto);
 }
 
+// Welche Wochen fehlen noch?
+//
+// Eine Woche wird erwartet, wenn in ihr gearbeitet wurde oder eine genehmigte
+// Abwesenheit lag - dann gibt es etwas zu berichten. Wochen ohne beides sind
+// keine Luecke: vor dem Ausbildungsbeginn, im Betriebsurlaub oder vor dem
+// Eintritt hat niemand etwas versaeumt. Die laufende Woche zaehlt nicht mit,
+// sie ist noch nicht vorbei.
+//
+// Gefragt wird nach 'submitted' oder 'approved': ein Entwurf ist geschrieben,
+// aber nicht abgegeben - und genau das ist die Luecke, die am Ende der
+// Ausbildung teuer wird.
+export async function listMissingApprenticeWeeks(client, context, userId, startedOn, limit = 26) {
+  const result = await client.query(
+    `WITH belegt AS (
+       SELECT DATE_TRUNC('week', work_date)::DATE AS week_start
+       FROM work_days
+       WHERE company_id = $1 AND user_id = $2 AND work_minutes > 0
+       UNION
+       SELECT DATE_TRUNC('week', tag)::DATE
+       FROM absence_requests AS abwesenheit,
+            LATERAL GENERATE_SERIES(
+              abwesenheit.start_date, abwesenheit.end_date, INTERVAL '1 day'
+            ) AS tag
+       WHERE abwesenheit.company_id = $1 AND abwesenheit.user_id = $2
+         AND abwesenheit.status = 'approved'
+     )
+     SELECT TO_CHAR(belegt.week_start, 'YYYY-MM-DD') AS week_start
+     FROM belegt
+     WHERE belegt.week_start < DATE_TRUNC('week', CURRENT_DATE)::DATE
+       AND belegt.week_start >= COALESCE($3::DATE, (CURRENT_DATE - INTERVAL '1 year')::DATE)
+       AND NOT EXISTS (
+         SELECT 1 FROM apprentice_reports AS bericht
+         WHERE bericht.company_id = $1
+           AND bericht.apprentice_user_id = $2
+           AND bericht.week_start = belegt.week_start
+           AND bericht.status IN ('submitted', 'approved')
+       )
+     ORDER BY belegt.week_start DESC
+     LIMIT $4`,
+    [context.companyId, userId, startedOn || null, limit]
+  );
+  return result.rows.map((zeile) => zeile.week_start);
+}
+
+// Dasselbe fuer den Ausbilder, ueber alle seine Auszubildenden. Er sieht damit
+// die Luecken, ohne jeden einzeln durchzugehen.
+export async function listApprenticeGaps(client, context) {
+  const azubis = await client.query(
+    `SELECT person.id, person.first_name, person.last_name,
+            TO_CHAR(person.apprenticeship_started_on, 'YYYY-MM-DD') AS started_on
+     FROM users AS person
+     WHERE person.company_id = $1
+       AND person.trainer_user_id = $2
+       AND person.status = 'active'
+     ORDER BY person.last_name, person.first_name`,
+    [context.companyId, context.userId]
+  );
+  const luecken = [];
+  for (const person of azubis.rows) {
+    const wochen = await listMissingApprenticeWeeks(
+      client, context, person.id, person.started_on, 12
+    );
+    if (wochen.length === 0) continue;
+    luecken.push({
+      apprenticeUserId: person.id,
+      apprenticeName: fullName(person),
+      weeks: wochen
+    });
+  }
+  return luecken;
+}
+
+// Alle Berichte eines Zeitraums fuer den Ausdruck ueber mehrere Wochen.
+export async function listApprenticeReportsForPrint(client, context, userId, { from, to }) {
+  const result = await client.query(
+    `SELECT *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text
+     FROM apprentice_reports
+     WHERE company_id = $1 AND apprentice_user_id = $2
+       AND week_start >= $3::DATE AND week_start <= $4::DATE
+     ORDER BY week_start`,
+    [context.companyId, userId, from, to]
+  );
+  return result.rows.map(apprenticeReportDto);
+}
+
 async function readOwnReport(client, context, weekStart) {
   const result = await client.query(
     `SELECT *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text

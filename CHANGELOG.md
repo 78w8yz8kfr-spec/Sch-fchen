@@ -4,6 +4,25 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Fehlende Wochen werden angemahnt.** Am Ende der Ausbildung ist eine Lücke
+  im Berichtsheft teuer, und bis dahin fällt sie niemandem auf.
+  - Eine Woche gilt als fällig, sobald in ihr **gearbeitet wurde oder eine
+    genehmigte Abwesenheit lag**. Wochen ohne beides sind keine Lücke — vor dem
+    Ausbildungsbeginn oder im Betriebsurlaub hat niemand etwas versäumt.
+  - Offen bleibt sie, bis ein Bericht **eingereicht** ist. Ein Entwurf zählt
+    nicht: geschrieben ist nicht abgegeben. Die laufende Woche wird nie
+    angemahnt, sie ist noch nicht vorbei.
+  - Der Auszubildende sieht seine Lücken über dem Wochenformular, mit einem Weg
+    direkt in die betreffende Woche. Der Ausbilder sieht sie über alle seine
+    Auszubildenden — ein Bericht, den niemand abgibt, fällt in einer Liste
+    eingereichter Berichte sonst nicht auf.
+- **Ein ganzer Zeitraum am Stück ausdruckbar**, eine Datei mit einer Seite je
+  Woche. Am Ende der Ausbildung sind das gut hundertfünfzig Blätter; sie Woche
+  für Woche einzeln zu laden und von Hand zu heften ist genau die Arbeit, die
+  diese App abnehmen soll. Das Lehrjahr wird dabei je Woche gerechnet — ein
+  Heft über zwei Lehrjahre trüge sonst auf allen Blättern dasselbe.
+- Fassung 0.42.10, Speicher `schaefchen-online-v52`, Migration 062.
+
 - **Das Berichtsheft wird täglich geschrieben und wöchentlich ausgedruckt.**
   Der Wochentext ist entfallen — er sagte nicht, an welchem Tag was war, und
   genau das will die Kammer sehen.

@@ -77,7 +77,8 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 | `PUT /api/v1/apprentice/reports/:montag` | Auszubildender, Entwurf speichern |
 | `POST /api/v1/apprentice/reports/:montag/submit` | Auszubildender, einreichen |
 | `GET /api/v1/apprentice/reports/:montag/pdf` | Auszubildender, eigene Woche als A4-Blatt |
-| `GET …/pdf?apprenticeUserId=` | Ausbilder, Woche eines seiner Auszubildenden |
+| `GET /api/v1/apprentice/reports/pdf?from=&to=` | Auszubildender, ein ganzer Zeitraum in einer Datei |
+| `GET …/pdf?apprenticeUserId=` | Ausbilder, Woche oder Zeitraum eines seiner Auszubildenden |
 | `GET /api/v1/admin/apprentice-reports` | Ausbilder |
 | `POST /api/v1/admin/apprentice-reports/review` | Ausbilder, einzeln oder als Sammelfreigabe |
 
@@ -123,9 +124,43 @@ Der Tageseintrag hängt immer an der **laufenden** Woche, nicht an der
 angezeigten: wer im Stundenzettel zurückblättert und dann Feierabend macht,
 trüge sonst in die falsche Woche ein.
 
+## Fehlende Wochen
+
+Am Ende der Ausbildung ist eine fehlende Woche teuer, und bis dahin fällt sie
+niemandem auf. Deshalb rechnet der Server sie aus, statt darauf zu warten, dass
+jemand nachzählt:
+
+* Eine Woche gilt als **fällig**, sobald in ihr gearbeitet wurde oder eine
+  genehmigte Abwesenheit lag. Wochen ohne beides sind keine Lücke — vor dem
+  Ausbildungsbeginn, im Betriebsurlaub oder vor dem Eintritt hat niemand etwas
+  versäumt.
+* **Offen** bleibt sie, bis ein Bericht eingereicht oder freigegeben ist. Ein
+  Entwurf zählt nicht: geschrieben ist nicht abgegeben.
+* Die **laufende Woche** wird nie angemahnt, sie ist noch nicht vorbei.
+* Weiter zurück als bis zum Ausbildungsbeginn — ersatzweise ein Jahr — wird
+  nicht gesucht.
+
+Der Auszubildende sieht seine Lücken über dem Wochenformular, mit einem Weg
+direkt in die betreffende Woche. Der Ausbilder sieht sie in seiner Prüfliste
+über alle seine Auszubildenden: ein Bericht, den niemand abgibt, fällt in einer
+Liste eingereichter Berichte sonst nicht auf.
+
+## Ein Zeitraum am Stück
+
+`GET /api/v1/apprentice/reports/pdf?from=&to=` liefert **eine Datei mit einer
+Seite je Woche**. Am Ende der Ausbildung sind das gut hundertfünfzig Blätter;
+sie Woche für Woche einzeln zu laden und von Hand zu heften ist genau die
+Arbeit, die diese App abnehmen soll. In der App steht dafür „Jahr … drucken“.
+
+* Die Wochen werden **geordnet** gedruckt, unabhängig davon, wie sie ankommen.
+* Das **Lehrjahr** wird je Woche gerechnet — ein Heft über zwei Lehrjahre trüge
+  sonst auf allen Blättern dasselbe.
+* Das **Logo** wird einmal eingebettet und auf jedem Blatt verwendet.
+* Die **Seitenzahl** zählt über das ganze Heft durch, nicht je Woche neu.
+* Ein Zeitraum ohne einen einzigen Bericht ist kein leeres Heft, sondern eine
+  klare Auskunft (404).
+
 ## Noch nicht enthalten
 
-* **Erinnerungen** an fehlende Wochen (heute sieht man offene Berichte nur,
-  wenn man in die Liste schaut).
-* **Ein Ausdruck über mehrere Wochen** am Stück, etwa ein ganzes Lehrjahr in
-  einer Datei.
+* Eine **Erinnerung, die von selbst kommt** — als Mitteilung oder E-Mail. Heute
+  sieht man die Lücken, sobald man die App öffnet.

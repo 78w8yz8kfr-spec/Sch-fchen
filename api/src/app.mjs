@@ -33,11 +33,18 @@ import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
 import { loadCompanyModules } from "./company-modules.mjs";
-import { buildApprenticeReportPdf, trainingYear } from "./apprentice-pdf.mjs";
+import {
+  buildApprenticeReportBookPdf,
+  buildApprenticeReportPdf,
+  trainingYear
+} from "./apprentice-pdf.mjs";
 import {
   APPRENTICE_MODULE_KEY,
   apprenticeReportDto,
+  listApprenticeGaps,
+  listApprenticeReportsForPrint,
   listApprenticeReviews,
+  listMissingApprenticeWeeks,
   listOwnApprenticeReports,
   loadApprenticeProfile,
   reviewApprenticeReports,
@@ -182,7 +189,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.9";
+export const APPLICATION_VERSION = "0.42.10";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1854,8 +1861,13 @@ async function requireApprentice(client, context) {
 
 async function getOwnApprenticeReports(client, context, range) {
   const profile = await requireApprentice(client, context);
-  const reports = await listOwnApprenticeReports(client, context, range);
-  return { profile, reports };
+  const [reports, missingWeeks] = await Promise.all([
+    listOwnApprenticeReports(client, context, range),
+    // Die Luecken haengen nicht am angezeigten Zeitraum: wer in den Januar
+    // blaettert, soll trotzdem sehen, dass der Maerz fehlt.
+    listMissingApprenticeWeeks(client, context, context.userId, profile.startedOn)
+  ]);
+  return { profile, reports, missingWeeks };
 }
 
 async function putOwnApprenticeReport(client, context, weekStart, input) {
@@ -1870,7 +1882,7 @@ async function submitApprenticeReport(client, context, weekStart) {
 
 // Der gedruckte Nachweis. Der Auszubildende darf seinen eigenen holen, sein
 // Ausbilder ebenfalls - sonst niemand.
-async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, staticDirectory) {
+async function resolveApprenticeForPrint(client, context, apprenticeUserId) {
   await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
   const eigener = !apprenticeUserId || apprenticeUserId === context.userId;
   const profile = await loadApprenticeProfile(client, context, apprenticeUserId || context.userId);
@@ -1888,6 +1900,31 @@ async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, 
       "apprentice_review_forbidden"
     );
   }
+  return profile;
+}
+
+async function apprenticePrintContext(client, context, profile, staticDirectory) {
+  const company = await client.query(
+    "SELECT legal_name, display_name, logo_object_key FROM companies WHERE id = $1",
+    [context.companyId]
+  );
+  const row = company.rows[0];
+  return {
+    apprentice: {
+      name: profile.name,
+      occupation: profile.occupation,
+      startedOn: profile.startedOn
+    },
+    company: { legalName: row.legal_name, displayName: row.display_name },
+    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key)
+  };
+}
+
+const apprenticeFileName = (name, teil) =>
+  `Berichtsheft-${teil}-${name.replace(/[^A-Za-zÄÖÜäöüß-]+/g, "-")}.pdf`;
+
+async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, staticDirectory) {
+  const profile = await resolveApprenticeForPrint(client, context, apprenticeUserId);
 
   const result = await client.query(
     `SELECT *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text
@@ -1902,32 +1939,51 @@ async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, 
       "apprentice_report_not_found"
     );
   }
-  const company = await client.query(
-    "SELECT legal_name, display_name, logo_object_key FROM companies WHERE id = $1",
-    [context.companyId]
-  );
-  const row = company.rows[0];
   const report = apprenticeReportDto(result.rows[0]);
+  const druck = await apprenticePrintContext(client, context, profile, staticDirectory);
   const pdf = await buildApprenticeReportPdf({
+    ...druck,
     report,
     apprentice: {
-      name: profile.name,
-      occupation: profile.occupation,
+      ...druck.apprentice,
       trainingYear: trainingYear(profile.startedOn, report.weekStart)
-    },
-    company: { legalName: row.legal_name, displayName: row.display_name },
-    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key)
+    }
   });
   return {
     content: pdf,
-    fileName: `Berichtsheft-${report.weekStart}-${profile.name.replace(/[^A-Za-zÄÖÜäöüß-]+/g, "-")}.pdf`
+    fileName: apprenticeFileName(profile.name, report.weekStart)
+  };
+}
+
+// Ein ganzer Zeitraum in einer Datei, eine Seite je Woche. Woche fuer Woche
+// einzeln zu laden und von Hand zu heften ist genau die Arbeit, die diese App
+// abnehmen soll - am Ende der Ausbildung sind das gut hundertfuenfzig Blaetter.
+async function buildApprenticeBookPdf(client, context, range, apprenticeUserId, staticDirectory) {
+  const profile = await resolveApprenticeForPrint(client, context, apprenticeUserId);
+  const reports = await listApprenticeReportsForPrint(client, context, profile.userId, range);
+  if (reports.length === 0) {
+    throw new InputError(
+      "In diesem Zeitraum steht kein Wochenbericht.",
+      404,
+      "apprentice_report_not_found"
+    );
+  }
+  const druck = await apprenticePrintContext(client, context, profile, staticDirectory);
+  const pdf = await buildApprenticeReportBookPdf({ ...druck, reports });
+  return {
+    content: pdf,
+    fileName: apprenticeFileName(profile.name, `${range.from}-bis-${range.to}`)
   };
 }
 
 async function getApprenticeReviews(client, context) {
   await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
   await requireApprenticeTrainer(client, context);
-  return listApprenticeReviews(client, context);
+  const [reports, gaps] = await Promise.all([
+    listApprenticeReviews(client, context),
+    listApprenticeGaps(client, context)
+  ]);
+  return { reports, gaps };
 }
 
 async function decideApprenticeReports(client, context, input) {
@@ -10133,6 +10189,25 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, body);
       }
 
+      // Mehrere Wochen am Stueck. Der Weg steht vor dem Wochenmuster, sonst
+      // fiele "pdf" nie auf: die Woche im Pfad ist zwar ein Datum, aber ein
+      // spaeterer Zweig wird nicht mehr erreicht.
+      if (request.method === "GET" && url.pathname === "/api/v1/apprentice/reports/pdf") {
+        const range = timesheetExportRange(url);
+        const apprenticeUserId = url.searchParams.get("apprenticeUserId");
+        if (apprenticeUserId && !UUID_PATTERN.test(apprenticeUserId)) {
+          throw new InputError("Die Kennung des Auszubildenden ist ungültig.");
+        }
+        const datei = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => buildApprenticeBookPdf(
+            client, context, range, apprenticeUserId, config.staticDirectory
+          )
+        );
+        return binaryAttachment(response, { ...datei, mimeType: "application/pdf" });
+      }
+
       const apprenticeWeekMatch =
         /^\/api\/v1\/apprentice\/reports\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
       if (request.method === "PUT" && apprenticeWeekMatch) {
@@ -10177,8 +10252,8 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/admin/apprentice-reports") {
-        const reports = await withReadySession(pool, tokenHash, getApprenticeReviews);
-        return json(response, 200, { reports });
+        const body = await withReadySession(pool, tokenHash, getApprenticeReviews);
+        return json(response, 200, body);
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/apprentice-reports/review") {

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, decodePDFRawStream } from "pdf-lib";
-import { buildApprenticeReportPdf, isoWeekNumber, trainingYear } from "../src/apprentice-pdf.mjs";
+import {
+  buildApprenticeReportBookPdf,
+  buildApprenticeReportPdf,
+  isoWeekNumber,
+  trainingYear
+} from "../src/apprentice-pdf.mjs";
 
 // Den Inhaltsstrom jeder Seite als Text zurueckgeben. Nur so laesst sich
 // pruefen, was wirklich auf dem Papier landet.
@@ -213,6 +218,51 @@ test("Ohne Unterschriften entsteht trotzdem ein Blatt zum Ausdrucken", async () 
   const text = seiten.map(lesbarerText).join(" ");
   assert.match(text, /ohne Unterschriften ungültig/);
   assert.match(text, /Datum:/);
+});
+
+test("Mehrere Wochen ergeben ein Heft mit einer Seite je Woche", async () => {
+  // Am Ende der Ausbildung sind das gut hundertfuenfzig Blaetter. Sie einzeln
+  // zu laden und von Hand zu heften ist genau die Arbeit, die abgenommen
+  // werden soll.
+  const reports = ["2024-05-13", "2024-05-20", "2024-05-27"].map((weekStart) => ({
+    ...bericht(),
+    weekStart,
+    dailyEntries: [tag(weekStart, 2)]
+  }));
+  const content = await buildApprenticeReportBookPdf({
+    reports: [reports[2], reports[0], reports[1]],
+    apprentice: azubi,
+    company: firma
+  });
+  const { document, seiten } = await seitenStroeme(content);
+  assert.equal(document.getPageCount(), 3);
+  assert.equal(document.getTitle(), "Berichtsheft Woche 20 / 2024 bis Woche 22 / 2024");
+
+  // Ungeordnet uebergeben, geordnet gedruckt: im Ordner stehen die Wochen
+  // hintereinander.
+  const texte = seiten.map(lesbarerText);
+  assert.match(texte[0], /Woche 20 \/ 2024/);
+  assert.match(texte[1], /Woche 21 \/ 2024/);
+  assert.match(texte[2], /Woche 22 \/ 2024/);
+  // Durchgezaehlt wird ueber das ganze Heft, nicht je Woche neu.
+  texte.forEach((text, index) => {
+    assert.ok(text.includes(`Seite ${index + 1} von 3`), `Seite ${index + 1} ist falsch gezaehlt`);
+  });
+  assert.ok(zeichenpunkte(seiten).every((punkt) => punkt.y >= 40));
+});
+
+test("Das Lehrjahr wandert im Heft mit", async () => {
+  // Ein Heft ueber zwei Lehrjahre truege sonst auf allen Blaettern dasselbe.
+  const content = await buildApprenticeReportBookPdf({
+    reports: ["2024-09-02", "2025-09-01"].map((weekStart) => ({
+      ...bericht(), weekStart, dailyEntries: [tag(weekStart, 1)]
+    })),
+    apprentice: { name: "Max Mustermann", occupation: "Elektroniker", startedOn: "2024-08-01" },
+    company: firma
+  });
+  const { seiten } = await seitenStroeme(content);
+  assert.match(lesbarerText(seiten[0]), /1\. Lehrjahr/);
+  assert.match(lesbarerText(seiten[1]), /2\. Lehrjahr/);
 });
 
 test("Ein unlesbares Firmenlogo verhindert den Ausdruck nicht", async () => {

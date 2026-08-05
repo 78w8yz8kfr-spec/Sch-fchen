@@ -344,6 +344,107 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   const leereWoche = await ruf("/api/v1/apprentice/reports/2026-04-06/pdf", azubiCookie);
   assert.equal(leereWoche.status, 404, await leereWoche.clone().text());
 
+  // Fehlende Wochen
+  //
+  // Am Ende der Ausbildung ist eine fehlende Woche teuer, und bis dahin faellt
+  // sie niemandem auf. Eine Woche gilt als faellig, sobald in ihr gearbeitet
+  // wurde oder eine genehmigte Abwesenheit lag - und sie bleibt offen, solange
+  // kein Bericht eingereicht ist. Ein Entwurf zaehlt nicht: geschrieben ist
+  // nicht abgegeben.
+  //
+  // Die Wochen werden aus dem heutigen Datum gerechnet, nicht fest verdrahtet:
+  // ein Test, der auf ein bestimmtes Jahr zeigt, wird irgendwann von selbst
+  // gruen oder von selbst rot.
+  const wochen = await ownerPool.query(
+    `SELECT TO_CHAR(DATE_TRUNC('week', CURRENT_DATE)::DATE - 14, 'YYYY-MM-DD') AS vorletzte,
+            TO_CHAR(DATE_TRUNC('week', CURRENT_DATE)::DATE - 7, 'YYYY-MM-DD') AS letzte,
+            TO_CHAR(DATE_TRUNC('week', CURRENT_DATE)::DATE, 'YYYY-MM-DD') AS laufende`
+  );
+  const { vorletzte, letzte, laufende } = wochen.rows[0];
+
+  await ownerPool.query(
+    `INSERT INTO work_days (
+       company_id, user_id, work_date, target_work_minutes,
+       gross_minutes, break_minutes, work_minutes
+     ) VALUES ($1, $2, $3::DATE, 480, 495, 30, 465),
+              ($1, $2, $4::DATE, 480, 495, 30, 465),
+              ($1, $2, $5::DATE, 480, 495, 30, 465)`,
+    [companyId, azubiId, vorletzte, letzte, laufende]
+  );
+
+  const mitLuecken = await ruf(
+    "/api/v1/apprentice/reports?from=2026-01-01&to=2026-12-31", azubiCookie
+  );
+  assert.equal(mitLuecken.status, 200, await mitLuecken.clone().text());
+  const luecken = (await mitLuecken.json()).missingWeeks;
+  assert.ok(luecken.includes(vorletzte), `Die Woche ${vorletzte} fehlt in der Mahnung`);
+  assert.ok(luecken.includes(letzte), `Die Woche ${letzte} fehlt in der Mahnung`);
+  // Die laufende Woche ist noch nicht vorbei - sie zu mahnen waere unfair.
+  assert.ok(!luecken.includes(laufende), "Die laufende Woche wird gemahnt");
+  // Die freigegebene Woche steht nicht mehr in der Liste.
+  assert.ok(!luecken.includes(woche), "Eine freigegebene Woche wird gemahnt");
+
+  // Ein Entwurf schliesst die Luecke nicht: er ist geschrieben, nicht abgegeben.
+  await ruf(`/api/v1/apprentice/reports/${letzte}`, azubiCookie, {
+    method: "PUT",
+    body: JSON.stringify({ dailyEntries: [{ workDate: letzte, activities: ["Angefangen"] }] })
+  });
+  const nachEntwurf = await ruf(
+    "/api/v1/apprentice/reports?from=2026-01-01&to=2026-12-31", azubiCookie
+  );
+  assert.ok((await nachEntwurf.json()).missingWeeks.includes(letzte));
+
+  // Der Ausbilder sieht dieselben Luecken, ohne jeden einzeln durchzugehen.
+  const pruefliste = await ruf("/api/v1/admin/apprentice-reports", ausbilderCookie);
+  const gaps = (await pruefliste.json()).gaps;
+  assert.equal(gaps.length, 1);
+  assert.equal(gaps[0].apprenticeName, "Anna Auszubildende");
+  assert.ok(gaps[0].weeks.includes(vorletzte));
+
+  // Eingereicht schliesst sie.
+  await ruf(`/api/v1/apprentice/reports/${letzte}/submit`, azubiCookie, { method: "POST" });
+  const nachAbgabe = await ruf(
+    "/api/v1/apprentice/reports?from=2026-01-01&to=2026-12-31", azubiCookie
+  );
+  const restluecken = (await nachAbgabe.json()).missingWeeks;
+  assert.ok(!restluecken.includes(letzte), "Eine eingereichte Woche wird weiter gemahnt");
+  assert.ok(restluecken.includes(vorletzte));
+
+  // Der Ausdruck ueber mehrere Wochen: ein Zeitraum, eine Datei, eine Seite je
+  // Woche. Woche fuer Woche einzeln zu laden ist genau die Arbeit, die diese
+  // App abnehmen soll.
+  const heft = await ruf(
+    `/api/v1/apprentice/reports/pdf?from=${woche}&to=${laufende}`, azubiCookie
+  );
+  assert.equal(heft.status, 200, await heft.clone().text());
+  assert.match(heft.headers.get("content-type"), /application\/pdf/);
+  assert.match(heft.headers.get("content-disposition"), /Berichtsheft-/);
+  const heftInhalt = Buffer.from(await heft.arrayBuffer());
+  assert.equal(heftInhalt.subarray(0, 5).toString("ascii"), "%PDF-");
+  // Zwei Wochen sind zwei Blaetter - das eine Blatt der einzelnen Woche ist
+  // kleiner.
+  assert.ok(heftInhalt.length > blatt.length);
+
+  // Der Ausbilder darf das Heft seines Auszubildenden holen, ein Monteur nicht.
+  const heftAusbilder = await ruf(
+    `/api/v1/apprentice/reports/pdf?from=${woche}&to=${laufende}&apprenticeUserId=${azubiId}`,
+    ausbilderCookie
+  );
+  assert.equal(heftAusbilder.status, 200, await heftAusbilder.clone().text());
+  const heftFremd = await ruf(
+    `/api/v1/apprentice/reports/pdf?from=${woche}&to=${laufende}&apprenticeUserId=${azubiId}`,
+    fremdCookie
+  );
+  assert.equal(heftFremd.status, 403, await heftFremd.clone().text());
+
+  // Ein Zeitraum ohne einen einzigen Bericht ist kein leeres Heft, sondern
+  // eine klare Auskunft.
+  const leeresHeft = await ruf(
+    "/api/v1/apprentice/reports/pdf?from=2019-01-07&to=2019-01-13", azubiCookie
+  );
+  assert.equal(leeresHeft.status, 404, await leeresHeft.clone().text());
+  assert.equal((await leeresHeft.json()).error.code, "apprentice_report_not_found");
+
   // Mandantentrennung: die Nachbarfirma sieht den Bericht nicht.
   const nachbar = await ownerPool.query(
     `INSERT INTO companies (legal_name, display_name) VALUES ($1, $2) RETURNING id, company_number`,
