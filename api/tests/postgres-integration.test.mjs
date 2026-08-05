@@ -303,7 +303,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(versionListResponse.status, 200, await versionListResponse.clone().text());
     const productionVersion = (await versionListResponse.json()).versions
       .find((version) => version.releaseStatus === "production");
-    assert.equal(productionVersion.version, "0.42.0");
+    assert.equal(productionVersion.version, "0.42.1");
     const requireUpdateResponse = await fetch(
       `${baseUrl}/api/v1/platform/versions/${productionVersion.id}`,
       {
@@ -324,7 +324,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(outdatedSessionResponse.status, 426);
     assert.equal((await outdatedSessionResponse.json()).error.code, "mandatory_update");
     const currentSessionResponse = await fetch(`${baseUrl}/api/v1/session`, {
-      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.0" }
+      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.1" }
     });
     assert.equal(currentSessionResponse.status, 200);
     const releaseUpdateResponse = await fetch(
@@ -356,7 +356,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(maintenanceOnResponse.status, 200, await maintenanceOnResponse.clone().text());
     await new Promise((resolve) => setTimeout(resolve, 2100));
     const maintenanceBlockedResponse = await fetch(`${baseUrl}/api/v1/session`, {
-      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.0" }
+      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.1" }
     });
     assert.equal(maintenanceBlockedResponse.status, 503);
     assert.equal((await maintenanceBlockedResponse.json()).error.code, "maintenance_mode");

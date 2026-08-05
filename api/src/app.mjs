@@ -9817,7 +9817,7 @@ async function recordUnhandledPlatformError(pool, request, requestId, error) {
       `INSERT INTO platform_error_groups (
          fingerprint,error_code,severity,module,application_version,
          sanitized_message,sanitized_details,first_seen_at,last_seen_at
-       ) VALUES ($1,$2,'error',$3,'0.42.0',$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       ) VALUES ($1,$2,'error',$3,'0.42.1',$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
        ON CONFLICT (fingerprint) DO UPDATE SET
          occurrence_count = platform_error_groups.occurrence_count + 1,
          last_seen_at = CURRENT_TIMESTAMP,

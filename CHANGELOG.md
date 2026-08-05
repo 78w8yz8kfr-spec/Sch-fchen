@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fassung 0.42.1. Der Dienst-Worker liefert die Dateien der App aus einem
+  Zwischenspeicher aus, ohne beim Server nachzufragen. Solange Fassungsnummer
+  und Speichername gleich blieben, erreichte **keine** Korrektur der Oberfläche
+  ein bereits eingerichtetes Gerät — auch nach einer Veröffentlichung nicht.
+  Der Speicher heißt jetzt `schaefchen-online-v43`, alle Dateien tragen
+  `?v=0.42.1`, und Migration 049 setzt den Produktionsstand entsprechend.
+  Offline abgelegte Baustellendokumente bleiben erhalten: ihr Speicher wird
+  bewusst nicht mitgewechselt.
+
 - zwei zusätzliche Prüfungen der Oberfläche: jedes der 35 Formulare muss einen
   Absende-Empfänger haben, und ein unmittelbar übergebener Ereignisbehandler
   darf als ersten Wert nur das Ereignis erwarten. Die zweite Prüfung gilt jetzt

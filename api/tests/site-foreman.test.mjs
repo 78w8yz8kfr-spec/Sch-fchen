@@ -114,7 +114,7 @@ integrationTest("Alleiniger Mitarbeiter bleibt bei Rückkehr berichtsverantwortl
       Origin: config.allowedOrigin,
       // Der grosse Integrationstest schaltet zeitweise ein Pflichtupdate. Ohne
       // die eigene Fassung wiese der Server jede Anfrage mit 426 ab.
-      "X-Schaefchen-Version": "0.42.0"
+      "X-Schaefchen-Version": "0.42.1"
     },
     body: JSON.stringify({
       companyNumber,
@@ -138,7 +138,7 @@ integrationTest("Alleiniger Mitarbeiter bleibt bei Rückkehr berichtsverantwortl
       headers: {
         "Content-Type": "application/json",
         Cookie: cookie,
-        "X-Schaefchen-Version": "0.42.0"
+        "X-Schaefchen-Version": "0.42.1"
       },
       body: JSON.stringify({ constructionSiteId, workDate: heute, newOccurrence })
     });

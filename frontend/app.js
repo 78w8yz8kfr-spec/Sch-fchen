@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.0";
+} from "./core/work-time.js?v=0.42.1";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.0";
+} from "./core/sync-queue.js?v=0.42.1";
 import {
   canAdministerModules as canAdministerModulesFor,
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
-} from "./core/permissions.js?v=0.42.0";
+} from "./core/permissions.js?v=0.42.1";
 import {
   ONLINE_STORAGE_KEY,
   carriedOverMessage,
@@ -33,7 +33,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.0";
+} from "./core/state-store.js?v=0.42.1";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -975,7 +975,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.0",
+          "X-Schaefchen-Version": "0.42.1",
           ...options.headers
         }
       });
@@ -1003,7 +1003,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.0" }
+        headers: { "X-Schaefchen-Version": "0.42.1" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1049,7 +1049,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.1 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
