@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: die Vorlage für den Baustellen-Import war leer. Zwei Blätter
+  ohne Spaltenüberschriften und ohne Beispiel; wer sie herunterlud, wusste
+  nicht, welche Spalten gefüllt werden müssen, und jeder Upload endete mit
+  „Die Excel-Datei enthält keine Baustellenzeilen.“ Die Vorlage enthält jetzt
+  die Überschriften, eine ausgefüllte Beispielzeile und ein Hinweisblatt mit
+  den Pflichtspalten und den erkannten Schreibweisen. Ein Test importiert die
+  mitgelieferte Vorlage.
+
 - der Baustellenlink und der QR-Code führen jetzt auch dann in die
   Baustellenakte, wenn der Mitarbeiter für diese Baustelle nicht eingeteilt
   ist. Wer vor Ort den Aufkleber scannt, steht auf dieser Baustelle; bisher
