@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.0">
-    <script type="module" src="./app.js?v=0.42.0"></script>
-    <script src="./version.js?v=0.42.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.1">
+    <script type="module" src="./app.js?v=0.42.1"></script>
+    <script src="./version.js?v=0.42.1" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -126,7 +126,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.1</p>
         </div>
       </section>
 
@@ -499,9 +499,9 @@
               <div class="week-heading__controls">
                 <strong id="week-period" class="week-period">Diese Woche</strong>
                 <div class="week-navigation" aria-label="Angezeigte Woche wechseln">
-                  <button id="week-previous" class="text-button" type="button" aria-label="Vorherige Woche">‹</button>
-                  <button id="week-current" class="text-button" type="button">Diese Woche</button>
-                  <button id="week-next" class="text-button" type="button" aria-label="Nächste Woche">›</button>
+                  <button id="week-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
+                  <button id="week-current" class="week-navigation__today" type="button">Diese Woche</button>
+                  <button id="week-next" class="week-button" type="button" aria-label="Nächste Woche">›</button>
                 </div>
               </div>
             </div>
@@ -593,140 +593,8 @@
               </details>
             </section>
 
-            <details class="week-advanced-panel week-advanced-panel--admin">
-              <summary>Erweiterte Bürobereiche</summary>
-            <section id="time-account-admin-panel" class="week-review-panel time-account-admin-panel" aria-labelledby="time-account-admin-title" hidden>
-              <div class="site-management-panel__heading">
-                <div>
-                  <p class="eyebrow">Kompakte Büroübersicht</p>
-                  <h3 id="time-account-admin-title">Jahreskonten</h3>
-                </div>
-                <span id="time-account-admin-year" class="site-list-summary">Jahr</span>
-              </div>
-              <p class="time-account-status">
-                Laufender Stand, Resturlaub und genehmigter Überstundenabbau je Mitarbeiter.
-              </p>
-              <ul id="time-account-admin-list" class="time-account-admin-list" aria-label="Stundenkonten der Mitarbeiter"></ul>
-              <form id="time-account-profile-form" class="time-account-admin-form" novalidate hidden>
-                <div class="admin-edit-heading">
-                  <div>
-                    <p class="eyebrow">Stundenkonto verwalten</p>
-                    <strong id="time-account-profile-title">Mitarbeiter</strong>
-                  </div>
-                </div>
-                <label class="time-account-enabled">
-                  <input id="time-account-profile-enabled" type="checkbox">
-                  <span>Stundenkonto aktiv</span>
-                </label>
-                <div class="setup-grid">
-                  <div>
-                    <label for="time-account-profile-start">Startdatum</label>
-                    <input id="time-account-profile-start" type="date" required>
-                  </div>
-                  <div>
-                    <label for="time-account-profile-vacation">Jahresurlaub</label>
-                    <input id="time-account-profile-vacation" type="number" min="0" max="60" step="0.5" required>
-                  </div>
-                </div>
-                <div class="form-actions">
-                  <button id="time-account-profile-save" class="button button--primary" type="submit">Einstellungen speichern</button>
-                  <button id="time-account-profile-cancel" class="button button--secondary" type="button">Schließen</button>
-                </div>
-                <p id="time-account-profile-message" class="form-message" aria-live="polite"></p>
-                <fieldset class="time-account-adjustment">
-                  <legend>Nachvollziehbare Korrektur buchen</legend>
-                  <div class="setup-grid">
-                    <div>
-                      <label for="time-account-adjustment-date">Datum</label>
-                      <input id="time-account-adjustment-date" type="date">
-                    </div>
-                    <div>
-                      <label for="time-account-adjustment-hours">Stunden (+ / −)</label>
-                      <input id="time-account-adjustment-hours" type="number" step="0.25" min="-10000" max="10000">
-                    </div>
-                  </div>
-                  <label for="time-account-adjustment-type">Art</label>
-                  <select id="time-account-adjustment-type">
-                    <option value="correction">Korrektur</option>
-                    <option value="opening_balance">Startsaldo</option>
-                    <option value="payout">Auszahlung / Abzug</option>
-                  </select>
-                  <label for="time-account-adjustment-note">Begründung</label>
-                  <textarea id="time-account-adjustment-note" maxlength="500" rows="2"></textarea>
-                  <button id="time-account-adjustment-submit" class="button button--secondary" type="button">Korrektur buchen</button>
-                  <p class="absence-flow-note">Buchungen werden nicht überschrieben. Fehler werden mit einer Gegenbuchung berichtigt.</p>
-                </fieldset>
-              </form>
-              <section id="holiday-calendar-admin" class="holiday-calendar-admin" aria-labelledby="holiday-calendar-title">
-                <div class="site-management-panel__heading">
-                  <div>
-                    <p class="eyebrow">Verbindliche Sollzeit</p>
-                    <h4 id="holiday-calendar-title">Feiertagskalender</h4>
-                  </div>
-                  <span id="holiday-calendar-year" class="site-list-summary">Jahr</span>
-                </div>
-                <p id="holiday-calendar-status" class="time-account-status">
-                  Feiertagskalender wird geladen …
-                </p>
-                <form id="holiday-calendar-form" class="holiday-calendar-form" novalidate hidden>
-                  <input id="holiday-calendar-country" type="hidden" value="DE">
-                  <label for="holiday-calendar-state">Bundesland des Betriebsstandorts</label>
-                  <div class="holiday-calendar-form__row">
-                    <select id="holiday-calendar-state" required>
-                      <option value="BW">Baden-Württemberg</option>
-                      <option value="BY">Bayern</option>
-                      <option value="BE">Berlin</option>
-                      <option value="BB">Brandenburg</option>
-                      <option value="HB">Bremen</option>
-                      <option value="HH">Hamburg</option>
-                      <option value="HE">Hessen</option>
-                      <option value="MV">Mecklenburg-Vorpommern</option>
-                      <option value="NI">Niedersachsen</option>
-                      <option value="NW">Nordrhein-Westfalen</option>
-                      <option value="RP">Rheinland-Pfalz</option>
-                      <option value="SL">Saarland</option>
-                      <option value="SN">Sachsen</option>
-                      <option value="ST">Sachsen-Anhalt</option>
-                      <option value="SH">Schleswig-Holstein</option>
-                      <option value="TH">Thüringen</option>
-                    </select>
-                    <button id="holiday-calendar-save" class="button button--secondary" type="submit">
-                      Bundesland speichern
-                    </button>
-                  </div>
-                </form>
-                <ul id="holiday-calendar-list" class="holiday-list holiday-list--admin" aria-label="Feiertage des Betriebs"></ul>
-                <details id="holiday-closure-panel" class="time-account-months-panel holiday-closure-panel" hidden>
-                  <summary>Örtlichen oder betrieblichen freien Tag ergänzen</summary>
-                  <form id="holiday-closure-form" class="holiday-closure-form" novalidate>
-                    <div class="setup-grid">
-                      <div>
-                        <label for="holiday-closure-date">Datum</label>
-                        <input id="holiday-closure-date" type="date" required>
-                      </div>
-                      <div>
-                        <label for="holiday-closure-name">Bezeichnung</label>
-                        <input id="holiday-closure-name" maxlength="120" placeholder="z. B. regionales Fronleichnam" required>
-                      </div>
-                    </div>
-                    <label for="holiday-closure-note">Grund</label>
-                    <textarea id="holiday-closure-note" minlength="3" maxlength="500" rows="2" placeholder="Örtliche Regelung oder Betriebsvereinbarung" required></textarea>
-                    <button id="holiday-closure-submit" class="button button--secondary" type="submit">
-                      Freien Tag hinzufügen
-                    </button>
-                  </form>
-                  <ul id="holiday-closure-list" class="holiday-closure-list" aria-label="Historie betrieblicher freier Tage"></ul>
-                </details>
-                <p class="absence-flow-note">
-                  Kommunale Sonderfeiertage werden bewusst zusätzlich gepflegt. Ein gespeicherter freier Tag wird nicht gelöscht, sondern begründet aufgehoben.
-                </p>
-                <p id="holiday-calendar-message" class="form-message" aria-live="polite"></p>
-              </section>
-              <p id="time-account-admin-message" class="form-message" aria-live="polite"></p>
-            </section>
-            </details>
 
-            <details class="week-advanced-panel">
+            <details id="absence-area" class="week-advanced-panel">
               <summary>Abwesenheit und Urlaub</summary>
             <section id="absence-panel" class="week-review-panel absence-panel" aria-labelledby="absence-title">
               <div class="site-management-panel__heading">
@@ -1172,10 +1040,16 @@
               <div class="site-management-panel__heading">
                 <div>
                   <p class="eyebrow">Firmenweite Freigabe</p>
-                  <h3 id="electrical-module-admin-title">Elektro-Spezialmodule</h3>
+                  <h3 id="electrical-module-admin-title">Bereiche der App</h3>
                 </div>
               </div>
-              <p>Nur vollständig angebundene Module erscheinen anschließend in der Baustellenakte.</p>
+              <p>
+                Abgeschaltete Bereiche verschwinden aus der App und werden auch über
+                die Schnittstelle abgewiesen. Vorhandene Daten bleiben erhalten und
+                sind nach dem Wiedereinschalten unverändert da. Zeiterfassung,
+                Mitarbeiter und Baustellen gehören zum Kern und lassen sich nicht
+                abschalten.
+              </p>
               <ul id="electrical-module-list" class="electrical-module-list"></ul>
               <p id="electrical-module-message" class="form-message" aria-live="polite"></p>
             </section>
@@ -1550,7 +1424,7 @@
               <div class="admin-week__header">
                 <button id="admin-week-previous" class="week-button" type="button" aria-label="Vorheriger Zeitraum">‹</button>
                 <div>
-                  <span>Desktop-Plantafel</span>
+                  <span>Plantafel</span>
                   <strong id="admin-week-title">Montag bis Freitag</strong>
                 </div>
                 <button id="admin-week-next" class="week-button" type="button" aria-label="Nächster Zeitraum">›</button>
@@ -2247,6 +2121,202 @@
               </details>
               <ul id="admin-assignment-list" class="admin-list" aria-label="Freigegebene Einsätze"></ul>
             </details>
+
+            <section id="time-account-admin-panel" class="week-review-panel time-account-admin-panel" aria-labelledby="time-account-admin-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Kompakte Büroübersicht</p>
+                  <h3 id="time-account-admin-title">Jahreskonten</h3>
+                </div>
+                <div class="admin-year-picker">
+                  <label class="visually-hidden" for="admin-year">Jahr der Auswertung</label>
+                  <select id="admin-year" class="admin-year-select"></select>
+                </div>
+              </div>
+              <p class="time-account-status">
+                Laufender Stand, Resturlaub und genehmigter Überstundenabbau je Mitarbeiter.
+              </p>
+              <ul id="time-account-admin-list" class="time-account-admin-list" aria-label="Stundenkonten der Mitarbeiter"></ul>
+              <form id="time-account-profile-form" class="time-account-admin-form" novalidate hidden>
+                <div class="admin-edit-heading">
+                  <div>
+                    <p class="eyebrow">Stundenkonto verwalten</p>
+                    <strong id="time-account-profile-title">Mitarbeiter</strong>
+                  </div>
+                </div>
+                <label class="time-account-enabled">
+                  <input id="time-account-profile-enabled" type="checkbox">
+                  <span>Stundenkonto aktiv</span>
+                </label>
+                <div class="setup-grid">
+                  <div>
+                    <label for="time-account-profile-start">Startdatum</label>
+                    <input id="time-account-profile-start" type="date" required>
+                  </div>
+                  <div>
+                    <label for="time-account-profile-vacation">Jahresurlaub</label>
+                    <input id="time-account-profile-vacation" type="number" min="0" max="60" step="0.5" required>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button id="time-account-profile-save" class="button button--primary" type="submit">Einstellungen speichern</button>
+                  <button id="time-account-profile-cancel" class="button button--secondary" type="button">Schließen</button>
+                </div>
+                <p id="time-account-profile-message" class="form-message" aria-live="polite"></p>
+                <fieldset class="time-account-adjustment">
+                  <legend>Nachvollziehbare Korrektur buchen</legend>
+                  <div class="setup-grid">
+                    <div>
+                      <label for="time-account-adjustment-date">Datum</label>
+                      <input id="time-account-adjustment-date" type="date">
+                    </div>
+                    <div>
+                      <label for="time-account-adjustment-hours">Stunden (+ / −)</label>
+                      <input id="time-account-adjustment-hours" type="number" step="0.25" min="-10000" max="10000">
+                    </div>
+                  </div>
+                  <label for="time-account-adjustment-type">Art</label>
+                  <select id="time-account-adjustment-type">
+                    <option value="correction">Korrektur</option>
+                    <option value="opening_balance">Startsaldo</option>
+                    <option value="payout">Auszahlung / Abzug</option>
+                  </select>
+                  <label for="time-account-adjustment-note">Begründung</label>
+                  <textarea id="time-account-adjustment-note" maxlength="500" rows="2"></textarea>
+                  <button id="time-account-adjustment-submit" class="button button--secondary" type="button">Korrektur buchen</button>
+                  <p class="absence-flow-note">Buchungen werden nicht überschrieben. Fehler werden mit einer Gegenbuchung berichtigt.</p>
+                </fieldset>
+              </form>
+              <p id="time-account-admin-message" class="form-message" aria-live="polite"></p>
+            </section>
+            <section id="holiday-calendar-admin" class="holiday-calendar-admin" aria-labelledby="holiday-calendar-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Verbindliche Sollzeit</p>
+                  <h4 id="holiday-calendar-title">Feiertagskalender</h4>
+                </div>
+                <span id="holiday-calendar-year" class="site-list-summary">Jahr</span>
+              </div>
+              <p id="holiday-calendar-status" class="time-account-status">
+                Feiertagskalender wird geladen …
+              </p>
+              <form id="holiday-calendar-form" class="holiday-calendar-form" novalidate hidden>
+                <input id="holiday-calendar-country" type="hidden" value="DE">
+                <label for="holiday-calendar-state">Bundesland des Betriebsstandorts</label>
+                <div class="holiday-calendar-form__row">
+                  <select id="holiday-calendar-state" required>
+                    <option value="BW">Baden-Württemberg</option>
+                    <option value="BY">Bayern</option>
+                    <option value="BE">Berlin</option>
+                    <option value="BB">Brandenburg</option>
+                    <option value="HB">Bremen</option>
+                    <option value="HH">Hamburg</option>
+                    <option value="HE">Hessen</option>
+                    <option value="MV">Mecklenburg-Vorpommern</option>
+                    <option value="NI">Niedersachsen</option>
+                    <option value="NW">Nordrhein-Westfalen</option>
+                    <option value="RP">Rheinland-Pfalz</option>
+                    <option value="SL">Saarland</option>
+                    <option value="SN">Sachsen</option>
+                    <option value="ST">Sachsen-Anhalt</option>
+                    <option value="SH">Schleswig-Holstein</option>
+                    <option value="TH">Thüringen</option>
+                  </select>
+                  <button id="holiday-calendar-save" class="button button--secondary" type="submit">
+                    Bundesland speichern
+                  </button>
+                </div>
+              </form>
+              <ul id="holiday-calendar-list" class="holiday-list holiday-list--admin" aria-label="Feiertage des Betriebs"></ul>
+              <details id="holiday-closure-panel" class="time-account-months-panel holiday-closure-panel" hidden>
+                <summary>Örtlichen oder betrieblichen freien Tag ergänzen</summary>
+                <form id="holiday-closure-form" class="holiday-closure-form" novalidate>
+                  <div class="setup-grid">
+                    <div>
+                      <label for="holiday-closure-date">Datum</label>
+                      <input id="holiday-closure-date" type="date" required>
+                    </div>
+                    <div>
+                      <label for="holiday-closure-name">Bezeichnung</label>
+                      <input id="holiday-closure-name" maxlength="120" placeholder="z. B. regionales Fronleichnam" required>
+                    </div>
+                  </div>
+                  <label for="holiday-closure-note">Grund</label>
+                  <textarea id="holiday-closure-note" minlength="3" maxlength="500" rows="2" placeholder="Örtliche Regelung oder Betriebsvereinbarung" required></textarea>
+                  <button id="holiday-closure-submit" class="button button--secondary" type="submit">
+                    Freien Tag hinzufügen
+                  </button>
+                </form>
+                <ul id="holiday-closure-list" class="holiday-closure-list" aria-label="Historie betrieblicher freier Tage"></ul>
+              </details>
+              <p class="absence-flow-note">
+                Kommunale Sonderfeiertage werden bewusst zusätzlich gepflegt. Ein gespeicherter freier Tag wird nicht gelöscht, sondern begründet aufgehoben.
+              </p>
+              <p id="holiday-calendar-message" class="form-message" aria-live="polite"></p>
+            </section>
+            <section
+              id="time-correction-policy-admin"
+              class="holiday-calendar-admin"
+              aria-labelledby="time-correction-policy-title"
+            >
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Regel des Betriebs</p>
+                  <h4 id="time-correction-policy-title">Eigene Zeitkorrekturen</h4>
+                </div>
+                <span id="time-correction-policy-state" class="site-list-summary">wird geladen …</span>
+              </div>
+              <p id="time-correction-policy-status" class="time-account-status">
+                Legt fest, ob Mitarbeiter ihre eigenen Zeiten selbst berichtigen dürfen,
+                bevor das Büro den Arbeitstag freigibt.
+              </p>
+              <form id="time-correction-policy-form" class="holiday-calendar-form" novalidate hidden>
+                <fieldset class="time-correction-policy-options">
+                  <legend class="visually-hidden">Regel für eigene Zeitkorrekturen</legend>
+                  <label class="time-correction-policy-option">
+                    <input type="radio" name="time-correction-policy" value="review_required">
+                    <span>
+                      <strong>Immer prüfen</strong>
+                      Jede Änderung und Löschung geht als Antrag ans Büro und wirkt erst
+                      nach der Freigabe.
+                    </span>
+                  </label>
+                  <label class="time-correction-policy-option">
+                    <input type="radio" name="time-correction-policy" value="same_day">
+                    <span>
+                      <strong>Am selben Tag frei</strong>
+                      Der laufende Tag bleibt frei berichtigbar. Zurückliegende Tage gehen
+                      ans Büro.
+                    </span>
+                  </label>
+                  <label class="time-correction-policy-option">
+                    <input type="radio" name="time-correction-policy" value="immediate">
+                    <span>
+                      <strong>Sofort wirksam</strong>
+                      Berichtigungen wirken ohne Prüfung, bis das Büro den Arbeitstag
+                      freigibt.
+                    </span>
+                  </label>
+                </fieldset>
+                <label for="time-correction-policy-reason">Begründung für die Umstellung</label>
+                <textarea
+                  id="time-correction-policy-reason"
+                  maxlength="500"
+                  rows="2"
+                  placeholder="Warum wird die Regel geändert?"
+                ></textarea>
+                <button
+                  id="time-correction-policy-save"
+                  class="button button--secondary"
+                  type="submit"
+                >Regel speichern</button>
+                <p id="time-correction-policy-message" class="form-message" role="status"></p>
+                <p class="absence-flow-note">
+                  Die Regel gilt nur für die eigenen Zeiten. Das Büro berichtigt fremde
+                  Zeiten unabhängig davon.
+                </p>
+              </form>
+            </section>
 
           </section>
 

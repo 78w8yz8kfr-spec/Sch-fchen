@@ -50,31 +50,31 @@ function json(response, status, body, headers = {}) {
   response.end(encoded);
 }
 
-function requiredText(value, name, maximum = 1000) {
+export function requiredText(value, name, maximum = 1000) {
   if (typeof value !== "string" || !value.trim() || value.trim().length > maximum) {
     throw new InputError(`${name} ist erforderlich und darf höchstens ${maximum} Zeichen lang sein.`);
   }
   return value.trim();
 }
 
-function optionalText(value, name, maximum = 1000) {
+export function optionalText(value, name, maximum = 1000) {
   if (value == null || value === "") return null;
   return requiredText(value, name, maximum);
 }
 
-function integer(value, name, minimum = 0, maximum = Number.MAX_SAFE_INTEGER) {
+export function integer(value, name, minimum = 0, maximum = Number.MAX_SAFE_INTEGER) {
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
     throw new InputError(`${name} ist ungültig.`);
   }
   return value;
 }
 
-function enumValue(value, allowed, name) {
+export function enumValue(value, allowed, name) {
   if (!allowed.has(value)) throw new InputError(`${name} ist ungültig.`);
   return value;
 }
 
-function optionalTimestamp(value, name) {
+export function optionalTimestamp(value, name) {
   if (value == null || value === "") return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.valueOf())) throw new InputError(`${name} ist ungültig.`);

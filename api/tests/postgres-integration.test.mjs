@@ -45,12 +45,21 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     }
   };
   const apiPool = createPool(config.database);
+  // Getrennter Lesezugang mit Eigentümerrechten. Die API-Rolle greift nur
+  // innerhalb ihrer Transaktionen mit Mandantenkontext; für die Prüfung des
+  // Protokolls wird dagegen unmittelbar in die Tabellen geschaut.
+  const inspectionPool = createPool({
+    ...config.database,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
   const server = createServer(createApp({ pool: apiPool, config, logger: { error() {} } }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => {
     await new Promise((resolve) => server.close(resolve));
     await apiPool.end();
+    await inspectionPool.end();
   });
 
   // Bindungen, die spätere Abschnitte weiterverwenden. Die Abschnitte
@@ -59,7 +68,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   let setup, cookie, session, platformCookie;
   let tenantCompany, assignmentDate, employeePersonnelNumber, employeeTemporaryPassword;
   let employeePassword, foremanPersonnelNumber, foremanTemporaryPassword, foremanPassword;
-  let plannerCookie, directorCookie, activatedVde, projectManager;
+  let plannerCookie, directorCookie, activatedVde, projectManager, director;
   let projectManagerCookie, employee, foreman, updatedEditableEmployee;
   let customer, updatedCustomer, project, updatedProject;
   let structuredSite, foremanCookie, clientReportId, mobileReport;
@@ -294,7 +303,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(versionListResponse.status, 200, await versionListResponse.clone().text());
     const productionVersion = (await versionListResponse.json()).versions
       .find((version) => version.releaseStatus === "production");
-    assert.equal(productionVersion.version, "0.42.0");
+    assert.equal(productionVersion.version, "0.42.1");
     const requireUpdateResponse = await fetch(
       `${baseUrl}/api/v1/platform/versions/${productionVersion.id}`,
       {
@@ -315,7 +324,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(outdatedSessionResponse.status, 426);
     assert.equal((await outdatedSessionResponse.json()).error.code, "mandatory_update");
     const currentSessionResponse = await fetch(`${baseUrl}/api/v1/session`, {
-      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.0" }
+      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.1" }
     });
     assert.equal(currentSessionResponse.status, 200);
     const releaseUpdateResponse = await fetch(
@@ -347,7 +356,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(maintenanceOnResponse.status, 200, await maintenanceOnResponse.clone().text());
     await new Promise((resolve) => setTimeout(resolve, 2100));
     const maintenanceBlockedResponse = await fetch(`${baseUrl}/api/v1/session`, {
-      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.0" }
+      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.1" }
     });
     assert.equal(maintenanceBlockedResponse.status, 503);
     assert.equal((await maintenanceBlockedResponse.json()).error.code, "maintenance_mode");
@@ -402,7 +411,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
       { headers: { Cookie: cookie } }
     );
-    assert.equal(initialOverview.status, 200);
+    assert.equal(initialOverview.status, 200, await initialOverview.clone().text());
     assert.equal((await initialOverview.json()).overview.canCreateManagementRoles, true);
 
     const plannerResponse = await fetch(`${baseUrl}/api/v1/admin/employees`, {
@@ -469,6 +478,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       })
     });
     assert.equal(directorResponse.status, 201, await directorResponse.clone().text());
+    director = (await directorResponse.clone().json()).employee;
 
     const directorLogin = await fetch(`${baseUrl}/api/v1/session`, {
       method: "POST",
@@ -493,24 +503,37 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     });
     assert.equal(initialModulesResponse.status, 200);
     const initialModules = (await initialModulesResponse.json()).modules;
-    assert.deepEqual(initialModules.map((module) => module.key), ["vde", "dguv"]);
-    assert.ok(initialModules.every((module) => !module.enabled));
-    assert.equal(initialModules.find((module) => module.key === "vde").available, true);
-    assert.equal(initialModules.find((module) => module.key === "dguv").available, false);
+    // Die Bereiche stammen aus dem Modulkatalog der Plattform. Der Kern und
+    // Bereiche, die es noch nicht gibt, stehen nicht darin.
+    assert.deepEqual(
+      initialModules.map((module) => module.key).sort(),
+      ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
+    );
+    assert.ok(!initialModules.some((module) => module.key === "time_tracking"));
+    assert.ok(!initialModules.some((module) => module.key === "scheduling"));
+    assert.ok(!initialModules.some((module) => module.key === "dguv"));
+    // Regulaere Bereiche gehoeren zum Umfang und sind ohne Zutun eingeschaltet.
+    // Das Spezialmodul VDE braucht zuerst die Freigabe der Plattform.
+    assert.equal(initialModules.find((module) => module.key === "vde").enabled, false);
+    assert.equal(initialModules.find((module) => module.key === "vde").available, false);
+    assert.ok(
+      initialModules
+        .filter((module) => module.key !== "vde")
+        .every((module) => module.enabled && module.available)
+    );
 
-    const forbiddenDguvActivationResponse = await fetch(
-      `${baseUrl}/api/v1/admin/modules/dguv`,
+    // Der Kern ist kein abschaltbarer Bereich.
+    const forbiddenCoreResponse = await fetch(
+      `${baseUrl}/api/v1/admin/modules/time_tracking`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Cookie: cookie },
-        body: JSON.stringify({ enabled: true, rowVersion: 0 })
+        body: JSON.stringify({ enabled: false, rowVersion: 0 })
       }
     );
-    assert.equal(forbiddenDguvActivationResponse.status, 403);
-    assert.equal(
-      (await forbiddenDguvActivationResponse.json()).error.code,
-      "platform_module_administration_required"
-    );
+    // Der Kern steht gar nicht erst unter den abschaltbaren Bereichen.
+    assert.equal(forbiddenCoreResponse.status, 404, await forbiddenCoreResponse.clone().text());
+    assert.equal((await forbiddenCoreResponse.json()).error.code, "module_not_found");
 
     const forbiddenModuleAdministration = await fetch(`${baseUrl}/api/v1/admin/modules`, {
       headers: { Cookie: plannerCookie }
@@ -521,6 +544,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       "module_administration_forbidden"
     );
 
+    // Ohne Freigabe der Plattform laesst sich VDE nicht einschalten.
     const vdeActivationResponse = await fetch(`${baseUrl}/api/v1/admin/modules/vde`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Cookie: directorCookie },
@@ -529,18 +553,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(vdeActivationResponse.status, 403, await vdeActivationResponse.clone().text());
     assert.equal(
       (await vdeActivationResponse.json()).error.code,
-      "platform_module_administration_required"
-    );
-
-    const staleVdeActivationResponse = await fetch(`${baseUrl}/api/v1/admin/modules/vde`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({ enabled: false, rowVersion: 0 })
-    });
-    assert.equal(staleVdeActivationResponse.status, 403);
-    assert.equal(
-      (await staleVdeActivationResponse.json()).error.code,
-      "platform_module_administration_required"
+      "module_not_entitled"
     );
 
     const platformVdeActivation = await fetch(
@@ -924,6 +937,45 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const foremanAssignment = (await foremanAssignmentResponse.json()).assignment;
     assert.equal(foremanAssignment.reportResponsible, true);
     assert.equal(foremanAssignment.reportResponsibilitySource, "manual");
+
+    // In kleinen Betrieben arbeiten Geschäftsführung und Administration selbst
+    // mit. Sie müssen sich einplanen lassen, ohne dafür zusätzlich die Rolle
+    // Monteur zu bekommen.
+    const directorAssignmentResponse = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: director.id,
+        constructionSiteId: structuredSite.id,
+        workDate: assignmentDate,
+        plannedStartTime: "13:00",
+        comment: "Geschäftsführung arbeitet auf der Baustelle mit"
+      })
+    });
+    assert.equal(
+      directorAssignmentResponse.status,
+      201,
+      await directorAssignmentResponse.clone().text()
+    );
+
+    // Die Berichtsverantwortung bleibt dem Vorarbeiter vorbehalten.
+    const directorReportResponsibility = await fetch(`${baseUrl}/api/v1/admin/assignments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        employeeId: director.id,
+        constructionSiteId: structuredSite.id,
+        workDate: nextBusinessDate(assignmentDate),
+        plannedStartTime: "13:00",
+        comment: "Geschäftsführung soll den Bericht übernehmen",
+        reportResponsible: true
+      })
+    });
+    assert.equal(directorReportResponsibility.status, 400);
+    assert.match(
+      (await directorReportResponsibility.json()).error.message,
+      /Vorarbeiter/
+    );
 
     const foremanLogin = await fetch(`${baseUrl}/api/v1/session`, {
       method: "POST",
@@ -3215,6 +3267,20 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   });
 
   await t.test("Zeiterfassung, Korrekturen und Stundenzettel", async () => {
+    // Dieser Abschnitt prüft die sofort wirksame Selbstkorrektur. Seit
+    // Migration 046 ist das nicht mehr die Voreinstellung, sondern eine von der
+    // Firma wählbare Regel; sie wird hier ausdrücklich gesetzt und am Ende
+    // wieder auf die geprüfte Voreinstellung zurückgestellt.
+    const immediatePolicy = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        policy: "immediate",
+        reason: "Sofort wirksame Selbstkorrektur im Integrationstest prüfen"
+      })
+    });
+    assert.equal(immediatePolicy.status, 200, await immediatePolicy.clone().text());
+
     const siteOptionsResponse = await fetch(
       `${baseUrl}/api/v1/time-tracking/site-options/${assignmentDate}`,
       { headers: { Cookie: cookie } }
@@ -3781,6 +3847,16 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(finalEntries.length, 2);
     assert.equal(finalEntries[0].entryType, "clock_in");
     assert.equal(finalEntries[1].entryType, "clock_out");
+
+    const restoredPolicy = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        policy: "review_required",
+        reason: "Geprüfte Voreinstellung nach dem Abschnitt wiederherstellen"
+      })
+    });
+    assert.equal(restoredPolicy.status, 200, await restoredPolicy.clone().text());
   });
 
   await t.test("Mitarbeiterlebenszyklus", async () => {
@@ -4004,6 +4080,29 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(officeEditResult.operation.status, "applied");
     assert.equal(officeEditResult.operation.action, "edit_entry");
 
+    // Eine ohne Prüfung wirksame Korrektur trägt keinen Prüfer. Das Protokoll
+    // darf keine Freigabe behaupten, die es nicht gegeben hat.
+    const unreviewed = await inspectionPool.query(
+      `SELECT operation.status, operation.applied_without_review,
+              operation.reviewed_by_user_id,
+              entry.applied_without_review AS entry_applied_without_review,
+              entry.reviewed_by_user_id AS entry_reviewed_by_user_id,
+              entry.reviewed_at AS entry_reviewed_at
+       FROM time_change_operations AS operation
+       JOIN time_change_items AS item ON item.operation_id = operation.id
+       JOIN time_entries AS entry ON entry.id = item.replacement_entry_id
+       WHERE operation.id = $1`,
+      [officeEditResult.operation.id]
+    );
+    assert.ok(unreviewed.rowCount >= 1);
+    for (const row of unreviewed.rows) {
+      assert.equal(row.applied_without_review, true);
+      assert.equal(row.reviewed_by_user_id, null);
+      assert.equal(row.entry_applied_without_review, true);
+      assert.equal(row.entry_reviewed_by_user_id, null, "Der Bearbeiter darf nicht als Prüfer erscheinen");
+      assert.ok(row.entry_reviewed_at, "Der Zeitpunkt der Wirksamkeit fehlt");
+    }
+
     const repeatedOfficeEdit = await fetch(
       `${baseUrl}/api/v1/admin/time-entries/${editableClockIn.id}`,
       {
@@ -4059,19 +4158,58 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(forbiddenOfficeEdit.status, 403);
 
     // Eine nachgetragene Baustellenbuchung verlangt einen freigegebenen Einsatz.
+    // Eine nachgetragene Baustellenbuchung legt den fehlenden Einsatz selbst an.
+    // Der Monteur stand auf einer Baustelle, für die ihn niemand eingeplant
+    // hatte; live durfte er sie schon immer selbst wählen, beim Nachtragen
+    // wurde die Buchung früher abgewiesen.
+    const unassignedArrivalAt = new Date(new Date(officeEditedAt).valueOf() + 1000).toISOString();
     const unassignedAddition = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: timeCookie },
       body: JSON.stringify({
         workDate: editableWorkDate,
         entryType: "site_arrival",
-        recordedAt: officeEditedAt,
+        recordedAt: unassignedArrivalAt,
         constructionSiteId: structuredSite.id,
         reason: "Ankunft auf einer nicht zugeordneten Baustelle nachtragen"
       })
     });
-    assert.equal(unassignedAddition.status, 403);
-    assert.equal((await unassignedAddition.json()).error.code, "site_not_assigned");
+    assert.equal(unassignedAddition.status, 201, await unassignedAddition.clone().text());
+
+    const createdAssignment = await inspectionPool.query(
+      `SELECT status, last_change_reason, created_by_user_id, comment
+       FROM site_assignments
+       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+         AND work_date = $4`,
+      [tenantCompany.id, timeEmployee.id, structuredSite.id, editableWorkDate]
+    );
+    assert.equal(createdAssignment.rowCount, 1, "Der fehlende Einsatz wurde nicht angelegt");
+    assert.equal(createdAssignment.rows[0].status, "released");
+    assert.equal(
+      createdAssignment.rows[0].created_by_user_id,
+      timeEmployee.id,
+      "Der selbst gewählte Einsatz muss dem Mitarbeiter zugeschrieben sein"
+    );
+    assert.match(
+      createdAssignment.rows[0].last_change_reason,
+      /Spontane Auswahl durch den Mitarbeiter/,
+      "Die Planung muss erkennen, dass der Einsatz nicht von ihr stammt"
+    );
+
+    // Eine unbekannte oder abgeschlossene Baustelle bleibt abgewiesen.
+    const unknownSiteAddition = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: timeCookie },
+      body: JSON.stringify({
+        workDate: editableWorkDate,
+        entryType: "site_arrival",
+        recordedAt: unassignedArrivalAt,
+        constructionSiteId: randomUUID(),
+        reason: "Ankunft auf einer unbekannten Baustelle nachtragen"
+      })
+    });
+    assert.equal(unknownSiteAddition.status, 404);
+    assert.equal((await unknownSiteAddition.json()).error.code, "site_not_found");
 
     // Das Büro liest den Stundenzettel des fremden Mitarbeiters vollständig.
     const officeWorkDayResponse = await fetch(
@@ -4107,6 +4245,291 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     );
     assert.equal(dayAfterOfficeDelete.status, 200);
     assert.equal((await dayAfterOfficeDelete.json()).workDay.entries.length, 0);
+  });
+
+  await t.test("Wählbare Regel für eigene Zeitkorrekturen", async () => {
+    // Voreinstellung ist die geprüfte Variante: eine eigene Korrektur wird zum
+    // Antrag und wirkt erst nach Freigabe durch das Büro.
+    const initial = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(initial.status, 200, await initial.clone().text());
+    const initialPolicy = (await initial.json()).timeCorrectionPolicy;
+    assert.equal(initialPolicy.policy, "review_required");
+    assert.deepEqual(initialPolicy.options, ["review_required", "same_day", "immediate"]);
+
+    const setPolicy = async (policy) => {
+      const response = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ policy, reason: "Korrekturregel im Integrationstest umstellen" })
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      return (await response.json()).timeCorrectionPolicy;
+    };
+
+    // Für jede Regel ein eigener Mitarbeiter mit eigenem Arbeitstag, damit sich
+    // die Fälle nicht gegenseitig beeinflussen.
+    const bookOwnDay = async (label) => {
+      const personnelNumber = `POL-${label}-${suffix}`;
+      const temporary = "Korrekturregel-Integration-2026!";
+      const created = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({
+          personnelNumber, firstName: "Rita", lastName: `Regel${label}`,
+          role: "foreman", temporaryPassword: temporary
+        })
+      });
+      assert.equal(created.status, 201, await created.clone().text());
+      const login = await fetch(`${baseUrl}/api/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+        body: JSON.stringify({ companyNumber: "F-000001", personnelNumber, password: temporary })
+      });
+      assert.equal(login.status, 201);
+      const ownCookie = login.headers.get("set-cookie").split(";", 1)[0];
+      const change = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: ownCookie },
+        body: JSON.stringify({ newPassword: `${temporary}-Neu` })
+      });
+      assert.equal(change.status, 200);
+
+      const startedAt = new Date(Date.now() - 9000).toISOString();
+      const endedAt = new Date(Date.now() - 5000).toISOString();
+      for (const [entryType, recordedAt] of [["clock_in", startedAt], ["clock_out", endedAt]]) {
+        const booking = await fetch(`${baseUrl}/api/v1/time-entries`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: ownCookie },
+          body: JSON.stringify({ clientEntryId: randomUUID(), entryType, recordedAt, clientCreatedAt: recordedAt })
+        });
+        assert.equal(booking.status, 201, await booking.clone().text());
+      }
+      const ownWorkDate = localDate(startedAt, config.timeZone);
+      const day = await fetch(`${baseUrl}/api/v1/work-days/${ownWorkDate}`, { headers: { Cookie: ownCookie } });
+      return { ownCookie, ownWorkDate, entry: (await day.json()).workDay.entries[0] };
+    };
+
+    const correctOwnStart = async ({ ownCookie, ownWorkDate, entry }) => {
+      const shifted = new Date(new Date(entry.recordedAt).valueOf() - 3_600_000).toISOString();
+      const response = await fetch(`${baseUrl}/api/v1/time-entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: ownCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: entry.recordedAt,
+          recordedAt: shifted,
+          workDate: ownWorkDate,
+          reason: "Arbeitsbeginn war früher als gebucht"
+        })
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      const operation = (await response.json()).operation;
+      const day = await fetch(`${baseUrl}/api/v1/work-days/${ownWorkDate}`, { headers: { Cookie: ownCookie } });
+      const workDay = (await day.json()).workDay;
+      return { operation, workDay, shifted };
+    };
+
+    // Geprüfte Variante: nichts ändert sich, bis das Büro entscheidet.
+    const reviewed = await bookOwnDay("REV");
+    const reviewedResult = await correctOwnStart(reviewed);
+    assert.equal(reviewedResult.operation.status, "pending");
+    assert.equal(reviewedResult.workDay.hasPendingCorrection, true);
+    assert.notEqual(
+      reviewedResult.workDay.entries[0].recordedAt,
+      reviewedResult.shifted,
+      "Die Zeit darf sich vor der Freigabe nicht ändern"
+    );
+
+    // Sofort wirksam: die Zeit steht unmittelbar im Stundenzettel.
+    await setPolicy("immediate");
+    const immediate = await bookOwnDay("SOF");
+    const immediateResult = await correctOwnStart(immediate);
+    assert.equal(immediateResult.operation.status, "applied");
+    assert.equal(immediateResult.workDay.hasPendingCorrection, false);
+    assert.equal(immediateResult.workDay.entries[0].recordedAt, immediateResult.shifted);
+
+    // Am selben Tag frei: der laufende Tag bleibt frei korrigierbar.
+    const sameDayPolicy = await setPolicy("same_day");
+    assert.equal(sameDayPolicy.policy, "same_day");
+    assert.equal(sameDayPolicy.previousPolicy, "immediate");
+    const sameDay = await bookOwnDay("TAG");
+    const sameDayResult = await correctOwnStart(sameDay);
+    assert.equal(sameDayResult.operation.status, "applied");
+    assert.equal(sameDayResult.workDay.entries[0].recordedAt, sameDayResult.shifted);
+
+    // Derselbe Mitarbeiter, ein zurückliegender Arbeitstag: jetzt greift die
+    // Prüfpflicht. Der Tag wird unmittelbar angelegt, weil die App für
+    // vergangene Tage keine Buchung anbietet.
+    const pastDate = localDate(new Date(Date.now() - 3 * 86_400_000).toISOString(), config.timeZone);
+    const pastEmployee = await inspectionPool.query(
+      "SELECT id, company_id FROM users WHERE personnel_number = $1",
+      [`POL-TAG-${suffix}`]
+    );
+    const pastDay = await inspectionPool.query(
+      `INSERT INTO work_days (company_id, user_id, work_date, target_work_minutes)
+       VALUES ($1, $2, $3, 480) RETURNING id`,
+      [pastEmployee.rows[0].company_id, pastEmployee.rows[0].id, pastDate]
+    );
+    const pastEntry = await inspectionPool.query(
+      `INSERT INTO time_entries (
+         company_id, user_id, work_day_id, entry_type, recorded_at,
+         client_entry_id, client_created_at, source, entered_by_user_id
+       ) VALUES ($1,$2,$3,'clock_in',$4::DATE + TIME '08:00', gen_random_uuid(),
+                 CURRENT_TIMESTAMP, 'employee', $2)
+       RETURNING id, recorded_at`,
+      [pastEmployee.rows[0].company_id, pastEmployee.rows[0].id, pastDay.rows[0].id, pastDate]
+    );
+    await inspectionPool.query(
+      `INSERT INTO time_entries (
+         company_id, user_id, work_day_id, entry_type, recorded_at,
+         client_entry_id, client_created_at, source, entered_by_user_id
+       ) VALUES ($1,$2,$3,'clock_out',$4::DATE + TIME '16:00', gen_random_uuid(),
+                 CURRENT_TIMESTAMP, 'employee', $2)`,
+      [pastEmployee.rows[0].company_id, pastEmployee.rows[0].id, pastDay.rows[0].id, pastDate]
+    );
+
+    const pastCorrection = await fetch(
+      `${baseUrl}/api/v1/time-entries/${pastEntry.rows[0].id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: sameDay.ownCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: new Date(pastEntry.rows[0].recorded_at).toISOString(),
+          recordedAt: new Date(new Date(pastEntry.rows[0].recorded_at).valueOf() - 3_600_000).toISOString(),
+          workDate: pastDate,
+          reason: "Nachträgliche Korrektur eines zurückliegenden Arbeitstags"
+        })
+      }
+    );
+    assert.equal(pastCorrection.status, 200, await pastCorrection.clone().text());
+    assert.equal(
+      (await pastCorrection.json()).operation.status,
+      "pending",
+      "Bei same_day muss ein zurückliegender Tag geprüft werden"
+    );
+
+    // Ohne Planungsrechte bleibt die Regel unerreichbar, lesend wie schreibend.
+    const foremanRead = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      headers: { Cookie: sameDay.ownCookie }
+    });
+    assert.equal(foremanRead.status, 403);
+    const foremanWrite = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: sameDay.ownCookie },
+      body: JSON.stringify({ policy: "immediate", reason: "Vorarbeiter stellt sich die Regel selbst um" })
+    });
+    assert.equal(foremanWrite.status, 403);
+    assert.equal((await foremanWrite.json()).error.code, "time_account_administration_forbidden");
+
+    // Auch die Planung ohne Administrationsrechte darf die Regel nur lesen.
+    const plannerRead = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      headers: { Cookie: plannerCookie }
+    });
+    assert.equal(plannerRead.status, 200);
+    const plannerWrite = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ policy: "immediate", reason: "Planung stellt die Regel um" })
+    });
+    assert.equal(plannerWrite.status, 403);
+
+    const unknownPolicy = await fetch(`${baseUrl}/api/v1/admin/time-correction-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ policy: "niemals", reason: "Unbekannte Regel setzen" })
+    });
+    assert.equal(unknownPolicy.status, 400);
+
+    await setPolicy("review_required");
+  });
+
+  await t.test("Firmeneigene Schalter für abschaltbare Bereiche", async () => {
+    const leseModule = async () => {
+      const response = await fetch(`${baseUrl}/api/v1/admin/modules`, { headers: { Cookie: cookie } });
+      assert.equal(response.status, 200, await response.clone().text());
+      return (await response.json()).modules;
+    };
+
+    const module = await leseModule();
+    const schluessel = module.map((eintrag) => eintrag.key).sort();
+    assert.deepEqual(
+      schluessel,
+      ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
+    );
+    // Der Kern taucht bewusst nicht als abschaltbarer Bereich auf.
+    assert.ok(!schluessel.includes("time_tracking"));
+    // Regulaere Bereiche gehoeren zum Umfang und sind ohne Zutun eingeschaltet.
+    assert.equal(module.find((eintrag) => eintrag.key === "absences").enabled, true);
+
+    const schalte = async (key, enabled, rowVersion, erwarteterStatus = 200) => {
+      const response = await fetch(`${baseUrl}/api/v1/admin/modules/${key}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ enabled, rowVersion })
+      });
+      assert.equal(response.status, erwarteterStatus, await response.clone().text());
+      return response.json();
+    };
+
+    const vorher = (await leseModule()).find((eintrag) => eintrag.key === "absences");
+    const abgeschaltet = await schalte("absences", false, vorher.rowVersion);
+    assert.equal(abgeschaltet.module.enabled, false);
+
+    // Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
+    const gesperrt = await fetch(`${baseUrl}/api/v1/absences`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        absenceType: "vacation",
+        startDate: "2027-03-01",
+        endDate: "2027-03-02",
+        note: "Urlaub im Integrationstest"
+      })
+    });
+    assert.equal(gesperrt.status, 409, await gesperrt.clone().text());
+    assert.equal((await gesperrt.json()).error.code, "module_disabled");
+
+    // Der Modulstand steht auch in der Sitzung, damit die App ihn ohne die
+    // Verwaltungsansicht kennt.
+    const sitzung = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });
+    assert.equal(sitzung.status, 200);
+    assert.equal((await sitzung.json()).session.modules.absences, false);
+
+    // Eine veraltete Fassung wird abgewiesen, damit zwei Bueros sich nicht
+    // gegenseitig ueberschreiben.
+    await schalte("absences", true, vorher.rowVersion, 409);
+
+    const zwischen = (await leseModule()).find((eintrag) => eintrag.key === "absences");
+    const wieder = await schalte("absences", true, zwischen.rowVersion);
+    assert.equal(wieder.module.enabled, true);
+
+    // Nach dem Wiedereinschalten funktioniert der Bereich unveraendert.
+    const erlaubt = await fetch(`${baseUrl}/api/v1/absences`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        absenceType: "vacation",
+        startDate: "2027-03-05",
+        endDate: "2027-03-06",
+        note: "Urlaub nach dem Wiedereinschalten"
+      })
+    });
+    assert.equal(erlaubt.status, 201, await erlaubt.clone().text());
+
+    // Ein unbekannter Bereich wird abgewiesen.
+    // Der Kern und die Einsatzplanung stehen nicht unter den abschaltbaren
+    // Bereichen: sie tragen die Zeitberechnung.
+    for (const fest of ["time_tracking", "scheduling"]) {
+      const unbekannt = await fetch(`${baseUrl}/api/v1/admin/modules/${fest}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ enabled: false, rowVersion: 0 })
+      });
+      assert.equal(unbekannt.status, 404, await unbekannt.clone().text());
+    }
   });
 
   await t.test("Plattformverwaltung: Firmen, Konten, Tarife und Betrieb", async () => {

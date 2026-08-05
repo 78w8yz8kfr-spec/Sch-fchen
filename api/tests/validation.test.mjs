@@ -42,6 +42,7 @@ import {
   validateSpontaneousSiteSelection,
   validateSiteBundle,
   validateId,
+  validateTimeCorrectionPolicy,
   validateTimeEntry,
   validateTimeEntryAddition,
   validateTimeEntryCorrection,
@@ -225,15 +226,25 @@ test("Abwesenheiten prüfen Art Zeitraum Halbtage und Entscheidungen", () => {
   }), /Begründung/);
 });
 
-test("Elektro-Module verlangen bekannten Schlüssel Status und Versionsstand", () => {
+test("Abschaltbare Bereiche verlangen bekannten Schlüssel Status und Versionsstand", () => {
   assert.deepEqual(
     validateCompanyModuleUpdate("VDE", { enabled: true, rowVersion: 0 }),
     { moduleKey: "vde", enabled: true, rowVersion: 0 }
   );
-  assert.throws(
-    () => validateCompanyModuleUpdate("lwl", { enabled: true, rowVersion: 0 }),
-    /Elektro-Spezialmodul/
-  );
+  for (const bereich of ["assembly_reports", "documents", "absences", "site_qr"]) {
+    assert.deepEqual(
+      validateCompanyModuleUpdate(bereich, { enabled: false, rowVersion: 3 }),
+      { moduleKey: bereich, enabled: false, rowVersion: 3 }
+    );
+  }
+  // Die Pruefung hier betrifft nur die Schluesselform. Ob ein Bereich wirklich
+  // abschaltbar ist, entscheidet der Modulkatalog und nicht eine zweite Liste.
+  for (const ungueltig of ["Gross Buchstaben", "mit-strich", "1ziffer"]) {
+    assert.throws(
+      () => validateCompanyModuleUpdate(ungueltig, { enabled: true, rowVersion: 0 }),
+      /ungültig/
+    );
+  }
   assert.throws(
     () => validateCompanyModuleUpdate("vde", { enabled: "ja", rowVersion: 0 }),
     /Modulstatus/
@@ -1390,4 +1401,31 @@ test("Pfadkennungen werden vor jeder Datenbankabfrage als UUID geprüft", () => 
   ]) {
     assert.throws(() => validateId(attack, "Zeitbuchungs-ID"), /Zeitbuchungs-ID/);
   }
+});
+
+test("Die Korrekturregel der Firma erlaubt nur die drei vorgesehenen Werte", () => {
+  assert.deepEqual(
+    validateTimeCorrectionPolicy({ policy: "SAME_DAY", reason: "Umstellung nach Absprache" }),
+    { policy: "same_day", reason: "Umstellung nach Absprache" }
+  );
+  for (const policy of ["review_required", "same_day", "immediate"]) {
+    assert.equal(
+      validateTimeCorrectionPolicy({ policy, reason: "Betriebliche Entscheidung" }).policy,
+      policy
+    );
+  }
+  assert.throws(
+    () => validateTimeCorrectionPolicy({ policy: "niemals", reason: "Unbekannte Regel" }),
+    /Korrekturregel/
+  );
+  assert.throws(
+    () => validateTimeCorrectionPolicy({ policy: "same_day" }),
+    /Begründung/
+  );
+  assert.throws(
+    () => validateTimeCorrectionPolicy({
+      policy: "same_day", reason: "Test", companyId: "11111111-1111-4111-8111-111111111111"
+    }),
+    /ausschließlich vom Server/
+  );
 });

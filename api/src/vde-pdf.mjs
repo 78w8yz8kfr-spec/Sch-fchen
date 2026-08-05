@@ -72,7 +72,7 @@ function pdfSafeText(value) {
   return safe;
 }
 
-function splitPdfWord(word, font, size, width) {
+export function splitPdfWord(word, font, size, width) {
   const chunks = [];
   let chunk = "";
   for (const character of word) {
@@ -88,7 +88,7 @@ function splitPdfWord(word, font, size, width) {
   return chunks;
 }
 
-function wrapText(text, font, size, width) {
+export function wrapText(text, font, size, width) {
   const lines = [];
   for (const paragraph of pdfSafeText(text || "-").replace(/\r/g, "").split("\n")) {
     const words = paragraph.trim().split(/\s+/).filter(Boolean).flatMap(
@@ -128,7 +128,7 @@ function resultLabel(result) {
   }[result] || "-";
 }
 
-function checkLabel(result) {
+export function checkLabel(result) {
   return {
     ok: "i.O.",
     not_ok: "n.i.O.",
@@ -136,7 +136,7 @@ function checkLabel(result) {
   }[result] || "offen";
 }
 
-function protectionLabel(device) {
+export function protectionLabel(device) {
   const current = device?.ratedCurrent ? ` ${device.ratedCurrent} A` : "";
   const characteristic = device?.characteristic || "";
   switch (device?.type) {
@@ -155,7 +155,7 @@ function protectionLabel(device) {
   }
 }
 
-function circuitEvaluation(circuit, upstreamRcd = null) {
+export function circuitEvaluation(circuit, upstreamRcd = null) {
   const measurements = circuit.measurements || {};
   const device = circuit.protectiveDevice || {};
   const warnings = [];

@@ -32,6 +32,7 @@ import { buildFinalReportPdf } from "./report-pdf.mjs";
 import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
+import { loadCompanyModules } from "./company-modules.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import {
   expectedNextTypes,
@@ -77,6 +78,7 @@ import {
   validateSiteBundle,
   validateTimeEntry,
   validateTimeEntryAddition,
+  validateTimeCorrectionPolicy,
   validateTimeEntryCorrection,
   validateTimeEntryCorrectionDecision,
   validateTimeEntryDelete,
@@ -130,20 +132,6 @@ const ABSENCE_OFFICE_REVIEW_ROLES = new Set([
   "executive_assistant"
 ]);
 const ABSENCE_MANAGEMENT_APPROVAL_ROLES = new Set(["managing_director"]);
-const ELECTRICAL_MODULES = [
-  {
-    key: "vde",
-    name: "VDE",
-    description: "Prüfungen elektrischer Anlagen und Betriebsmittel",
-    integrated: true
-  },
-  {
-    key: "dguv",
-    name: "DGUV",
-    description: "Wiederkehrende Prüfungen elektrischer Betriebsmittel",
-    integrated: false
-  }
-];
 const FEDERAL_STATE_NAMES = new Map([
   ["BW", "Baden-Württemberg"],
   ["BY", "Bayern"],
@@ -823,6 +811,13 @@ async function getAssignments(client, context, date) {
        assignment.comment,
        assignment.report_responsible,
        assignment.report_responsibility_source,
+       -- Die Berichtsverantwortung gehoert dem Menschen fuer diese Baustelle an
+       -- diesem Tag, nicht einem einzelnen Einsatzeintrag. Wer nach der Mittags-
+       -- pause zurueckkehrt, bekommt einen zweiten Eintrag; ohne diese
+       -- Zusammenfassung verlor er dabei den Zugang zum Bericht.
+       BOOL_OR(assignment.report_responsible) OVER (
+         PARTITION BY assignment.construction_site_id
+       ) AS responsible_for_site,
        report.id AS mobile_report_id,
        report.report_number AS mobile_report_number,
        report.status AS mobile_report_status,
@@ -863,7 +858,7 @@ async function getAssignments(client, context, date) {
     plannedDurationMinutes: row.planned_duration_minutes,
     status: row.status,
     comment: row.comment,
-    reportResponsible: row.report_responsible,
+    reportResponsible: row.responsible_for_site,
     reportResponsibilitySource: row.report_responsibility_source,
     mobileReport: row.mobile_report_id ? {
       id: row.mobile_report_id,
@@ -968,6 +963,62 @@ async function getTimeTrackingSiteOptions(client, context, date) {
   };
 }
 
+// Stellt sicher, dass der eigene Einsatz auf einer Baustelle besteht, und legt
+// ihn sonst als Auswahl des Mitarbeiters an.
+//
+// Ein Monteur landet regelmäßig auf einer Baustelle, für die ihn niemand
+// eingeplant hat: kurzfristige Umleitung, Notdienst, Aushilfe auf einer
+// fremden Baustelle. Live konnte er die Baustelle deshalb schon immer selbst
+// wählen. Beim Nachtragen und beim Berichtigen fehlte diese Möglichkeit, und
+// die Buchung wurde abgewiesen, obwohl derselbe Vorgang live erlaubt ist.
+// Der Einsatz wird daher überall gleich behandelt und bei Bedarf angelegt.
+//
+// Die Prüfungen bleiben: Die Baustelle muss zur Firma gehören, aktiv sein und
+// für projektgebundene Rollen zugänglich sein.
+async function ensureOwnSiteAssignment(client, context, workDate, constructionSiteId, comment) {
+  const existing = await client.query(
+    `SELECT id, report_responsible FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+       AND work_date = $4 AND status IN ('released', 'completed')
+     ORDER BY report_responsible DESC, sequence_number`,
+    [context.companyId, context.userId, constructionSiteId, workDate]
+  );
+  if (existing.rowCount > 0) return existing.rows[0];
+
+  const roles = await activeRoleKeys(client, context);
+  if (hasProjectScopedAccess(roles)) {
+    await requireConstructionSiteAccess(client, context, constructionSiteId, roles);
+  }
+  const site = await client.query(
+    `SELECT id, name FROM construction_sites
+     WHERE company_id = $1 AND id = $2
+       AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
+    [context.companyId, constructionSiteId]
+  );
+  if (site.rowCount !== 1) {
+    throw new InputError(
+      "Die Baustelle wurde nicht gefunden oder ist nicht mehr offen.",
+      404,
+      "site_not_found"
+    );
+  }
+  await createEmployeeSelectedAssignment(
+    client,
+    context,
+    workDate,
+    constructionSiteId,
+    `${comment} · ${site.rows[0].name}`
+  );
+  const created = await client.query(
+    `SELECT id, report_responsible FROM site_assignments
+     WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
+       AND work_date = $4 AND status IN ('released', 'completed')
+     ORDER BY report_responsible DESC, sequence_number`,
+    [context.companyId, context.userId, constructionSiteId, workDate]
+  );
+  return created.rows[0];
+}
+
 function requireToday(workDate, timeZone) {
   const today = localDate(new Date().toISOString(), timeZone);
   if (workDate !== today) {
@@ -1042,25 +1093,29 @@ async function selectSpontaneousSite(client, context, input, timeZone) {
       roles
     );
   }
+  // Der Baustellenlink und der QR-Code tragen die QR-Kennung, nicht die
+  // Baustellen-ID. Wer vor Ort den Aufkleber scannt, soll damit dieselbe
+  // Baustelle waehlen koennen wie aus der Liste.
   const site = await client.query(
     `SELECT id, name
      FROM construction_sites
-     WHERE company_id = $1 AND id = $2
+     WHERE company_id = $1 AND (id = $2 OR qr_code = $2::TEXT)
        AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
     [context.companyId, input.constructionSiteId]
   );
   if (site.rowCount !== 1) {
     throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
   }
+  const constructionSiteId = site.rows[0].id;
   const assignments = await createEmployeeSelectedAssignment(
     client,
     context,
     input.workDate,
-    input.constructionSiteId,
+    constructionSiteId,
     `Spontan gewählt · ${site.rows[0].name}`,
     input.newOccurrence
   );
-  return { assignments, selectedSiteId: input.constructionSiteId };
+  return { assignments, selectedSiteId: constructionSiteId };
 }
 
 async function resolveConstructionSiteParent(client, context, input) {
@@ -1550,6 +1605,51 @@ async function requireModuleAdministrator(client, context) {
   return roles;
 }
 
+// Regel der Firma für eigene Zeitkorrekturen vor der Freigabe des Arbeitstags.
+// Die Bearbeitung fremder Zeiten durch das Büro bleibt davon unberührt.
+async function companyTimeCorrectionPolicy(client, context) {
+  const result = await client.query(
+    "SELECT time_correction_policy FROM companies WHERE id = $1",
+    [context.companyId]
+  );
+  return result.rows[0]?.time_correction_policy || "review_required";
+}
+
+function ownCorrectionNeedsReview(policy, workDate, timeZone) {
+  if (policy === "immediate") return false;
+  if (policy === "same_day") {
+    return workDate !== localDate(new Date().toISOString(), timeZone);
+  }
+  return true;
+}
+
+async function getTimeCorrectionPolicy(client, context) {
+  await requirePlanner(client, context);
+  return {
+    policy: await companyTimeCorrectionPolicy(client, context),
+    options: ["review_required", "same_day", "immediate"]
+  };
+}
+
+async function updateTimeCorrectionPolicy(client, context, input) {
+  await requireTimeAccountAdministrator(client, context);
+  const before = await companyTimeCorrectionPolicy(client, context);
+  const updated = await client.query(
+    `UPDATE companies SET time_correction_policy = $2
+     WHERE id = $1
+     RETURNING time_correction_policy`,
+    [context.companyId, input.policy]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError("Die Firma wurde nicht gefunden.", 404, "company_not_found");
+  }
+  return {
+    policy: updated.rows[0].time_correction_policy,
+    previousPolicy: before,
+    options: ["review_required", "same_day", "immediate"]
+  };
+}
+
 async function requireTimeAccountAdministrator(client, context) {
   const roles = await activeRoleKeys(client, context);
   if (![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
@@ -1690,44 +1790,24 @@ function absenceRequestDto(row) {
   };
 }
 
-function companyModuleDto(definition, row) {
-  const enabled = row?.entitlement_status === "permanent"
-    || (
-      row?.entitlement_status === "trial"
-      && (!row.starts_at || new Date(row.starts_at) <= new Date())
-      && (!row.ends_at || new Date(row.ends_at) > new Date())
-    );
-  return {
-    key: definition.key,
-    name: definition.name,
-    description: definition.description,
-    available: definition.integrated,
-    enabled: definition.integrated && enabled,
-    status: row?.entitlement_status || "inactive",
-    availableOnRequest: !enabled,
-    rowVersion: row ? Number(row.row_version) : 0,
-    changedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null,
-    changedByName: row ? "Plattformverwaltung" : null,
-    startsAt: row?.starts_at ? new Date(row.starts_at).toISOString() : null,
-    endsAt: row?.ends_at ? new Date(row.ends_at).toISOString() : null
-  };
+// Montage- und Tagesberichte stehen im Katalog als eigene Bereiche. Ein Betrieb
+// kann den einen fuehren und den anderen abschalten.
+function siteReportModuleKey(reportType) {
+  return reportType === "daily" ? "site_daily_reports" : "assembly_reports";
 }
 
-async function loadCompanyModules(client, context) {
-  const result = await client.query(
-    `SELECT catalog.module_key, entitlement.entitlement_status,
-            entitlement.row_version, entitlement.updated_at,
-            entitlement.starts_at, entitlement.ends_at
-     FROM module_catalog AS catalog
-     LEFT JOIN company_module_entitlements AS entitlement
-       ON entitlement.module_id = catalog.id AND entitlement.company_id = $1
-     WHERE catalog.module_key IN ('vde','dguv')`,
-    [context.companyId]
+// Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
+// Sonst bliebe er ueber die Schnittstelle weiter bedienbar und der Schalter
+// waere eine reine Anzeige.
+async function requireEnabledModule(client, context, moduleKey) {
+  const modules = await loadCompanyModules(client, context);
+  const module = modules.find((entry) => entry.key === moduleKey);
+  if (module?.enabled) return module;
+  throw new InputError(
+    `Der Bereich „${module?.name || moduleKey}" ist für diese Firma abgeschaltet.`,
+    409,
+    "module_disabled"
   );
-  const rows = new Map(result.rows.map((row) => [row.module_key, row]));
-  return ELECTRICAL_MODULES.map((definition) => (
-    companyModuleDto(definition, rows.get(definition.key))
-  ));
 }
 
 async function getCompanyModules(client, context) {
@@ -1780,11 +1860,42 @@ async function markPlatformAnnouncementRead(client, context, announcementId) {
 
 async function updateCompanyModule(client, context, input) {
   await requireModuleAdministrator(client, context);
-  throw new InputError(
-    "Spezialmodule werden ausschließlich durch die Plattformverwaltung freigeschaltet. Das Modul kann auf Anfrage bereitgestellt werden.",
-    403,
-    "platform_module_administration_required"
+  const vorher = (await loadCompanyModules(client, context))
+    .find((entry) => entry.key === input.moduleKey);
+  if (!vorher) {
+    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.", 404, "module_not_found");
+  }
+
+  // Einschalten kann die Firma nur, was die Plattform ihr freigegeben hat.
+  if (input.enabled && !vorher.available) {
+    throw new InputError(
+      "Dieser Bereich ist für die Firma nicht freigegeben. Die Plattformverwaltung stellt ihn auf Anfrage bereit.",
+      403,
+      "module_not_entitled"
+    );
+  }
+  if (vorher.rowVersion !== input.rowVersion) {
+    throw new InputError(
+      "Der Bereich wurde zwischenzeitlich geändert. Bitte die Ansicht neu laden.",
+      409,
+      "module_row_version_conflict"
+    );
+  }
+  if (vorher.enabled === input.enabled) return vorher;
+
+  // Ein fehlender Eintrag bedeutet eingeschaltet. Beim ersten Abschalten
+  // entsteht die Zeile, danach wird sie fortgeschrieben. Die Historie fuehrt
+  // der Trigger der Tabelle.
+  await client.query(
+    `INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (company_id, module_key) DO UPDATE
+       SET is_enabled = EXCLUDED.is_enabled,
+           changed_by_user_id = EXCLUDED.changed_by_user_id`,
+    [context.companyId, input.moduleKey, input.enabled, context.userId]
   );
+  return (await loadCompanyModules(client, context))
+    .find((entry) => entry.key === input.moduleKey);
 }
 
 function vdeInspectionDto(row, includeProtocol = false) {
@@ -1846,18 +1957,12 @@ const VDE_INSPECTION_SELECT = `
 `;
 
 async function requireVdeModuleEnabled(client, context) {
-  const result = await client.query(
-    `SELECT 1
-     FROM company_module_entitlements AS entitlement
-     JOIN module_catalog AS catalog ON catalog.id = entitlement.module_id
-     WHERE entitlement.company_id = $1
-       AND catalog.module_key = 'vde'
-       AND entitlement.entitlement_status IN ('permanent','trial')
-       AND (entitlement.starts_at IS NULL OR entitlement.starts_at <= CURRENT_TIMESTAMP)
-       AND (entitlement.ends_at IS NULL OR entitlement.ends_at > CURRENT_TIMESTAMP)`,
-    [context.companyId]
-  );
-  if (result.rowCount !== 1) {
+  // Die Plattform gibt das Modul frei, die Firma kann es zusaetzlich
+  // abschalten. Beides fuehrt zur selben Antwort, damit sich der bisherige
+  // Vertrag der Schnittstelle nicht aendert.
+  const modules = await loadCompanyModules(client, context);
+  const vde = modules.find((module) => module.key === "vde");
+  if (!vde?.enabled) {
     throw new InputError(
       "Das VDE-Modul ist für diese Firma nicht aktiviert.",
       404,
@@ -2936,6 +3041,7 @@ async function listOwnAbsenceRequests(client, context, { from, to }) {
 }
 
 async function createAbsenceRequest(client, context, input) {
+  await requireEnabledModule(client, context, "absences");
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     [`absence:${context.companyId}:${context.userId}`]
@@ -5120,6 +5226,7 @@ async function getSiteTaskRecord(client, context, taskId) {
 }
 
 async function createSiteTask(client, context, input) {
+  await requireEnabledModule(client, context, "documents");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5366,6 +5473,7 @@ async function storeSiteNote(client, context, input) {
 }
 
 async function createAdminSiteNote(client, context, input) {
+  await requireEnabledModule(client, context, "documents");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5540,6 +5648,7 @@ function structuredReportData(input, personnel, photos = []) {
 }
 
 async function createSiteReport(client, context, input) {
+  await requireEnabledModule(client, context, siteReportModuleKey(input.reportType));
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5593,6 +5702,7 @@ async function createSiteReport(client, context, input) {
 }
 
 async function createMobileSiteReport(client, context, input) {
+  await requireEnabledModule(client, context, siteReportModuleKey(input.reportType));
   const duplicate = await client.query(
     `SELECT id, author_user_id, construction_site_id, work_date, report_type,
             source_mode, summary, details, structured_data
@@ -7454,7 +7564,7 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
     [`assignment-report:${context.companyId}:${constructionSiteId}:${workDate}`]
   );
   const result = await client.query(
-    `SELECT assignment.id, assignment.report_responsible,
+    `SELECT assignment.id, assignment.user_id, assignment.report_responsible,
             assignment.report_responsibility_source,
             EXISTS (
               SELECT 1
@@ -7476,10 +7586,20 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
     assignment.report_responsible
     && assignment.report_responsibility_source === "manual"
   ));
+  // Entscheidend ist, wie viele Menschen auf der Baustelle sind, nicht wie
+  // viele Einsatzzeilen es gibt. Wer nach einer Unterbrechung zurueckkehrt,
+  // bekommt einen zweiten Eintrag und galt dadurch faelschlich als Team: die
+  // automatische Vorarbeiterfunktion wurde ihm wieder entzogen, obwohl er
+  // weiterhin allein arbeitete.
+  const menschenAufDerBaustelle = new Set(
+    assignmentsForSite.map((assignment) => assignment.user_id)
+  );
 
-  if (assignmentsForSite.length === 1 && !manualResponsible) {
-    const [assignment] = assignmentsForSite;
-    if (!assignment.report_responsible && !assignment.has_mobile_report) {
+  if (menschenAufDerBaustelle.size === 1 && !manualResponsible) {
+    const traegt = assignmentsForSite.some((assignment) => assignment.report_responsible);
+    const hatBericht = assignmentsForSite.some((assignment) => assignment.has_mobile_report);
+    if (!traegt && !hatBericht) {
+      const [assignment] = assignmentsForSite;
       await client.query(
         `UPDATE site_assignments
          SET report_responsible = TRUE,
@@ -7493,7 +7613,7 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
     return;
   }
 
-  if (assignmentsForSite.length !== 1) {
+  if (menschenAufDerBaustelle.size !== 1) {
     await client.query(
       `UPDATE site_assignments AS assignment
        SET report_responsible = FALSE,
@@ -7517,30 +7637,22 @@ async function reconcileAutomaticSiteForeman(client, context, constructionSiteId
   }
 }
 
+// Eine Teamvorlage darf jeden aktiven Mitarbeiter enthalten, weil auch jeder
+// aktive Mitarbeiter einzeln eingeplant werden kann. Alles andere wäre für die
+// Planung nicht nachvollziehbar: derselbe Mensch wäre einzeln planbar, im Team
+// aber nicht.
 async function assertPlanningTeamEmployees(client, context, memberIds) {
   const result = await client.query(
     `SELECT account.id
      FROM users AS account
      WHERE account.company_id = $1
        AND account.id = ANY($2::UUID[])
-       AND account.status = 'active'
-       AND EXISTS (
-         SELECT 1
-         FROM user_roles AS assignment
-         JOIN roles AS role
-           ON role.company_id = assignment.company_id
-          AND role.id = assignment.role_id
-         WHERE assignment.company_id = account.company_id
-           AND assignment.user_id = account.id
-           AND assignment.revoked_at IS NULL
-           AND role.status = 'active'
-           AND role.role_key IN ('installer', 'foreman')
-       )`,
+       AND account.status = 'active'`,
     [context.companyId, memberIds]
   );
   if (result.rowCount !== memberIds.length) {
     throw new InputError(
-      "Teamvorlagen dürfen nur aktive Monteure und Vorarbeiter enthalten.",
+      "Teamvorlagen dürfen nur aktive Mitarbeiter der eigenen Firma enthalten.",
       409,
       "planning_team_member_conflict"
     );
@@ -7858,19 +7970,7 @@ async function createAssignment(client, context, input) {
   await assertNoApprovedFullDayAbsence(client, context, input.employeeId, input.workDate);
   const [employee, site] = await Promise.all([
     client.query(
-      `SELECT account.is_foreman,
-              EXISTS (
-                SELECT 1
-                FROM user_roles AS assignment
-                JOIN roles AS role
-                  ON role.company_id = assignment.company_id
-                 AND role.id = assignment.role_id
-                WHERE assignment.company_id = account.company_id
-                  AND assignment.user_id = account.id
-                  AND assignment.revoked_at IS NULL
-                  AND role.status = 'active'
-                  AND role.role_key IN ('installer', 'foreman')
-              ) AS is_field_employee
+      `SELECT account.is_foreman
        FROM users AS account
        WHERE account.company_id = $1
          AND account.id = $2
@@ -7884,14 +7984,12 @@ async function createAssignment(client, context, input) {
       [context.companyId, input.constructionSiteId]
     )
   ]);
+  // Jeder aktive Mitarbeiter kann auf eine Baustelle eingeplant werden. In
+  // kleinen Betrieben arbeiten Administration, Geschäftsführung und
+  // Projektleitung regelmäßig selbst mit; die frühere Beschränkung auf Monteure
+  // und Vorarbeiter sperrte sie ohne Ausweg aus. Wer eingeplant wird,
+  // entscheidet die Planung, nicht die Rollenzuordnung.
   if (employee.rowCount !== 1) throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
-  if (!employee.rows[0].is_field_employee) {
-    throw new InputError(
-      "Einsätze können nur Monteuren oder Vorarbeitern zugewiesen werden.",
-      409,
-      "assignment_employee_role_conflict"
-    );
-  }
   if (site.rowCount !== 1) throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
   if (input.reportResponsible && !employee.rows[0].is_foreman) {
     throw new InputError("Nur ein Mitarbeiter mit der Rolle Vorarbeiter kann den Baustellenbericht übernehmen.");
@@ -8395,17 +8493,13 @@ async function insertTimeEntry(client, context, input, timeZone) {
 
   let matchedAssignment = null;
   if (input.constructionSiteId) {
-    const assignment = await client.query(
-      `SELECT id, report_responsible FROM site_assignments
-       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released', 'completed')
-       ORDER BY report_responsible DESC, sequence_number`,
-      [context.companyId, context.userId, input.constructionSiteId, workDate]
+    matchedAssignment = await ensureOwnSiteAssignment(
+      client,
+      context,
+      workDate,
+      input.constructionSiteId,
+      "Selbst gewählt bei der Buchung"
     );
-    if (assignment.rowCount === 0) {
-      throw new InputError("Die Baustelle ist für diesen Arbeitstag nicht freigegeben.", 403, "site_not_assigned");
-    }
-    matchedAssignment = assignment.rows[0];
   }
 
   if (input.entryType === "site_departure" && matchedAssignment?.report_responsible) {
@@ -8813,16 +8907,18 @@ async function ensureEditableSite(client, context, userId, workDate, siteId, adm
   if (site.rowCount !== 1) {
     throw new InputError("Die Zielbaustelle wurde nicht gefunden oder ist nicht aktiv.", 404, "site_not_found");
   }
-  if (!administrator) {
-    const assignment = await client.query(
-      `SELECT 1 FROM site_assignments
-       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released','completed')`,
-      [context.companyId, userId, siteId, workDate]
+  // Beim Berichtigen der eigenen Zeiten gilt dieselbe Regel wie beim Buchen:
+  // Fehlt der Einsatz auf der Zielbaustelle, wird er als Auswahl des
+  // Mitarbeiters angelegt statt die Korrektur abzuweisen. Das Büro bearbeitet
+  // fremde Zeiten ohnehin ohne diese Einschränkung.
+  if (!administrator && userId === context.userId) {
+    await ensureOwnSiteAssignment(
+      client,
+      context,
+      workDate,
+      siteId,
+      "Selbst gewählt beim Berichtigen"
     );
-    if (assignment.rowCount === 0) {
-      throw new InputError("Die Zielbaustelle ist für diesen Arbeitstag nicht freigegeben.", 403, "site_not_assigned");
-    }
   }
 }
 
@@ -8896,9 +8992,14 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
     original.user_id,
     input.workDate
   );
-  const controlled = ["approved", "locked"].includes(original.work_day_status)
+  const lockedDay = ["approved", "locked"].includes(original.work_day_status)
     || ["approved", "locked"].includes(targetDay.status);
-  if (controlled && administrator) {
+  const policy = administrator ? null : await companyTimeCorrectionPolicy(client, context);
+  const controlled = lockedDay
+    || (!administrator && ownCorrectionNeedsReview(
+      policy, databaseDate(original.work_date), timeZone
+    ));
+  if (lockedDay && administrator) {
     await requireEmployeeLifecycleAdministrator(client, context);
   }
 
@@ -8968,11 +9069,12 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
 
   const operation = await client.query(
     `INSERT INTO time_change_operations (
-       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id,
+       applied_without_review
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
     [
       context.companyId, original.user_id, input.clientChangeId, expectedAction,
-      input.reason, controlled ? "pending" : "applied", context.userId
+      input.reason, controlled ? "pending" : "applied", context.userId, !controlled
     ]
   );
   const insertedItems = [];
@@ -8995,10 +9097,13 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
       ]
     );
     if (!controlled) {
+      // Ohne Prüfung wirksam: kein Prüfer, sondern die ausdrückliche
+      // Kennzeichnung, dass das Büro nicht beteiligt war.
       await client.query(
-        `UPDATE time_entries SET correction_status = 'approved', reviewed_by_user_id = $2
-         WHERE company_id = $1 AND id = $3`,
-        [context.companyId, context.userId, inserted.rows[0].id]
+        `UPDATE time_entries
+         SET correction_status = 'approved', applied_without_review = TRUE
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, inserted.rows[0].id]
       );
     }
     const item = await client.query(
@@ -9063,7 +9168,7 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
   };
 }
 
-async function deleteTimeEntry(client, context, entryId, input, administrator = false) {
+async function deleteTimeEntry(client, context, entryId, input, timeZone, administrator = false) {
   const streamUserId = await lockTimeEntryStream(client, context, entryId, administrator);
   const idempotent = await existingTimeChange(
     client, context.companyId, streamUserId, input.clientChangeId, "delete_entry"
@@ -9083,8 +9188,13 @@ async function deleteTimeEntry(client, context, entryId, input, administrator = 
   if (block.length === 0) throw new InputError("Der Arbeitsblock wurde nicht gefunden.", 409, "time_block_missing");
   const remaining = sourceEntries.filter((entry) => !block.some((item) => item.id === entry.id));
   assertEffectiveTimeline(remaining);
-  const controlled = ["approved", "locked"].includes(original.work_day_status);
-  if (controlled && administrator) await requireEmployeeLifecycleAdministrator(client, context);
+  const lockedDay = ["approved", "locked"].includes(original.work_day_status);
+  const policy = administrator ? null : await companyTimeCorrectionPolicy(client, context);
+  const controlled = lockedDay
+    || (!administrator && ownCorrectionNeedsReview(
+      policy, databaseDate(original.work_date), timeZone
+    ));
+  if (lockedDay && administrator) await requireEmployeeLifecycleAdministrator(client, context);
   if (!controlled) {
     await client.query(
       `UPDATE work_days SET status = 'open'
@@ -9094,9 +9204,13 @@ async function deleteTimeEntry(client, context, entryId, input, administrator = 
   }
   const operation = await client.query(
     `INSERT INTO time_change_operations (
-       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id
-     ) VALUES ($1,$2,$3,'delete_entry',$4,$5,$6) RETURNING *`,
-    [context.companyId, original.user_id, input.clientChangeId, input.reason, controlled ? "pending" : "applied", context.userId]
+       company_id,user_id,client_change_id,action,reason,status,requested_by_user_id,
+       applied_without_review
+     ) VALUES ($1,$2,$3,'delete_entry',$4,$5,$6,$7) RETURNING *`,
+    [
+      context.companyId, original.user_id, input.clientChangeId, input.reason,
+      controlled ? "pending" : "applied", context.userId, !controlled
+    ]
   );
   const items = [];
   for (const entry of block) {
@@ -9116,10 +9230,13 @@ async function deleteTimeEntry(client, context, entryId, input, administrator = 
       ]
     );
     if (!controlled) {
+      // Ohne Prüfung wirksam: kein Prüfer, sondern die ausdrückliche
+      // Kennzeichnung, dass das Büro nicht beteiligt war.
       await client.query(
-        `UPDATE time_entries SET correction_status = 'approved', reviewed_by_user_id = $2
-         WHERE company_id = $1 AND id = $3`,
-        [context.companyId, context.userId, invalidation.rows[0].id]
+        `UPDATE time_entries
+         SET correction_status = 'approved', applied_without_review = TRUE
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, invalidation.rows[0].id]
       );
     }
     const item = await client.query(
@@ -9407,21 +9524,13 @@ async function createTimeEntryAddition(client, context, input, timeZone) {
   const day = dayResult.rows[0];
 
   if (input.constructionSiteId) {
-    const assignment = await client.query(
-      `SELECT 1
-       FROM site_assignments
-       WHERE company_id = $1 AND user_id = $2 AND construction_site_id = $3
-         AND work_date = $4 AND status IN ('released', 'completed')
-       LIMIT 1`,
-      [context.companyId, context.userId, input.constructionSiteId, input.workDate]
+    await ensureOwnSiteAssignment(
+      client,
+      context,
+      input.workDate,
+      input.constructionSiteId,
+      "Selbst gewählt beim Nachtragen"
     );
-    if (assignment.rowCount !== 1) {
-      throw new InputError(
-        "Die Baustelle war diesem Arbeitstag nicht zugeordnet.",
-        403,
-        "site_not_assigned"
-      );
-    }
   }
 
   await client.query(
@@ -9708,7 +9817,7 @@ async function recordUnhandledPlatformError(pool, request, requestId, error) {
       `INSERT INTO platform_error_groups (
          fingerprint,error_code,severity,module,application_version,
          sanitized_message,sanitized_details,first_seen_at,last_seen_at
-       ) VALUES ($1,$2,'error',$3,'0.42.0',$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       ) VALUES ($1,$2,'error',$3,'0.42.1',$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
        ON CONFLICT (fingerprint) DO UPDATE SET
          occurrence_count = platform_error_groups.occurrence_count + 1,
          last_seen_at = CURRENT_TIMESTAMP,
@@ -10236,6 +10345,25 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           }
         );
         return json(response, 200, { holidayCalendar });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/time-correction-policy") {
+        const timeCorrectionPolicy = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getTimeCorrectionPolicy(client, context)
+        );
+        return json(response, 200, { timeCorrectionPolicy });
+      }
+
+      if (request.method === "PATCH" && url.pathname === "/api/v1/admin/time-correction-policy") {
+        const input = validateTimeCorrectionPolicy(await readJson(request));
+        const timeCorrectionPolicy = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateTimeCorrectionPolicy(client, context, input)
+        );
+        return json(response, 200, { timeCorrectionPolicy });
       }
 
       if (request.method === "PATCH" && url.pathname === "/api/v1/admin/holiday-calendar") {
@@ -10815,7 +10943,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const result = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => deleteTimeEntry(client, context, entryId, input, true)
+          (client, context) => deleteTimeEntry(client, context, entryId, input, config.timeZone, true)
         );
         return json(response, 200, result);
       }
@@ -11029,7 +11157,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const result = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => deleteTimeEntry(client, context, entryId, input, false)
+          (client, context) => deleteTimeEntry(client, context, entryId, input, config.timeZone, false)
         );
         return json(response, 200, result);
       }

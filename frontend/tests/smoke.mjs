@@ -43,6 +43,63 @@ assert.match(html, /id="week-total-overtime"/);
 assert.match(html, /id="week-previous"/);
 assert.match(html, /id="week-current"/);
 assert.match(html, /id="week-next"/);
+// Der Wochenwechsel nutzt dieselbe Schaltflaeche wie die Plantafel. Vorher war
+// er als kleiner Textknopf ausgefuehrt und mit dem Finger schwer zu treffen.
+assert.match(html, /id="week-previous" class="week-button"/);
+assert.match(html, /id="week-next" class="week-button"/);
+assert.match(html, /id="week-current" class="week-navigation__today"/);
+// Die Plantafel heisst auf jedem Geraet gleich. "Desktop-Plantafel" stand auch
+// dann ueber der Ansicht, wenn sie auf dem Handy geoeffnet wurde.
+assert.doesNotMatch(html, /Desktop-Plantafel/);
+// Die Bereiche der App lassen sich firmenweit abschalten. Der Schalter war
+// frueher auf die Elektro-Spezialmodule beschraenkt und wies jeden Versuch ab.
+assert.match(html, /<h3 id="electrical-module-admin-title">Bereiche der App<\/h3>/);
+assert.doesNotMatch(html, /Elektro-Spezialmodule/);
+assert.match(html, /id="absence-area"/);
+assert.match(app, /function moduleEnabled\(key\)/);
+assert.match(app, /function applyModuleVisibility\(\)/);
+// Die Bereiche tragen die Schluessel des Plattformkatalogs, nicht eigene.
+for (const bereich of ["absences", "assembly_reports", "site_daily_reports", "documents", "materials", "site_qr"]) {
+  assert.ok(app.includes(`"${bereich}"`), `Der Bereich ${bereich} fehlt in der Oberflaeche`);
+}
+for (const erfunden of ["site_reports", "site_documents"]) {
+  assert.ok(!app.includes(`"${erfunden}"`), `${erfunden} steht nicht im Modulkatalog`);
+}
+// Der Kern ist kein abschaltbarer Bereich.
+assert.doesNotMatch(app, /moduleEnabled\("time_tracking"\)/);
+// Ein direkt uebergebener Handler bekommt das Ereignis als ersten Wert. Nimmt
+// die Funktion dort etwas anderes entgegen, arbeitet sie mit dem Ereignis
+// weiter. So brach die Baustellenakte ab: openEmployeeSiteWorkspace hielt den
+// PointerEvent fuer den angeforderten Einsatz und meldete, es sei keine
+// Baustelle freigegeben.
+for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platform-admin.js", platformApp]]) {
+  const handlerBezuege = [...quelle.matchAll(/addEventListener\(\s*"[a-z]+",\s*([A-Za-z_$][\w$]*)\s*\)/g)];
+  for (const [, name] of handlerBezuege) {
+    const deklaration = new RegExp(`(?:async\\s+)?function ${name}\\(([^),]*)`).exec(quelle);
+    if (!deklaration) continue;
+    const ersterWert = deklaration[1].trim().split(/\s*=/)[0].trim();
+    // Ein Parameter ist in Ordnung, solange er das Ereignis meint. Erwartet die
+    // Funktion dort fachliche Daten, arbeitet sie mit dem Klickereignis weiter.
+    assert.ok(
+      ersterWert === "" || /^(event|e|ereignis)$/.test(ersterWert),
+      `${datei}: ${name} wird direkt als Handler uebergeben, erwartet als ersten Wert aber "${ersterWert}"`
+    );
+  }
+}
+
+// Jedes Formular braucht einen Absende-Empfaenger. Ohne ihn laedt der Browser
+// die Seite neu und die Eingabe ist fort, ohne dass jemand etwas bemerkt.
+const formularKennungen = [...html.matchAll(/<form[^>]*id="([a-z0-9-]+)"/g)].map((treffer) => treffer[1]);
+assert.ok(formularKennungen.length > 20, "Die Formulare der App werden gefunden");
+for (const kennung of formularKennungen) {
+  const name = kennung.replace(/-([a-z0-9])/g, (_, zeichen) => zeichen.toUpperCase());
+  const ueberElement = new RegExp(`\\b${name}\\.addEventListener\\(\\s*["']submit["']`);
+  const ueberAuswahl = new RegExp(`#${kennung}["']\\)\\s*\\.addEventListener\\(\\s*["']submit["']`);
+  assert.ok(
+    ueberElement.test(app) || ueberAuswahl.test(app),
+    `Das Formular ${kennung} hat keinen Absende-Empfaenger`
+  );
+}
 assert.match(html, /id="time-account-panel"/);
 assert.match(html, /id="time-account-balance"/);
 assert.match(html, /id="time-account-months"/);
@@ -51,6 +108,64 @@ assert.match(html, /id="time-account-admin-list"/);
 assert.match(html, /id="time-account-profile-form"/);
 assert.match(html, /id="time-account-adjustment-submit"/);
 assert.match(html, /id="time-account-holiday-list"/);
+// Die Bueroverwaltung liegt vollstaendig im Verwaltungsbereich und nicht mehr
+// hinter einem Aufklapper in der Wochenansicht.
+assert.match(html, /id="admin-year"/);
+assert.doesNotMatch(html, /week-advanced-panel--admin/);
+const weekSection = html.slice(
+  html.indexOf('id="week-section"'),
+  html.indexOf('id="admin-section"')
+);
+for (const buried of ["time-account-admin-panel", "holiday-calendar-admin", "time-correction-policy-admin"]) {
+  assert.ok(
+    !weekSection.includes(`id="${buried}"`),
+    `${buried} gehoert in die Verwaltung, nicht in die Wochenansicht`
+  );
+}
+// Die drei Verwaltungsbereiche stehen gleichrangig nebeneinander. Frueher steckte
+// der Feiertagskalender in der Karte der Jahreskonten und war dort schwer zu finden.
+const kontenPanel = html.slice(
+  html.indexOf('id="time-account-admin-panel"'),
+  html.indexOf('id="holiday-calendar-admin"')
+);
+assert.ok(
+  kontenPanel.includes("</section>"),
+  "Der Feiertagskalender steht neben den Jahreskonten und nicht in ihnen"
+);
+// Das frueher genutzte Jahres-Element gibt es nicht mehr. Solange app.js noch
+// darauf schreibt, bricht die Darstellung der Verwaltung ab.
+assert.doesNotMatch(html, /id="time-account-admin-year"/);
+assert.doesNotMatch(app, /timeAccountAdminYear/);
+// Als eigener Bereich braucht der Feiertagskalender eine eigene Sichtbarkeit.
+assert.match(app, /elements\.holidayCalendarAdmin\.hidden = !visible/);
+assert.match(app, /let adminYear = new Date\(\)\.getFullYear\(\)/);
+assert.doesNotMatch(
+  app,
+  /function renderAdminTimeAccounts\(\)[\s\S]{0,400}selectedWeekStart/,
+  "Die Jahreskonten folgen nicht mehr der gewaehlten Woche"
+);
+assert.match(styles, /\.admin-year-select/);
+assert.match(html, /id="time-correction-policy-admin"/);
+assert.match(html, /id="time-correction-policy-form"/);
+assert.match(html, /id="time-correction-policy-reason"/);
+// Die Regel gehört in die Verwaltung, nicht in die Wochenansicht: sie steht
+// innerhalb des Verwaltungsbereichs und nicht im Wochenabschnitt.
+const adminSection = html.slice(html.indexOf('id="admin-section"'));
+assert.ok(
+  adminSection.includes('id="time-correction-policy-admin"'),
+  "Die Korrekturregel muss im Verwaltungsbereich stehen"
+);
+assert.equal(
+  [...html.matchAll(/name="time-correction-policy"/g)].length,
+  3,
+  "Genau die drei vorgesehenen Regeln stehen zur Auswahl"
+);
+for (const value of ["review_required", "same_day", "immediate"]) {
+  assert.ok(html.includes(`value="${value}"`), `Die Regel ${value} fehlt in der Auswahl`);
+}
+assert.match(app, /\.\/api\/v1\/admin\/time-correction-policy/);
+assert.match(styles, /\.time-correction-policy-option/);
+assert.match(styles, /\.visually-hidden/);
 assert.match(html, /id="holiday-calendar-form"/);
 assert.match(html, /id="holiday-calendar-state"/);
 assert.match(html, /id="holiday-calendar-list"/);
@@ -222,9 +337,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.0/);
-assert.match(html, /app\.js\?v=0\.42\.0/);
-assert.match(html, /version\.js\?v=0\.42\.0/);
+assert.match(html, /styles\.css\?v=0\.42\.1/);
+assert.match(html, /app\.js\?v=0\.42\.1/);
+assert.match(html, /version\.js\?v=0\.42\.1/);
 assert.match(html, /id="electrical-module-admin"/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
@@ -515,28 +630,56 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.0"'));
-assert.ok(worker.includes('"./app.js?v=0.42.0"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.0"'));
-assert.ok(worker.includes('"./version.js?v=0.42.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.1"'));
+assert.ok(worker.includes('"./app.js?v=0.42.1"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.1"'));
+assert.ok(worker.includes('"./version.js?v=0.42.1"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.0"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.0";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.1"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.1";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
+// Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
+// Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
+// greift. Die Pruefung gilt fuer alle Kernmodule, nicht nur die bekannten.
+// Der Zustandsspeicher liegt im Kernmodul. Die Schluessel und die Regel fuer
+// den Tageswechsel duerfen nicht zusaetzlich in app.js stehen.
+assert.doesNotMatch(app, /const DEMO_STORAGE_KEY = "/);
+assert.doesNotMatch(app, /const ONLINE_STORAGE_KEY = "/);
+assert.doesNotMatch(app, /saved\.workDate === localDateKey\(\)/);
+assert.match(app, /restoreState\(saved, \{ today: localDateKey\(\), demoMode \}\)/);
+// Die Rollenlisten stehen nur noch im Kernmodul. Vorher lagen zwei fast
+// gleiche Fassungen in app.js, die sich beim Ergaenzen einer Rolle
+// auseinanderentwickeln konnten.
+assert.doesNotMatch(app, /const planningRoles = new Set/);
+assert.doesNotMatch(app, /const fullPlanningRoles = new Set/);
+assert.doesNotMatch(app, /function employeeRoleLabel/);
+// Die Plantafel bietet jeden aktiven Mitarbeiter an. Sie war auf Monteure und
+// Vorarbeiter gefiltert, obwohl die Schnittstelle alle Rollen einplant.
+assert.doesNotMatch(app, /\["installer", "foreman"\]\.includes/);
+assert.match(app, /return plannableEmployees\(adminState\?\.employees\)/);
+const eingebundeneKerne = [...app.matchAll(/from "(\.\/core\/[^"]+)"/g)].map((treffer) => treffer[1]);
+assert.ok(eingebundeneKerne.length >= 2, "app.js bindet die Kernmodule ein");
+for (const modul of eingebundeneKerne) {
+  assert.ok(
+    worker.includes(`"${modul}"`),
+    `${modul} fehlt im App-Shell-Cache des Service Workers`
+  );
+  assert.match(modul, /\?v=0\.42\.1$/, `${modul} braucht dieselbe Fassungsnummer`);
+}
 assert.doesNotMatch(
   app,
   /^\s{2}function (calculateTimes|formatMinutes|durationMinutes|localDateKey)\(/m,
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.0"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.0"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.1"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.1"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.0"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.0"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.1"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.1"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -574,8 +717,8 @@ assert.match(vdeHtml, /id="signature-pad"/);
 assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
 assert.match(vdeHtml, /V15-Bestand importieren/);
 assert.match(vdeHtml, /id="legacy-local-import"/);
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.0/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.0/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.1/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.1/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

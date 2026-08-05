@@ -4,6 +4,192 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fassung 0.42.1. Der Dienst-Worker liefert die Dateien der App aus einem
+  Zwischenspeicher aus, ohne beim Server nachzufragen. Solange Fassungsnummer
+  und Speichername gleich blieben, erreichte **keine** Korrektur der Oberfläche
+  ein bereits eingerichtetes Gerät — auch nach einer Veröffentlichung nicht.
+  Der Speicher heißt jetzt `schaefchen-online-v43`, alle Dateien tragen
+  `?v=0.42.1`, und Migration 049 setzt den Produktionsstand entsprechend.
+  Offline abgelegte Baustellendokumente bleiben erhalten: ihr Speicher wird
+  bewusst nicht mitgewechselt.
+
+- zwei zusätzliche Prüfungen der Oberfläche: jedes der 35 Formulare muss einen
+  Absende-Empfänger haben, und ein unmittelbar übergebener Ereignisbehandler
+  darf als ersten Wert nur das Ereignis erwarten. Die zweite Prüfung gilt jetzt
+  auch für das VDE-Modul und die Plattformverwaltung, nicht mehr nur für die
+  Haupt-App.
+
+- Fehler behoben: die Vorlage für den Baustellen-Import war leer. Zwei Blätter
+  ohne Spaltenüberschriften und ohne Beispiel; wer sie herunterlud, wusste
+  nicht, welche Spalten gefüllt werden müssen, und jeder Upload endete mit
+  „Die Excel-Datei enthält keine Baustellenzeilen.“ Die Vorlage enthält jetzt
+  die Überschriften, eine ausgefüllte Beispielzeile und ein Hinweisblatt mit
+  den Pflichtspalten und den erkannten Schreibweisen. Ein Test importiert die
+  mitgelieferte Vorlage.
+
+- der Baustellenlink und der QR-Code führen jetzt auch dann in die
+  Baustellenakte, wenn der Mitarbeiter für diese Baustelle nicht eingeteilt
+  ist. Wer vor Ort den Aufkleber scannt, steht auf dieser Baustelle; bisher
+  endete der Weg mit „Diese Baustelle ist dir heute nicht zugewiesen“, obwohl
+  ein Mitarbeiter seine Baustelle selbst wählen darf. Die Wahl wird übernommen
+  und als eigene Auswahl vermerkt.
+- die Baustellenwahl nimmt neben der Baustellen-ID auch die QR-Kennung
+  entgegen. Der Link trägt die Kennung, nicht die ID.
+- der Fall „allein auf der Baustelle, Rückkehr nach einer Unterbrechung“ hat
+  jetzt einen eigenen, unabhängigen Test mit eigener Firma.
+
+- die fachliche Bewertung eines VDE-Stromkreises ist jetzt einzeln geprüft:
+  Isolationswiderstand unter 1 MΩ, Auslösestrom über dem Bemessungswert,
+  fehlende Messwerte und die Bezeichnung jeder Schutzorgan-Bauart. Bisher war
+  sie nur mittelbar über das fertige PDF abgedeckt. Ebenso die
+  Eingabeprüfungen der Plattformverwaltung.
+- die Mindestabdeckung in der Prüffolge steigt auf 86 Prozent Zeilen,
+  73 Prozent Zweige und 94 Prozent Funktionen.
+
+- Fehler behoben: wer nach einer Unterbrechung auf dieselbe Baustelle
+  zurückkehrte, verlor die Berichtsverantwortung. Die automatische
+  Vorarbeiterfunktion zählte Einsatzzeilen statt Menschen: die Rückkehr legt
+  einen zweiten Eintrag an, und der galt als Teambelegung. Der allein
+  Arbeitende wurde dadurch zum Monteur zurückgestuft, obwohl niemand
+  hinzugekommen war. Gezählt werden jetzt die Menschen auf der Baustelle.
+- die Berichtsverantwortung gilt für den Mitarbeiter auf dieser Baustelle an
+  diesem Tag, nicht für einen einzelnen Einsatzeintrag. Bei mehreren Fahrten
+  zur selben Baustelle trug nur die erste die Verantwortung, sodass der
+  Zugang zum Bericht nach der Rückkehr verschwand.
+
+- Fehler behoben: die Baustellenakte ließ sich vom Einsatz aus nicht öffnen. Der
+  Knopf war sichtbar, meldete aber „Für heute ist keine Baustelle freigegeben“,
+  obwohl ein Einsatz vorlag. Der Klick wurde unmittelbar an die Funktion
+  weitergereicht, die daraufhin das Klickereignis für den angeforderten Einsatz
+  hielt. Ein Vorarbeiter kam damit gar nicht an Aufgaben, Berichte, Fotos,
+  Dokumente, Material und Notizen seiner Baustelle. Ein Test prüft jetzt jeden
+  unmittelbar übergebenen Ereignisbehandler auf diesen Fehler.
+
+- die Bereiche der App lassen sich firmenweit abschalten: Montageberichte,
+  Bautagesberichte, Dokumentenverwaltung, Materialverwaltung, Abwesenheiten,
+  Baustellenlink und QR sowie VDE-Prüfprotokolle. Ein abgeschalteter Bereich
+  verschwindet aus der Oberfläche und wird auch über die Schnittstelle
+  abgewiesen; vorhandene Daten bleiben erhalten und sind nach dem
+  Wiedereinschalten unverändert da. Jede Umstellung steht mit Zeitpunkt und
+  handelnder Person in der Historie.
+- die abschaltbaren Bereiche kommen aus `module_catalog`, dem Katalog der
+  Plattformverwaltung. Er ist die einzige Quelle: `category = 'core'` markiert
+  den unverzichtbaren Kern, `is_special` das, was die Plattform zuerst
+  freigeben muss. Wer dort ein Modul ergänzt, muss nichts weiter nachziehen.
+  Abwesenheiten und Baustellenlink fehlten im Katalog und sind ergänzt.
+- Fehler behoben: der Schalter für Module war ohne Wirkung. Die Verwaltung zeigte
+  ihn bedienbar, doch jeder Versuch endete mit „Spezialmodule werden
+  ausschließlich durch die Plattformverwaltung freigeschaltet“. Die zugehörige
+  Funktion war ein Platzhalter, der ausnahmslos abwies. Die beiden Ebenen sind
+  jetzt getrennt: die Plattform gibt ein Spezialmodul frei, die Firma schaltet
+  es zusätzlich ein oder aus.
+- die Zeiterfassung ist im Katalog als Kern gekennzeichnet und damit nicht
+  abschaltbar; ohne sie ist Schäfchen kein Arbeitszeitnachweis mehr. Die
+  Einsatzplanung bleibt ebenfalls fest, weil die Zeiterfassung an der
+  Baustellenzuordnung hängt. Bereiche, die noch nicht gebaut sind, erscheinen
+  gar nicht erst als Schalter.
+- der Schalter für DGUV ist entfernt. Das Modul war nicht gebaut, ließ sich aber
+  in der Verwaltung anwählen.
+
+- Fehler behoben (Datenverlust): offline erfasste Buchungen und Berichte gingen
+  beim Tageswechsel verloren. Der gespeicherte Stand wurde nur wiederhergestellt,
+  wenn er vom selben Kalendertag stammte; wer abends ohne Verbindung buchte und
+  die App am nächsten Morgen öffnete, verlor die Arbeit des Vortags
+  stillschweigend, und der nächste Speichervorgang überschrieb sie endgültig.
+  Der Arbeitstag beginnt jetzt neu, nimmt aber alles mit, was noch nicht beim
+  Server ist. Der Mitarbeiter wird darauf hingewiesen. Die Kennung des
+  Mitarbeiters wird dabei zwingend mitgeführt, damit übernommene Arbeit nicht
+  einem anderen Konto zugeordnet werden kann.
+- der Zustandsspeicher liegt in `frontend/core/state-store.js` und ist ohne
+  Browser prüfbar.
+
+- Fehler behoben: Administration, Geschäftsführung und Projektleitung ließen
+  sich weiterhin nicht einplanen, obwohl die Schnittstelle sie längst zulässt.
+  Die Plantafel, die Einzelzuweisung und die Teamvorlagen zeigten nur Monteure
+  und Vorarbeiter, sodass die übrigen Rollen gar nicht erst zur Auswahl standen.
+  Jeder aktive Mitarbeiter steht jetzt in allen drei Listen. Die Tageslage zählt
+  dieselbe Menge.
+- auf der Plantafel stand hinter jedem Namen entweder „Vorarbeiter“ oder
+  „Monteur“; eine Geschäftsführerin erschien damit als Monteurin. Die
+  Bezeichnung stammt jetzt überall aus derselben Stelle und lautet für
+  planende Rollen „Planung“.
+- die Rollenlogik der Oberfläche liegt in `frontend/core/permissions.js` und
+  ist ohne Browser prüfbar. Die Liste der Planungsrollen stand vorher zweimal
+  fast gleich in `app.js`; die Fassung für die eingeschränkte Projektsicht
+  leitet sich nun aus der vollen Liste ab und kann nicht mehr abweichen.
+
+- Fehler behoben: ein offline geschriebener Bericht ging verloren, wenn die
+  Sitzung während der Übertragung ablief. Der Bericht wurde dauerhaft als
+  fehlerhaft vermerkt und nach dem erneuten Anmelden nie wieder versucht. Bei
+  Zeitbuchungen war derselbe Fall bereits richtig behandelt. Eine abgelaufene
+  Sitzung, ein Ausfall des Servers und eine fehlende Verbindung führen jetzt
+  einheitlich zu einem neuen Versuch; nur eine inhaltliche Zurückweisung des
+  Servers hält den Datensatz an, weil dann ein Mensch hinsehen muss.
+- die Regeln der Offline-Warteschlange liegen in `frontend/core/sync-queue.js`
+  und sind ohne Browser prüfbar. Welcher Fehler wie behandelt wird, stand
+  vorher zweimal in `app.js` und wich zwischen Berichten und Zeitbuchungen
+  voneinander ab.
+
+- Fehler behoben: die Anpassung der Wochenansicht an schmale Geräte blieb
+  wirkungslos. Die Medienabfrage traf zu, wurde aber von einer weiter unten
+  stehenden Regel gleicher Spezifität wieder aufgehoben; der Kopfbereich stand
+  auf dem Handy deshalb rechtsbündig. Ein Test prüft jetzt alle Stylesheets auf
+  solche überschriebenen Anpassungen.
+- der Wochenwechsel sieht aus wie dieselbe Bedienung auf der Plantafel und ist
+  mit dem Finger sicher zu treffen: vorher 30 Pixel groß und grau, jetzt 40
+  Pixel und farbig. Die Felder des Stundenexports waren ohne eigene Gestaltung
+  nur rund 22 Pixel hoch und folgen jetzt den Maßen der übrigen Auswahlfelder;
+  gleiches gilt für „Gelesen“ an den Mitteilungen.
+- die Plantafel heißt auf jedem Gerät „Plantafel“. Die Überschrift lautete
+  „Desktop-Plantafel“, auch wenn sie auf dem Handy geöffnet wurde.
+
+- die Büroverwaltung liegt vollständig im Bereich „Mehr“ und nicht mehr hinter
+  einem Aufklapper in der Wochenansicht. Jahreskonten, Feiertagskalender und
+  die Regel für eigene Zeitkorrekturen stehen dort gleichrangig nebeneinander;
+  der Feiertagskalender war zuvor in der Karte der Jahreskonten versteckt. Die
+  Wochenansicht zeigt nur noch das eigene Stundenkonto.
+- die Auswertung der Verwaltung folgt einer eigenen Jahresauswahl statt der in
+  der Wochenansicht gewählten Woche. Das Jahr galt bisher für Jahreskonten und
+  Feiertage gleichermaßen, ließ sich aber nur über einen Wochenwechsel
+  verstellen.
+
+- die Regel für eigene Zeitkorrekturen lässt sich jetzt in der Verwaltung
+  auswählen: drei erklärte Möglichkeiten, Begründungsfeld und sofort sichtbarer
+  Stand. Lesen darf die Planung, ändern nur Administration und
+  Geschäftsführung; die Oberfläche bildet das ab, statt eine Schaltfläche zu
+  zeigen, die der Server anschließend verweigert.
+
+- Fehler behoben: Zeitbuchungen auf einer Baustelle, für die der Mitarbeiter
+  nicht eingeplant war, wurden abgewiesen. Live durfte er die Baustelle
+  längst selbst wählen; beim Nachtragen und beim Berichtigen fehlte diese
+  Möglichkeit, und für zurückliegende Tage ließ sich die Baustelle überhaupt
+  nicht mehr wählen. Der fehlende Einsatz wird jetzt überall gleich behandelt
+  und als Auswahl des Mitarbeiters angelegt. Die Planung erkennt am Grund
+  „Spontane Auswahl durch den Mitarbeiter“, dass er nicht von ihr stammt.
+- Fehler behoben: Administration, Geschäftsführung und Projektleitung ließen
+  sich nicht auf Baustellen einplanen; Einsätze waren auf Monteure und
+  Vorarbeiter beschränkt. In kleinen Betrieben arbeiten sie regelmäßig mit.
+  Jeder aktive Mitarbeiter kann jetzt eingeplant und in eine Teamvorlage
+  aufgenommen werden. Die Berichtsverantwortung bleibt dem Vorarbeiter
+  vorbehalten.
+- die Firma wählt, wie mit eigenen Zeitkorrekturen vor der Freigabe des
+  Arbeitstags umgegangen wird: `review_required` macht jede Änderung und
+  Löschung zum prüfpflichtigen Antrag, `same_day` lässt den laufenden
+  Kalendertag frei und verlangt für zurückliegende Tage eine Prüfung,
+  `immediate` entspricht dem bisherigen Verhalten
+- **Verhaltensänderung:** Voreinstellung ist `review_required`, auch für
+  bestehende Firmen. Bisher wurde jede eigene Korrektur an einem noch nicht
+  freigegebenen Arbeitstag sofort wirksam, ohne dass das Büro davon erfuhr.
+  Wer das beibehalten will, stellt die Regel auf `immediate`.
+- die Regel ändert nur die Selbstkorrektur. Die Bearbeitung fremder Zeiten
+  durch das Büro folgt weiterhin allein dem Status des Arbeitstags. Lesen darf
+  die Regel die Planung, ändern nur Administration und Geschäftsführung.
+- Fehler behoben: Eine Zeitkorrektur, die ohne Beteiligung des Büros sofort
+  wirksam wurde, trug den Mitarbeiter selbst als Prüfer ein. Das Protokoll
+  behauptete damit eine Freigabe, die es nie gegeben hat. Migration 045 führt
+  diesen Fall als eigenen Zustand: wirksam, ausdrücklich ungeprüft und ohne
+  Prüfer. Bereits gespeicherte Einträge bleiben unverändert, weil eine
+  nachträgliche Umschrift selbst eine Verfälschung der Historie wäre.
 - der Service Worker wird im Betrieb geprüft statt im Quelltext: zehn Tests
   fahren die Ereignisbehandlungen aus und belegen unter anderem, dass offline
   ausschließlich der Dokumentencache des eigenen Kontos gelesen wird und dass

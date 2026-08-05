@@ -10,11 +10,32 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.0";
+} from "./core/work-time.js?v=0.42.1";
+import {
+  buildReportPayload,
+  buildTimeEntryPayload,
+  classifySyncError,
+  selectPendingWork,
+  syncErrorMessage,
+  timeEntriesMayFollow
+} from "./core/sync-queue.js?v=0.42.1";
+import {
+  canAdministerModules as canAdministerModulesFor,
+  canPlan as canPlanFor,
+  employeeRoleLabel,
+  isProjectScopedSession as isProjectScopedSessionFor,
+  plannableEmployees
+} from "./core/permissions.js?v=0.42.1";
+import {
+  ONLINE_STORAGE_KEY,
+  carriedOverMessage,
+  initialState as freshState,
+  restoreState,
+  serializeState,
+  storageKey
+} from "./core/state-store.js?v=0.42.1";
 
 (() => {
-  const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
-  const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
   const DOCUMENT_CACHE_VERSION = "v42";
   const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
   const queryMode = new URLSearchParams(window.location.search).get("mode");
@@ -200,7 +221,7 @@ import {
     weekOpenActions: document.querySelector("#week-open-actions"),
     weekOpenActionsList: document.querySelector("#week-open-actions-list"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
-    timeAccountAdminYear: document.querySelector("#time-account-admin-year"),
+    adminYear: document.querySelector("#admin-year"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
     timeAccountAdminMessage: document.querySelector("#time-account-admin-message"),
     timeAccountProfileForm: document.querySelector("#time-account-profile-form"),
@@ -216,6 +237,13 @@ import {
     timeAccountAdjustmentType: document.querySelector("#time-account-adjustment-type"),
     timeAccountAdjustmentNote: document.querySelector("#time-account-adjustment-note"),
     timeAccountAdjustmentSubmit: document.querySelector("#time-account-adjustment-submit"),
+    timeCorrectionPolicyAdmin: document.querySelector("#time-correction-policy-admin"),
+    timeCorrectionPolicyState: document.querySelector("#time-correction-policy-state"),
+    timeCorrectionPolicyStatus: document.querySelector("#time-correction-policy-status"),
+    timeCorrectionPolicyForm: document.querySelector("#time-correction-policy-form"),
+    timeCorrectionPolicyReason: document.querySelector("#time-correction-policy-reason"),
+    timeCorrectionPolicySave: document.querySelector("#time-correction-policy-save"),
+    timeCorrectionPolicyMessage: document.querySelector("#time-correction-policy-message"),
     holidayCalendarAdmin: document.querySelector("#holiday-calendar-admin"),
     holidayCalendarYear: document.querySelector("#holiday-calendar-year"),
     holidayCalendarStatus: document.querySelector("#holiday-calendar-status"),
@@ -776,6 +804,11 @@ import {
   let absenceState = [];
   let timeAccountState = null;
   let timeAccountsState = null;
+  let timeCorrectionPolicyState = null;
+  // Die Verwaltung wertet ein Kalenderjahr aus. Frueher folgte sie der
+  // gewaehlten Woche des Monteurs; seit die Bereiche getrennt sind, waere das
+  // nicht mehr nachvollziehbar.
+  let adminYear = new Date().getFullYear();
   let announcementsState = [];
   let selectedWeekStart = currentWeekStart();
   let editingAssignmentId = null;
@@ -804,6 +837,9 @@ import {
   let editingTimeAccountId = null;
   let speechRecognition = null;
   let cachedUserId = null;
+  // Hinweis auf Arbeit, die aus einem frueheren Tag mitgenommen wurde. Er wird
+  // erst gezeigt, wenn die Oberflaeche steht.
+  let pendingCarryOverNotice = null;
   let employeeSiteState = null;
   let employeeSiteSection = "overview";
   let siteDashboardSection = "overview";
@@ -880,38 +916,21 @@ import {
   );
 
   function initialState() {
-    return {
-      version: 1,
-      workDate: localDateKey(),
-      workDayStatus: null,
-      events: [],
-      reports: [],
-      reportDraft: null,
-      siteWorkspace: null
-    };
+    return freshState(localDateKey());
   }
 
   function loadState() {
-    const key = demoMode ? DEMO_STORAGE_KEY : ONLINE_STORAGE_KEY;
     try {
-      const saved = JSON.parse(window.localStorage.getItem(key));
-      if (saved?.version === 1 && saved.workDate === localDateKey() && Array.isArray(saved.events)) {
-        if (!demoMode) {
-          if (Array.isArray(saved.assignments)) assignments = saved.assignments;
-          cachedUserId = typeof saved.userId === "string" ? saved.userId : null;
-        }
-        return {
-          version: 1,
-          workDate: saved.workDate,
-          workDayStatus: saved.workDayStatus || null,
-          events: saved.events,
-          reports: Array.isArray(saved.reports) ? saved.reports : [],
-          reportDraft: saved.reportDraft && typeof saved.reportDraft === "object"
-            ? saved.reportDraft
-            : null,
-          siteWorkspace: saved.siteWorkspace || null
-        };
+      const saved = JSON.parse(window.localStorage.getItem(storageKey(demoMode)));
+      const wiederhergestellt = restoreState(saved, { today: localDateKey(), demoMode });
+      if (wiederhergestellt.assignments) assignments = wiederhergestellt.assignments;
+      if (wiederhergestellt.userId) cachedUserId = wiederhergestellt.userId;
+      // Arbeit aus einem frueheren Tag kam mit. Der Mitarbeiter muss erfahren,
+      // dass sie noch aussteht, sonst haelt er sie fuer laengst uebertragen.
+      if (wiederhergestellt.carriedOver) {
+        pendingCarryOverNotice = carriedOverMessage(wiederhergestellt.carriedOver);
       }
+      return wiederhergestellt.state;
     } catch {
       // Ein blockierter Speicher darf die App nicht unbenutzbar machen.
     }
@@ -919,13 +938,12 @@ import {
   }
 
   function saveState() {
-    const key = demoMode ? DEMO_STORAGE_KEY : ONLINE_STORAGE_KEY;
     try {
-      window.localStorage.setItem(key, JSON.stringify({
-        ...state,
-        assignments: demoMode ? undefined : assignments,
-        userId: demoMode ? undefined : (session?.user.id || cachedUserId)
-      }));
+      window.localStorage.setItem(storageKey(demoMode), JSON.stringify(serializeState(state, {
+        assignments,
+        userId: session?.user.id || cachedUserId,
+        demoMode
+      })));
     } catch {
       showToast("Lokaler Speicher ist in diesem Browser blockiert.");
     }
@@ -957,7 +975,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.0",
+          "X-Schaefchen-Version": "0.42.1",
           ...options.headers
         }
       });
@@ -985,7 +1003,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.0" }
+        headers: { "X-Schaefchen-Version": "0.42.1" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1031,7 +1049,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.1 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1148,38 +1166,15 @@ import {
   }
 
   function canPlan() {
-    const planningRoles = new Set([
-      "admin",
-      "managing_director",
-      "dispatch_office",
-      "office",
-      "planner",
-      "project_manager",
-      "executive_assistant"
-    ]);
-    return !demoMode && Boolean(session?.user.roles?.some((role) => planningRoles.has(role)));
+    return canPlanFor(session, { demoMode });
   }
 
   function isProjectScopedSession() {
-    const roles = session?.user?.roles || [];
-    const fullPlanningRoles = new Set([
-      "admin",
-      "managing_director",
-      "dispatch_office",
-      "office",
-      "planner",
-      "executive_assistant"
-    ]);
-    return roles.includes("project_manager")
-      && !roles.some((role) => fullPlanningRoles.has(role));
+    return isProjectScopedSessionFor(session);
   }
 
   function canAdministerModules() {
-    return !demoMode && Boolean(
-      session?.user.roles?.some((role) => (
-        role === "admin" || role === "managing_director"
-      ))
-    );
+    return canAdministerModulesFor(session, { demoMode });
   }
 
   function dateFromIso(date) {
@@ -2397,10 +2392,22 @@ import {
     return status === "completed" ? "Abgeschlossen" : "Entwurf";
   }
 
+  // Ist ein Bereich für diese Firma eingeschaltet?
+  //
+  // Die Sitzung führt den Stand für jeden Angemeldeten mit, damit auch ein
+  // Monteur einen abgeschalteten Bereich gar nicht erst angeboten bekommt.
+  // Die Verwaltung kennt zusätzlich die ausführliche Liste. Ohne Angabe gilt
+  // ein Bereich als eingeschaltet, sonst verschwände er beim ersten Start,
+  // bevor die Sitzung steht.
+  function moduleEnabled(key) {
+    const ausDerVerwaltung = adminState?.modules?.find((module) => module.key === key);
+    if (ausDerVerwaltung) return Boolean(ausDerVerwaltung.enabled);
+    const ausDerSitzung = session?.modules?.[key];
+    return ausDerSitzung === undefined ? true : Boolean(ausDerSitzung);
+  }
+
   function vdeModuleEnabled() {
-    return Boolean(adminState?.modules?.some((module) => (
-      module.key === "vde" && module.enabled
-    )));
+    return moduleEnabled("vde");
   }
 
   function vdeEditorUrl(siteId, inspectionId = null, date = null) {
@@ -2592,17 +2599,17 @@ import {
       const connected = Boolean(module.available);
       title.textContent = module.name;
       description.textContent = connected
-        ? `${module.description} · aus der Baustelle startbar`
-        : `${module.description} · noch nicht fachlich angebunden`;
+        ? module.description
+        : `${module.description} · auf Anfrage über die Plattformverwaltung`;
       content.append(title, description);
       control.className = "electrical-module-toggle";
       toggle.type = "checkbox";
       toggle.checked = connected && module.enabled;
       toggle.disabled = !connected;
-      toggle.setAttribute("aria-label", `${module.name} firmenweit aktivieren`);
+      toggle.setAttribute("aria-label", `${module.name} firmenweit ein- oder ausschalten`);
       stateLabel.textContent = connected
-        ? (module.enabled ? "Aktiv" : "Inaktiv")
-        : "Vorbereitet";
+        ? (module.enabled ? "Aktiv" : "Abgeschaltet")
+        : "Nicht freigegeben";
       control.append(toggle, stateLabel);
       item.append(content, control);
 
@@ -2610,8 +2617,9 @@ import {
         toggle.addEventListener("change", async () => {
           const requested = toggle.checked;
           toggle.disabled = true;
-          elements.electricalModuleMessage.textContent =
-            requested ? "VDE-Modul wird aktiviert …" : "VDE-Modul wird deaktiviert …";
+          elements.electricalModuleMessage.textContent = requested
+            ? `${module.name} wird eingeschaltet …`
+            : `${module.name} wird abgeschaltet …`;
           try {
             const body = await requestJson(
               `./api/v1/admin/modules/${encodeURIComponent(module.key)}`,
@@ -2629,8 +2637,8 @@ import {
             await refreshAdmin(adminState.date);
             showToast(
               requested
-                ? "VDE-Modul ist für die Firma aktiviert."
-                : "VDE-Modul ist deaktiviert; vorhandene Prüfungen bleiben erhalten."
+                ? `${module.name}: eingeschaltet.`
+                : `${module.name}: abgeschaltet. Vorhandene Daten bleiben erhalten.`
             );
           } catch (error) {
             toggle.checked = !requested;
@@ -3512,9 +3520,7 @@ import {
   }
 
   function fieldPlanningEmployees() {
-    return (adminState?.employees || []).filter((employee) => (
-      employee.roles.some((role) => ["installer", "foreman"].includes(role))
-    ));
+    return plannableEmployees(adminState?.employees);
   }
 
   function populatePlanningFilter(select, items, allLabel, label) {
@@ -3538,7 +3544,7 @@ import {
     const employees = fieldPlanningEmployees();
     if (employees.length === 0) {
       const empty = document.createElement("p");
-      empty.textContent = "Noch keine Monteure oder Vorarbeiter angelegt.";
+      empty.textContent = "Noch keine Mitarbeiter angelegt.";
       container.append(empty);
       return;
     }
@@ -4041,7 +4047,7 @@ import {
       row.className = "planning-board-row";
       identity.className = "planning-board-employee";
       name.textContent = `${employee.firstName} ${employee.lastName}`;
-      role.textContent = employee.roles.includes("foreman") ? "Vorarbeiter" : "Monteur";
+      role.textContent = employeeRoleLabel(employee.roles);
       identity.append(name, role);
       row.append(identity);
       let employeeCount = 0;
@@ -4387,7 +4393,7 @@ import {
     ));
     const approved = absences.filter((absence) => absence.status === "approved");
     const visible = [...pending, ...approved];
-    elements.absenceReviewPanel.hidden = !canPlan();
+    elements.absenceReviewPanel.hidden = !canPlan() || !moduleEnabled("absences");
     elements.absenceReviewCount.textContent = String(pending.length);
     elements.absenceReviewList.replaceChildren();
 
@@ -4605,9 +4611,7 @@ import {
 
   function renderDispatchSummary() {
     const date = adminState.date;
-    const fieldEmployees = adminState.employees.filter((employee) => (
-      employee.roles.some((role) => ["installer", "foreman"].includes(role))
-    ));
+    const fieldEmployees = fieldPlanningEmployees();
     const dayAssignments = adminState.assignments.filter((assignment) => assignment.workDate === date);
     const plannedEmployeeIds = new Set(dayAssignments.map((assignment) => assignment.employeeId));
     const dayAbsences = (adminState.absences || []).filter((absence) => (
@@ -4655,9 +4659,9 @@ import {
         (employee) => `${employee.firstName} ${employee.lastName}`
       ).join(", ")}`);
     } else if (fieldEmployees.length) {
-      notes.push("Alle Monteure und Vorarbeiter sind eingeplant");
+      notes.push("Alle Mitarbeiter sind eingeplant");
     } else {
-      notes.push("Noch keine Monteure oder Vorarbeiter angelegt");
+      notes.push("Noch keine Mitarbeiter angelegt");
     }
     if (reviews.length) {
       notes.push(`Zeit prüfen: ${reviews.map((day) => day.employeeName).join(", ")}`);
@@ -4669,6 +4673,10 @@ import {
 
   function renderAdmin() {
     if (!adminState) return;
+    // Die Verwaltung kennt den Modulstand genauer als die Sitzung. Nach dem
+    // Umschalten muss die Oberflaeche sofort folgen, nicht erst beim naechsten
+    // vollstaendigen Durchlauf.
+    applyModuleVisibility();
     const projectScoped = Boolean(adminState.projectScopeRestricted);
     elements.assignmentImportPanel.hidden = projectScoped;
     elements.siteImportPanel.hidden = projectScoped;
@@ -4940,6 +4948,7 @@ import {
       adminState = body.overview;
       elements.assignmentDate.value = adminState.date;
       renderAdmin();
+      await refreshTimeCorrectionPolicy();
     } catch (error) {
       if (error.status === 401) showLogin();
       else if (!error.network) showToast(error.message);
@@ -4972,7 +4981,25 @@ import {
       )
     );
     if (!assignment) {
-      showToast("Diese Baustelle ist dir heute nicht zugewiesen.");
+      // Wer vor Ort den Baustellenlink oeffnet, steht auf dieser Baustelle.
+      // Frueher endete der Weg hier mit einer Absage, obwohl ein Mitarbeiter
+      // seine Baustelle selbst waehlen darf. Die Wahl wird uebernommen und der
+      // Einsatz als eigene Auswahl vermerkt.
+      let uebernommeneId = null;
+      try {
+        uebernommeneId = await applySelectedSite(siteId);
+      } catch (error) {
+        showToast(error.network
+          ? "Ohne Verbindung lässt sich die Baustelle nicht übernehmen."
+          : "Diese Baustelle ist dir heute nicht zugewiesen.");
+        return;
+      }
+      const uebernommen = assignments.find(
+        (candidate) => candidate.constructionSite.id === uebernommeneId
+          || candidate.constructionSite.qrCode === siteId
+      );
+      if (!uebernommen) return;
+      await openEmployeeSiteWorkspace(uebernommen);
       return;
     }
     await openEmployeeSiteWorkspace(assignment);
@@ -4993,14 +5020,6 @@ import {
     } finally {
       submit.disabled = false;
     }
-  }
-
-  function employeeRoleLabel(roles = []) {
-    if (roles.includes("foreman")) return "Vorarbeiter";
-    if (roles.some((role) => ["admin", "managing_director", "dispatch_office", "project_manager"].includes(role))) {
-      return "Planung";
-    }
-    return "Monteur";
   }
 
   function appendEmployeeSiteEmpty(list, message) {
@@ -5758,8 +5777,12 @@ import {
     }
   }
 
-  async function applySelectedSite(selectedSiteId) {
-    if (!selectedSiteId) return;
+  // Nimmt die Baustellen-ID oder die QR-Kennung entgegen. Der Server loest die
+  // Kennung auf und meldet die tatsaechliche Baustelle zurueck; ohne diese
+  // Aufloesung fand die Umsortierung den Einsatz nicht wieder.
+  async function applySelectedSite(gewaehlteKennung) {
+    if (!gewaehlteKennung) return null;
+    let selectedSiteId = gewaehlteKennung;
     const targetIndex = siteChoiceTargetIndex();
     const existingIndex = assignments.findIndex(
       (assignment) => assignment.constructionSite.id === selectedSiteId
@@ -5778,6 +5801,7 @@ import {
         })
       });
       nextAssignments = body.selection.assignments;
+      selectedSiteId = body.selection.selectedSiteId || selectedSiteId;
     } else if (newOccurrence) {
       const previous = assignments[existingIndex];
       nextAssignments = [
@@ -5795,6 +5819,7 @@ import {
       addEntry("next_site", targetIndex);
     }
     showToast("Baustelle gewählt · der Baustellenplan bleibt als Vorschlag erhalten.");
+    return selectedSiteId;
   }
 
   function lastEvent() {
@@ -6092,8 +6117,7 @@ import {
       syncRequested = true;
       return;
     }
-    const pendingReports = (state.reports || []).filter((report) => report.pendingSync && !report.syncError);
-    const pending = state.events.filter((entry) => entry.pendingSync && !entry.syncError);
+    const { reports: pendingReports, entries: pending } = selectPendingWork(state);
     if (pendingReports.length === 0 && pending.length === 0) return;
     syncing = true;
     updateConnectionState();
@@ -6103,23 +6127,7 @@ import {
       try {
         const body = await requestJson("./api/v1/site-reports", {
           method: "POST",
-          body: JSON.stringify({
-            clientReportId: report.clientReportId,
-            constructionSiteId: report.constructionSiteId,
-            reportType: report.reportType,
-            workDate: report.workDate,
-            sourceMode: "digital",
-            summary: report.summary,
-            details: report.details,
-            workPerformed: report.workPerformed || report.details || report.summary,
-            obstructions: report.obstructions || null,
-            openItems: report.openItems || null,
-            weather: report.weather || null,
-            materialsAndEquipment: report.materialsAndEquipment || null,
-            agreements: report.agreements || null,
-            incidents: report.incidents || null,
-            personnel: report.personnel
-          })
+          body: JSON.stringify(buildReportPayload(report))
         });
         report.id = body.siteReport.id;
         report.number = body.siteReport.number;
@@ -6132,9 +6140,10 @@ import {
           status: report.status
         };
       } catch (error) {
-        if (!error.network) report.syncError = error.message;
-        if (error.status === 401) showLogin();
-        showToast(error.network ? "Bericht wartet auf Verbindung." : error.message);
+        const behandlung = classifySyncError(error);
+        if (behandlung.vermerken) report.syncError = error.message;
+        if (behandlung.anmeldenNoetig) showLogin();
+        showToast(syncErrorMessage(behandlung.grund, error.message));
         reportSyncFailed = true;
         break;
       }
@@ -6142,30 +6151,20 @@ import {
       render();
     }
 
-    const reportStillPending = (state.reports || []).some((report) => report.pendingSync);
-    for (const entry of reportSyncFailed || reportStillPending ? [] : pending) {
+    const zeitenDuerfenFolgen = !reportSyncFailed && timeEntriesMayFollow(state.reports);
+    for (const entry of zeitenDuerfenFolgen ? pending : []) {
       try {
         const body = await requestJson("./api/v1/time-entries", {
           method: "POST",
-          body: JSON.stringify({
-            clientEntryId: entry.clientEntryId,
-            entryType: entry.type,
-            recordedAt: entry.recordedAt,
-            clientCreatedAt: entry.clientCreatedAt,
-            ...(entry.constructionSiteId ? { constructionSiteId: entry.constructionSiteId } : {})
-          })
+          body: JSON.stringify(buildTimeEntryPayload(entry))
         });
         entry.id = body.timeEntry.id;
         entry.pendingSync = false;
       } catch (error) {
-        if (error.network) break;
-        if (error.status === 401) {
-          showLogin();
-          showToast("Bitte erneut anmelden.");
-          break;
-        }
-        entry.syncError = error.message;
-        showToast(error.message);
+        const behandlung = classifySyncError(error);
+        if (behandlung.vermerken) entry.syncError = error.message;
+        if (behandlung.anmeldenNoetig) showLogin();
+        showToast(syncErrorMessage(behandlung.grund, error.message));
         break;
       }
       saveState();
@@ -6835,6 +6834,48 @@ import {
     });
   }
 
+  const TIME_CORRECTION_POLICY_LABELS = {
+    review_required: "Immer prüfen",
+    same_day: "Am selben Tag frei",
+    immediate: "Sofort wirksam"
+  };
+
+  function renderTimeCorrectionPolicy() {
+    // Lesen darf die Planung, ändern nur Administration und Geschäftsführung.
+    // Die Oberfläche bildet genau das ab, damit niemand auf eine Schaltfläche
+    // trifft, die der Server anschließend verweigert.
+    const canManage = Boolean(adminState?.canCreateManagementRoles);
+    elements.timeCorrectionPolicyAdmin.hidden = !canPlan();
+    elements.timeCorrectionPolicyForm.hidden = !canManage;
+    if (!timeCorrectionPolicyState) {
+      elements.timeCorrectionPolicyState.textContent = navigator.onLine
+        ? "wird geladen …"
+        : "offline nicht verfügbar";
+      return;
+    }
+    const active = timeCorrectionPolicyState.policy;
+    elements.timeCorrectionPolicyState.textContent =
+      TIME_CORRECTION_POLICY_LABELS[active] || active;
+    for (const option of elements.timeCorrectionPolicyForm.querySelectorAll(
+      "input[name='time-correction-policy']"
+    )) {
+      option.checked = option.value === active;
+      option.disabled = !navigator.onLine;
+    }
+    elements.timeCorrectionPolicySave.disabled = !navigator.onLine;
+  }
+
+  async function refreshTimeCorrectionPolicy() {
+    if (demoMode || !canPlan()) return;
+    try {
+      const body = await requestJson("./api/v1/admin/time-correction-policy");
+      timeCorrectionPolicyState = body.timeCorrectionPolicy;
+    } catch (error) {
+      if (!error.network) timeCorrectionPolicyState = null;
+    }
+    renderTimeCorrectionPolicy();
+  }
+
   function renderHolidayCalendarAdmin(calendar, requestedYear) {
     elements.holidayCalendarYear.textContent = String(requestedYear);
     elements.holidayCalendarList.replaceChildren();
@@ -6961,13 +7002,28 @@ import {
     elements.timeAccountProfileForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  function renderAdminYearOptions() {
+    const current = new Date().getFullYear();
+    const years = [current + 1, current, current - 1, current - 2];
+    if (elements.adminYear.options.length !== years.length) {
+      elements.adminYear.replaceChildren(...years.map((year) => {
+        const option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = String(year);
+        return option;
+      }));
+    }
+    elements.adminYear.value = String(adminYear);
+  }
+
   function renderAdminTimeAccounts() {
+    renderAdminYearOptions();
     const visible = canPlan() && !isProjectScopedSession();
     elements.timeAccountAdminPanel.hidden = !visible;
+    elements.holidayCalendarAdmin.hidden = !visible;
     if (!visible) return;
-    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const requestedYear = adminYear;
     const overview = timeAccountsState?.year === requestedYear ? timeAccountsState : null;
-    elements.timeAccountAdminYear.textContent = String(requestedYear);
     elements.timeAccountAdminList.replaceChildren();
     renderHolidayCalendarAdmin(overview?.holidayCalendar || null, requestedYear);
     if (!overview) {
@@ -7328,7 +7384,57 @@ import {
     elements.employeeTimesheetExportPdfSubmit.disabled = !navigator.onLine;
   }
 
+  // Abgeschaltete Bereiche werden aus der Oberflaeche genommen. Der Server
+  // weist sie ohnehin ab; eine Schaltflaeche, die nur einen Fehler erzeugt,
+  // waere schlechter als gar keine.
+  const MODULBEREICHE = [
+    { key: "absences", knoten: ["#absence-area", "#absence-review-panel"] },
+    { key: "documents", knoten: [], reiter: ["tasks", "photos", "documents", "notes"] },
+    { key: "materials", knoten: [], reiter: ["materials"] },
+    { key: "site_qr", knoten: ["#site-dashboard-copy-link"] },
+    // Montage- und Tagesberichte sind getrennte Bereiche. Die Berichtsansicht
+    // faellt erst weg, wenn beide abgeschaltet sind.
+    {
+      key: "site_daily_reports",
+      knoten: ["#report-center"],
+      reiter: ["reports"],
+      zusammen: ["assembly_reports"]
+    }
+  ];
+
+  // Merkt sich, dass dieser Knoten wegen eines abgeschalteten Bereichs
+  // verborgen wurde. Nur dann darf er beim Wiedereinschalten zurueckkommen:
+  // ob er dann wirklich sichtbar wird, entscheidet weiterhin die jeweilige
+  // Ansicht anhand von Rolle, Reiter und Auswahl.
+  function verstecke(knoten, eingeschaltet) {
+    if (!knoten) return;
+    if (!eingeschaltet) {
+      knoten.dataset.moduleHidden = "true";
+      knoten.hidden = true;
+      return;
+    }
+    if (knoten.dataset.moduleHidden === "true") {
+      delete knoten.dataset.moduleHidden;
+      knoten.hidden = false;
+    }
+  }
+
+  function applyModuleVisibility() {
+    for (const bereich of MODULBEREICHE) {
+      const an = moduleEnabled(bereich.key);
+      const wirksam = bereich.zusammen
+        ? an || bereich.zusammen.some((weitere) => moduleEnabled(weitere))
+        : an;
+      for (const auswahl of bereich.knoten) verstecke(document.querySelector(auswahl), wirksam);
+      for (const reiter of bereich.reiter || []) {
+        verstecke(document.querySelector(`[data-site-dashboard-section-button="${reiter}"]`), wirksam);
+        verstecke(document.querySelector(`[data-site-dashboard-section="${reiter}"]`), wirksam);
+      }
+    }
+  }
+
   function render() {
+    applyModuleVisibility();
     renderAction();
     renderAssignment();
     renderTimes();
@@ -7448,7 +7554,8 @@ import {
     if (canPlan()) {
       elements.assignmentPlanningShell.hidden = pane !== "assignments";
       elements.sitePlanningShell.hidden = pane !== "sites";
-      elements.reportCenter.hidden = pane !== "sites";
+      elements.reportCenter.hidden = pane !== "sites"
+        || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
       elements.employeePanel.hidden = pane !== "more" || isProjectScopedSession();
       elements.adminSummary.hidden = pane === "more";
       elements.dispatchSummary.hidden = pane !== "assignments";
@@ -7597,10 +7704,10 @@ import {
       renderAdminTimeAccounts();
       return;
     }
-    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const requestedYear = adminYear;
     try {
       const body = await requestJson(`./api/v1/admin/time-accounts?year=${requestedYear}`);
-      if (requestedYear !== Number(selectedWeekStart.slice(0, 4))) return;
+      if (requestedYear !== adminYear) return;
       timeAccountsState = body.timeAccounts;
       elements.timeAccountAdminMessage.textContent = "";
       renderAdminTimeAccounts();
@@ -8003,9 +8110,50 @@ import {
     }
   });
 
+  elements.timeCorrectionPolicyForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const chosen = elements.timeCorrectionPolicyForm.querySelector(
+      "input[name='time-correction-policy']:checked"
+    );
+    const reason = elements.timeCorrectionPolicyReason.value.trim();
+    if (!chosen) {
+      elements.timeCorrectionPolicyMessage.textContent = "Bitte eine Regel auswählen.";
+      return;
+    }
+    if (reason.length < 3) {
+      elements.timeCorrectionPolicyMessage.textContent =
+        "Bitte kurz begründen, warum die Regel geändert wird.";
+      return;
+    }
+    elements.timeCorrectionPolicySave.disabled = true;
+    elements.timeCorrectionPolicyMessage.textContent = "Regel wird gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/admin/time-correction-policy", {
+        method: "PATCH",
+        body: JSON.stringify({ policy: chosen.value, reason })
+      });
+      timeCorrectionPolicyState = body.timeCorrectionPolicy;
+      elements.timeCorrectionPolicyMessage.textContent = "";
+      elements.timeCorrectionPolicyReason.value = "";
+      showToast(`Regel gespeichert · ${TIME_CORRECTION_POLICY_LABELS[body.timeCorrectionPolicy.policy]}`);
+      renderTimeCorrectionPolicy();
+    } catch (error) {
+      elements.timeCorrectionPolicyMessage.textContent = error.message;
+    } finally {
+      elements.timeCorrectionPolicySave.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.adminYear.addEventListener("change", async () => {
+    const chosen = Number(elements.adminYear.value);
+    if (!Number.isInteger(chosen) || chosen === adminYear) return;
+    adminYear = chosen;
+    await refreshAdminTimeAccounts();
+  });
+
   elements.holidayCalendarForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    const requestedYear = adminYear;
     const calendar = timeAccountsState?.year === requestedYear
       ? timeAccountsState.holidayCalendar
       : null;
@@ -8041,7 +8189,7 @@ import {
 
   elements.holidayClosureForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const requestedYear = selectedWeekStart.slice(0, 4);
+    const requestedYear = String(adminYear);
     const holidayDate = elements.holidayClosureDate.value;
     const name = elements.holidayClosureName.value.trim();
     const note = elements.holidayClosureNote.value.trim();
@@ -9493,7 +9641,11 @@ import {
   });
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
   elements.secondaryAction.addEventListener("click", () => addEntry("clock_out"));
-  elements.assignmentDetails.addEventListener("click", openEmployeeSiteWorkspace);
+  // Ohne die eigene Funktion bekaeme openEmployeeSiteWorkspace das Klickereignis
+  // als angeforderten Einsatz. Es ist wahr, hat aber keine Baustelle: die Akte
+  // brach dann mit "Für heute ist keine Baustelle freigegeben" ab, obwohl ein
+  // Einsatz vorlag.
+  elements.assignmentDetails.addEventListener("click", () => openEmployeeSiteWorkspace());
   elements.assignmentReport.addEventListener("click", () => {
     const assignment = assignments[currentSiteIndex()];
     if (assignment) void openMobileReportForm(assignment, { leaveAfterSave: false });
@@ -9996,6 +10148,10 @@ import {
   configureModeCopy();
   updateConnectionState();
   render();
+  if (pendingCarryOverNotice) {
+    showToast(pendingCarryOverNotice);
+    pendingCarryOverNotice = null;
+  }
   window.setInterval(renderTimes, 15000);
   window.addEventListener("online", () => {
     updateConnectionState();
