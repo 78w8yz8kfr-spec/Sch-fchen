@@ -4,6 +4,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- zwei zusätzliche Prüfungen der Oberfläche: jedes der 35 Formulare muss einen
+  Absende-Empfänger haben, und ein unmittelbar übergebener Ereignisbehandler
+  darf als ersten Wert nur das Ereignis erwarten. Die zweite Prüfung gilt jetzt
+  auch für das VDE-Modul und die Plattformverwaltung, nicht mehr nur für die
+  Haupt-App.
+
 - Fehler behoben: die Vorlage für den Baustellen-Import war leer. Zwei Blätter
   ohne Spaltenüberschriften und ohne Beispiel; wer sie herunterlud, wusste
   nicht, welche Spalten gefüllt werden müssen, und jeder Upload endete mit

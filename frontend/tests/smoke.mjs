@@ -72,15 +72,32 @@ assert.doesNotMatch(app, /moduleEnabled\("time_tracking"\)/);
 // weiter. So brach die Baustellenakte ab: openEmployeeSiteWorkspace hielt den
 // PointerEvent fuer den angeforderten Einsatz und meldete, es sei keine
 // Baustelle freigegeben.
-const handlerBezuege = [...app.matchAll(/addEventListener\(\s*"[a-z]+",\s*([A-Za-z_$][\w$]*)\s*\)/g)];
-assert.ok(handlerBezuege.length > 0, "Es gibt direkt uebergebene Handler");
-for (const [, name] of handlerBezuege) {
-  const deklaration = new RegExp(`(?:async\\s+)?function ${name}\\(([^)]*)\\)`).exec(app);
-  if (!deklaration) continue;
-  assert.equal(
-    deklaration[1].trim(),
-    "",
-    `${name} wird direkt als Handler uebergeben und bekaeme das Ereignis als ersten Wert`
+for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platform-admin.js", platformApp]]) {
+  const handlerBezuege = [...quelle.matchAll(/addEventListener\(\s*"[a-z]+",\s*([A-Za-z_$][\w$]*)\s*\)/g)];
+  for (const [, name] of handlerBezuege) {
+    const deklaration = new RegExp(`(?:async\\s+)?function ${name}\\(([^),]*)`).exec(quelle);
+    if (!deklaration) continue;
+    const ersterWert = deklaration[1].trim().split(/\s*=/)[0].trim();
+    // Ein Parameter ist in Ordnung, solange er das Ereignis meint. Erwartet die
+    // Funktion dort fachliche Daten, arbeitet sie mit dem Klickereignis weiter.
+    assert.ok(
+      ersterWert === "" || /^(event|e|ereignis)$/.test(ersterWert),
+      `${datei}: ${name} wird direkt als Handler uebergeben, erwartet als ersten Wert aber "${ersterWert}"`
+    );
+  }
+}
+
+// Jedes Formular braucht einen Absende-Empfaenger. Ohne ihn laedt der Browser
+// die Seite neu und die Eingabe ist fort, ohne dass jemand etwas bemerkt.
+const formularKennungen = [...html.matchAll(/<form[^>]*id="([a-z0-9-]+)"/g)].map((treffer) => treffer[1]);
+assert.ok(formularKennungen.length > 20, "Die Formulare der App werden gefunden");
+for (const kennung of formularKennungen) {
+  const name = kennung.replace(/-([a-z0-9])/g, (_, zeichen) => zeichen.toUpperCase());
+  const ueberElement = new RegExp(`\\b${name}\\.addEventListener\\(\\s*["']submit["']`);
+  const ueberAuswahl = new RegExp(`#${kennung}["']\\)\\s*\\.addEventListener\\(\\s*["']submit["']`);
+  assert.ok(
+    ueberElement.test(app) || ueberAuswahl.test(app),
+    `Das Formular ${kennung} hat keinen Absende-Empfaenger`
   );
 }
 assert.match(html, /id="time-account-panel"/);
