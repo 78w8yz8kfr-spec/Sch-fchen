@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
-import { buildVdeInspectionPdf } from "../src/vde-pdf.mjs";
+import {
+  buildVdeInspectionPdf,
+  checkLabel,
+  circuitEvaluation,
+  protectionLabel,
+  splitPdfWord,
+  wrapText
+} from "../src/vde-pdf.mjs";
 
 test("VDE-Abschluss beginnt Messwerte auf Seite zwei und setzt das Stromkreisverzeichnis auf eine eigene Folgeseite", async () => {
   const signature = Buffer.from(
@@ -186,4 +193,111 @@ test("VDE-Abschluss beginnt Messwerte auf Seite zwei und setzt das Stromkreisver
   });
   const loadedWithoutDirectory = await PDFDocument.load(withoutDirectory);
   assert.equal(loadedWithoutDirectory.getPageCount(), 2);
+});
+
+// Die folgenden Prüfungen schreiben die fachliche Bewertung eines Stromkreises
+// fest. Sie entscheidet, ob ein Prüfprotokoll "i.O.", "prüfen" oder "n.i.O."
+// ausweist, und war bisher nur mittelbar über das fertige PDF abgedeckt.
+
+test("Ein vollständig gemessener Stromkreis ohne RCD gilt als in Ordnung", () => {
+  const bewertung = circuitEvaluation({
+    measurements: { riso: "500", rpe: "0.3", zs: "0.8" },
+    protectiveDevice: { type: "mcb", ratedCurrent: 16, characteristic: "B" }
+  });
+  assert.equal(bewertung.state, "i.O.");
+  assert.deepEqual(bewertung.warnings, []);
+});
+
+test("Ein Isolationswiderstand unter 1 MOhm macht den Stromkreis nicht in Ordnung", () => {
+  const bewertung = circuitEvaluation({
+    measurements: { riso: "0.4", rpe: "0.3", zs: "0.8" },
+    protectiveDevice: { type: "mcb" }
+  });
+  assert.equal(bewertung.state, "n.i.O.");
+  assert.ok(bewertung.warnings.includes("RISO < 1 MOhm"));
+});
+
+test("Fehlende Messwerte fuehren zu pruefen, nicht zu nicht in Ordnung", () => {
+  const bewertung = circuitEvaluation({ measurements: {}, protectiveDevice: { type: "mcb" } });
+  assert.equal(bewertung.state, "prüfen");
+  assert.ok(bewertung.warnings.includes("RISO fehlt"));
+  assert.ok(bewertung.warnings.includes("RPE fehlt"));
+  // Ohne RCD zaehlt die Schleifenimpedanz oder der Kurzschlussstrom.
+  assert.ok(bewertung.warnings.includes("Zs oder Ik fehlt"));
+});
+
+test("Der Kurzschlussstrom ersetzt die Schleifenimpedanz", () => {
+  const bewertung = circuitEvaluation({
+    measurements: { riso: "500", rpe: "0.3", ik: "240" },
+    protectiveDevice: { type: "mcb" }
+  });
+  assert.ok(!bewertung.warnings.includes("Zs oder Ik fehlt"));
+});
+
+test("Ein Ausloesestrom oberhalb des Bemessungswerts macht den Stromkreis nicht in Ordnung", () => {
+  const bewertung = circuitEvaluation({
+    measurements: { riso: "500", rpe: "0.3", rcdTripTime: "18", rcdTripCurrent: "42" },
+    protectiveDevice: { type: "rcbo", ratedResidualCurrent: 30 }
+  });
+  assert.equal(bewertung.state, "n.i.O.");
+  assert.ok(bewertung.warnings.includes("RCD-Auslösestrom > Idn"));
+});
+
+test("Ein Ausloesestrom innerhalb des Bemessungswerts ist in Ordnung", () => {
+  const bewertung = circuitEvaluation({
+    measurements: { riso: "500", rpe: "0.3", rcdTripTime: "18", rcdTripCurrent: "22" },
+    protectiveDevice: { type: "rcbo", ratedResidualCurrent: 30 }
+  });
+  assert.equal(bewertung.state, "i.O.");
+});
+
+test("Ein vorgelagerter Fehlerstromschutz verlangt eigene Messwerte", () => {
+  const bewertung = circuitEvaluation(
+    { measurements: { riso: "500", rpe: "0.3" }, protectiveDevice: { type: "mcb" } },
+    { ratedResidualCurrent: 30 }
+  );
+  assert.equal(bewertung.state, "prüfen");
+  assert.ok(bewertung.warnings.includes("RCD-Zeit fehlt"));
+  assert.ok(bewertung.warnings.includes("RCD-Strom fehlt"));
+  // Mit vorgelagertem RCD wird die Schleifenimpedanz nicht zusaetzlich verlangt.
+  assert.ok(!bewertung.warnings.includes("Zs oder Ik fehlt"));
+});
+
+test("Jede Bauart des Schutzorgans bekommt eine lesbare Bezeichnung", () => {
+  assert.equal(protectionLabel({ type: "mcb", characteristic: "B", ratedCurrent: 16 }), "LS B 16 A");
+  assert.equal(protectionLabel({ type: "mcb" }), "LS");
+  assert.match(protectionLabel({ type: "rcbo", ratedResidualCurrent: 30, rcdType: "A" }), /FI\/LS.*Typ A.*30 mA/);
+  assert.equal(protectionLabel({ type: "fuse_nh", ratedCurrent: 63 }), "NH-Sicherung 63 A");
+  assert.equal(protectionLabel({ type: "fuse_nh", ratedCurrent: 63, designation: "gG" }), "NH-Sicherung 63 A, gG");
+  assert.equal(protectionLabel({ type: "fuse_diazed", ratedCurrent: 25 }), "Diazed 25 A");
+  assert.equal(protectionLabel({ type: "fuse_neozed", ratedCurrent: 35 }), "Neozed 35 A");
+  assert.equal(protectionLabel({ type: "unbekannt", designation: "Sonderbauform" }), "Sonderbauform");
+  assert.equal(protectionLabel(undefined), "Sonstiges Schutzorgan");
+});
+
+test("Das Prüfergebnis wird in die Kurzform des Protokolls uebersetzt", () => {
+  assert.equal(checkLabel("ok"), "i.O.");
+  assert.equal(checkLabel("not_ok"), "n.i.O.");
+  assert.equal(checkLabel("not_checked"), "offen");
+  assert.equal(checkLabel(undefined), "offen");
+  assert.equal(checkLabel("etwas anderes"), "offen");
+});
+
+test("Ein ueberlanges Wort wird umbrochen statt aus dem Feld zu laufen", () => {
+  // Der Umbruch arbeitet mit einer Schriftbreite; eine feste Breite je Zeichen
+  // genuegt fuer die Pruefung der Regel.
+  const font = { widthOfTextAtSize: (text) => text.length * 10 };
+  assert.deepEqual(splitPdfWord("Hauptverteilung", font, 10, 50), ["Haupt", "verte", "ilung"]);
+  assert.deepEqual(splitPdfWord("kurz", font, 10, 100), ["kurz"]);
+  const zeilen = wrapText("ein sehr langer Satz", font, 10, 90);
+  assert.ok(zeilen.length > 1);
+  assert.ok(zeilen.every((zeile) => zeile.length <= 9));
+});
+
+test("Ein leerer Text wird zu einem Strich statt zu einer leeren Zeile", () => {
+  const font = { widthOfTextAtSize: (text) => text.length * 10 };
+  assert.deepEqual(wrapText("", font, 10, 100), ["-"]);
+  assert.deepEqual(wrapText(null, font, 10, 100), ["-"]);
+  // Absaetze bleiben erhalten.
+  assert.deepEqual(wrapText("eins\n\nzwei", font, 10, 100), ["eins", "", "zwei"]);
 });

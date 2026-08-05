@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- die fachliche Bewertung eines VDE-Stromkreises ist jetzt einzeln geprüft:
+  Isolationswiderstand unter 1 MΩ, Auslösestrom über dem Bemessungswert,
+  fehlende Messwerte und die Bezeichnung jeder Schutzorgan-Bauart. Bisher war
+  sie nur mittelbar über das fertige PDF abgedeckt. Ebenso die
+  Eingabeprüfungen der Plattformverwaltung.
+- die Mindestabdeckung in der Prüffolge steigt auf 86 Prozent Zeilen,
+  73 Prozent Zweige und 94 Prozent Funktionen.
+
 - Fehler behoben: wer nach einer Unterbrechung auf dieselbe Baustelle
   zurückkehrte, verlor die Berichtsverantwortung. Die automatische
   Vorarbeiterfunktion zählte Einsatzzeilen statt Menschen: die Rückkehr legt
