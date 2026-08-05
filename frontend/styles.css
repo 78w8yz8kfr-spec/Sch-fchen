@@ -3434,6 +3434,20 @@ select:focus-visible {
   align-self: center;
 }
 
+/* Faltet die restlichen Karten einer Zelle auf. Ohne sie waere die Zeile so
+   hoch wie ihr vollster Tag - und in allen anderen Tagesspalten stuende
+   dieselbe Hoehe als Leere. */
+.planning-board-more {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px dashed var(--line);
+  border-radius: 11px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.63rem;
+  font-weight: 800;
+}
+
 .assignment-edit-form {
   margin-bottom: 14px;
   border: 2px solid var(--brand);

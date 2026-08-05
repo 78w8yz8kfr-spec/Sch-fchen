@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.4";
+} from "./core/work-time.js?v=0.42.5";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,13 +18,13 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.4";
+} from "./core/sync-queue.js?v=0.42.5";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
-} from "./core/permissions.js?v=0.42.4";
+} from "./core/permissions.js?v=0.42.5";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -35,10 +35,12 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.4";
+} from "./core/state-store.js?v=0.42.5";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
+  // Karten je Zelle der Plantafel, bevor der Rest zusammengefaltet wird.
+  const PLANNING_CARDS_PER_CELL = 2;
   const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
   const queryMode = new URLSearchParams(window.location.search).get("mode");
   const demoMode = queryMode === "demo" || (
@@ -813,6 +815,8 @@ import {
   // Zu welchem Tag gehoeren die geladenen Einsaetze? Die Schnittstelle liefert
   // sie je Tag und traegt das Datum nicht in den einzelnen Einsatz ein.
   let assignmentsDate = null;
+  // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
+  const expandedPlanningCells = new Set();
   let deviceCompany = null;
   let companyChangeRequested = false;
   let adminState = null;
@@ -1042,7 +1046,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.4",
+          "X-Schaefchen-Version": "0.42.5",
           ...options.headers
         }
       });
@@ -1070,7 +1074,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.4" }
+        headers: { "X-Schaefchen-Version": "0.42.5" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1117,7 +1121,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.4 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.5 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -4079,11 +4083,43 @@ import {
           }`;
           cell.append(absenceCard);
         });
-        assignments.forEach((assignment) => {
+        // Alle Zellen einer Zeile liegen in derselben Rasterzeile: die hoechste
+        // bestimmt die Hoehe aller. Ein Mitarbeiter mit vier Einsaetzen an
+        // einem Tag machte seine Zeile ueber 500 Pixel hoch, und in den
+        // uebrigen Tagesspalten stand ebenso viel Leere - auf dem Handy sieht
+        // man ohnehin nur eine Spalte auf einmal. Deshalb zeigt eine Zelle
+        // hoechstens zwei Karten und den Rest auf Wunsch.
+        const zellenSchluessel = `${employee.id}|${workDate}`;
+        const aufgeklappt = expandedPlanningCells.has(zellenSchluessel);
+        const sichtbare = aufgeklappt
+          ? assignments
+          : assignments.slice(0, PLANNING_CARDS_PER_CELL);
+        sichtbare.forEach((assignment) => {
           cell.append(createPlanningAssignmentCard(assignment));
-          employeeCount += 1;
-          visibleAssignments += 1;
         });
+        employeeCount += assignments.length;
+        visibleAssignments += assignments.length;
+        if (assignments.length > sichtbare.length) {
+          const mehr = document.createElement("button");
+          mehr.type = "button";
+          mehr.className = "planning-board-more";
+          mehr.textContent = `+${assignments.length - sichtbare.length} weitere`;
+          mehr.addEventListener("click", () => {
+            expandedPlanningCells.add(zellenSchluessel);
+            renderAdminWeek();
+          });
+          cell.append(mehr);
+        } else if (aufgeklappt && assignments.length > PLANNING_CARDS_PER_CELL) {
+          const weniger = document.createElement("button");
+          weniger.type = "button";
+          weniger.className = "planning-board-more";
+          weniger.textContent = "Weniger zeigen";
+          weniger.addEventListener("click", () => {
+            expandedPlanningCells.delete(zellenSchluessel);
+            renderAdminWeek();
+          });
+          cell.append(weniger);
+        }
         if (assignments.length === 0 && absences.length === 0) {
           const empty = document.createElement("span");
           empty.className = "admin-week-empty";

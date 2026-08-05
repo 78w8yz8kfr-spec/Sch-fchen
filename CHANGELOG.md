@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Plantafel: eine Zelle zeigt höchstens zwei Karten, der Rest lässt sich mit
+  „+2 weitere“ aufklappen. Alle Zellen einer Zeile liegen in derselben
+  Rasterzeile — die höchste bestimmt die Höhe aller. Ein Mitarbeiter mit vier
+  Einsätzen an einem Tag machte seine Zeile 679 Pixel hoch, und in den übrigen
+  Tagesspalten stand ebenso viel Leere; auf dem Handy sieht man ohnehin nur
+  eine Spalte auf einmal. Zusammengefaltet sind es 362 Pixel, das ganze Brett
+  wird 317 Pixel kürzer. Gezählt wird weiterhin, was eingeplant ist, nicht was
+  gerade zu sehen ist.
+- Fassung 0.42.5, Speicher `schaefchen-online-v47`, Migration 054.
+
 - Fehler behoben: auf den Karten der Plantafel lagen die Schaltflächen
   „Ändern“ und „Kopieren“ über dem Text. Gemessen auf dem Handy: die Karte ist
   163 Pixel breit, die beiden Schaltflächen brauchen zusammen 113 davon — jede
