@@ -4,6 +4,23 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Berichtsheft bekommt einen eigenen Bereich.** Bisher lag es unten in
+  der Wochenansicht, zwischen Stundenzettel und Abwesenheiten. Für den
+  Auszubildenden ist es aber die Arbeit, die er täglich neben der
+  Zeiterfassung hat, und für den Ausbilder die, die er wöchentlich abzeichnet
+  — kein Anhängsel.
+  - Der Bereich heißt **„Nachweis“** und erscheint nur bei diesen beiden.
+  - Er enthält die Woche mit ihren Tageszeilen samt eigenem Wochenwechsel, die
+    fehlenden Wochen und **alle bisherigen Berichte**. Jede Zeile dort führt in
+    ihre Woche zurück und lässt sich von dort drucken; vorher war die Liste
+    eine tote Aufzählung. Für den Ausbilder steht dort seine Prüfliste.
+  - Die angezeigte Woche ist dieselbe wie im Stundenzettel: zwei getrennte
+    Wochenstände in einer App wären für niemanden nachvollziehbar.
+  - Die Navigationsleiste richtet sich jetzt nach den sichtbaren
+    Schaltflächen. Die Spaltenzahl war fest verdrahtet (drei, für die Planung
+    fünf) und wäre mit jedem neuen Bereich falsch geworden.
+- Fassung 0.42.13, Speicher `schaefchen-online-v55`, Migration 065.
+
 - **Eine eingereichte Woche lässt sich zurückholen.** Zu erklären, warum die
   Felder gesperrt sind, war nur die halbe Antwort: wer zu früh eingereicht
   hatte, saß fest — schreiben ging nicht mehr, und der einzige Weg zurück

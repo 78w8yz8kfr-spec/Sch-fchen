@@ -126,6 +126,27 @@ Nachweis ohne Unterschriften ungültig ist.
   ist es nicht; im Ordner der Kammer fällt das erst am Ende der Ausbildung auf.
   Gedruckt wird, was eingereicht oder freigegeben ist — also unterschrieben.
 
+## Wo es steht
+
+Das Berichtsheft ist ein **eigener Bereich** in der Navigation („Nachweis“),
+kein Anhängsel der Wochenansicht. Für den Auszubildenden ist es die Arbeit, die
+er täglich neben der Zeiterfassung hat; für den Ausbilder die, die er
+wöchentlich abzeichnet. Der Bereich erscheint nur bei diesen beiden — für alle
+anderen ist er nicht da.
+
+Er enthält:
+
+* die **Woche** mit einer Zeile je Tag, samt eigenem Wochenwechsel. Die
+  angezeigte Woche ist dieselbe wie im Stundenzettel: zwei getrennte
+  Wochenstände in einer App wären für niemanden nachvollziehbar.
+* die **fehlenden Wochen** mit einem Weg direkt hinein,
+* die **bisherigen Berichte** — jede Zeile führt in ihre Woche zurück und
+  lässt sich von dort drucken,
+* für den Ausbilder die **Prüfliste** samt Lücken seiner Auszubildenden.
+
+Die Navigationsleiste richtet sich nach den sichtbaren Schaltflächen; eine fest
+verdrahtete Spaltenzahl wäre mit jedem neuen Bereich falsch.
+
 ## Wann es auftaucht
 
 Das Heft lag zuerst allein im Wochenbereich. Dort sucht am Feierabend niemand

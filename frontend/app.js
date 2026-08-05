@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.12";
+} from "./core/work-time.js?v=0.42.13";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.12";
+} from "./core/sync-queue.js?v=0.42.13";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.12";
+} from "./core/permissions.js?v=0.42.13";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.12";
+} from "./core/state-store.js?v=0.42.13";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -420,6 +420,12 @@ import {
     bottomNav: document.querySelector(".bottom-nav"),
     navStart: document.querySelector("#nav-start"),
     navWeek: document.querySelector("#nav-week"),
+    navApprentice: document.querySelector("#nav-apprentice"),
+    apprenticeSection: document.querySelector("#apprentice-section"),
+    apprenticePeriod: document.querySelector("#apprentice-period"),
+    apprenticePrevious: document.querySelector("#apprentice-previous"),
+    apprenticeCurrent: document.querySelector("#apprentice-current"),
+    apprenticeNext: document.querySelector("#apprentice-next"),
     navAssignments: document.querySelector("#nav-assignments"),
     navSites: document.querySelector("#nav-sites"),
     navMore: document.querySelector("#nav-more"),
@@ -1091,7 +1097,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.12",
+          "X-Schaefchen-Version": "0.42.13",
           ...options.headers
         }
       });
@@ -1119,7 +1125,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.12" }
+        headers: { "X-Schaefchen-Version": "0.42.13" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1166,7 +1172,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.12 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.13 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1215,7 +1221,16 @@ import {
     const planner = canPlan();
     elements.navAssignments.hidden = !planner;
     elements.navSites.hidden = !planner;
+    // Das Berichtsheft ist ein eigener Bereich, kein Anhaengsel der
+    // Wochenansicht: fuer den Auszubildenden ist es die Arbeit, die er neben
+    // der Zeiterfassung taeglich hat, und fuer den Ausbilder die, die er
+    // woechentlich abzeichnet.
+    elements.navApprentice.hidden = !(isApprentice() || mayReviewApprentices());
     elements.bottomNav.classList.toggle("bottom-nav--planner", planner);
+    // Ab fuenf Schaltflaechen wird es eng: dann kleinere Schrift und Symbole.
+    // Ein ausbildender Vorarbeiter mit Planungsrolle haette sechs.
+    const sichtbare = [...elements.bottomNav.children].filter((knopf) => !knopf.hidden).length;
+    elements.bottomNav.classList.toggle("bottom-nav--compact", sichtbare >= 5);
     document.title = "Start · Schäfchen";
     render();
     showDashboardPane("start", false);
@@ -7258,6 +7273,10 @@ import {
       : `Woche ab ${shortDate(weekStart)}`;
     elements.weekCurrent.disabled = weekStart === currentWeekStart(today);
     elements.weekNext.disabled = weekStart >= currentWeekStart(today);
+    // Der Berichtsheft-Bereich blaettert dieselbe Woche.
+    elements.apprenticePeriod.textContent = elements.weekPeriod.textContent;
+    elements.apprenticeCurrent.disabled = elements.weekCurrent.disabled;
+    elements.apprenticeNext.disabled = elements.weekNext.disabled;
     const targetMinutes = visibleWeek.days.reduce(
       (sum, { workDay }) => sum + Number(workDay?.targetWorkMinutes || 0),
       0
@@ -7708,7 +7727,10 @@ import {
   }
 
   function activateNavigation(activeButton) {
-    [elements.navStart, elements.navWeek, elements.navAssignments, elements.navSites, elements.navMore].forEach((button) => {
+    [
+      elements.navStart, elements.navWeek, elements.navApprentice,
+      elements.navAssignments, elements.navSites, elements.navMore
+    ].forEach((button) => {
       const active = button === activeButton;
       button.classList.toggle("nav-item--active", active);
       if (active) button.setAttribute("aria-current", "page");
@@ -7742,6 +7764,11 @@ import {
         element.hidden = pane !== "start" || !isApprentice();
         return;
       }
+      if (element === elements.apprenticeSection) {
+        element.hidden = pane !== "apprentice"
+          || !(isApprentice() || mayReviewApprentices());
+        return;
+      }
       element.hidden = element.dataset.dashboardPane !== pane;
     });
 
@@ -7770,6 +7797,7 @@ import {
 
     const activeButton = {
       week: elements.navWeek,
+      apprentice: elements.navApprentice,
       assignments: elements.navAssignments,
       sites: elements.navSites,
       more: elements.navMore
@@ -7779,6 +7807,7 @@ import {
     renderAccountCard();
     const title = {
       week: "Woche",
+      apprentice: "Berichtsheft",
       site: "Baustelle",
       assignments: "Einsätze",
       sites: "Baustellen",
@@ -7953,16 +7982,50 @@ import {
     renderApprenticeOpenDays();
     renderApprenticeMissing();
 
+    renderApprenticeHistory();
+  }
+
+  // Seine bisherigen Berichte. Fruher war das eine tote Aufzaehlung; im
+  // eigenen Bereich ist sie der Weg zurueck in jede Woche - und zu ihrem
+  // Ausdruck.
+  function renderApprenticeHistory() {
+    const berichte = apprenticeState || [];
     elements.apprenticeHistory.replaceChildren();
-    for (const eintrag of (apprenticeState || []).slice(0, 12)) {
+
+    if (berichte.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "admin-list__empty";
+      leer.textContent = "Noch kein Wochenbericht geschrieben.";
+      elements.apprenticeHistory.append(leer);
+      return;
+    }
+
+    for (const eintrag of berichte.slice(0, 26)) {
       const zeile = document.createElement("li");
+      zeile.classList.toggle("apprentice-history__current", eintrag.weekStart === selectedWeekStart);
+
+      const oeffnen = document.createElement("button");
+      oeffnen.type = "button";
+      oeffnen.className = "apprentice-history__open";
       const woche = document.createElement("strong");
       const zustand = document.createElement("span");
       woche.textContent = `Woche ab ${shortDate(eintrag.weekStart)}`;
       zustand.textContent = `${APPRENTICE_STATUS_LABEL[eintrag.status]} · ${
         formatMinutes(eintrag.workedMinutes)
       } h`;
-      zeile.append(woche, zustand);
+      zustand.className = `apprentice-history__status apprentice-history__status--${eintrag.status}`;
+      oeffnen.append(woche, zustand);
+      oeffnen.addEventListener("click", () => void selectWeek(eintrag.weekStart));
+      zeile.append(oeffnen);
+
+      if (APPRENTICE_PRINTABLE.includes(eintrag.status)) {
+        const drucken = document.createElement("button");
+        drucken.type = "button";
+        drucken.className = "text-button";
+        drucken.textContent = "Drucken";
+        drucken.addEventListener("click", () => printApprenticeReport(eintrag.weekStart));
+        zeile.append(drucken);
+      }
       elements.apprenticeHistory.append(zeile);
     }
   }
@@ -10474,9 +10537,8 @@ import {
   elements.apprenticeTodayOpen.addEventListener("click", () => openApprenticeToday());
   elements.apprenticeWeekOpen.addEventListener("click", () => {
     selectedWeekStart = currentWeekStart();
-    showDashboardPane("week");
+    showDashboardPane("apprentice");
     void refreshWeekData();
-    elements.apprenticePanel.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   elements.apprenticeTodayForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -10892,6 +10954,24 @@ import {
     void selectWeek(currentWeekStart());
   });
   elements.weekNext.addEventListener("click", () => {
+    if (selectedWeekStart < currentWeekStart()) {
+      void selectWeek(addIsoDays(selectedWeekStart, 7));
+    }
+  });
+  // Der Berichtsheft-Bereich teilt sich die angezeigte Woche mit dem
+  // Stundenzettel: zwei getrennte Wochen in einer App waeren fuer niemanden
+  // nachvollziehbar.
+  elements.navApprentice.addEventListener("click", () => {
+    showDashboardPane("apprentice");
+    void Promise.all([refreshWeekData(), refreshApprenticeReviews()]);
+  });
+  elements.apprenticePrevious.addEventListener("click", () => {
+    void selectWeek(addIsoDays(selectedWeekStart, -7));
+  });
+  elements.apprenticeCurrent.addEventListener("click", () => {
+    void selectWeek(currentWeekStart());
+  });
+  elements.apprenticeNext.addEventListener("click", () => {
     if (selectedWeekStart < currentWeekStart()) {
       void selectWeek(addIsoDays(selectedWeekStart, 7));
     }

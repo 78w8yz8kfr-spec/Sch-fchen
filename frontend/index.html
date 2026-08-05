@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.12">
-    <script type="module" src="./app.js?v=0.42.12"></script>
-    <script src="./version.js?v=0.42.12" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.13">
+    <script type="module" src="./app.js?v=0.42.13"></script>
+    <script src="./version.js?v=0.42.13" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.12</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.13</p>
         </div>
       </section>
 
@@ -647,54 +647,6 @@
               <p id="week-next-assignment-meta"></p>
             </section>
 
-            <section id="apprentice-panel" class="week-review-panel apprentice-panel" aria-labelledby="apprentice-title" hidden>
-              <div class="site-management-panel__heading">
-                <div>
-                  <p class="eyebrow">Ausbildungsnachweis</p>
-                  <h3 id="apprentice-title">Berichtsheft</h3>
-                </div>
-                <span id="apprentice-status" class="site-list-summary" aria-live="polite">Entwurf</span>
-              </div>
-              <p id="apprentice-week" class="apprentice-week">Woche</p>
-              <p id="apprentice-return" class="apprentice-return" hidden></p>
-              <p id="apprentice-lock" class="apprentice-lock" aria-live="polite" hidden></p>
-              <p id="apprentice-open" class="apprentice-open" aria-live="polite" hidden></p>
-              <div id="apprentice-missing" class="apprentice-missing" hidden>
-                <p id="apprentice-missing-text"></p>
-                <div id="apprentice-missing-weeks" class="apprentice-missing__weeks"></div>
-              </div>
-              <form id="apprentice-form" class="apprentice-form" novalidate>
-                <div id="apprentice-days" class="apprentice-days"></div>
-                <label for="apprentice-week-remark">Bemerkungen zur Woche</label>
-                <textarea id="apprentice-week-remark" rows="2" maxlength="1000"
-                  placeholder="Besonderes in dieser Woche"></textarea>
-                <div class="apprentice-actions">
-                  <button id="apprentice-withdraw" class="button button--secondary" type="button">Wieder bearbeiten</button>
-                  <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
-                  <button id="apprentice-print" class="button button--secondary" type="button">Woche drucken</button>
-                  <button id="apprentice-print-book" class="button button--secondary" type="button">Ganzes Jahr drucken</button>
-                  <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
-                </div>
-              </form>
-              <p id="apprentice-message" class="form-message" aria-live="polite"></p>
-              <ul id="apprentice-history" class="apprentice-history" aria-label="Bisherige Wochenberichte"></ul>
-            </section>
-
-            <section id="apprentice-review-panel" class="week-review-panel apprentice-review-panel" aria-labelledby="apprentice-review-title" hidden>
-              <div class="site-management-panel__heading">
-                <div>
-                  <p class="eyebrow">Ausbildung begleiten</p>
-                  <h3 id="apprentice-review-title">Berichtshefte prüfen</h3>
-                </div>
-                <span id="apprentice-review-count" class="site-list-summary" aria-live="polite">0</span>
-              </div>
-              <ul id="apprentice-gap-list" class="apprentice-gap-list" aria-label="Fehlende Wochenberichte"></ul>
-              <ul id="apprentice-review-list" class="apprentice-review-list" aria-label="Eingereichte Wochenberichte"></ul>
-              <div class="apprentice-actions">
-                <button id="apprentice-approve-all" class="button button--primary" type="button">Alle freigeben</button>
-              </div>
-              <p id="apprentice-review-message" class="form-message" aria-live="polite"></p>
-            </section>
 
             <section id="week-days-section" class="week-content-section" aria-labelledby="week-days-title">
               <div class="week-section-title">
@@ -823,6 +775,72 @@
                 Beide Schritte müssen von verschiedenen Konten stammen.
               </p>
               <ul id="absence-review-list" class="absence-review-list" aria-label="Zu prüfende Abwesenheiten"></ul>
+            </section>
+          </section>
+
+          <section id="apprentice-section" class="section apprentice-section"
+            data-dashboard-pane="apprentice" aria-labelledby="apprentice-section-title" hidden>
+            <div class="section-heading week-heading">
+              <div>
+                <p class="eyebrow">Ausbildungsnachweis</p>
+                <h2 id="apprentice-section-title">Berichtsheft</h2>
+              </div>
+              <div class="week-heading__controls">
+                <strong id="apprentice-period" class="week-period">Diese Woche</strong>
+                <div class="week-navigation" aria-label="Angezeigte Woche wechseln">
+                  <button id="apprentice-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
+                  <button id="apprentice-current" class="week-navigation__today" type="button">Diese Woche</button>
+                  <button id="apprentice-next" class="week-button" type="button" aria-label="Nächste Woche">›</button>
+                </div>
+              </div>
+            </div>
+            <section id="apprentice-panel" class="week-review-panel apprentice-panel" aria-labelledby="apprentice-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Tag für Tag</p>
+                  <h3 id="apprentice-title">Deine Einträge</h3>
+                </div>
+                <span id="apprentice-status" class="site-list-summary" aria-live="polite">Entwurf</span>
+              </div>
+              <p id="apprentice-week" class="apprentice-week">Woche</p>
+              <p id="apprentice-return" class="apprentice-return" hidden></p>
+              <p id="apprentice-lock" class="apprentice-lock" aria-live="polite" hidden></p>
+              <p id="apprentice-open" class="apprentice-open" aria-live="polite" hidden></p>
+              <div id="apprentice-missing" class="apprentice-missing" hidden>
+                <p id="apprentice-missing-text"></p>
+                <div id="apprentice-missing-weeks" class="apprentice-missing__weeks"></div>
+              </div>
+              <form id="apprentice-form" class="apprentice-form" novalidate>
+                <div id="apprentice-days" class="apprentice-days"></div>
+                <label for="apprentice-week-remark">Bemerkungen zur Woche</label>
+                <textarea id="apprentice-week-remark" rows="2" maxlength="1000"
+                  placeholder="Besonderes in dieser Woche"></textarea>
+                <div class="apprentice-actions">
+                  <button id="apprentice-withdraw" class="button button--secondary" type="button">Wieder bearbeiten</button>
+                  <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
+                  <button id="apprentice-print" class="button button--secondary" type="button">Woche drucken</button>
+                  <button id="apprentice-print-book" class="button button--secondary" type="button">Ganzes Jahr drucken</button>
+                  <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
+                </div>
+              </form>
+              <p id="apprentice-message" class="form-message" aria-live="polite"></p>
+              <ul id="apprentice-history" class="apprentice-history" aria-label="Bisherige Wochenberichte"></ul>
+            </section>
+
+            <section id="apprentice-review-panel" class="week-review-panel apprentice-review-panel" aria-labelledby="apprentice-review-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Ausbildung begleiten</p>
+                  <h3 id="apprentice-review-title">Berichtshefte prüfen</h3>
+                </div>
+                <span id="apprentice-review-count" class="site-list-summary" aria-live="polite">0</span>
+              </div>
+              <ul id="apprentice-gap-list" class="apprentice-gap-list" aria-label="Fehlende Wochenberichte"></ul>
+              <ul id="apprentice-review-list" class="apprentice-review-list" aria-label="Eingereichte Wochenberichte"></ul>
+              <div class="apprentice-actions">
+                <button id="apprentice-approve-all" class="button button--primary" type="button">Alle freigeben</button>
+              </div>
+              <p id="apprentice-review-message" class="form-message" aria-live="polite"></p>
             </section>
           </section>
 
@@ -2476,6 +2494,10 @@
           <button id="nav-week" class="nav-item" type="button">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/></svg>
             <span>Woche</span>
+          </button>
+          <button id="nav-apprentice" class="nav-item" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
+            <span>Nachweis</span>
           </button>
           <button id="nav-assignments" class="nav-item" type="button" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
