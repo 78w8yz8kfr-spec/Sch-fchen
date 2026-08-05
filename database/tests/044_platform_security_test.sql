@@ -81,10 +81,13 @@ BEGIN
         RAISE EXCEPTION 'Gesperrte Firmen können sich weiterhin anmelden';
     END IF;
 
+    -- Genau eine Produktionsfassung, und die Fassung 0.42.0 fuehrt ihre
+    -- Migrationen mit. Welche Fassung gerade Produktion ist, gehoert nicht in
+    -- diesen Test: jede spaetere Veroeffentlichung loest 0.42.0 ab.
     IF (SELECT COUNT(*) FROM application_versions WHERE release_status = 'production') <> 1
        OR NOT EXISTS (
             SELECT 1 FROM application_versions
-            WHERE version = '0.42.0' AND release_status = 'production'
+            WHERE version = '0.42.0'
               AND database_migrations = '["039", "040", "041", "042", "043", "044"]'::JSONB
        )
        OR EXISTS (
