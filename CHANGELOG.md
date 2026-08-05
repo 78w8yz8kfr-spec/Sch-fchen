@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: während einer Veröffentlichung ließ sich die App auf einem
+  eingerichteten Gerät gar nicht mehr öffnen. Die Seite selbst wird immer frisch
+  geholt; direkt nach einer Veröffentlichung verweist sie auf Dateien mit neuer
+  Fassungsnummer — und genau in diesem Moment ist der Dienst nicht erreichbar
+  oder läuft erst wieder an. Das Gerät hatte dann die neue Seite, aber kein
+  `app.js` dazu und blieb weiß. Der Dienst-Worker nimmt jetzt im Fehlerfall
+  dieselbe Datei aus der vorherigen Fassung; eine Fassung zu alt und laufend ist
+  besser als gar keine. Auch eine Fehlerseite des anlaufenden Dienstes (Status
+  ab 500) ersetzt keine Datei mehr. War die Datei nie da, schlägt der Fehler
+  weiterhin durch — ein Rückfall darf nichts erfinden.
+
 - Fehler behoben: die Anmeldung kam nur zu einer einzigen Firma. Das Feld für
   die Firmennummer war dauerhaft verborgen und fest mit der im Server
   hinterlegten Firma der Ersteinrichtung gefüllt; ein Mitarbeiter jeder

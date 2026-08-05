@@ -102,20 +102,46 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
+    caches.match(event.request).then(async (cached) => {
       if (cached) {
         return cached;
       }
 
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type === "opaque") {
-          return response;
-        }
+      // Diese Datei liegt noch nicht im Speicher. Das ist der Normalfall
+      // unmittelbar nach einer Veroeffentlichung: die Seite selbst wird immer
+      // frisch geholt und verweist dann auf Dateien mit neuer Fassungsnummer.
+      //
+      // Genau in diesem Moment ist der Server aber nicht erreichbar - waehrend
+      // einer Veroeffentlichung oder wenn der Dienst erst wieder anlaeuft. Ohne
+      // Rueckfall bekam das Geraet dann eine neue index.html, aber kein app.js
+      // dazu: die App blieb weiss und liess sich gar nicht mehr oeffnen.
+      //
+      // Deshalb zaehlt im Fehlerfall dieselbe Datei aus einer frueheren
+      // Fassung. Eine Fassung zu alt und laufend ist besser als gar keine.
+      const fruehereFassung = () => caches.match(event.request, { ignoreSearch: true });
 
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      let response;
+      try {
+        response = await fetch(event.request);
+      } catch (fehler) {
+        const ersatz = await fruehereFassung();
+        if (ersatz) return ersatz;
+        throw fehler;
+      }
+
+      if (!response || response.status !== 200 || response.type === "opaque") {
+        // Ein anlaufender oder gerade ausgetauschter Dienst antwortet mit einer
+        // Fehlerseite statt mit der Datei. Die waere als Javascript unlesbar.
+        if (response && response.status >= 500) {
+          const ersatz = await fruehereFassung();
+          if (ersatz) return ersatz;
+        }
         return response;
-      });
+      }
+
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      return response;
     })
   );
 });

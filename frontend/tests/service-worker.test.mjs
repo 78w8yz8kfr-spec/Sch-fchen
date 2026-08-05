@@ -31,8 +31,17 @@ class FakeCache {
     this.entries.set(cacheKey(request), response);
   }
 
-  async match(request) {
-    return this.entries.get(cacheKey(request));
+  async match(request, options = {}) {
+    const treffer = this.entries.get(cacheKey(request));
+    if (treffer || !options.ignoreSearch) return treffer;
+    // Wie im Browser: ohne Fragezeichenteil vergleichen. So findet eine Anfrage
+    // nach app.js?v=0.42.2 die abgelegte app.js?v=0.42.1.
+    const ohneAbfrage = (wert) => new URL(wert, ORIGIN).pathname;
+    const gesucht = ohneAbfrage(cacheKey(request));
+    for (const [schluessel, antwort] of this.entries) {
+      if (ohneAbfrage(schluessel) === gesucht) return antwort;
+    }
+    return undefined;
   }
 
   async addAll(urls) {
@@ -58,9 +67,9 @@ class FakeCacheStorage {
     return this.stores.delete(name);
   }
 
-  async match(request) {
+  async match(request, options) {
     for (const store of this.stores.values()) {
-      const hit = await store.match(request);
+      const hit = await store.match(request, options);
       if (hit) return hit;
     }
     return undefined;
@@ -306,6 +315,45 @@ test("Statische Dateien kommen zuerst aus dem Cache und werden sonst nachgeladen
   assert.equal(worker.fetchCalls.length, 1);
   await new Promise((done) => setImmediate(done));
   assert.ok(await shell.match(missing), "Die nachgeladene Datei wurde nicht abgelegt");
+});
+
+test("Waehrend einer Veroeffentlichung springt die vorherige Fassung ein", async () => {
+  // Der eigentliche Fehler: die Seite selbst wird immer frisch geholt. Direkt
+  // nach einer Veroeffentlichung verweist sie auf Dateien mit neuer
+  // Fassungsnummer - und genau dann ist der Server kurz nicht erreichbar. Das
+  // Geraet hatte dann die neue Seite, aber kein app.js dazu: die App blieb
+  // weiss und liess sich nicht mehr oeffnen.
+  const worker = loadServiceWorker({
+    fetchImplementation: async () => { throw new Error("Der Server antwortet nicht."); }
+  });
+  const shell = await worker.caches.open("schaefchen-online-v44");
+  await shell.put(requestFor("/app.js?v=0.42.1"), new Response("Vorherige Fassung"));
+
+  const neu = requestFor("/app.js?v=0.42.2");
+  const antwort = await runFetch(worker, neu);
+  assert.equal(await antwort.text(), "Vorherige Fassung");
+});
+
+test("Eine Fehlerseite des anlaufenden Dienstes ersetzt keine Datei", async () => {
+  // Ein Dienst, der gerade wieder anlaeuft, antwortet mit einer Fehlerseite
+  // statt mit der Datei. Als Javascript waere sie unlesbar.
+  const worker = loadServiceWorker({
+    fetchImplementation: async () => new Response("<html>Dienst nicht erreichbar</html>", { status: 503 })
+  });
+  const shell = await worker.caches.open("schaefchen-online-v44");
+  await shell.put(requestFor("/styles.css?v=0.42.1"), new Response("Vorherige Gestaltung"));
+
+  const antwort = await runFetch(worker, requestFor("/styles.css?v=0.42.2"));
+  assert.equal(await antwort.text(), "Vorherige Gestaltung");
+});
+
+test("Ohne vorherige Fassung bleibt der Fehler sichtbar", async () => {
+  // Ein Rueckfall darf nichts erfinden. Ist die Datei nie dagewesen, muss der
+  // Fehler durchschlagen, sonst sucht niemand die Ursache.
+  const worker = loadServiceWorker({
+    fetchImplementation: async () => { throw new Error("Der Server antwortet nicht."); }
+  });
+  await assert.rejects(() => runFetch(worker, requestFor("/assets/neu.svg")));
 });
 
 test("Fehlerhafte und undurchsichtige Antworten landen nicht im Cache", async () => {
