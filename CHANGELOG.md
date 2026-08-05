@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- der Baustellenlink und der QR-Code führen jetzt auch dann in die
+  Baustellenakte, wenn der Mitarbeiter für diese Baustelle nicht eingeteilt
+  ist. Wer vor Ort den Aufkleber scannt, steht auf dieser Baustelle; bisher
+  endete der Weg mit „Diese Baustelle ist dir heute nicht zugewiesen“, obwohl
+  ein Mitarbeiter seine Baustelle selbst wählen darf. Die Wahl wird übernommen
+  und als eigene Auswahl vermerkt.
+- die Baustellenwahl nimmt neben der Baustellen-ID auch die QR-Kennung
+  entgegen. Der Link trägt die Kennung, nicht die ID.
+- der Fall „allein auf der Baustelle, Rückkehr nach einer Unterbrechung“ hat
+  jetzt einen eigenen, unabhängigen Test mit eigener Firma.
+
 - die fachliche Bewertung eines VDE-Stromkreises ist jetzt einzeln geprüft:
   Isolationswiderstand unter 1 MΩ, Auslösestrom über dem Bemessungswert,
   fehlende Messwerte und die Bezeichnung jeder Schutzorgan-Bauart. Bisher war

@@ -1093,25 +1093,29 @@ async function selectSpontaneousSite(client, context, input, timeZone) {
       roles
     );
   }
+  // Der Baustellenlink und der QR-Code tragen die QR-Kennung, nicht die
+  // Baustellen-ID. Wer vor Ort den Aufkleber scannt, soll damit dieselbe
+  // Baustelle waehlen koennen wie aus der Liste.
   const site = await client.query(
     `SELECT id, name
      FROM construction_sites
-     WHERE company_id = $1 AND id = $2
+     WHERE company_id = $1 AND (id = $2 OR qr_code = $2::TEXT)
        AND status IN ('planned', 'active', 'on_hold', 'delayed')`,
     [context.companyId, input.constructionSiteId]
   );
   if (site.rowCount !== 1) {
     throw new InputError("Die Baustelle wurde nicht gefunden.", 404, "site_not_found");
   }
+  const constructionSiteId = site.rows[0].id;
   const assignments = await createEmployeeSelectedAssignment(
     client,
     context,
     input.workDate,
-    input.constructionSiteId,
+    constructionSiteId,
     `Spontan gewählt · ${site.rows[0].name}`,
     input.newOccurrence
   );
-  return { assignments, selectedSiteId: input.constructionSiteId };
+  return { assignments, selectedSiteId: constructionSiteId };
 }
 
 async function resolveConstructionSiteParent(client, context, input) {

@@ -4981,7 +4981,25 @@ import {
       )
     );
     if (!assignment) {
-      showToast("Diese Baustelle ist dir heute nicht zugewiesen.");
+      // Wer vor Ort den Baustellenlink oeffnet, steht auf dieser Baustelle.
+      // Frueher endete der Weg hier mit einer Absage, obwohl ein Mitarbeiter
+      // seine Baustelle selbst waehlen darf. Die Wahl wird uebernommen und der
+      // Einsatz als eigene Auswahl vermerkt.
+      let uebernommeneId = null;
+      try {
+        uebernommeneId = await applySelectedSite(siteId);
+      } catch (error) {
+        showToast(error.network
+          ? "Ohne Verbindung lässt sich die Baustelle nicht übernehmen."
+          : "Diese Baustelle ist dir heute nicht zugewiesen.");
+        return;
+      }
+      const uebernommen = assignments.find(
+        (candidate) => candidate.constructionSite.id === uebernommeneId
+          || candidate.constructionSite.qrCode === siteId
+      );
+      if (!uebernommen) return;
+      await openEmployeeSiteWorkspace(uebernommen);
       return;
     }
     await openEmployeeSiteWorkspace(assignment);
@@ -5759,8 +5777,12 @@ import {
     }
   }
 
-  async function applySelectedSite(selectedSiteId) {
-    if (!selectedSiteId) return;
+  // Nimmt die Baustellen-ID oder die QR-Kennung entgegen. Der Server loest die
+  // Kennung auf und meldet die tatsaechliche Baustelle zurueck; ohne diese
+  // Aufloesung fand die Umsortierung den Einsatz nicht wieder.
+  async function applySelectedSite(gewaehlteKennung) {
+    if (!gewaehlteKennung) return null;
+    let selectedSiteId = gewaehlteKennung;
     const targetIndex = siteChoiceTargetIndex();
     const existingIndex = assignments.findIndex(
       (assignment) => assignment.constructionSite.id === selectedSiteId
@@ -5779,6 +5801,7 @@ import {
         })
       });
       nextAssignments = body.selection.assignments;
+      selectedSiteId = body.selection.selectedSiteId || selectedSiteId;
     } else if (newOccurrence) {
       const previous = assignments[existingIndex];
       nextAssignments = [
@@ -5796,6 +5819,7 @@ import {
       addEntry("next_site", targetIndex);
     }
     showToast("Baustelle gewählt · der Baustellenplan bleibt als Vorschlag erhalten.");
+    return selectedSiteId;
   }
 
   function lastEvent() {
