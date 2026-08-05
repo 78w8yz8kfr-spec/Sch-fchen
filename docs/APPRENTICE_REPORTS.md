@@ -142,7 +142,12 @@ Er enthält:
 * die **fehlenden Wochen** mit einem Weg direkt hinein,
 * die **bisherigen Berichte** — jede Zeile führt in ihre Woche zurück und
   lässt sich von dort drucken,
-* für den Ausbilder die **Prüfliste** samt Lücken seiner Auszubildenden.
+* für den Ausbilder die **Prüfliste** und darüber seine Auszubildenden, jeder
+  mit seinem Stand („2 Wochen offen“ oder „Alle Wochen abgegeben“) und dem Weg
+  zum gedruckten Heft eines ganzen Jahres.
+
+Der Wochenwechsel gehört zum eigenen Heft und erscheint deshalb nur beim
+Auszubildenden — beim Ausbilder stand er da und tat nichts.
 
 Die Navigationsleiste richtet sich nach den sichtbaren Schaltflächen; eine fest
 verdrahtete Spaltenzahl wäre mit jedem neuen Bereich falsch.

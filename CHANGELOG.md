@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Nachlese zum Berichtsheft-Bereich.** Die App wurde als Ganzes durchgemessen
+  — sechs Rollen, alle Bereiche, jeweils auf waagerechtes Überlaufen, doppelte
+  oder leere Überschriften, stumme Schaltflächen und Konsolenfehler geprüft.
+  Gefunden wurden drei Dinge, alle im Bereich des Ausbilders:
+  - Der **Wochenwechsler stand da und tat nichts** — ein Ausbilder hat kein
+    eigenes Heft. Er erscheint jetzt nur beim Auszubildenden.
+  - **„Keine Wochenberichte vorhanden“ widersprach der Zeile darüber**, die
+    offene Wochen nannte. In dieser Liste stehen nur eingereichte Wochen; sie
+    sagt das jetzt auch.
+  - Der Weg zum **gedruckten Heft eines ganzen Jahres war für den Ausbilder
+    nicht erreichbar**. Die Schnittstelle dafür gab es bereits samt Test, nur
+    keine Schaltfläche. Er sieht jetzt seine Auszubildenden mit ihrem Stand
+    („2 Wochen offen“ oder „Alle Wochen abgegeben“) und druckt das Jahr je
+    Person.
+- Fassung 0.42.14, Speicher `schaefchen-online-v56`, Migration 066.
+
 - **Das Berichtsheft bekommt einen eigenen Bereich.** Bisher lag es unten in
   der Wochenansicht, zwischen Stundenzettel und Abwesenheiten. Für den
   Auszubildenden ist es aber die Arbeit, die er täglich neben der

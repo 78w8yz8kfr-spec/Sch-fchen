@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.13";
+} from "./core/work-time.js?v=0.42.14";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.13";
+} from "./core/sync-queue.js?v=0.42.14";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.13";
+} from "./core/permissions.js?v=0.42.14";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.13";
+} from "./core/state-store.js?v=0.42.14";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -210,7 +210,7 @@ import {
     apprenticeMissing: document.querySelector("#apprentice-missing"),
     apprenticeMissingText: document.querySelector("#apprentice-missing-text"),
     apprenticeMissingWeeks: document.querySelector("#apprentice-missing-weeks"),
-    apprenticeGapList: document.querySelector("#apprentice-gap-list"),
+    apprenticePeople: document.querySelector("#apprentice-people"),
     apprenticeSubmit: document.querySelector("#apprentice-submit"),
     apprenticeMessage: document.querySelector("#apprentice-message"),
     apprenticeHistory: document.querySelector("#apprentice-history"),
@@ -422,6 +422,7 @@ import {
     navWeek: document.querySelector("#nav-week"),
     navApprentice: document.querySelector("#nav-apprentice"),
     apprenticeSection: document.querySelector("#apprentice-section"),
+    apprenticeWeekControls: document.querySelector("#apprentice-week-controls"),
     apprenticePeriod: document.querySelector("#apprentice-period"),
     apprenticePrevious: document.querySelector("#apprentice-previous"),
     apprenticeCurrent: document.querySelector("#apprentice-current"),
@@ -1097,7 +1098,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.13",
+          "X-Schaefchen-Version": "0.42.14",
           ...options.headers
         }
       });
@@ -1125,7 +1126,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.13" }
+        headers: { "X-Schaefchen-Version": "0.42.14" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1172,7 +1173,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.13 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.14 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -7940,6 +7941,9 @@ import {
 
   function renderApprenticePanel() {
     renderApprenticeToday();
+    // Der Wochenwechsler gehoert zum eigenen Heft. Ein Ausbilder hat keines -
+    // bei ihm stand er nur da und tat nichts.
+    elements.apprenticeWeekControls.hidden = !isApprentice();
     elements.apprenticePanel.hidden = !isApprentice();
     if (elements.apprenticePanel.hidden) return;
     const bericht = currentApprenticeReport();
@@ -8182,21 +8186,50 @@ import {
       .filter((zeile) => zeile.activities.trim());
   }
 
-  // Was der Ausbilder sonst nie saehe: Wochen, in denen gearbeitet wurde, zu
-  // denen aber nichts eingereicht ist. Ein Bericht, den niemand abgibt, faellt
-  // in einer Liste eingereichter Berichte nicht auf.
-  function renderApprenticeGaps() {
-    elements.apprenticeGapList.replaceChildren();
+  // Die Auszubildenden dieses Ausbilders, jeder mit seinem Stand.
+  //
+  // Zwei Dinge sieht er hier, die eine Liste eingereichter Berichte nicht
+  // zeigt: Wochen, in denen gearbeitet wurde, zu denen aber nichts eingereicht
+  // ist - ein Bericht, den niemand abgibt, faellt sonst nirgends auf -, und
+  // den Weg zum gedruckten Heft eines ganzen Jahres, das am Ende der
+  // Ausbildung bei der Kammer liegt.
+  function renderApprenticePeople() {
+    const leute = new Map();
+    const merken = (userId, name) => {
+      if (!userId) return null;
+      if (!leute.has(userId)) leute.set(userId, { name, weeks: [] });
+      return leute.get(userId);
+    };
+    for (const bericht of apprenticeReviewState || []) {
+      merken(bericht.apprenticeUserId, bericht.apprenticeName);
+    }
     for (const luecke of apprenticeGapState || []) {
+      const eintrag = merken(luecke.apprenticeUserId, luecke.apprenticeName);
+      if (eintrag) eintrag.weeks = luecke.weeks;
+    }
+
+    const jahr = currentWeekStart().slice(0, 4);
+    elements.apprenticePeople.replaceChildren();
+    for (const [userId, person] of leute) {
       const zeile = document.createElement("li");
       const name = document.createElement("strong");
-      const wochen = document.createElement("span");
-      name.textContent = luecke.apprenticeName;
-      wochen.textContent = luecke.weeks.length === 1
-        ? `Eine Woche offen: ab ${shortDate(luecke.weeks[0])}`
-        : `${luecke.weeks.length} Wochen offen, älteste ab ${shortDate(luecke.weeks.at(-1))}`;
-      zeile.append(name, wochen);
-      elements.apprenticeGapList.append(zeile);
+      const stand = document.createElement("span");
+      name.textContent = person.name;
+      stand.textContent = person.weeks.length === 0
+        ? "Alle Wochen abgegeben"
+        : person.weeks.length === 1
+          ? `Eine Woche offen: ab ${shortDate(person.weeks[0])}`
+          : `${person.weeks.length} Wochen offen, älteste ab ${shortDate(person.weeks.at(-1))}`;
+      zeile.classList.toggle("apprentice-gap-list__offen", person.weeks.length > 0);
+
+      const drucken = document.createElement("button");
+      drucken.type = "button";
+      drucken.className = "text-button";
+      drucken.textContent = `Jahr ${jahr} drucken`;
+      drucken.addEventListener("click", () => printApprenticeYear(jahr, userId));
+
+      zeile.append(name, stand, drucken);
+      elements.apprenticePeople.append(zeile);
     }
   }
 
@@ -8208,12 +8241,14 @@ import {
     elements.apprenticeReviewCount.textContent = `${offene.length} offen`;
     elements.apprenticeApproveAll.hidden = offene.length === 0;
     elements.apprenticeReviewList.replaceChildren();
-    renderApprenticeGaps();
+    renderApprenticePeople();
 
     if (berichte.length === 0) {
       const leer = document.createElement("li");
       leer.className = "admin-list__empty";
-      leer.textContent = "Keine Wochenberichte vorhanden.";
+      // In dieser Liste stehen nur eingereichte Wochen. "Keine Wochenberichte
+      // vorhanden" widersprach der Zeile darueber, die offene Wochen nannte.
+      leer.textContent = "Zurzeit ist kein Wochenbericht eingereicht.";
       elements.apprenticeReviewList.append(leer);
       return;
     }
@@ -8301,16 +8336,19 @@ import {
   // Das ganze Jahr in einer Datei. Am Ende der Ausbildung sind das gut
   // hundertfuenfzig Blaetter - Woche fuer Woche einzeln zu laden und von Hand
   // zu heften ist genau die Arbeit, die diese App abnehmen soll.
-  async function printApprenticeYear(jahr) {
-    elements.apprenticeMessage.textContent = "Das Berichtsheft wird erstellt …";
+  async function printApprenticeYear(jahr, apprenticeUserId = null) {
+    const feld = apprenticeUserId ? elements.apprenticeReviewMessage : elements.apprenticeMessage;
+    feld.textContent = "Das Berichtsheft wird erstellt …";
     try {
       await downloadFile(
-        `./api/v1/apprentice/reports/pdf?from=${jahr}-01-01&to=${jahr}-12-31`,
+        `./api/v1/apprentice/reports/pdf?from=${jahr}-01-01&to=${jahr}-12-31${
+          apprenticeUserId ? `&apprenticeUserId=${apprenticeUserId}` : ""
+        }`,
         `Berichtsheft-${jahr}.pdf`
       );
-      elements.apprenticeMessage.textContent = "";
+      feld.textContent = "";
     } catch (error) {
-      elements.apprenticeMessage.textContent = error.message;
+      feld.textContent = error.message;
     }
   }
 

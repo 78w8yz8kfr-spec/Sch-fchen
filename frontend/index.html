@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.13">
-    <script type="module" src="./app.js?v=0.42.13"></script>
-    <script src="./version.js?v=0.42.13" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.14">
+    <script type="module" src="./app.js?v=0.42.14"></script>
+    <script src="./version.js?v=0.42.14" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.13</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.14</p>
         </div>
       </section>
 
@@ -785,7 +785,7 @@
                 <p class="eyebrow">Ausbildungsnachweis</p>
                 <h2 id="apprentice-section-title">Berichtsheft</h2>
               </div>
-              <div class="week-heading__controls">
+              <div id="apprentice-week-controls" class="week-heading__controls" hidden>
                 <strong id="apprentice-period" class="week-period">Diese Woche</strong>
                 <div class="week-navigation" aria-label="Angezeigte Woche wechseln">
                   <button id="apprentice-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
@@ -835,7 +835,7 @@
                 </div>
                 <span id="apprentice-review-count" class="site-list-summary" aria-live="polite">0</span>
               </div>
-              <ul id="apprentice-gap-list" class="apprentice-gap-list" aria-label="Fehlende Wochenberichte"></ul>
+              <ul id="apprentice-people" class="apprentice-gap-list" aria-label="Meine Auszubildenden"></ul>
               <ul id="apprentice-review-list" class="apprentice-review-list" aria-label="Eingereichte Wochenberichte"></ul>
               <div class="apprentice-actions">
                 <button id="apprentice-approve-all" class="button button--primary" type="button">Alle freigeben</button>
