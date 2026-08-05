@@ -110,7 +110,7 @@
   async function request(path, options = {}) {
     const headers = {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      "X-Schaefchen-Version": "0.42.1",
+      "X-Schaefchen-Version": "0.42.2",
       ...(supportMode?.id ? { "X-Support-Access-Id": supportMode.id } : {}),
       ...(options.headers || {})
     };
@@ -851,6 +851,38 @@
     elements.actionMessage.textContent = "Die Einladung wurde erzeugt. Dieser Schlüssel wird nur jetzt vollständig angezeigt.";
   }
 
+  // Was der neue Kunde braucht, um sich anzumelden. Ohne diese Anzeige musste
+  // die Firmennummer nach dem Anlegen erst in der Liste gesucht werden, obwohl
+  // sie ohne sie gar nicht in die App kommen: die Nummer entscheidet, bei
+  // welcher Firma die Anmeldung landet.
+  function showCompanyHandover(administrator) {
+    const zugangsdaten = [
+      `Firmennummer: ${administrator.companyNumber}`,
+      `Personalnummer: ${administrator.personnelNumber}`
+    ].join("\n");
+    const kopieren = document.createElement("button");
+    kopieren.type = "button";
+    kopieren.className = "platform-button platform-button--quiet";
+    kopieren.textContent = "Zugangsdaten kopieren";
+    kopieren.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(zugangsdaten);
+        elements.actionMessage.textContent = "Zugangsdaten kopiert. Das Startpasswort steht bewusst nicht dabei.";
+      } catch {
+        elements.actionMessage.textContent = "Bitte die Angaben von Hand übernehmen.";
+      }
+    });
+    elements.actionFields.replaceChildren(
+      readonlyField("handoverCompanyNumber", "Firmennummer für die Anmeldung", administrator.companyNumber, "text"),
+      readonlyField("handoverPersonnelNumber", "Personalnummer der ersten Administration", administrator.personnelNumber, "text"),
+      kopieren
+    );
+    elements.actionForm.querySelector('button[type="submit"]').hidden = true;
+    elements.actionMessage.textContent = administrator.mustChangePassword
+      ? "Die Firma steht. Beim ersten Anmelden wird das Startpasswort geändert."
+      : "Die Firma steht.";
+  }
+
   async function restoreSupportMode() {
     const saved = sessionStorage.getItem("schaefchen.platform.support");
     if (!saved) return;
@@ -1066,6 +1098,11 @@
       const result = await submitAction();
       if (result?.invitationToken) {
         showInvitationToken(result.invitationToken);
+        await loadCurrentView();
+        return;
+      }
+      if (result?.administrator?.companyNumber) {
+        showCompanyHandover(result.administrator);
         await loadCurrentView();
         return;
       }

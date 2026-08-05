@@ -6,6 +6,8 @@ import {
   STATE_VERSION,
   carriedOverMessage,
   initialState,
+  normalizeCompanyNumber,
+  rememberedCompany,
   restoreState,
   serializeState,
   storageKey
@@ -24,6 +26,60 @@ test("Vorfuehrung und Betrieb nutzen getrennte Speicher", () => {
   assert.equal(storageKey(true), DEMO_STORAGE_KEY);
   assert.equal(storageKey(false), ONLINE_STORAGE_KEY);
   assert.notEqual(DEMO_STORAGE_KEY, ONLINE_STORAGE_KEY);
+});
+
+test("Die Firmennummer wird so gelesen, wie ein Mensch sie tippt", () => {
+  assert.equal(normalizeCompanyNumber("F-000020"), "F-000020");
+  assert.equal(normalizeCompanyNumber(" f-000020 "), "F-000020");
+  assert.equal(normalizeCompanyNumber("F 000020"), "F-000020");
+  assert.equal(normalizeCompanyNumber("f000020"), "F-000020");
+  // Nur die Ziffern vom Willkommensschreiben genuegen ebenfalls.
+  assert.equal(normalizeCompanyNumber("20"), "F-000020");
+  assert.equal(normalizeCompanyNumber("1"), "F-000001");
+  assert.equal(normalizeCompanyNumber(""), "");
+  assert.equal(normalizeCompanyNumber(null), "");
+  assert.equal(normalizeCompanyNumber(undefined), "");
+});
+
+test("Eine unbekannte Schreibweise wird nicht verbogen", () => {
+  // Die Spalte laesst 20 Zeichen zu. Eine spaeter anders vergebene Nummer darf
+  // nicht an einem zu strengen Muster der App scheitern.
+  assert.equal(normalizeCompanyNumber("schaaf-elektro"), "SCHAAF-ELEKTRO");
+  assert.equal(normalizeCompanyNumber("F-0000001"), "F-0000001");
+});
+
+test("Ohne gemerkte Firma gilt die Firma der Ersteinrichtung", () => {
+  const setup = { companyNumber: "F-000001", displayName: "Schaaf Elektro GmbH", logoUrl: "/logo.webp" };
+  assert.deepEqual(rememberedCompany(null, setup), {
+    number: "F-000001", displayName: "Schaaf Elektro GmbH", logoUrl: "/logo.webp"
+  });
+  assert.deepEqual(rememberedCompany({ number: "" }, setup).number, "F-000001");
+  // Dieselbe Firma, nur anders geschrieben: Name und Logo bleiben.
+  assert.deepEqual(rememberedCompany({ number: "1", displayName: "Alt" }, setup), {
+    number: "F-000001", displayName: "Schaaf Elektro GmbH", logoUrl: "/logo.webp"
+  });
+});
+
+test("Auf dem Geraet einer anderen Firma gewinnt deren Nummer", () => {
+  // Der Server nennt nur die Firma der Ersteinrichtung. Ohne diese Regel
+  // stuende auf jedem verkauften Geraet die falsche Firma im Anmeldeformular.
+  const setup = { companyNumber: "F-000001", displayName: "Schaaf Elektro GmbH", logoUrl: "/logo.webp" };
+  assert.deepEqual(rememberedCompany({ number: "F-000020", displayName: "Neukunde GmbH" }, setup), {
+    number: "F-000020", displayName: "Neukunde GmbH", logoUrl: null
+  });
+  // Ohne bekannten Namen nennt die Anmeldung ehrlich nur die Nummer, und das
+  // fremde Logo wird nicht weitergereicht.
+  assert.deepEqual(rememberedCompany({ number: "F-000020" }, setup), {
+    number: "F-000020", displayName: "F-000020", logoUrl: null
+  });
+});
+
+test("Ohne Angaben des Servers bleibt die gemerkte Firma bestehen", () => {
+  // Beim Start ist die Antwort des Servers noch nicht da.
+  assert.deepEqual(rememberedCompany({ number: "F-000020", displayName: "Neukunde GmbH" }, null), {
+    number: "F-000020", displayName: "Neukunde GmbH", logoUrl: null
+  });
+  assert.deepEqual(rememberedCompany(null, null), { number: "", displayName: "", logoUrl: null });
 });
 
 test("Ohne gespeicherten Stand beginnt ein leerer Arbeitstag", () => {

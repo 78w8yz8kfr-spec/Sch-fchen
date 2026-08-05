@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { createApp } from "../src/app.mjs";
+import { APPLICATION_VERSION, createApp } from "../src/app.mjs";
 import { createPool } from "../src/database.mjs";
 import { localDate } from "../src/validation.mjs";
 
@@ -303,7 +303,10 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(versionListResponse.status, 200, await versionListResponse.clone().text());
     const productionVersion = (await versionListResponse.json()).versions
       .find((version) => version.releaseStatus === "production");
-    assert.equal(productionVersion.version, "0.42.1");
+    // Der Produktionsstand in der Datenbank und die Fassung des Servers muessen
+    // zusammenpassen. Ein fester Wert an dieser Stelle waere bei jeder neuen
+    // Fassung falsch geworden, ohne dass etwas kaputt gewesen waere.
+    assert.equal(productionVersion.version, APPLICATION_VERSION);
     const requireUpdateResponse = await fetch(
       `${baseUrl}/api/v1/platform/versions/${productionVersion.id}`,
       {
@@ -324,7 +327,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(outdatedSessionResponse.status, 426);
     assert.equal((await outdatedSessionResponse.json()).error.code, "mandatory_update");
     const currentSessionResponse = await fetch(`${baseUrl}/api/v1/session`, {
-      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.1" }
+      headers: { Cookie: cookie, "X-Schaefchen-Version": APPLICATION_VERSION }
     });
     assert.equal(currentSessionResponse.status, 200);
     const releaseUpdateResponse = await fetch(
@@ -356,7 +359,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(maintenanceOnResponse.status, 200, await maintenanceOnResponse.clone().text());
     await new Promise((resolve) => setTimeout(resolve, 2100));
     const maintenanceBlockedResponse = await fetch(`${baseUrl}/api/v1/session`, {
-      headers: { Cookie: cookie, "X-Schaefchen-Version": "0.42.1" }
+      headers: { Cookie: cookie, "X-Schaefchen-Version": APPLICATION_VERSION }
     });
     assert.equal(maintenanceBlockedResponse.status, 503);
     assert.equal((await maintenanceBlockedResponse.json()).error.code, "maintenance_mode");

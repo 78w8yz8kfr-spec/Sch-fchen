@@ -203,6 +203,17 @@ select:focus-visible {
 #company-number-field {
   display: grid;
   gap: 9px;
+  margin-bottom: 6px;
+}
+
+#company-number {
+  text-transform: uppercase;
+}
+
+#company-number-hint {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .preview-note,

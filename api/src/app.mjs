@@ -163,6 +163,11 @@ function json(response, status, body, headers = {}) {
   response.end(encoded);
 }
 
+// Fassung dieses Servers. Sie stand frueher als Zeichenkette mitten in der
+// Fehleraufzeichnung und wurde beim Ausliefern regelmaessig vergessen; ein
+// Fehlerbericht nannte dann eine Fassung, die es laengst nicht mehr gab.
+export const APPLICATION_VERSION = "0.42.2";
+
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
     .replace(/^v/i, "")
@@ -9817,7 +9822,7 @@ async function recordUnhandledPlatformError(pool, request, requestId, error) {
       `INSERT INTO platform_error_groups (
          fingerprint,error_code,severity,module,application_version,
          sanitized_message,sanitized_details,first_seen_at,last_seen_at
-       ) VALUES ($1,$2,'error',$3,'0.42.1',$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       ) VALUES ($1,$2,'error',$3,$6,$4,$5::JSONB,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
        ON CONFLICT (fingerprint) DO UPDATE SET
          occurrence_count = platform_error_groups.occurrence_count + 1,
          last_seen_at = CURRENT_TIMESTAMP,
@@ -9830,7 +9835,8 @@ async function recordUnhandledPlatformError(pool, request, requestId, error) {
         safeCode,
         moduleName,
         `Unbehandelte Serverausnahme bei ${request.method} ${path}`,
-        JSON.stringify({ method: request.method, path, errorType: error?.name || "Error" })
+        JSON.stringify({ method: request.method, path, errorType: error?.name || "Error" }),
+        APPLICATION_VERSION
       ]
     );
     await client.query(

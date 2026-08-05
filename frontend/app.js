@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.1";
+} from "./core/work-time.js?v=0.42.2";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,22 +18,25 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.1";
+} from "./core/sync-queue.js?v=0.42.2";
 import {
   canAdministerModules as canAdministerModulesFor,
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
-} from "./core/permissions.js?v=0.42.1";
+} from "./core/permissions.js?v=0.42.2";
 import {
+  COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
   carriedOverMessage,
   initialState as freshState,
+  normalizeCompanyNumber,
+  rememberedCompany,
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.1";
+} from "./core/state-store.js?v=0.42.2";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -799,6 +802,10 @@ import {
   let syncing = false;
   let syncRequested = false;
   let session = null;
+  // Angaben des Servers zur Firma der Ersteinrichtung und die zuletzt auf
+  // diesem Geraet benutzte Firma. Beide zusammen fuellen das Anmeldeformular.
+  let loginSetup = null;
+  let deviceCompany = null;
   let adminState = null;
   let weekState = null;
   let absenceState = [];
@@ -949,6 +956,43 @@ import {
     }
   }
 
+  // Die zuletzt benutzte Firma bleibt auf dem Geraet. Ein Monteur soll seine
+  // Firmennummer nicht bei jeder Anmeldung heraussuchen muessen, und ein
+  // abgemeldetes Geraet gehoert weiterhin zu derselben Firma.
+  function loadRememberedCompany() {
+    try {
+      return JSON.parse(window.localStorage.getItem(COMPANY_STORAGE_KEY));
+    } catch {
+      return null;
+    }
+  }
+
+  function rememberCompany(number, displayName) {
+    const nummer = normalizeCompanyNumber(number);
+    if (!nummer) return;
+    deviceCompany = { number: nummer, displayName: displayName || nummer };
+    try {
+      window.localStorage.setItem(COMPANY_STORAGE_KEY, JSON.stringify(deviceCompany));
+    } catch {
+      // Ohne lokalen Speicher wird die Nummer eben wieder eingetippt.
+    }
+  }
+
+  // Zeigt ueber dem Anmeldeformular, zu welcher Firma die eingetippte Nummer
+  // gehoert. Vor der Anmeldung kennt die App den Namen nur aus dem letzten
+  // Besuch; fuer eine fremde Nummer nennt sie deshalb ehrlich nur die Nummer.
+  function applyLoginCompanyIdentity() {
+    // In der Vorfuehrung gibt es keine Anmeldung und damit keine Firmenwahl.
+    if (demoMode) return;
+    const eingetippt = normalizeCompanyNumber(elements.companyNumber.value);
+    const bekannt = deviceCompany && normalizeCompanyNumber(deviceCompany.number) === eingetippt
+      ? deviceCompany
+      : { number: eingetippt };
+    const firma = rememberedCompany(bekannt, loginSetup);
+    elements.loginCompanyName.textContent = firma.displayName || firma.number || "Bitte Firmennummer eingeben";
+    setCompanyMark(elements.loginCompanyMark, firma.displayName || firma.number, firma.logoUrl);
+  }
+
   function createClientEntryId() {
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
@@ -975,7 +1019,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.1",
+          "X-Schaefchen-Version": "0.42.2",
           ...options.headers
         }
       });
@@ -1003,7 +1047,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.1" }
+        headers: { "X-Schaefchen-Version": "0.42.2" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1041,7 +1085,10 @@ import {
     elements.openPreview.hidden = !demoMode;
     elements.previewDivider.hidden = !demoMode;
     elements.modeNote.hidden = !demoMode;
-    elements.companyNumberField.hidden = true;
+    // Jede Firma arbeitet getrennt. Ohne dieses Feld kaeme man auf einem Geraet
+    // nur zu der Firma, die der Server als Ersteinrichtung kennt.
+    elements.companyNumberField.hidden = demoMode;
+    elements.companyNumber.readOnly = false;
     elements.modeBadge.textContent = demoMode ? "Vorschau" : "Live";
     elements.timesheetEyebrow.textContent = demoMode ? "Live und lokal" : "Live synchronisiert";
     elements.resetDemo.hidden = !demoMode;
@@ -1049,7 +1096,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.2 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1112,6 +1159,7 @@ import {
     elements.setupForm.hidden = true;
     elements.loginForm.hidden = false;
     configureModeCopy();
+    applyLoginCompanyIdentity();
     document.title = "Schäfchen";
     elements.passwordInput.value = "";
     elements.loginMessage.textContent = "";
@@ -7781,6 +7829,9 @@ import {
     }
     session = sessionView;
     cachedUserId = session.user.id;
+    // Die Firma steht jetzt fest. Sie bleibt auf dem Geraet, auch wenn gleich
+    // noch das erste Passwort gesetzt werden muss.
+    rememberCompany(session.company.number, session.company.displayName);
     saveState();
     if (session.user.mustChangePassword) {
       showPasswordChange();
@@ -7809,13 +7860,9 @@ import {
   async function initialiseOnline() {
     try {
       const setupBody = await requestJson("./api/v1/setup");
-      elements.companyNumber.value = setupBody.setup.companyNumber;
-      elements.loginCompanyName.textContent = setupBody.setup.displayName;
-      setCompanyMark(
-        elements.loginCompanyMark,
-        setupBody.setup.displayName,
-        setupBody.setup.logoUrl
-      );
+      loginSetup = setupBody.setup;
+      elements.companyNumber.value = rememberedCompany(deviceCompany, loginSetup).number;
+      applyLoginCompanyIdentity();
       if (setupBody.setup.setupRequired) {
         showSetup(setupBody.setup);
         return;
@@ -7832,6 +7879,12 @@ import {
     }
   }
 
+  elements.companyNumber.addEventListener("input", applyLoginCompanyIdentity);
+  elements.companyNumber.addEventListener("change", () => {
+    elements.companyNumber.value = normalizeCompanyNumber(elements.companyNumber.value);
+    applyLoginCompanyIdentity();
+  });
+
   elements.loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (demoMode) {
@@ -7839,13 +7892,21 @@ import {
       return;
     }
 
+    const companyNumber = normalizeCompanyNumber(elements.companyNumber.value);
+    if (!companyNumber) {
+      elements.loginMessage.textContent = "Bitte die Firmennummer eingeben.";
+      elements.companyNumber.focus();
+      return;
+    }
+    elements.companyNumber.value = companyNumber;
+
     elements.loginSubmit.disabled = true;
     elements.loginMessage.textContent = "Anmeldung wird geprüft …";
     try {
       const body = await requestJson("./api/v1/session", {
         method: "POST",
         body: JSON.stringify({
-          companyNumber: elements.companyNumber.value,
+          companyNumber,
           personnelNumber: elements.personnelNumber.value,
           password: elements.passwordInput.value
         })
@@ -7877,7 +7938,6 @@ import {
       elements.personnelNumber.value = elements.setupPersonnelNumber.value;
       elements.setupForm.reset();
       showLogin();
-      elements.companyNumber.readOnly = false;
       elements.loginMessage.textContent = "Admin angelegt. Du kannst dich jetzt anmelden.";
     } catch (error) {
       elements.setupMessage.textContent = error.message;
@@ -10145,6 +10205,11 @@ import {
   elements.absenceEndDate.value = localDateKey();
   syncAbsenceDateFields();
   elements.todayLabel.textContent = dateFormatter.format(new Date());
+  deviceCompany = loadRememberedCompany();
+  if (deviceCompany?.number) {
+    elements.companyNumber.value = normalizeCompanyNumber(deviceCompany.number);
+    applyLoginCompanyIdentity();
+  }
   configureModeCopy();
   updateConnectionState();
   render();

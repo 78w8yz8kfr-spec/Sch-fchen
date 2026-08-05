@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.1">
-    <script type="module" src="./app.js?v=0.42.1"></script>
-    <script src="./version.js?v=0.42.1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.2">
+    <script type="module" src="./app.js?v=0.42.2"></script>
+    <script src="./version.js?v=0.42.2" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -49,9 +49,12 @@
                 name="company-number"
                 type="text"
                 autocomplete="organization"
-                value="F-000001"
+                autocapitalize="characters"
+                spellcheck="false"
+                placeholder="F-000001"
                 maxlength="20"
               >
+              <p id="company-number-hint">Steht im Willkommensschreiben deiner Firma.</p>
             </div>
 
             <label for="personnel-number">Personalnummer</label>
@@ -126,7 +129,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.1</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.2</p>
         </div>
       </section>
 

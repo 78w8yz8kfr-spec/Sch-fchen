@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: die Anmeldung kam nur zu einer einzigen Firma. Das Feld für
+  die Firmennummer war dauerhaft verborgen und fest mit der im Server
+  hinterlegten Firma der Ersteinrichtung gefüllt; ein Mitarbeiter jeder
+  weiteren Firma konnte sich gar nicht anmelden, obwohl die Schnittstelle
+  jede Firmennummer längst annahm. Das Feld steht jetzt im Anmeldeformular,
+  nimmt die üblichen Schreibweisen entgegen (`f-000024`, `F 000024`, `24`) und
+  merkt sich die zuletzt benutzte Firma samt Namen auf dem Gerät. Ohne Nummer
+  geht die Anmeldung gar nicht erst zum Server.
+- nach dem Anlegen einer Firma zeigt die Plattformverwaltung, was der neue
+  Kunde für die Anmeldung braucht: Firmennummer und Personalnummer der ersten
+  Administration, zum Kopieren. Vorher schloss sich der Dialog wortlos und die
+  Nummer musste in der Liste gesucht werden.
+- die Fassung des Servers steht als `APPLICATION_VERSION` an einer Stelle. Sie
+  stand als Zeichenkette in der Fehleraufzeichnung und in zwei Tests; beim
+  Ausliefern wurde sie dort regelmäßig vergessen.
+
 - Fehler behoben: eine über „Firma anlegen“ direkt erzeugte Firma war dauerhaft
   unbenutzbar. Sie bekam keinen Benutzer, und es gab keinen Weg, einen
   anzulegen: die Ersteinrichtung der App gilt nur für die im Server hinterlegte
@@ -15,6 +31,11 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   Nummernkreise, keine fremden Daten in der Übersicht, 404 beim Direktzugriff
   auf einen fremden Datensatz und 401 bei einer Anmeldung mit fremdem Konto in
   der falschen Firma.
+
+- Fassung 0.42.2. Speicher `schaefchen-online-v44`, alle Dateien tragen
+  `?v=0.42.2`, Migration 050 setzt den Produktionsstand. Die Abnahme zu 049
+  verlangt nicht mehr, dass 0.42.1 der Produktionsstand ist: das wäre mit der
+  nächsten Fassung falsch geworden, ohne dass etwas kaputt gewesen wäre.
 
 - Fassung 0.42.1. Der Dienst-Worker liefert die Dateien der App aus einem
   Zwischenspeicher aus, ohne beim Server nachzufragen. Solange Fassungsnummer

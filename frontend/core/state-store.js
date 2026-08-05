@@ -6,10 +6,40 @@
 
 export const DEMO_STORAGE_KEY = "schaefchen.sprint2.demo.v1";
 export const ONLINE_STORAGE_KEY = "schaefchen.online.cache.v1";
+export const COMPANY_STORAGE_KEY = "schaefchen.company.v1";
 export const STATE_VERSION = 1;
 
 export function storageKey(demoMode) {
   return demoMode ? DEMO_STORAGE_KEY : ONLINE_STORAGE_KEY;
+}
+
+// Die Firmennummer entscheidet, bei welcher Firma die Anmeldung landet. Jede
+// Firma arbeitet vollstaendig getrennt, dieselbe Personalnummer kann es also
+// mehrfach geben. Getippt wird die Nummer selten, deshalb nimmt die App die
+// Schreibweisen entgegen, die Menschen naheliegen: klein geschrieben, ohne
+// Bindestrich, mit Leerzeichen oder nur die Ziffern vom Blatt Papier.
+export function normalizeCompanyNumber(value) {
+  const roh = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  const treffer = /^F?-?(\d{1,6})$/.exec(roh);
+  return treffer ? `F-${treffer[1].padStart(6, "0")}` : roh;
+}
+
+// Welche Firma steht beim Oeffnen der Anmeldung im Feld?
+//
+// Der Server nennt nur die Firma der Ersteinrichtung. Auf dem Geraet eines
+// Kunden waere das die falsche: er hat sich zuletzt bei seiner eigenen Firma
+// angemeldet. Deshalb gewinnt die gemerkte Nummer. Ihr Name stammt aus der
+// letzten erfolgreichen Anmeldung; ein Logo zeigt die App nur fuer die vom
+// Server benannte Firma, denn nur dafuer kennt sie eine Adresse.
+export function rememberedCompany(saved, setup) {
+  const vorgabe = {
+    number: normalizeCompanyNumber(setup?.companyNumber),
+    displayName: setup?.displayName || "",
+    logoUrl: setup?.logoUrl || null
+  };
+  const nummer = normalizeCompanyNumber(saved?.number);
+  if (!nummer || nummer === vorgabe.number) return vorgabe;
+  return { number: nummer, displayName: saved?.displayName || nummer, logoUrl: null };
 }
 
 export function initialState(today) {

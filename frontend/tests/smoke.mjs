@@ -99,6 +99,10 @@ for (const feld of [
   );
 }
 assert.match(platformApp, /companies\/\$\{encodeURIComponent\(firma\.id\)\}\/administrator/);
+// Nach dem Anlegen braucht der neue Kunde seine Firmennummer: ohne sie kommt er
+// nicht an die Anmeldung. Der Dialog schloss sich vorher wortlos.
+assert.match(platformApp, /function showCompanyHandover\(administrator\)/);
+assert.match(platformApp, /result\?\.administrator\?\.companyNumber/);
 
 // Jedes Formular braucht einen Absende-Empfaenger. Ohne ihn laedt der Browser
 // die Seite neu und die Eingabe ist fort, ohne dass jemand etwas bemerkt.
@@ -331,8 +335,20 @@ assert.match(html, /value="project_manager">Projektleiter/);
 assert.doesNotMatch(html, /value="planner">Planer/);
 assert.doesNotMatch(html, /value="executive_assistant">Assistenz der Geschäftsführung/);
 assert.doesNotMatch(html, /value="office"/);
+// Die Firmennummer entscheidet, bei welcher Firma die Anmeldung landet. Sie
+// war fest auf die Firma der Ersteinrichtung verdrahtet und das Feld dauerhaft
+// verborgen: Mitarbeiter jeder weiteren Firma kamen damit gar nicht erst an
+// die Anmeldung, obwohl die Schnittstelle sie laengst kannte.
 assert.match(html, /id="company-number"/);
-assert.match(html, /id="company-number-field" hidden/);
+assert.doesNotMatch(html, /id="company-number"[\s\S]*?value="F-\d+"/);
+assert.match(html, /id="company-number-hint"/);
+assert.doesNotMatch(app, /elements\.companyNumberField\.hidden = true;/);
+assert.match(app, /elements\.companyNumberField\.hidden = demoMode;/);
+// Ohne Nummer geht die Anmeldung gar nicht erst zum Server.
+assert.match(app, /Bitte die Firmennummer eingeben\./);
+// Die zuletzt benutzte Firma bleibt auf dem Geraet, sonst muesste sie jeder
+// Monteur bei jeder Anmeldung heraussuchen.
+assert.match(app, /rememberCompany\(session\.company\.number, session\.company\.displayName\)/);
 assert.match(html, /assets\/company-logos\/schaaf-elektro\.webp/);
 assert.doesNotMatch(html, /class="live-overview"/);
 assert.match(html, /id="status-since"/);
@@ -350,9 +366,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.1/);
-assert.match(html, /app\.js\?v=0\.42\.1/);
-assert.match(html, /version\.js\?v=0\.42\.1/);
+assert.match(html, /styles\.css\?v=0\.42\.2/);
+assert.match(html, /app\.js\?v=0\.42\.2/);
+assert.match(html, /version\.js\?v=0\.42\.2/);
 assert.match(html, /id="electrical-module-admin"/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
@@ -643,16 +659,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.1"'));
-assert.ok(worker.includes('"./app.js?v=0.42.1"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.1"'));
-assert.ok(worker.includes('"./version.js?v=0.42.1"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.2"'));
+assert.ok(worker.includes('"./app.js?v=0.42.2"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.2"'));
+assert.ok(worker.includes('"./version.js?v=0.42.2"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.1"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.1";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.2"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.2";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -680,7 +696,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.1$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.2$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -688,11 +704,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.1"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.1"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.2"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.2"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.1"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.1"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.2"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.2"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -730,8 +746,8 @@ assert.match(vdeHtml, /id="signature-pad"/);
 assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
 assert.match(vdeHtml, /V15-Bestand importieren/);
 assert.match(vdeHtml, /id="legacy-local-import"/);
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.1/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.1/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.2/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.2/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

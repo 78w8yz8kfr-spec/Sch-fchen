@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
-import { createApp } from "../src/app.mjs";
+import { APPLICATION_VERSION, createApp } from "../src/app.mjs";
 import { createPool } from "../src/database.mjs";
 import { hashPassword } from "../src/password.mjs";
 
@@ -114,7 +114,7 @@ integrationTest("Alleiniger Mitarbeiter bleibt bei Rückkehr berichtsverantwortl
       Origin: config.allowedOrigin,
       // Der grosse Integrationstest schaltet zeitweise ein Pflichtupdate. Ohne
       // die eigene Fassung wiese der Server jede Anfrage mit 426 ab.
-      "X-Schaefchen-Version": "0.42.1"
+      "X-Schaefchen-Version": APPLICATION_VERSION
     },
     body: JSON.stringify({
       companyNumber,
@@ -138,7 +138,7 @@ integrationTest("Alleiniger Mitarbeiter bleibt bei Rückkehr berichtsverantwortl
       headers: {
         "Content-Type": "application/json",
         Cookie: cookie,
-        "X-Schaefchen-Version": "0.42.1"
+        "X-Schaefchen-Version": APPLICATION_VERSION
       },
       body: JSON.stringify({ constructionSiteId, workDate: heute, newOccurrence })
     });
