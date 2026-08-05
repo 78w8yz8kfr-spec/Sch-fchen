@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.10";
+} from "./core/work-time.js?v=0.42.11";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.10";
+} from "./core/sync-queue.js?v=0.42.11";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.10";
+} from "./core/permissions.js?v=0.42.11";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.10";
+} from "./core/state-store.js?v=0.42.11";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -198,6 +198,8 @@ import {
     apprenticeStatus: document.querySelector("#apprentice-status"),
     apprenticeWeek: document.querySelector("#apprentice-week"),
     apprenticeReturn: document.querySelector("#apprentice-return"),
+    apprenticeLock: document.querySelector("#apprentice-lock"),
+    apprenticeOpen: document.querySelector("#apprentice-open"),
     apprenticeForm: document.querySelector("#apprentice-form"),
     apprenticeDays: document.querySelector("#apprentice-days"),
     apprenticeWeekRemark: document.querySelector("#apprentice-week-remark"),
@@ -1088,7 +1090,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.10",
+          "X-Schaefchen-Version": "0.42.11",
           ...options.headers
         }
       });
@@ -1116,7 +1118,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.10" }
+        headers: { "X-Schaefchen-Version": "0.42.11" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1163,7 +1165,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.10 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.11 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -7892,6 +7894,9 @@ import {
     renderApprenticeReviews();
   }
 
+  // Gedruckt wird nur, was der Auszubildende unterschrieben hat.
+  const APPRENTICE_PRINTABLE = ["submitted", "approved"];
+
   const APPRENTICE_STATUS_LABEL = {
     draft: "Entwurf",
     submitted: "Eingereicht",
@@ -7933,9 +7938,14 @@ import {
     elements.apprenticeWeekRemark.readOnly = !offen;
     elements.apprenticeSave.hidden = !offen;
     elements.apprenticeSubmit.hidden = !offen;
-    elements.apprenticePrint.hidden = !bericht;
-    elements.apprenticePrintBook.hidden = (apprenticeState || []).length === 0;
+    // Gedruckt wird nur, was eingereicht ist. Ein Entwurf auf Papier sieht
+    // fertig aus und ist es nicht.
+    elements.apprenticePrint.hidden = !APPRENTICE_PRINTABLE.includes(status);
+    elements.apprenticePrintBook.hidden = !(apprenticeState || [])
+      .some((eintrag) => APPRENTICE_PRINTABLE.includes(eintrag.status));
     elements.apprenticePrintBook.textContent = `Jahr ${selectedWeekStart.slice(0, 4)} drucken`;
+    renderApprenticeLock(status, bericht);
+    renderApprenticeOpenDays();
     renderApprenticeMissing();
 
     elements.apprenticeHistory.replaceChildren();
@@ -7950,6 +7960,53 @@ import {
       zeile.append(woche, zustand);
       elements.apprenticeHistory.append(zeile);
     }
+  }
+
+  // Warum lassen sich die Felder nicht mehr beschreiben?
+  //
+  // Nach dem Einreichen sind sie gesperrt - das ist der Sinn der Unterschrift.
+  // Auf dem Bildschirm stand dazu aber nichts: die Felder waren stumm, die
+  // Schaltflaechen fort, und das Berichtsheft sah schlicht kaputt aus. Eine
+  // Sperre, die sich nicht erklaert, ist ein Fehler.
+  function renderApprenticeLock(status, bericht) {
+    const texte = {
+      // Das kurze Datum endet bereits auf einen Punkt ("05.08."); ein
+      // Satzpunkt dahinter ergaebe zwei.
+      submitted: bericht?.submittedAt
+        ? `Eingereicht am ${shortDate(bericht.submittedAt.slice(0, 10))} — zum Ändern muss dein Ausbilder die Woche zurückgeben.`
+        : "Eingereicht. Zum Ändern muss dein Ausbilder die Woche zurückgeben.",
+      approved: bericht?.reviewedAt
+        ? `Freigegeben am ${shortDate(bericht.reviewedAt.slice(0, 10))} von ${bericht.trainerSignatureName || "deinem Ausbilder"}. Ein freigegebener Nachweis bleibt, wie er ist.`
+        : "Freigegeben. Ein freigegebener Nachweis bleibt, wie er ist."
+    };
+    elements.apprenticeLock.hidden = !texte[status];
+    elements.apprenticeLock.textContent = texte[status] || "";
+  }
+
+  // Welche Arbeitstage sind noch unbeschrieben? Der Server nimmt eine
+  // unvollstaendige Woche nicht an - das soll man beim Schreiben sehen und
+  // nicht erst an einer Fehlermeldung nach dem Einreichen.
+  //
+  // Ein Tag mit Abwesenheit ist durch die Abwesenheit erklaert: wer krank war,
+  // hat nichts zu berichten.
+  function renderApprenticeOpenDays() {
+    const bloecke = [...elements.apprenticeDays.querySelectorAll(".apprentice-day")];
+    const schreibbar = !elements.apprenticeSubmit.hidden;
+    const offeneTage = [];
+    for (const block of bloecke) {
+      const fehlt = block.dataset.worked === "true"
+        && block.dataset.absence !== "true"
+        && !block.querySelector("textarea").value.trim();
+      block.classList.toggle("apprentice-day--offen", schreibbar && fehlt);
+      if (fehlt) offeneTage.push(block.dataset.dayLabel);
+    }
+    elements.apprenticeOpen.hidden = !schreibbar || offeneTage.length === 0;
+    elements.apprenticeOpen.textContent = elements.apprenticeOpen.hidden
+      ? ""
+      // Die Kurzform des Wochentags endet bereits auf einen Punkt ("Di.").
+      // Mit einem Satzpunkt dahinter stuenden dort zwei.
+      : `Noch ohne Eintrag: ${offeneTage.join(" · ")} — ein Arbeitstag ohne Zeile ist kein Nachweis.`;
+    elements.apprenticeSubmit.disabled = schreibbar && offeneTage.length > 0;
   }
 
   // Fehlende Wochen. Am Ende der Ausbildung ist eine Luecke teuer, und bis
@@ -8007,12 +8064,20 @@ import {
       const block = document.createElement("div");
       block.className = "apprentice-day";
       block.dataset.workDate = datum;
+      // Ein Arbeitstag ohne Abwesenheit braucht eine Zeile. Woran das haengt,
+      // steht am Block selbst, damit es beim Tippen ohne neue Abfrage zu
+      // pruefen ist.
+      block.dataset.worked = String(minuten > 0);
+      block.dataset.absence = String(Boolean(abwesenheit));
 
       const kopf = document.createElement("div");
       kopf.className = "apprentice-day__head";
       const name = document.createElement("strong");
       name.textContent = dateFromIso(datum).toLocaleDateString("de-DE", {
         weekday: "long", day: "2-digit", month: "2-digit"
+      });
+      block.dataset.dayLabel = dateFromIso(datum).toLocaleDateString("de-DE", {
+        weekday: "short", day: "2-digit", month: "2-digit"
       });
       const zusatz = document.createElement("span");
       // Arbeitszeit und Abwesenheit werden nicht getippt: sie stehen bereits in
@@ -8031,6 +8096,7 @@ import {
       feld.value = taetigkeiten.join("\n");
       feld.readOnly = !offen;
       feld.setAttribute("aria-label", `Tätigkeiten am ${name.textContent}`);
+      feld.addEventListener("input", renderApprenticeOpenDays);
 
       block.append(kopf, feld);
       elements.apprenticeDays.append(block);

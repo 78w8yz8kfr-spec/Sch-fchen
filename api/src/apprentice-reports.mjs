@@ -155,6 +155,31 @@ export async function buildDailyEntries(client, context, userId, weekStart, gesc
   return zeilen;
 }
 
+// Ein Arbeitstag ohne eine einzige Zeile ist eine Luecke im Nachweis.
+//
+// Ein Tag, an dem gearbeitet wurde, muss beschrieben sein - sonst steht im
+// Ausdruck eine leere Zeile neben "07:45 h", und genau das nimmt die Kammer
+// nicht an. Tage mit einer Abwesenheit sind durch die Abwesenheit erklaert;
+// wer krank war, hat nichts zu berichten.
+export function incompleteWorkDays(dailyEntries) {
+  return (dailyEntries || [])
+    .filter((zeile) => Number(zeile.workedMinutes || 0) > 0
+      && !zeile.absence
+      && (zeile.activities || []).length === 0)
+    .map((zeile) => zeile.workDate);
+}
+
+// "Di, 28.07. und Mi, 29.07." - so, wie man es jemandem sagen wuerde.
+export function germanDayList(dates) {
+  const benannt = dates.map((datum) => {
+    const tag = new Date(`${datum}T12:00:00Z`);
+    const [jahr, monat, nummer] = datum.split("-");
+    return `${WEEKDAY_LABELS[(tag.getUTCDay() + 6) % 7]}, ${nummer}.${monat}.`;
+  });
+  if (benannt.length <= 1) return benannt.join("");
+  return `${benannt.slice(0, -1).join(", ")} und ${benannt.at(-1)}`;
+}
+
 // Geleistete Arbeitszeit der Woche aus der Zeiterfassung.
 export async function weekWorkedMinutes(client, context, userId, weekStart) {
   const result = await client.query(
@@ -252,12 +277,18 @@ export async function listApprenticeGaps(client, context) {
 }
 
 // Alle Berichte eines Zeitraums fuer den Ausdruck ueber mehrere Wochen.
+//
+// Entwuerfe bleiben aussen vor: in ein Heft fuer die Kammer gehoert nur, was
+// der Auszubildende auch unterschrieben hat.
+export const PRINTABLE_STATUS = ["submitted", "approved"];
+
 export async function listApprenticeReportsForPrint(client, context, userId, { from, to }) {
   const result = await client.query(
     `SELECT *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text
      FROM apprentice_reports
      WHERE company_id = $1 AND apprentice_user_id = $2
        AND week_start >= $3::DATE AND week_start <= $4::DATE
+       AND status IN ('submitted', 'approved')
      ORDER BY week_start`,
     [context.companyId, userId, from, to]
   );
@@ -337,6 +368,17 @@ export async function submitOwnApprenticeReport(client, context, weekStart, prof
   }
   const minuten = await weekWorkedMinutes(client, context, context.userId, weekStart);
   const zeilen = await buildDailyEntries(client, context, context.userId, weekStart, geschrieben);
+  // Eingereicht wird nur, was vollstaendig ist. Ein halb ausgefuellter
+  // Nachweis faellt erst am Ende der Ausbildung auf, und dann ist die Woche
+  // nicht mehr zu rekonstruieren.
+  const luecken = incompleteWorkDays(zeilen);
+  if (luecken.length > 0) {
+    throw new errors.InputError(
+      `Für ${germanDayList(luecken)} fehlt noch eine Zeile. Ein Arbeitstag ohne Eintrag ist kein Nachweis.`,
+      400,
+      "apprentice_report_incomplete"
+    );
+  }
   const result = await client.query(
     `UPDATE apprentice_reports
      SET status = 'submitted',

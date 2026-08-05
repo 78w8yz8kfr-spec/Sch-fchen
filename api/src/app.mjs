@@ -43,6 +43,7 @@ import {
   apprenticeReportDto,
   listApprenticeGaps,
   listApprenticeReportsForPrint,
+  PRINTABLE_STATUS,
   listApprenticeReviews,
   listMissingApprenticeWeeks,
   listOwnApprenticeReports,
@@ -189,7 +190,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.10";
+export const APPLICATION_VERSION = "0.42.11";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1940,6 +1941,16 @@ async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, 
     );
   }
   const report = apprenticeReportDto(result.rows[0]);
+  // Ein Entwurf wird nicht gedruckt. Ein halb ausgefuellter Nachweis auf
+  // Papier sieht fertig aus und ist es nicht - im Ordner der Kammer faellt
+  // das erst am Ende der Ausbildung auf.
+  if (!PRINTABLE_STATUS.includes(report.status)) {
+    throw new InputError(
+      "Erst einreichen, dann drucken: ein Entwurf ist noch kein Nachweis.",
+      409,
+      "apprentice_report_not_submitted"
+    );
+  }
   const druck = await apprenticePrintContext(client, context, profile, staticDirectory);
   const pdf = await buildApprenticeReportPdf({
     ...druck,
@@ -1963,7 +1974,7 @@ async function buildApprenticeBookPdf(client, context, range, apprenticeUserId, 
   const reports = await listApprenticeReportsForPrint(client, context, profile.userId, range);
   if (reports.length === 0) {
     throw new InputError(
-      "In diesem Zeitraum steht kein Wochenbericht.",
+      "In diesem Zeitraum ist kein Wochenbericht eingereicht.",
       404,
       "apprentice_report_not_found"
     );

@@ -58,6 +58,15 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 * Ein Tag, an dem **gearbeitet wurde oder eine Abwesenheit lag**, bekommt seine
   Zeile auch dann, wenn nichts geschrieben wurde. Im Nachweis darf kein Tag
   fehlen.
+* **Eingereicht wird nur eine vollständige Woche.** Jeder Tag mit Arbeitszeit
+  braucht mindestens eine Zeile; ein Tag mit Abwesenheit ist durch die
+  Abwesenheit erklärt. Sonst stünde im Ausdruck eine leere Zeile neben
+  „07:45 h“ — und das fällt erst am Ende der Ausbildung auf, wenn sich die
+  Woche nicht mehr rekonstruieren lässt. Die App sagt beim Schreiben, welche
+  Tage noch offen sind, und sperrt „Einreichen“ so lange.
+* Nach dem Einreichen sind die Felder **gesperrt** — das ist der Sinn der
+  Unterschrift. Auf dem Bildschirm steht, warum: eine Sperre, die sich nicht
+  erklärt, sieht aus wie ein Fehler.
 * Eine **Rückgabe ohne Bemerkung** ist nicht möglich: der Auszubildende wüsste
   sonst nicht, was er nachbessern soll.
 * Ein **freigegebener** Nachweis ist unveränderlich, auch für den Ausbilder.
@@ -103,7 +112,9 @@ Nachweis ohne Unterschriften ungültig ist.
   geschriebene Zeilen abzuschneiden wäre der schlechtere Handel, der Nachweis
   wäre dann unvollständig. Die Seitenzahl am Fuß sagt, wie viele Blätter es
   geworden sind.
-* Ein **Entwurf** lässt sich ebenfalls drucken und von Hand unterschreiben.
+* Ein **Entwurf wird nicht gedruckt** (409). Auf Papier sieht er fertig aus und
+  ist es nicht; im Ordner der Kammer fällt das erst am Ende der Ausbildung auf.
+  Gedruckt wird, was eingereicht oder freigegeben ist — also unterschrieben.
 
 ## Wann es auftaucht
 

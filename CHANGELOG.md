@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Zwei gemeldete Fehler im Berichtsheft behoben.**
+  - **„Man kann nicht schreiben."** Nach dem Einreichen sind die Felder
+    gesperrt — das ist der Sinn der Unterschrift. Auf dem Bildschirm stand dazu
+    aber nichts: die Felder waren stumm, die Schaltflächen fort, und das Heft
+    sah schlicht kaputt aus. Jetzt steht dort, warum und was zu tun ist:
+    „Eingereicht am … Zum Ändern muss dein Ausbilder die Woche zurückgeben.“
+    Eine Sperre, die sich nicht erklärt, ist ein Fehler.
+  - **Eine halb ausgefüllte Woche ließ sich einreichen und drucken.** Ein Tag
+    mit Arbeitszeit, aber ohne eine einzige Zeile, ergibt im Ausdruck eine
+    leere Zeile neben „07:45 h“ — und das fällt erst am Ende der Ausbildung
+    auf, wenn sich die Woche nicht mehr rekonstruieren lässt. Jeder Arbeitstag
+    braucht jetzt eine Zeile; ein Tag mit Abwesenheit ist durch die
+    Abwesenheit erklärt. Die App nennt beim Schreiben die offenen Tage,
+    markiert sie und sperrt „Einreichen“ so lange. Der Server weist eine
+    unvollständige Woche ebenfalls ab — die Oberfläche ist der bequeme Weg,
+    nicht die Absicherung.
+  - **Ein Entwurf wird nicht mehr gedruckt.** Auf Papier sieht er fertig aus
+    und ist es nicht. Gedruckt wird, was eingereicht oder freigegeben ist —
+    das gilt für die einzelne Woche wie für das Jahresheft.
+- Fassung 0.42.11, Speicher `schaefchen-online-v53`, Migration 063.
+
 - **Fehlende Wochen werden angemahnt.** Am Ende der Ausbildung ist eine Lücke
   im Berichtsheft teuer, und bis dahin fällt sie niemandem auf.
   - Eine Woche gilt als fällig, sobald in ihr **gearbeitet wurde oder eine

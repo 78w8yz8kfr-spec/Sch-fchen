@@ -5939,6 +5939,29 @@ select:focus-visible {
   font-weight: 700;
 }
 
+/* Eine Sperre, die sich nicht erklaert, ist ein Fehler: nach dem Einreichen
+   sahen die stummen Felder schlicht kaputt aus. */
+.apprentice-lock {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--surface-muted, #f2f4f3);
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.apprentice-open {
+  margin: 0 0 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+/* Ein Arbeitstag ohne Zeile faellt schon beim Schreiben auf. */
+.apprentice-day--offen {
+  border-color: var(--brand);
+}
+
 /* Fehlende Wochen. Am Ende der Ausbildung ist eine Luecke teuer, und bis dahin
    faellt sie niemandem auf - deshalb steht sie hier hervorgehoben. */
 .apprentice-missing {

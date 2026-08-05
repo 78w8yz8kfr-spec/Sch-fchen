@@ -213,6 +213,42 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
     [companyId, azubiId, woche]
   );
 
+  // Ein Arbeitstag ohne Zeile ist kein Nachweis. Der Dienstag hat 470 Minuten
+  // aus der Zeiterfassung, aber im Entwurf steht dazu nichts - eingereicht
+  // wird das nicht. Ein halb ausgefuellter Nachweis faellt sonst erst am Ende
+  // der Ausbildung auf, und dann ist die Woche nicht mehr zu rekonstruieren.
+  const nurMontag = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
+    method: "PUT",
+    body: JSON.stringify({
+      dailyEntries: [{ workDate: woche, activities: ["Nur der Montag"] }]
+    })
+  });
+  assert.equal(nurMontag.status, 200, await nurMontag.clone().text());
+  const unvollstaendig = await ruf(`/api/v1/apprentice/reports/${woche}/submit`, azubiCookie, {
+    method: "POST"
+  });
+  assert.equal(unvollstaendig.status, 400, await unvollstaendig.clone().text());
+  const luecke = (await unvollstaendig.json()).error;
+  assert.equal(luecke.code, "apprentice_report_incomplete");
+  assert.match(luecke.message, /Di, 03\.03\./);
+
+  // Ein Entwurf wird nicht gedruckt: auf Papier sieht er fertig aus.
+  const entwurfsdruck = await ruf(`/api/v1/apprentice/reports/${woche}/pdf`, azubiCookie);
+  assert.equal(entwurfsdruck.status, 409, await entwurfsdruck.clone().text());
+  assert.equal((await entwurfsdruck.json()).error.code, "apprentice_report_not_submitted");
+
+  // Mit dem Dienstag ist die Woche vollstaendig.
+  await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
+    method: "PUT",
+    body: JSON.stringify({
+      dailyEntries: [
+        { workDate: woche, activities: ["Unterverteilung verdrahtet", "Anschlüsse geprüft"] },
+        { workDate: "2026-03-03", activities: "Kabel verlegt\nVerteilerkasten angeschlossen" }
+      ],
+      weekRemark: "Ruhige Woche"
+    })
+  });
+
   const eingereicht = await ruf(`/api/v1/apprentice/reports/${woche}/submit`, azubiCookie, {
     method: "POST"
   });
@@ -283,6 +319,7 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
     body: JSON.stringify({
       dailyEntries: [
         { workDate: woche, activities: ["Unterverteilung verdrahtet", "Anschlüsse geprüft"] },
+        { workDate: "2026-03-03", activities: ["Kabel verlegt"] },
         { workDate: "2026-03-06", activities: ["Berufsschule: Grundlagen der Messtechnik"] }
       ]
     })
