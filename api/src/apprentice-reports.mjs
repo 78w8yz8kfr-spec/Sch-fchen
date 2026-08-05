@@ -393,6 +393,47 @@ export async function submitOwnApprenticeReport(client, context, weekStart, prof
   return apprenticeReportDto(result.rows[0]);
 }
 
+// Einreichen zurueckholen, solange der Ausbilder nicht unterschrieben hat.
+//
+// Im Papierheft streicht man vor der Unterschrift des Ausbilders einfach durch.
+// Ohne diesen Weg war eine zu frueh eingereichte Woche eine Sackgasse: der
+// Auszubildende konnte nichts mehr schreiben und musste warten, bis jemand
+// anders sie zurueckgibt.
+//
+// Die eigene Unterschrift darf er zuruecknehmen, die des Ausbilders nicht:
+// ein freigegebener Nachweis bleibt, wie er ist. Der Verlauf behaelt beide
+// Schritte - zurueckgeholt wird nichts stillschweigend.
+export async function withdrawOwnApprenticeReport(client, context, weekStart, errors) {
+  const vorhanden = await readOwnReport(client, context, weekStart);
+  if (!vorhanden) {
+    throw new errors.InputError(
+      "Für diese Woche gibt es noch keinen Bericht.",
+      404,
+      "apprentice_report_not_found"
+    );
+  }
+  if (vorhanden.status === "approved") {
+    throw new errors.InputError(
+      "Dein Ausbilder hat diese Woche bereits unterschrieben.",
+      409,
+      "apprentice_report_locked"
+    );
+  }
+  // Schon offen: dann ist nichts zu tun. Ein zweiter Fingertipp soll keine
+  // Fehlermeldung ergeben.
+  if (["draft", "returned"].includes(vorhanden.status)) {
+    return apprenticeReportDto(vorhanden);
+  }
+  const result = await client.query(
+    `UPDATE apprentice_reports
+     SET status = 'draft', return_comment = NULL
+     WHERE company_id = $1 AND apprentice_user_id = $2 AND week_start = $3::DATE
+     RETURNING *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text`,
+    [context.companyId, context.userId, weekStart]
+  );
+  return apprenticeReportDto(result.rows[0]);
+}
+
 // Berichte, die dieser Mensch sehen darf.
 //
 // Das ist ausschliesslich der eingetragene Ausbilder. Ein Berichtsheft ist

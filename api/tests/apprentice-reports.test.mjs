@@ -279,6 +279,46 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   assert.equal(nachtraeglich.status, 409, await nachtraeglich.clone().text());
   assert.equal((await nachtraeglich.json()).error.code, "apprentice_report_locked");
 
+  // Aber er holt sie selbst zurueck, solange der Ausbilder nicht
+  // unterschrieben hat. Ohne diesen Weg war eine zu frueh eingereichte Woche
+  // eine Sackgasse: schreiben ging nicht mehr, und der Azubi musste warten,
+  // bis jemand anders sie zurueckgibt.
+  const zurueckgeholt = await ruf(`/api/v1/apprentice/reports/${woche}/withdraw`, azubiCookie, {
+    method: "POST"
+  });
+  assert.equal(zurueckgeholt.status, 200, await zurueckgeholt.clone().text());
+  const offenerBericht = (await zurueckgeholt.json()).report;
+  assert.equal(offenerBericht.status, "draft");
+  // Die eigene Unterschrift ist mit zurueckgenommen.
+  assert.equal(offenerBericht.apprenticeSignatureName, null);
+  assert.equal(offenerBericht.submittedAt, null);
+  // Die geschriebenen Tage bleiben stehen.
+  assert.equal(offenerBericht.dailyEntries.length, 4);
+
+  // Ein zweiter Fingertipp ergibt keine Fehlermeldung.
+  const nochmalZurueck = await ruf(`/api/v1/apprentice/reports/${woche}/withdraw`, azubiCookie, {
+    method: "POST"
+  });
+  assert.equal(nochmalZurueck.status, 200, await nochmalZurueck.clone().text());
+
+  // Jetzt laesst sich wieder schreiben - und ohne Unterschrift auch nicht
+  // drucken.
+  const weiterAmText = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
+    method: "PUT",
+    body: JSON.stringify({
+      dailyEntries: [
+        { workDate: woche, activities: ["Unterverteilung verdrahtet", "Anschlüsse geprüft"] },
+        { workDate: "2026-03-03", activities: ["Kabel verlegt", "Verteilerkasten angeschlossen"] }
+      ],
+      weekRemark: "Ruhige Woche"
+    })
+  });
+  assert.equal(weiterAmText.status, 200, await weiterAmText.clone().text());
+  const entwurfsdruckZwei = await ruf(`/api/v1/apprentice/reports/${woche}/pdf`, azubiCookie);
+  assert.equal(entwurfsdruckZwei.status, 409, await entwurfsdruckZwei.clone().text());
+
+  await ruf(`/api/v1/apprentice/reports/${woche}/submit`, azubiCookie, { method: "POST" });
+
   // Ein Berichtsheft ist persoenlich: weder ein fremder Monteur noch die
   // Geschaeftsfuehrung sehen es. Nur der eingetragene Ausbilder.
   for (const [wer, cookie] of [["Monteur", fremdCookie], ["Geschäftsführung", chefCookie]]) {
@@ -351,9 +391,16 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
     "SELECT status FROM apprentice_report_events WHERE report_id = $1 ORDER BY report_row_version",
     [berichtId]
   );
+  // Auch das Zurueckholen steht im Verlauf - zurueckgeholt wird nichts
+  // stillschweigend. Festgehalten werden nur Statuswechsel: ein erneutes
+  // Speichern desselben Entwurfs ist kein Schritt im Ablauf und fuellt den
+  // Verlauf nicht mit Rauschen.
   assert.deepEqual(
     verlauf.rows.map((zeile) => zeile.status),
-    ["draft", "submitted", "returned", "draft", "submitted", "approved"]
+    [
+      "draft", "submitted", "draft", "submitted",
+      "returned", "draft", "submitted", "approved"
+    ]
   );
 
   // Der Ausdruck fuer die Kammer. Ohne diesen Test lief die Route nie: sie

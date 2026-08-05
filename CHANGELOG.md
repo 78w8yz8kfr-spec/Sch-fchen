@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Eine eingereichte Woche lässt sich zurückholen.** Zu erklären, warum die
+  Felder gesperrt sind, war nur die halbe Antwort: wer zu früh eingereicht
+  hatte, saß fest — schreiben ging nicht mehr, und der einzige Weg zurück
+  führte über den Ausbilder. Solange der nicht unterschrieben hat, gehört der
+  Bericht aber dem Auszubildenden; im Papierheft streicht man vor seiner
+  Unterschrift ebenso einfach durch. „Wieder bearbeiten“ nimmt die eigene
+  Unterschrift zurück, die geschriebenen Tage bleiben stehen. Ein
+  freigegebener Nachweis bleibt unverändert — dort steht die Unterschrift des
+  Ausbilders. Beide Schritte stehen im Verlauf.
+- Fassung 0.42.12, Speicher `schaefchen-online-v54`, Migration 064.
+
 - **Zwei gemeldete Fehler im Berichtsheft behoben.**
   - **„Man kann nicht schreiben."** Nach dem Einreichen sind die Felder
     gesperrt — das ist der Sinn der Unterschrift. Auf dem Bildschirm stand dazu

@@ -67,6 +67,15 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 * Nach dem Einreichen sind die Felder **gesperrt** — das ist der Sinn der
   Unterschrift. Auf dem Bildschirm steht, warum: eine Sperre, die sich nicht
   erklärt, sieht aus wie ein Fehler.
+* **Solange der Ausbilder nicht unterschrieben hat, gehört der Bericht dem
+  Auszubildenden.** Er holt ihn mit „Wieder bearbeiten“ selbst zurück; die
+  eigene Unterschrift wird dabei zurückgenommen, die geschriebenen Tage
+  bleiben stehen. Im Papierheft streicht man vor der Unterschrift des
+  Ausbilders ebenso einfach durch. Ohne diesen Weg war eine zu früh
+  eingereichte Woche eine Sackgasse: schreiben ging nicht mehr, und der
+  Auszubildende musste warten, bis jemand anders sie zurückgibt.
+* Ein **freigegebener** Nachweis lässt sich nicht mehr zurückholen — dort steht
+  die Unterschrift des Ausbilders, und die gehört ihm.
 * Eine **Rückgabe ohne Bemerkung** ist nicht möglich: der Auszubildende wüsste
   sonst nicht, was er nachbessern soll.
 * Ein **freigegebener** Nachweis ist unveränderlich, auch für den Ausbilder.
@@ -85,6 +94,7 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 | `GET /api/v1/apprentice/reports?from=&to=` | Auszubildender, eigene Berichte |
 | `PUT /api/v1/apprentice/reports/:montag` | Auszubildender, Entwurf speichern |
 | `POST /api/v1/apprentice/reports/:montag/submit` | Auszubildender, einreichen |
+| `POST /api/v1/apprentice/reports/:montag/withdraw` | Auszubildender, zurückholen (nicht nach der Freigabe) |
 | `GET /api/v1/apprentice/reports/:montag/pdf` | Auszubildender, eigene Woche als A4-Blatt |
 | `GET /api/v1/apprentice/reports/pdf?from=&to=` | Auszubildender, ein ganzer Zeitraum in einer Datei |
 | `GET …/pdf?apprenticeUserId=` | Ausbilder, Woche oder Zeitraum eines seiner Auszubildenden |

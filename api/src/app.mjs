@@ -50,7 +50,8 @@ import {
   loadApprenticeProfile,
   reviewApprenticeReports,
   saveOwnApprenticeReport,
-  submitOwnApprenticeReport
+  submitOwnApprenticeReport,
+  withdrawOwnApprenticeReport
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import {
@@ -190,7 +191,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.11";
+export const APPLICATION_VERSION = "0.42.12";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1879,6 +1880,11 @@ async function putOwnApprenticeReport(client, context, weekStart, input) {
 async function submitApprenticeReport(client, context, weekStart) {
   const profile = await requireApprentice(client, context);
   return submitOwnApprenticeReport(client, context, weekStart, profile, { InputError });
+}
+
+async function withdrawApprenticeReport(client, context, weekStart) {
+  await requireApprentice(client, context);
+  return withdrawOwnApprenticeReport(client, context, weekStart, { InputError });
 }
 
 // Der gedruckte Nachweis. Der Auszubildende darf seinen eigenen holen, sein
@@ -10240,6 +10246,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           pool,
           tokenHash,
           (client, context) => submitApprenticeReport(client, context, weekStart)
+        );
+        return json(response, 200, { report });
+      }
+
+      const apprenticeWithdrawMatch =
+        /^\/api\/v1\/apprentice\/reports\/(\d{4}-\d{2}-\d{2})\/withdraw$/.exec(url.pathname);
+      if (request.method === "POST" && apprenticeWithdrawMatch) {
+        const weekStart = validateApprenticeWeek(apprenticeWithdrawMatch[1]);
+        const report = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => withdrawApprenticeReport(client, context, weekStart)
         );
         return json(response, 200, { report });
       }

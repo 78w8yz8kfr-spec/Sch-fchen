@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.11";
+} from "./core/work-time.js?v=0.42.12";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.11";
+} from "./core/sync-queue.js?v=0.42.12";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.11";
+} from "./core/permissions.js?v=0.42.12";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.11";
+} from "./core/state-store.js?v=0.42.12";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -204,6 +204,7 @@ import {
     apprenticeDays: document.querySelector("#apprentice-days"),
     apprenticeWeekRemark: document.querySelector("#apprentice-week-remark"),
     apprenticeSave: document.querySelector("#apprentice-save"),
+    apprenticeWithdraw: document.querySelector("#apprentice-withdraw"),
     apprenticePrint: document.querySelector("#apprentice-print"),
     apprenticePrintBook: document.querySelector("#apprentice-print-book"),
     apprenticeMissing: document.querySelector("#apprentice-missing"),
@@ -1090,7 +1091,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.11",
+          "X-Schaefchen-Version": "0.42.12",
           ...options.headers
         }
       });
@@ -1118,7 +1119,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.11" }
+        headers: { "X-Schaefchen-Version": "0.42.12" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1165,7 +1166,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.11 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.12 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -7938,6 +7939,10 @@ import {
     elements.apprenticeWeekRemark.readOnly = !offen;
     elements.apprenticeSave.hidden = !offen;
     elements.apprenticeSubmit.hidden = !offen;
+    // Solange der Ausbilder nicht unterschrieben hat, gehoert der Bericht dem
+    // Auszubildenden. Ohne diesen Weg war eine zu frueh eingereichte Woche
+    // eine Sackgasse.
+    elements.apprenticeWithdraw.hidden = status !== "submitted";
     // Gedruckt wird nur, was eingereicht ist. Ein Entwurf auf Papier sieht
     // fertig aus und ist es nicht.
     elements.apprenticePrint.hidden = !APPRENTICE_PRINTABLE.includes(status);
@@ -7973,8 +7978,8 @@ import {
       // Das kurze Datum endet bereits auf einen Punkt ("05.08."); ein
       // Satzpunkt dahinter ergaebe zwei.
       submitted: bericht?.submittedAt
-        ? `Eingereicht am ${shortDate(bericht.submittedAt.slice(0, 10))} — zum Ändern muss dein Ausbilder die Woche zurückgeben.`
-        : "Eingereicht. Zum Ändern muss dein Ausbilder die Woche zurückgeben.",
+        ? `Eingereicht am ${shortDate(bericht.submittedAt.slice(0, 10))} — dein Ausbilder muss noch unterschreiben. Bis dahin kannst du die Woche mit „Wieder bearbeiten“ zurückholen.`
+        : "Eingereicht — dein Ausbilder muss noch unterschreiben. Bis dahin kannst du die Woche mit „Wieder bearbeiten“ zurückholen.",
       approved: bericht?.reviewedAt
         ? `Freigegeben am ${shortDate(bericht.reviewedAt.slice(0, 10))} von ${bericht.trainerSignatureName || "deinem Ausbilder"}. Ein freigegebener Nachweis bleibt, wie er ist.`
         : "Freigegeben. Ein freigegebener Nachweis bleibt, wie er ist."
@@ -8262,6 +8267,21 @@ import {
         : "Wochenbericht zurückgegeben.");
     } catch (error) {
       elements.apprenticeReviewMessage.textContent = error.message;
+    }
+  }
+
+  // Zurueckholen, solange der Ausbilder nicht unterschrieben hat.
+  async function withdrawApprenticeReport() {
+    elements.apprenticeMessage.textContent = "Die Woche wird zurückgeholt …";
+    try {
+      await requestJson(`./api/v1/apprentice/reports/${selectedWeekStart}/withdraw`, {
+        method: "POST"
+      });
+      elements.apprenticeMessage.textContent = "";
+      await refreshApprenticeData();
+      showToast("Die Woche liegt wieder bei dir.");
+    } catch (error) {
+      elements.apprenticeMessage.textContent = error.message;
     }
   }
 
@@ -10442,6 +10462,7 @@ import {
   });
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
+  elements.apprenticeWithdraw.addEventListener("click", () => withdrawApprenticeReport());
   elements.apprenticePrint.addEventListener("click", () => printApprenticeReport(selectedWeekStart));
   elements.apprenticePrintBook.addEventListener(
     "click", () => printApprenticeYear(selectedWeekStart.slice(0, 4))
