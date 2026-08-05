@@ -4557,6 +4557,63 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const secondCompany = (await newCompanyResponse.json()).company;
     assert.equal(secondCompany.status, "active");
 
+    // Eine direkt angelegte Firma hatte bisher keinen Benutzer und keinen Weg,
+    // einen zu bekommen: die Ersteinrichtung der App gilt nur fuer die im
+    // Server hinterlegte erste Firma. Solche Firmen blieben unbenutzbar.
+    const ersterAdminResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}/administrator`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          personnelNumber: `FIL-${suffix}`,
+          firstName: "Fiona",
+          lastName: "Filiale",
+          temporaryPassword: "Filiale-Start-2026!",
+          reason: "Erster Firmenadministrator nach Vertragsabschluss"
+        })
+      }
+    );
+    assert.equal(ersterAdminResponse.status, 201, await ersterAdminResponse.clone().text());
+    const ersterAdmin = (await ersterAdminResponse.json()).administrator;
+    assert.equal(ersterAdmin.companyNumber, secondCompany.companyNumber);
+    assert.equal(ersterAdmin.mustChangePassword, true);
+
+    // Nur solange die Firma keine Administration hat. Danach vergibt sie ihre
+    // Konten selbst; die Plattform legt keine Benutzer im laufenden Betrieb an.
+    const zweiterVersuch = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${secondCompany.id}/administrator`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          personnelNumber: `FIL2-${suffix}`,
+          firstName: "Zwei",
+          lastName: "Zuviel",
+          temporaryPassword: "Filiale-Start-2026!",
+          reason: "Zweiter Versuch"
+        })
+      }
+    );
+    assert.equal(zweiterVersuch.status, 409, await zweiterVersuch.clone().text());
+    assert.equal((await zweiterVersuch.json()).error.code, "company_administrator_exists");
+
+    // Die neue Firma laeuft eigenstaendig: eigene Anmeldung, eigene Adminrolle.
+    const filialAnmeldung = await fetch(`${baseUrl}/api/v1/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+      body: JSON.stringify({
+        companyNumber: secondCompany.companyNumber,
+        personnelNumber: `FIL-${suffix}`,
+        password: "Filiale-Start-2026!"
+      })
+    });
+    assert.equal(filialAnmeldung.status, 201, await filialAnmeldung.clone().text());
+    const filialSitzung = (await filialAnmeldung.json()).session;
+    assert.deepEqual(filialSitzung.user.roles, ["admin"]);
+    assert.equal(filialSitzung.company.number, secondCompany.companyNumber);
+    assert.equal(filialSitzung.user.mustChangePassword, true);
+
     const secondCompanyDetailResponse = await fetch(
       `${baseUrl}/api/v1/platform/companies/${secondCompany.id}`,
       { headers: { Cookie: platformCookie } }

@@ -712,6 +712,87 @@ async function updateCompany(client, context, permissions, request, companyId, b
   return publicValue(updated.rows[0]);
 }
 
+// Legt den ersten Firmenadministrator an.
+//
+// Eine ueber "Firma anlegen" erzeugte Firma hatte bisher keinen Benutzer und
+// keinen Weg, einen zu bekommen: die Ersteinrichtung der App gilt nur fuer die
+// im Server hinterlegte erste Firma. Solche Firmen blieben dauerhaft
+// unbenutzbar.
+//
+// Der Weg ist bewusst eng: er greift nur, solange die Firma keinen aktiven
+// Administrator hat. Danach vergibt die Firma ihre Konten selbst; die
+// Plattform legt keine Benutzer in einem laufenden Betrieb an.
+async function createFirstCompanyAdministrator(client, context, permissions, request, companyId, body) {
+  requirePermission(permissions, "companies.manage");
+  const company = await ensureCompany(client, companyId);
+  const reason = requiredText(body.reason, "Begründung", 1000);
+  const personnelNumber = requiredText(body.personnelNumber, "Personalnummer", 30);
+  const firstName = requiredText(body.firstName, "Vorname", 100);
+  const lastName = requiredText(body.lastName, "Nachname", 100);
+  const temporaryPassword = requiredText(body.temporaryPassword, "Startpasswort", 256);
+  if (temporaryPassword.length < 12) {
+    throw new InputError("Das Startpasswort ist zu kurz.");
+  }
+
+  const vorhandene = await client.query(
+    `SELECT 1
+     FROM users AS account
+     JOIN user_roles AS zuweisung
+       ON zuweisung.company_id = account.company_id AND zuweisung.user_id = account.id
+      AND zuweisung.revoked_at IS NULL
+     JOIN roles AS rolle
+       ON rolle.company_id = zuweisung.company_id AND rolle.id = zuweisung.role_id
+     WHERE account.company_id = $1 AND account.status = 'active'
+       AND rolle.role_key = 'admin' AND rolle.status = 'active'
+     LIMIT 1`,
+    [companyId]
+  );
+  if (vorhandene.rowCount > 0) {
+    throw new InputError(
+      "Diese Firma hat bereits eine Administration. Weitere Konten vergibt sie selbst.",
+      409,
+      "company_administrator_exists"
+    );
+  }
+
+  const user = await client.query(
+    `INSERT INTO users (
+       company_id, personnel_number, first_name, last_name, email,
+       password_hash, must_change_password, status
+     ) VALUES ($1,$2,$3,$4,$5,$6,TRUE,'active')
+     RETURNING id, personnel_number`,
+    [
+      companyId, personnelNumber, firstName, lastName,
+      optionalText(body.email, "E-Mail-Adresse", 254)?.toLowerCase() || company.contact_email || null,
+      await hashPassword(temporaryPassword)
+    ]
+  );
+  const zuweisung = await client.query(
+    `INSERT INTO user_roles (company_id, user_id, role_id, reason)
+     SELECT $1, $2, id, $3 FROM roles
+     WHERE company_id = $1 AND role_key = 'admin' AND status = 'active'`,
+    [companyId, user.rows[0].id, "Erster Firmenadministrator durch die Plattformverwaltung"]
+  );
+  if (zuweisung.rowCount !== 1) {
+    throw new InputError("Für diese Firma fehlt die Adminrolle.", 409, "company_admin_role_missing");
+  }
+
+  await audit(client, context, request, {
+    action: "company.first_administrator_created",
+    targetType: "user",
+    targetId: user.rows[0].id,
+    companyId,
+    newState: { personnelNumber: user.rows[0].personnel_number },
+    reason
+  });
+
+  return {
+    companyNumber: company.company_number,
+    personnelNumber: user.rows[0].personnel_number,
+    mustChangePassword: true
+  };
+}
+
 async function createCompany(client, context, permissions, request, body) {
   requirePermission(permissions, "companies.create");
   const legalName = requiredText(body.legalName, "Firmenname", 200);
@@ -1988,6 +2069,14 @@ export function createPlatformHandler({ pool, config, limiter }) {
       if (request.method === "POST" && url.pathname === "/api/v1/platform/companies") {
         const company = await createCompany(client, context, permissions, request, await readJson(request));
         return { status: 201, body: { company } };
+      }
+      const firstAdminMatch = /^\/api\/v1\/platform\/companies\/([^/]+)\/administrator$/.exec(url.pathname);
+      if (firstAdminMatch && request.method === "POST") {
+        const ergebnis = await createFirstCompanyAdministrator(
+          client, context, permissions, request,
+          validateId(firstAdminMatch[1], "Firmen-ID"), await readJson(request)
+        );
+        return { status: 201, body: { administrator: ergebnis } };
       }
       const companyMatch = /^\/api\/v1\/platform\/companies\/([^/]+)$/.exec(url.pathname);
       if (companyMatch && request.method === "GET") {

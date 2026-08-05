@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Fehler behoben: eine über „Firma anlegen“ direkt erzeugte Firma war dauerhaft
+  unbenutzbar. Sie bekam keinen Benutzer, und es gab keinen Weg, einen
+  anzulegen: die Ersteinrichtung der App gilt nur für die im Server hinterlegte
+  erste Firma. Der Anlegedialog fragt jetzt die erste Administration mit ab, und
+  ein eigener Weg der Plattformverwaltung legt sie nach. Er greift nur, solange
+  die Firma keine aktive Administration hat; danach vergibt sie ihre Konten
+  selbst.
+- die Trennung mehrerer Firmen ist nachgewiesen: eigene Anmeldung, eigene
+  Nummernkreise, keine fremden Daten in der Übersicht, 404 beim Direktzugriff
+  auf einen fremden Datensatz und 401 bei einer Anmeldung mit fremdem Konto in
+  der falschen Firma.
+
 - Fassung 0.42.1. Der Dienst-Worker liefert die Dateien der App aus einem
   Zwischenspeicher aus, ohne beim Server nachzufragen. Solange Fassungsnummer
   und Speichername gleich blieben, erreichte **keine** Korrektur der Oberfläche

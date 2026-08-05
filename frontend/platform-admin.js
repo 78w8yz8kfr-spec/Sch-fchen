@@ -630,7 +630,7 @@
     actionContext = { kind };
     const definitions = {
       platform_account: ["Plattformadministrator anlegen", [field("firstName", "Vorname"), field("lastName", "Nachname"), field("email", "E-Mail", "email"), field("temporaryPassword", "Temporäres Passwort", "password"), field("roleKeys", "Rollen (kommagetrennt)", "text", null, "support")]],
-      company: ["Firma oder Einladung anlegen", [field("mode", "Vorgang", "text", [["company", "Firma direkt anlegen"], ["invitation", "Einladung erzeugen"]]), field("legalName", "Firmenname"), field("displayName", "Anzeigename"), field("contactName", "Ansprechpartner"), field("contactEmail", "E-Mail", "email"), field("isTestCompany", "Testfirma", "text", [["false", "Nein"], ["true", "Ja"]]), field("licensePlan", "Tarif", "text", null, "standard")]],
+      company: ["Firma oder Einladung anlegen", [field("mode", "Vorgang", "text", [["company", "Firma direkt anlegen"], ["invitation", "Einladung erzeugen"]]), field("legalName", "Firmenname"), field("displayName", "Anzeigename"), field("contactName", "Ansprechpartner"), field("contactEmail", "E-Mail", "email"), field("isTestCompany", "Testfirma", "text", [["false", "Nein"], ["true", "Ja"]]), field("licensePlan", "Tarif", "text", null, "standard"), field("adminPersonnelNumber", "Erste Administration: Personalnummer"), field("adminFirstName", "Erste Administration: Vorname"), field("adminLastName", "Erste Administration: Nachname"), field("adminTemporaryPassword", "Erste Administration: Startpasswort", "password")]],
       plan: ["Tarif anlegen", [field("key", "Tarifschlüssel"), field("name", "Name"), field("status", "Status", "text", [["draft", "Entwurf"], ["active", "Aktiv"]]), field("description", "Beschreibung", "textarea")]],
       support: ["Supportfall anlegen", [field("companyId", "Firmen-ID"), field("contactName", "Ansprechpartner"), field("contactEmail", "E-Mail", "email"), field("category", "Kategorie", "text", [["support", "Support"], ["technical", "Technik"], ["setup", "Einrichtung"], ["billing", "Abrechnung"]]), field("priority", "Priorität", "text", [["low", "Niedrig"], ["normal", "Normal"], ["high", "Hoch"], ["critical", "Kritisch"]]), field("subject", "Betreff"), field("description", "Beschreibung")]],
       announcement: ["Mitteilung erstellen", [field("title", "Titel"), field("message", "Nachricht", "textarea"), field("type", "Art", "text", [["maintenance", "Wartung"], ["outage", "Störung"], ["security", "Sicherheit"], ["feature", "Neue Funktion"], ["update", "Update"], ["terms", "Bedingungen"]]), field("status", "Status", "text", [["draft", "Entwurf"], ["scheduled", "Geplant"], ["published", "Sofort veröffentlichen"]]), ...targetFields(), field("publishAt", "Veröffentlichung", "datetime-local"), field("expiresAt", "Ablauf", "datetime-local")]],
@@ -751,7 +751,32 @@
     if (kind === "platform_account") await request("administrators", { method: "POST", body: JSON.stringify({ ...data, roleKeys: textList(data.roleKeys) }) });
     else if (kind === "company") {
       const isInvitation = data.mode === "invitation";
-      return request(isInvitation ? "registrations" : "companies", { method: "POST", body: JSON.stringify({ ...data, isTestCompany: data.isTestCompany === "true", expiresInDays: 7 }) });
+      if (isInvitation) {
+        return request("registrations", { method: "POST", body: JSON.stringify({ ...data, isTestCompany: data.isTestCompany === "true", expiresInDays: 7 }) });
+      }
+      // Eine direkt angelegte Firma braucht sofort ihre erste Administration.
+      // Ohne sie kommt niemand hinein: die Ersteinrichtung der App gilt nur
+      // fuer die im Server hinterlegte erste Firma.
+      if (!data.adminPersonnelNumber?.trim() || !data.adminFirstName?.trim()
+        || !data.adminLastName?.trim() || !data.adminTemporaryPassword?.trim()) {
+        throw new Error("Für eine direkt angelegte Firma sind Personalnummer, Name und Startpasswort der ersten Administration nötig.");
+      }
+      const angelegt = await request("companies", {
+        method: "POST",
+        body: JSON.stringify({ ...data, isTestCompany: data.isTestCompany === "true" })
+      });
+      const firma = angelegt?.company;
+      if (!firma?.id) throw new Error("Die Firma wurde angelegt, ihre Kennung fehlt aber in der Antwort.");
+      return request(`companies/${encodeURIComponent(firma.id)}/administrator`, {
+        method: "POST",
+        body: JSON.stringify({
+          personnelNumber: data.adminPersonnelNumber,
+          firstName: data.adminFirstName,
+          lastName: data.adminLastName,
+          temporaryPassword: data.adminTemporaryPassword,
+          reason: data.reason
+        })
+      });
     } else if (kind === "plan") await request("plans", { method: "POST", body: JSON.stringify(data) });
     else if (kind === "platform_admin") await request(`administrators/${encodeURIComponent(actionContext.item.id)}/actions`, { method: "POST", body: JSON.stringify({ ...data, roleKeys: textList(data.roleKeys) }) });
     else if (kind === "plan_manage") {

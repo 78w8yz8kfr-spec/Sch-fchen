@@ -87,6 +87,19 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
   }
 }
 
+// Eine direkt angelegte Firma braucht sofort ihre erste Administration.
+// Ohne sie kommt niemand hinein: die Ersteinrichtung der App gilt nur fuer die
+// im Server hinterlegte erste Firma, und einen zweiten Weg gab es nicht.
+for (const feld of [
+  "adminPersonnelNumber", "adminFirstName", "adminLastName", "adminTemporaryPassword"
+]) {
+  assert.ok(
+    platformApp.includes(`"${feld}"`),
+    `Der Anlegedialog fuer Firmen fragt ${feld} nicht ab`
+  );
+}
+assert.match(platformApp, /companies\/\$\{encodeURIComponent\(firma\.id\)\}\/administrator/);
+
 // Jedes Formular braucht einen Absende-Empfaenger. Ohne ihn laedt der Browser
 // die Seite neu und die Eingabe ist fort, ohne dass jemand etwas bemerkt.
 const formularKennungen = [...html.matchAll(/<form[^>]*id="([a-z0-9-]+)"/g)].map((treffer) => treffer[1]);
