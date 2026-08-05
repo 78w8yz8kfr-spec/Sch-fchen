@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.2";
+} from "./core/work-time.js?v=0.42.3";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,13 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.2";
+} from "./core/sync-queue.js?v=0.42.3";
 import {
-  canAdministerModules as canAdministerModulesFor,
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
-} from "./core/permissions.js?v=0.42.2";
+} from "./core/permissions.js?v=0.42.3";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +35,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.2";
+} from "./core/state-store.js?v=0.42.3";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -81,6 +80,7 @@ import {
     loginSubmit: document.querySelector("#login-submit"),
     companyNumberField: document.querySelector("#company-number-field"),
     companyNumber: document.querySelector("#company-number"),
+    changeCompany: document.querySelector("#change-company"),
     personnelNumber: document.querySelector("#personnel-number"),
     passwordInput: document.querySelector("#password"),
     passwordState: document.querySelector("#password-state"),
@@ -190,6 +190,13 @@ import {
     todayLabel: document.querySelector("#today-label"),
     weekStrip: document.querySelector("#week-strip"),
     weekPeriod: document.querySelector("#week-period"),
+    weekDaysTitle: document.querySelector("#week-days-title"),
+    accountCard: document.querySelector("#account-card"),
+    accountName: document.querySelector("#account-name"),
+    accountPersonnelNumber: document.querySelector("#account-personnel-number"),
+    accountCompany: document.querySelector("#account-company"),
+    accountRoles: document.querySelector("#account-roles"),
+    accountLogout: document.querySelector("#account-logout"),
     weekPrevious: document.querySelector("#week-previous"),
     weekCurrent: document.querySelector("#week-current"),
     weekNext: document.querySelector("#week-next"),
@@ -413,9 +420,6 @@ import {
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
     sitePlanningShell: document.querySelector("#site-planning-shell"),
     sitePlanningContent: document.querySelector("#site-planning-content"),
-    electricalModuleAdmin: document.querySelector("#electrical-module-admin"),
-    electricalModuleList: document.querySelector("#electrical-module-list"),
-    electricalModuleMessage: document.querySelector("#electrical-module-message"),
     businessStructurePanel: document.querySelector("#business-structure-panel"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminCustomerCount: document.querySelector("#admin-customer-count"),
@@ -805,7 +809,12 @@ import {
   // Angaben des Servers zur Firma der Ersteinrichtung und die zuletzt auf
   // diesem Geraet benutzte Firma. Beide zusammen fuellen das Anmeldeformular.
   let loginSetup = null;
+  let currentDashboardPane = "start";
+  // Zu welchem Tag gehoeren die geladenen Einsaetze? Die Schnittstelle liefert
+  // sie je Tag und traegt das Datum nicht in den einzelnen Einsatz ein.
+  let assignmentsDate = null;
   let deviceCompany = null;
+  let companyChangeRequested = false;
   let adminState = null;
   let weekState = null;
   let absenceState = [];
@@ -971,11 +980,25 @@ import {
     const nummer = normalizeCompanyNumber(number);
     if (!nummer) return;
     deviceCompany = { number: nummer, displayName: displayName || nummer };
+    companyChangeRequested = false;
     try {
       window.localStorage.setItem(COMPANY_STORAGE_KEY, JSON.stringify(deviceCompany));
     } catch {
       // Ohne lokalen Speicher wird die Nummer eben wieder eingetippt.
     }
+  }
+
+  // Nach welcher Firma wird gefragt?
+  //
+  // Beim ersten Mal nach jeder: das Geraet weiss noch nicht, zu wem es gehoert.
+  // Danach steht die Firma fest und das Feld verschwindet - ein Monteur soll
+  // seine Firmennummer nicht bei jeder Anmeldung wiedersehen. Ein stiller Weg
+  // zurueck bleibt, sonst kaeme ein einmal falsch eingerichtetes Geraet nie
+  // wieder heraus.
+  function applyCompanyFieldVisibility() {
+    const bekannt = Boolean(deviceCompany?.number) && !companyChangeRequested;
+    elements.companyNumberField.hidden = demoMode || bekannt;
+    elements.changeCompany.hidden = demoMode || !bekannt;
   }
 
   // Zeigt ueber dem Anmeldeformular, zu welcher Firma die eingetippte Nummer
@@ -1019,7 +1042,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.2",
+          "X-Schaefchen-Version": "0.42.3",
           ...options.headers
         }
       });
@@ -1047,7 +1070,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.2" }
+        headers: { "X-Schaefchen-Version": "0.42.3" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1085,10 +1108,8 @@ import {
     elements.openPreview.hidden = !demoMode;
     elements.previewDivider.hidden = !demoMode;
     elements.modeNote.hidden = !demoMode;
-    // Jede Firma arbeitet getrennt. Ohne dieses Feld kaeme man auf einem Geraet
-    // nur zu der Firma, die der Server als Ersteinrichtung kennt.
-    elements.companyNumberField.hidden = demoMode;
     elements.companyNumber.readOnly = false;
+    applyCompanyFieldVisibility();
     elements.modeBadge.textContent = demoMode ? "Vorschau" : "Live";
     elements.timesheetEyebrow.textContent = demoMode ? "Live und lokal" : "Live synchronisiert";
     elements.resetDemo.hidden = !demoMode;
@@ -1096,7 +1117,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.2 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.3 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1221,16 +1242,17 @@ import {
     return isProjectScopedSessionFor(session);
   }
 
-  function canAdministerModules() {
-    return canAdministerModulesFor(session, { demoMode });
-  }
-
   function dateFromIso(date) {
     return new Date(`${date}T12:00:00`);
   }
 
+  // Ohne gueltiges Datum lieber nichts anzeigen als "Invalid Date". Der Text
+  // stand in der Wochenansicht ueber dem naechsten Einsatz und sah aus, als sei
+  // der Einsatz kaputt.
   function shortDate(date) {
-    return dateFromIso(date).toLocaleDateString("de-DE", {
+    const wert = dateFromIso(date);
+    if (Number.isNaN(wert.valueOf())) return "";
+    return wert.toLocaleDateString("de-DE", {
       weekday: "short",
       day: "2-digit",
       month: "2-digit"
@@ -2440,16 +2462,14 @@ import {
     return status === "completed" ? "Abgeschlossen" : "Entwurf";
   }
 
-  // Ist ein Bereich für diese Firma eingeschaltet?
+  // Ist ein Bereich für diese Firma freigegeben?
   //
-  // Die Sitzung führt den Stand für jeden Angemeldeten mit, damit auch ein
-  // Monteur einen abgeschalteten Bereich gar nicht erst angeboten bekommt.
-  // Die Verwaltung kennt zusätzlich die ausführliche Liste. Ohne Angabe gilt
-  // ein Bereich als eingeschaltet, sonst verschwände er beim ersten Start,
-  // bevor die Sitzung steht.
+  // Darüber entscheidet ausschließlich die Plattformverwaltung. Die Sitzung
+  // führt den Stand für jeden Angemeldeten mit, damit auch ein Monteur einen
+  // gesperrten Bereich gar nicht erst angeboten bekommt. Ohne Angabe gilt ein
+  // Bereich als freigegeben, sonst verschwände er beim ersten Start, bevor die
+  // Sitzung steht.
   function moduleEnabled(key) {
-    const ausDerVerwaltung = adminState?.modules?.find((module) => module.key === key);
-    if (ausDerVerwaltung) return Boolean(ausDerVerwaltung.enabled);
     const ausDerSitzung = session?.modules?.[key];
     return ausDerSitzung === undefined ? true : Boolean(ausDerSitzung);
   }
@@ -2627,76 +2647,6 @@ import {
       );
     });
     showSiteDashboardSection(siteDashboardSection);
-  }
-
-  function renderElectricalModuleAdministration() {
-    const allowed = canAdministerModules();
-    elements.electricalModuleAdmin.hidden = !allowed;
-    elements.electricalModuleList.replaceChildren();
-    elements.electricalModuleMessage.textContent = "";
-    if (!allowed) return;
-
-    (adminState?.modules || []).forEach((module) => {
-      const item = document.createElement("li");
-      const content = document.createElement("div");
-      const title = document.createElement("strong");
-      const description = document.createElement("span");
-      const control = document.createElement("label");
-      const toggle = document.createElement("input");
-      const stateLabel = document.createElement("span");
-      const connected = Boolean(module.available);
-      title.textContent = module.name;
-      description.textContent = connected
-        ? module.description
-        : `${module.description} · auf Anfrage über die Plattformverwaltung`;
-      content.append(title, description);
-      control.className = "electrical-module-toggle";
-      toggle.type = "checkbox";
-      toggle.checked = connected && module.enabled;
-      toggle.disabled = !connected;
-      toggle.setAttribute("aria-label", `${module.name} firmenweit ein- oder ausschalten`);
-      stateLabel.textContent = connected
-        ? (module.enabled ? "Aktiv" : "Abgeschaltet")
-        : "Nicht freigegeben";
-      control.append(toggle, stateLabel);
-      item.append(content, control);
-
-      if (connected) {
-        toggle.addEventListener("change", async () => {
-          const requested = toggle.checked;
-          toggle.disabled = true;
-          elements.electricalModuleMessage.textContent = requested
-            ? `${module.name} wird eingeschaltet …`
-            : `${module.name} wird abgeschaltet …`;
-          try {
-            const body = await requestJson(
-              `./api/v1/admin/modules/${encodeURIComponent(module.key)}`,
-              {
-                method: "PATCH",
-                body: JSON.stringify({
-                  enabled: requested,
-                  rowVersion: module.rowVersion
-                })
-              }
-            );
-            adminState.modules = adminState.modules.map((itemModule) => (
-              itemModule.key === body.module.key ? body.module : itemModule
-            ));
-            await refreshAdmin(adminState.date);
-            showToast(
-              requested
-                ? `${module.name}: eingeschaltet.`
-                : `${module.name}: abgeschaltet. Vorhandene Daten bleiben erhalten.`
-            );
-          } catch (error) {
-            toggle.checked = !requested;
-            toggle.disabled = false;
-            elements.electricalModuleMessage.textContent = error.message;
-          }
-        });
-      }
-      elements.electricalModuleList.append(item);
-    });
   }
 
   function resetSiteReportFinalization() {
@@ -4925,7 +4875,6 @@ import {
     renderAbsenceReviews();
     renderTimesheetExport();
     renderAdminTimeAccounts();
-    renderElectricalModuleAdministration();
     if (openedSiteId && !elements.siteDashboard.hidden) {
       renderSiteDocuments(openedSiteId);
       renderSitePhotos(openedSiteId);
@@ -6254,6 +6203,10 @@ import {
     elements.primaryActionLabel.textContent = label;
     elements.primaryActionIcon.textContent = icon;
     elements.primaryAction.disabled = disabled;
+    // Eine Schaltflaeche, die nichts ausloest, ist keine. Bei abgeschlossenem
+    // Arbeitstag stand auf ihr Wort fuer Wort derselbe Satz wie in der
+    // Ueberschrift zwei Zeilen darueber.
+    elements.primaryAction.hidden = disabled;
   }
 
   function renderAction() {
@@ -6893,7 +6846,7 @@ import {
     // Die Oberfläche bildet genau das ab, damit niemand auf eine Schaltfläche
     // trifft, die der Server anschließend verweigert.
     const canManage = Boolean(adminState?.canCreateManagementRoles);
-    elements.timeCorrectionPolicyAdmin.hidden = !canPlan();
+    elements.timeCorrectionPolicyAdmin.hidden = !canPlan() || !isOfficeAdminPane();
     elements.timeCorrectionPolicyForm.hidden = !canManage;
     if (!timeCorrectionPolicyState) {
       elements.timeCorrectionPolicyState.textContent = navigator.onLine
@@ -7066,7 +7019,7 @@ import {
 
   function renderAdminTimeAccounts() {
     renderAdminYearOptions();
-    const visible = canPlan() && !isProjectScopedSession();
+    const visible = canPlan() && !isProjectScopedSession() && isOfficeAdminPane();
     elements.timeAccountAdminPanel.hidden = !visible;
     elements.holidayCalendarAdmin.hidden = !visible;
     if (!visible) return;
@@ -7167,6 +7120,12 @@ import {
     elements.weekPeriod.textContent = `${
       periodStart.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
     } – ${periodEnd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+    // Ueber den erfassten Arbeitstagen stand fest "Diese Woche", auch wenn
+    // gerade eine frueher liegende Woche geblaettert war. Wer den Kopf der
+    // Ansicht nicht mitlas, hielt fremde Zahlen fuer die eigenen dieser Woche.
+    elements.weekDaysTitle.textContent = weekStart === currentWeekStart(today)
+      ? "Diese Woche"
+      : `Woche ab ${shortDate(weekStart)}`;
     elements.weekCurrent.disabled = weekStart === currentWeekStart(today);
     elements.weekNext.disabled = weekStart >= currentWeekStart(today);
     const targetMinutes = visibleWeek.days.reduce(
@@ -7195,14 +7154,15 @@ import {
     renderAdminTimeAccounts();
 
     const selectedIsCurrentWeek = weekStart === currentWeekStart(today);
-    const nextAssignment = selectedIsCurrentWeek
-      ? assignments.find((assignment) => assignment.workDate >= localDateKey()) || assignments[0]
-      : null;
+    // Die Einsaetze werden immer fuer den heutigen Tag geladen. Frueher wurde
+    // hier nach assignment.workDate gesucht - das Feld gibt es im Einsatz gar
+    // nicht, und in der Karte stand deshalb "Invalid Date".
+    const nextAssignment = selectedIsCurrentWeek ? assignments[0] : null;
     elements.weekNextAssignment.hidden = !nextAssignment;
     if (nextAssignment) {
       elements.weekNextAssignmentName.textContent = nextAssignment.constructionSite.name;
       elements.weekNextAssignmentMeta.textContent = [
-        shortDate(nextAssignment.workDate),
+        shortDate(assignmentsDate || localDateKey()),
         nextAssignment.plannedStartTime ? `${nextAssignment.plannedStartTime.slice(0, 5)} Uhr` : null,
         nextAssignment.comment || nextAssignment.constructionSite.shortText
       ].filter(Boolean).join(" · ");
@@ -7488,6 +7448,7 @@ import {
     renderTimes();
     renderEntries();
     renderWeek();
+    renderAccountCard();
     renderPlatformAnnouncements();
     updateConnectionState();
   }
@@ -7587,7 +7548,17 @@ import {
     });
   }
 
+  // Die Bueroverwaltung - Jahreskonten, Feiertagskalender und die Regel fuer
+  // Zeitkorrekturen - gehoert unter "Mehr". Ohne diese Pruefung stand sie in
+  // allen drei Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten
+  // dieselben drei Karten, weil sie im gemeinsamen Verwaltungsbereich liegen
+  // und keine eigene Zuordnung hatten.
+  function isOfficeAdminPane() {
+    return currentDashboardPane === "more";
+  }
+
   function showDashboardPane(pane, smooth = true) {
+    currentDashboardPane = pane;
     if (pane !== "start") closeMobileReportForm();
     if (pane !== "week") closeTimeCorrectionForm();
     const adminPanes = new Set(["assignments", "sites", "more"]);
@@ -7615,6 +7586,8 @@ import {
       if (copy) {
         [elements.adminEyebrow.textContent, elements.adminTitle.textContent, elements.adminIntro.textContent] = copy;
       }
+      renderAdminTimeAccounts();
+      renderTimeCorrectionPolicy();
     }
 
     const activeButton = {
@@ -7795,6 +7768,7 @@ import {
         requestJson(`./api/v1/work-days/${date}`)
       ]);
       assignments = assignmentBody.assignments;
+      assignmentsDate = date;
       const persisted = serverEntries(workDayBody.workDay);
       const knownIds = new Set(persisted.map((entry) => entry.clientEntryId));
       state = {
@@ -7878,6 +7852,14 @@ import {
       elements.loginMessage.textContent = error.message;
     }
   }
+
+  elements.changeCompany.addEventListener("click", () => {
+    companyChangeRequested = true;
+    applyCompanyFieldVisibility();
+    elements.companyNumber.value = "";
+    elements.companyNumber.focus();
+    applyLoginCompanyIdentity();
+  });
 
   elements.companyNumber.addEventListener("input", applyLoginCompanyIdentity);
   elements.companyNumber.addEventListener("change", () => {
@@ -9678,6 +9660,18 @@ import {
   });
 
   elements.openPreview.addEventListener("click", showDashboard);
+  // Unter "Mehr" stand fuer einen Monteur bisher nur ein Hinweistext. Wer
+  // seine Personalnummer oder die Firma nachsehen wollte, fand sie nirgends,
+  // und abmelden ging nur ueber das kleine Zeichen oben rechts.
+  function renderAccountCard() {
+    elements.accountCard.hidden = demoMode || !session;
+    if (elements.accountCard.hidden) return;
+    elements.accountName.textContent = `${session.user.firstName} ${session.user.lastName}`;
+    elements.accountPersonnelNumber.textContent = session.user.personnelNumber;
+    elements.accountCompany.textContent = `${session.company.displayName} · ${session.company.number}`;
+    elements.accountRoles.textContent = employeeRoleLabel(session.user.roles);
+  }
+
   elements.closePreview.addEventListener("click", async () => {
     if (demoMode) return showLogin();
     try {
@@ -9699,6 +9693,7 @@ import {
       showToast(error.message);
     }
   });
+  elements.accountLogout.addEventListener("click", () => elements.closePreview.click());
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
   elements.secondaryAction.addEventListener("click", () => addEntry("clock_out"));
   // Ohne die eigene Funktion bekaeme openEmployeeSiteWorkspace das Klickereignis

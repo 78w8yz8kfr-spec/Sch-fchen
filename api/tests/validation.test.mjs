@@ -11,7 +11,6 @@ import {
   validateAssignmentUpdate,
   validateConstructionSite,
   validateConstructionSiteUpdate,
-  validateCompanyModuleUpdate,
   validateCustomer,
   validateCustomerUpdate,
   validateDocumentStatusUpdate,
@@ -224,35 +223,6 @@ test("Abwesenheiten prüfen Art Zeitraum Halbtage und Entscheidungen", () => {
     comment: "",
     rowVersion: 2
   }), /Begründung/);
-});
-
-test("Abschaltbare Bereiche verlangen bekannten Schlüssel Status und Versionsstand", () => {
-  assert.deepEqual(
-    validateCompanyModuleUpdate("VDE", { enabled: true, rowVersion: 0 }),
-    { moduleKey: "vde", enabled: true, rowVersion: 0 }
-  );
-  for (const bereich of ["assembly_reports", "documents", "absences", "site_qr"]) {
-    assert.deepEqual(
-      validateCompanyModuleUpdate(bereich, { enabled: false, rowVersion: 3 }),
-      { moduleKey: bereich, enabled: false, rowVersion: 3 }
-    );
-  }
-  // Die Pruefung hier betrifft nur die Schluesselform. Ob ein Bereich wirklich
-  // abschaltbar ist, entscheidet der Modulkatalog und nicht eine zweite Liste.
-  for (const ungueltig of ["Gross Buchstaben", "mit-strich", "1ziffer"]) {
-    assert.throws(
-      () => validateCompanyModuleUpdate(ungueltig, { enabled: true, rowVersion: 0 }),
-      /ungültig/
-    );
-  }
-  assert.throws(
-    () => validateCompanyModuleUpdate("vde", { enabled: "ja", rowVersion: 0 }),
-    /Modulstatus/
-  );
-  assert.throws(
-    () => validateCompanyModuleUpdate("vde", { enabled: true, rowVersion: -1 }),
-    /Modulversion/
-  );
 });
 
 test("VDE-Prüfungen speichern nur strukturierte Fachdaten und passende Schutzorganparameter", () => {

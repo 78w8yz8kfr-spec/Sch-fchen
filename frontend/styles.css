@@ -216,6 +216,20 @@ select:focus-visible {
   font-size: 0.72rem;
 }
 
+/* Steht die Firma fest, verschwindet das Feld. Der Weg zurueck bleibt, faellt
+   aber nicht ins Auge: er wird auf einem Geraet hoechstens einmal gebraucht. */
+.company-context__change {
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 4px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .preview-note,
 .info-card {
   display: flex;
@@ -484,6 +498,23 @@ select:focus-visible {
   margin-top: 2px;
   color: var(--muted);
   font-size: 0.68rem;
+}
+
+/* Diese Regel muss nach `.brand--small span` stehen und ist genauer als sie.
+   Sonst gewinnt dort display: block, und das Firmenzeichen stand allein in
+   einer eigenen Zeile ueber dem Firmennamen statt daneben. */
+.brand--small .company-brand-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.brand--small .company-brand-line > span {
+  overflow: hidden;
+  margin-top: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .topbar__actions {
@@ -4432,74 +4463,6 @@ select:focus-visible {
   margin: 0;
 }
 
-.electrical-module-admin {
-  display: grid;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid #f0b9bd;
-  border-radius: 18px;
-  background: #fffafa;
-}
-
-.electrical-module-admin > p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.68rem;
-  line-height: 1.5;
-}
-
-.electrical-module-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.electrical-module-list > li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 64px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: var(--surface);
-}
-
-.electrical-module-list > li > div {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.electrical-module-list strong {
-  font-size: 0.73rem;
-}
-
-.electrical-module-list span {
-  color: var(--muted);
-  font-size: 0.62rem;
-  line-height: 1.45;
-}
-
-.electrical-module-toggle {
-  display: grid;
-  flex: 0 0 auto;
-  justify-items: center;
-  gap: 3px;
-  font-size: 0.56rem;
-  font-weight: 800;
-}
-
-.electrical-module-toggle input {
-  width: 36px;
-  height: 20px;
-  margin: 0;
-  accent-color: var(--brand);
-}
-
 .employee-site-module--vde {
   border-color: #f0b9bd;
   background:
@@ -5748,4 +5711,34 @@ select:focus-visible {
     width: 100%;
     justify-items: start;
   }
+}
+
+/* Konto unter "Mehr": vier Angaben und der Weg hinaus. Fuer einen Monteur war
+   diese Ansicht bis auf einen Hinweistext leer. */
+.account-list {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.account-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-list dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.account-list dd {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: right;
 }

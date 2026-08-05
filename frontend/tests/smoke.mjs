@@ -51,11 +51,45 @@ assert.match(html, /id="week-current" class="week-navigation__today"/);
 // Die Plantafel heisst auf jedem Geraet gleich. "Desktop-Plantafel" stand auch
 // dann ueber der Ansicht, wenn sie auf dem Handy geoeffnet wurde.
 assert.doesNotMatch(html, /Desktop-Plantafel/);
-// Die Bereiche der App lassen sich firmenweit abschalten. Der Schalter war
-// frueher auf die Elektro-Spezialmodule beschraenkt und wies jeden Versuch ab.
-assert.match(html, /<h3 id="electrical-module-admin-title">Bereiche der App<\/h3>/);
+// Ueber die Bereiche der App entscheidet allein die Plattformverwaltung. Die
+// Firma hatte einen eigenen Schalter: sie konnte sich damit einen Bereich
+// abschalten, den sie ohne fremde Hilfe nicht zurueckholen konnte, und der
+// verkaufte Umfang lag in der Hand des Kunden.
+assert.doesNotMatch(html, /electrical-module/);
+assert.doesNotMatch(html, /Bereiche der App/);
 assert.doesNotMatch(html, /Elektro-Spezialmodule/);
+assert.doesNotMatch(app, /admin\/modules/);
+assert.doesNotMatch(app, /canAdministerModules/);
 assert.match(html, /id="absence-area"/);
+
+// Die Bueroverwaltung gehoert unter "Mehr". Sie lag im gemeinsamen
+// Verwaltungsbereich ohne eigene Zuordnung und stand deshalb in allen drei
+// Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten dieselben drei
+// Karten - Jahreskonten, Feiertagskalender und die Regel fuer Zeitkorrekturen.
+assert.match(app, /function isOfficeAdminPane\(\)/);
+assert.match(app, /const visible = canPlan\(\) && !isProjectScopedSession\(\) && isOfficeAdminPane\(\);/);
+assert.match(app, /elements\.timeCorrectionPolicyAdmin\.hidden = !canPlan\(\) \|\| !isOfficeAdminPane\(\);/);
+
+// Eine Schaltflaeche, die nichts ausloest, ist keine: bei abgeschlossenem
+// Arbeitstag stand auf ihr derselbe Satz wie in der Ueberschrift darueber.
+assert.match(app, /elements\.primaryAction\.hidden = disabled;/);
+
+// Ueber den erfassten Arbeitstagen stand fest "Diese Woche", auch wenn eine
+// frueher liegende Woche geblaettert war.
+assert.match(app, /elements\.weekDaysTitle\.textContent = weekStart === currentWeekStart\(today\)/);
+
+// Ohne gueltiges Datum darf nirgends "Invalid Date" stehen. In der
+// Wochenansicht stand es ueber dem naechsten Einsatz: die Schnittstelle
+// liefert die Einsaetze je Tag und traegt kein workDate in den Einsatz ein.
+assert.match(app, /if \(Number\.isNaN\(wert\.valueOf\(\)\)\) return "";/);
+assert.doesNotMatch(app, /assignment\.workDate >= localDateKey\(\)/);
+
+// Unter "Mehr" stand fuer einen Monteur nur ein Hinweistext. Personalnummer,
+// Firma und der Weg hinaus waren nirgends zu finden.
+assert.match(html, /id="account-card"/);
+assert.match(html, /id="account-personnel-number"/);
+assert.match(html, /id="account-logout"/);
+assert.match(app, /function renderAccountCard\(\)/);
 assert.match(app, /function moduleEnabled\(key\)/);
 assert.match(app, /function applyModuleVisibility\(\)/);
 // Die Bereiche tragen die Schluessel des Plattformkatalogs, nicht eigene.
@@ -343,7 +377,14 @@ assert.match(html, /id="company-number"/);
 assert.doesNotMatch(html, /id="company-number"[\s\S]*?value="F-\d+"/);
 assert.match(html, /id="company-number-hint"/);
 assert.doesNotMatch(app, /elements\.companyNumberField\.hidden = true;/);
-assert.match(app, /elements\.companyNumberField\.hidden = demoMode;/);
+// Nach der ersten Anmeldung steht die Firma fest und das Feld verschwindet.
+// Ein Monteur soll seine Firmennummer nicht bei jeder Anmeldung wiedersehen.
+assert.match(app, /function applyCompanyFieldVisibility\(\)/);
+assert.match(app, /elements\.companyNumberField\.hidden = demoMode \|\| bekannt;/);
+// Ohne Weg zurueck kaeme ein einmal falsch eingerichtetes Geraet nie wieder
+// zu einer anderen Firma.
+assert.match(html, /id="change-company"/);
+assert.match(app, /elements\.changeCompany\.addEventListener\("click"/);
 // Ohne Nummer geht die Anmeldung gar nicht erst zum Server.
 assert.match(app, /Bitte die Firmennummer eingeben\./);
 // Die zuletzt benutzte Firma bleibt auf dem Geraet, sonst muesste sie jeder
@@ -366,10 +407,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.2/);
-assert.match(html, /app\.js\?v=0\.42\.2/);
-assert.match(html, /version\.js\?v=0\.42\.2/);
-assert.match(html, /id="electrical-module-admin"/);
+assert.match(html, /styles\.css\?v=0\.42\.3/);
+assert.match(html, /app\.js\?v=0\.42\.3/);
+assert.match(html, /version\.js\?v=0\.42\.3/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -387,7 +427,9 @@ assert.match(html, /id="timesheet-export-form"/);
 assert.match(html, /id="employee-timesheet-export-pdf-submit"/);
 assert.match(html, /id="timesheet-export-pdf-submit"/);
 assert.match(html, /Stundenzettel exportieren/);
-assert.match(html, /<summary>Baustellen<\/summary>/);
+// Der Aufklapper zeigt die Struktur aus Kunde, Projekt und Baustelle. Er hiess
+// "Baustellen" wie der Abschnitt darueber und wie die Navigation darunter.
+assert.match(html, /<summary>Kunden, Projekte und Baustellen<\/summary>/);
 assert.match(html, /id="site-customer"/);
 assert.match(html, /id="project-panel" class="admin-panel" hidden/);
 assert.match(html, /id="mobile-report-card"/);
@@ -659,16 +701,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.2"'));
-assert.ok(worker.includes('"./app.js?v=0.42.2"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.2"'));
-assert.ok(worker.includes('"./version.js?v=0.42.2"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.3"'));
+assert.ok(worker.includes('"./app.js?v=0.42.3"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.3"'));
+assert.ok(worker.includes('"./version.js?v=0.42.3"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.2"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.2";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.3"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.3";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -696,7 +738,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.2$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.3$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -704,11 +746,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.2"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.2"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.3"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.3"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.2"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.2"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.3"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.3"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -738,7 +780,6 @@ assert.match(styles, /\.time-account-table/);
 assert.match(styles, /\.time-account-admin-item/);
 assert.match(styles, /\.holiday-calendar-form/);
 assert.match(styles, /\.holiday-closure-list/);
-assert.match(styles, /\.electrical-module-admin/);
 assert.match(vdeHtml, /lang="de"/);
 assert.match(vdeHtml, /id="inspection-form"/);
 assert.match(vdeHtml, /id="distribution-list"/);
@@ -746,8 +787,8 @@ assert.match(vdeHtml, /id="signature-pad"/);
 assert.match(vdeHtml, /RCD-Auslösezeit und -strom werden am jeweiligen Stromkreis/);
 assert.match(vdeHtml, /V15-Bestand importieren/);
 assert.match(vdeHtml, /id="legacy-local-import"/);
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.2/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.2/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.3/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.3/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

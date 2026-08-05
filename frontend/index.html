@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.2">
-    <script type="module" src="./app.js?v=0.42.2"></script>
-    <script src="./version.js?v=0.42.2" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.3">
+    <script type="module" src="./app.js?v=0.42.3"></script>
+    <script src="./version.js?v=0.42.3" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -32,6 +32,7 @@
               <span>Firma</span>
               <strong id="login-company-name">Schaaf Elektro GmbH</strong>
             </div>
+            <button id="change-company" class="company-context__change" type="button" hidden>Wechseln</button>
           </div>
 
           <div id="mode-note" class="preview-note" role="note" hidden>
@@ -129,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.2</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.3</p>
         </div>
       </section>
 
@@ -1039,26 +1040,8 @@
               </div>
             </section>
 
-            <section id="electrical-module-admin" class="electrical-module-admin" aria-labelledby="electrical-module-admin-title" hidden>
-              <div class="site-management-panel__heading">
-                <div>
-                  <p class="eyebrow">Firmenweite Freigabe</p>
-                  <h3 id="electrical-module-admin-title">Bereiche der App</h3>
-                </div>
-              </div>
-              <p>
-                Abgeschaltete Bereiche verschwinden aus der App und werden auch über
-                die Schnittstelle abgewiesen. Vorhandene Daten bleiben erhalten und
-                sind nach dem Wiedereinschalten unverändert da. Zeiterfassung,
-                Mitarbeiter und Baustellen gehören zum Kern und lassen sich nicht
-                abschalten.
-              </p>
-              <ul id="electrical-module-list" class="electrical-module-list"></ul>
-              <p id="electrical-module-message" class="form-message" aria-live="polite"></p>
-            </section>
-
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
-              <summary>Baustellen</summary>
+              <summary>Kunden, Projekte und Baustellen</summary>
               <div class="hierarchy-toolbar">
                 <label for="hierarchy-search">
                   <span>Suchen</span>
@@ -2358,6 +2341,22 @@
               <p class="time-correction-note">Nach dem Scannen prüft Schäfchen zuerst die Anmeldung und anschließend die Berechtigung für diese Baustelle.</p>
             </section>
           </dialog>
+
+          <section id="account-card" class="section account-card" data-dashboard-pane="more" aria-labelledby="account-title" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Dein Zugang</p>
+                <h2 id="account-title">Konto</h2>
+              </div>
+            </div>
+            <dl class="account-list">
+              <div><dt>Name</dt><dd id="account-name">–</dd></div>
+              <div><dt>Personalnummer</dt><dd id="account-personnel-number">–</dd></div>
+              <div><dt>Firma</dt><dd id="account-company">–</dd></div>
+              <div><dt>Rolle</dt><dd id="account-roles">–</dd></div>
+            </dl>
+            <button id="account-logout" class="button button--secondary" type="button">Abmelden</button>
+          </section>
 
           <aside class="info-card" data-dashboard-pane="more" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>

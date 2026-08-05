@@ -47,7 +47,6 @@ import {
   validateAssignmentUpdate,
   validateConstructionSite,
   validateConstructionSiteUpdate,
-  validateCompanyModuleUpdate,
   validateCustomer,
   validateCustomerUpdate,
   validateDocumentStatusUpdate,
@@ -166,7 +165,7 @@ function json(response, status, body, headers = {}) {
 // Fassung dieses Servers. Sie stand frueher als Zeichenkette mitten in der
 // Fehleraufzeichnung und wurde beim Ausliefern regelmaessig vergessen; ein
 // Fehlerbericht nannte dann eine Fassung, die es laengst nicht mehr gab.
-export const APPLICATION_VERSION = "0.42.2";
+export const APPLICATION_VERSION = "0.42.3";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1598,18 +1597,6 @@ async function requireAbsenceManagementApprover(client, context) {
   return roles;
 }
 
-async function requireModuleAdministrator(client, context) {
-  const roles = await activeRoleKeys(client, context);
-  if (![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
-    throw new InputError(
-      "Module dürfen nur durch Administration oder Geschäftsführung freigeschaltet werden.",
-      403,
-      "module_administration_forbidden"
-    );
-  }
-  return roles;
-}
-
 // Regel der Firma für eigene Zeitkorrekturen vor der Freigabe des Arbeitstags.
 // Die Bearbeitung fremder Zeiten durch das Büro bleibt davon unberührt.
 async function companyTimeCorrectionPolicy(client, context) {
@@ -1815,11 +1802,6 @@ async function requireEnabledModule(client, context, moduleKey) {
   );
 }
 
-async function getCompanyModules(client, context) {
-  await requireModuleAdministrator(client, context);
-  return loadCompanyModules(client, context);
-}
-
 async function getPlatformAnnouncements(client, context) {
   const result = await client.query(
     `SELECT announcement.id, announcement.title, announcement.message,
@@ -1861,46 +1843,6 @@ async function markPlatformAnnouncementRead(client, context, announcementId) {
     [announcementId, context.companyId, context.userId]
   );
   return { id: announcementId, read: true };
-}
-
-async function updateCompanyModule(client, context, input) {
-  await requireModuleAdministrator(client, context);
-  const vorher = (await loadCompanyModules(client, context))
-    .find((entry) => entry.key === input.moduleKey);
-  if (!vorher) {
-    throw new InputError("Dieser Bereich ist nicht zum Abschalten vorgesehen.", 404, "module_not_found");
-  }
-
-  // Einschalten kann die Firma nur, was die Plattform ihr freigegeben hat.
-  if (input.enabled && !vorher.available) {
-    throw new InputError(
-      "Dieser Bereich ist für die Firma nicht freigegeben. Die Plattformverwaltung stellt ihn auf Anfrage bereit.",
-      403,
-      "module_not_entitled"
-    );
-  }
-  if (vorher.rowVersion !== input.rowVersion) {
-    throw new InputError(
-      "Der Bereich wurde zwischenzeitlich geändert. Bitte die Ansicht neu laden.",
-      409,
-      "module_row_version_conflict"
-    );
-  }
-  if (vorher.enabled === input.enabled) return vorher;
-
-  // Ein fehlender Eintrag bedeutet eingeschaltet. Beim ersten Abschalten
-  // entsteht die Zeile, danach wird sie fortgeschrieben. Die Historie fuehrt
-  // der Trigger der Tabelle.
-  await client.query(
-    `INSERT INTO company_modules (company_id, module_key, is_enabled, changed_by_user_id)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (company_id, module_key) DO UPDATE
-       SET is_enabled = EXCLUDED.is_enabled,
-           changed_by_user_id = EXCLUDED.changed_by_user_id`,
-    [context.companyId, input.moduleKey, input.enabled, context.userId]
-  );
-  return (await loadCompanyModules(client, context))
-    .find((entry) => entry.key === input.moduleKey);
 }
 
 function vdeInspectionDto(row, includeProtocol = false) {
@@ -4606,7 +4548,8 @@ async function adminOverview(client, context, date) {
     siteMaterials: onlyVisibleSiteRecords(materialResult.rows, siteMaterialDto),
     siteNotes: onlyVisibleSiteRecords(noteResult.rows, siteNoteDto),
     siteReports: onlyVisibleSiteRecords(reportResult.rows, siteReportDto),
-    modules,
+    // Der Modulstand steht in der Sitzung. Er stand zusaetzlich hier und war
+    // damit eine zweite Quelle fuer dieselbe Angabe.
     vdeInspections: onlyVisibleSiteRecords(
       vdeInspectionResult.rows,
       (inspection) => vdeInspectionDto(inspection)
@@ -10490,29 +10433,6 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => reviewAbsenceRequest(client, context, absenceId, input)
         );
         return json(response, 200, { absence });
-      }
-
-      if (request.method === "GET" && url.pathname === "/api/v1/admin/modules") {
-        const modules = await withReadySession(
-          pool,
-          tokenHash,
-          getCompanyModules
-        );
-        return json(response, 200, { modules });
-      }
-
-      const adminModuleMatch = /^\/api\/v1\/admin\/modules\/([^/]+)$/.exec(url.pathname);
-      if (request.method === "PATCH" && adminModuleMatch) {
-        const input = validateCompanyModuleUpdate(
-          adminModuleMatch[1],
-          await readJson(request)
-        );
-        const module = await withReadySession(
-          pool,
-          tokenHash,
-          (client, context) => updateCompanyModule(client, context, input)
-        );
-        return json(response, 200, { module });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/site-notes") {

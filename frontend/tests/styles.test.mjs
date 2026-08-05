@@ -75,6 +75,33 @@ test("Keine Anpassung fuer schmale Geraete wird von einer spaeteren Grundregel a
   assert.deepEqual([...new Set(befunde)], []);
 });
 
+test("Firmenzeichen und Firmenname stehen im Kopf nebeneinander", async () => {
+  // `.company-brand-line` legt display: flex fest, `.brand--small span` weiter
+  // unten display: block. Die zweite Regel ist genauer und gewann: das
+  // Firmenzeichen stand allein in einer eigenen Zeile ueber dem Firmennamen.
+  // Dieselbe Falle wie bei den Medienabfragen, nur ohne Medienabfrage.
+  const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
+  const regeln = leseRegeln(css);
+  const zeile = regeln.filter((regel) =>
+    regel.umgebung === null
+    && regel.selektor.includes("company-brand-line")
+    && !regel.selektor.includes(">")
+    && regel.eigenschaften.has("display"));
+  assert.ok(zeile.length > 0, "Keine Regel legt die Darstellung der Firmenzeile fest");
+  assert.equal(zeile.at(-1).eigenschaften.get("display"), "flex");
+
+  const stoerer = regeln.findLast((regel) =>
+    regel.umgebung === null
+    && regel.selektor === ".brand--small strong, .brand--small span"
+    && regel.eigenschaften.get("display") === "block");
+  if (stoerer) {
+    assert.ok(
+      zeile.at(-1).position > stoerer.position,
+      "Die Firmenzeile muss nach der allgemeinen Regel fuer .brand--small span stehen"
+    );
+  }
+});
+
 test("Bedienelemente sind gross genug zum Antippen", async () => {
   const css = await readFile(resolve(frontendDirectory, "styles.css"), "utf8");
   const regeln = leseRegeln(css);

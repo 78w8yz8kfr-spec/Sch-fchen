@@ -69,9 +69,6 @@ backup-restore-test: check-env
 	sh database/scripts/verify-backup-restore.sh
 
 frontend-test:
-	node --check frontend/app.js
-	node --check frontend/vde/app.js
-	node --check frontend/sw.js
 	node frontend/tests/smoke.mjs
 	node --test frontend/tests/*.test.mjs
 

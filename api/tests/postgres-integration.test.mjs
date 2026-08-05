@@ -501,62 +501,44 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     });
     assert.equal(directorPasswordChange.status, 200);
 
-    const initialModulesResponse = await fetch(`${baseUrl}/api/v1/admin/modules`, {
-      headers: { Cookie: cookie }
-    });
-    assert.equal(initialModulesResponse.status, 200);
-    const initialModules = (await initialModulesResponse.json()).modules;
+    // Eine Firma schaltet ihre Bereiche nicht selbst. Was sie nutzen darf,
+    // gehoert zum verkauften Umfang; darueber entscheidet allein die
+    // Plattformverwaltung. Der frueher vorhandene Weg der Firma ist entfallen.
+    const moduleView = async (sessionCookie) => {
+      const antwort = await fetch(`${baseUrl}/api/v1/session`, {
+        headers: { Cookie: sessionCookie }
+      });
+      assert.equal(antwort.status, 200);
+      return (await antwort.json()).session.modules;
+    };
+
+    for (const [methode, pfad] of [
+      ["GET", "/api/v1/admin/modules"],
+      ["PATCH", "/api/v1/admin/modules/vde"],
+      ["PATCH", "/api/v1/admin/modules/time_tracking"]
+    ]) {
+      const versuch = await fetch(`${baseUrl}${pfad}`, {
+        method: methode,
+        headers: { "Content-Type": "application/json", Cookie: directorCookie },
+        body: methode === "GET" ? undefined : JSON.stringify({ enabled: false, rowVersion: 0 })
+      });
+      assert.equal(versuch.status, 404, `${methode} ${pfad} antwortet noch`);
+    }
+
+    const initialModules = await moduleView(cookie);
     // Die Bereiche stammen aus dem Modulkatalog der Plattform. Der Kern und
     // Bereiche, die es noch nicht gibt, stehen nicht darin.
     assert.deepEqual(
-      initialModules.map((module) => module.key).sort(),
+      Object.keys(initialModules).sort(),
       ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
     );
-    assert.ok(!initialModules.some((module) => module.key === "time_tracking"));
-    assert.ok(!initialModules.some((module) => module.key === "scheduling"));
-    assert.ok(!initialModules.some((module) => module.key === "dguv"));
-    // Regulaere Bereiche gehoeren zum Umfang und sind ohne Zutun eingeschaltet.
+    // Regulaere Bereiche gehoeren zum Umfang und stehen ohne Zutun offen.
     // Das Spezialmodul VDE braucht zuerst die Freigabe der Plattform.
-    assert.equal(initialModules.find((module) => module.key === "vde").enabled, false);
-    assert.equal(initialModules.find((module) => module.key === "vde").available, false);
+    assert.equal(initialModules.vde, false);
     assert.ok(
-      initialModules
-        .filter((module) => module.key !== "vde")
-        .every((module) => module.enabled && module.available)
-    );
-
-    // Der Kern ist kein abschaltbarer Bereich.
-    const forbiddenCoreResponse = await fetch(
-      `${baseUrl}/api/v1/admin/modules/time_tracking`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: cookie },
-        body: JSON.stringify({ enabled: false, rowVersion: 0 })
-      }
-    );
-    // Der Kern steht gar nicht erst unter den abschaltbaren Bereichen.
-    assert.equal(forbiddenCoreResponse.status, 404, await forbiddenCoreResponse.clone().text());
-    assert.equal((await forbiddenCoreResponse.json()).error.code, "module_not_found");
-
-    const forbiddenModuleAdministration = await fetch(`${baseUrl}/api/v1/admin/modules`, {
-      headers: { Cookie: plannerCookie }
-    });
-    assert.equal(forbiddenModuleAdministration.status, 403);
-    assert.equal(
-      (await forbiddenModuleAdministration.json()).error.code,
-      "module_administration_forbidden"
-    );
-
-    // Ohne Freigabe der Plattform laesst sich VDE nicht einschalten.
-    const vdeActivationResponse = await fetch(`${baseUrl}/api/v1/admin/modules/vde`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Cookie: directorCookie },
-      body: JSON.stringify({ enabled: true, rowVersion: 0 })
-    });
-    assert.equal(vdeActivationResponse.status, 403, await vdeActivationResponse.clone().text());
-    assert.equal(
-      (await vdeActivationResponse.json()).error.code,
-      "module_not_entitled"
+      Object.entries(initialModules)
+        .filter(([key]) => key !== "vde")
+        .every(([, enabled]) => enabled === true)
     );
 
     const platformVdeActivation = await fetch(
@@ -577,14 +559,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     activatedVde = (await platformVdeActivation.json()).entitlement;
     assert.equal(activatedVde.entitlementStatus, "permanent");
 
-    const activatedModulesResponse = await fetch(`${baseUrl}/api/v1/admin/modules`, {
-      headers: { Cookie: cookie }
-    });
-    assert.equal(activatedModulesResponse.status, 200);
-    assert.equal(
-      (await activatedModulesResponse.json()).modules.find((module) => module.key === "vde").enabled,
-      true
-    );
+    assert.equal((await moduleView(cookie)).vde, true);
 
     const directorOverview = await fetch(
       `${baseUrl}/api/v1/admin/overview?date=${assignmentDate}`,
@@ -1983,9 +1958,9 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.ok(structureOverview.siteNotes.some((item) => item.id === adminNote.id && item.isImportant));
     assert.ok(structureOverview.siteNotes.some((item) => item.id === mobileNote.id));
     assert.ok(structureOverview.siteReports.some((item) => item.id === siteReport.id && item.sourceMode === "photo"));
-    assert.ok(structureOverview.modules.some(
-      (module) => module.key === "vde" && module.enabled
-    ));
+    // Der Modulstand steht allein in der Sitzung, nicht zusaetzlich in der
+    // Verwaltungsuebersicht.
+    assert.equal(structureOverview.modules, undefined);
     assert.ok(structureOverview.vdeInspections.some(
       (inspection) => (
         inspection.id === completedVdeInspection.id
@@ -4449,39 +4424,43 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     await setPolicy("review_required");
   });
 
-  await t.test("Firmeneigene Schalter für abschaltbare Bereiche", async () => {
-    const leseModule = async () => {
-      const response = await fetch(`${baseUrl}/api/v1/admin/modules`, { headers: { Cookie: cookie } });
-      assert.equal(response.status, 200, await response.clone().text());
-      return (await response.json()).modules;
+  await t.test("Nur die Plattform gibt Bereiche frei", async () => {
+    // Frueher konnte die Firma ihre Bereiche selbst abschalten. Das ist
+    // entfallen: der Umfang gehoert zum Verkauf, und ein selbst abgeschalteter
+    // Bereich liess sich ohne fremde Hilfe nicht zurueckholen.
+    const modulstand = async () => {
+      const antwort = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });
+      assert.equal(antwort.status, 200, await antwort.clone().text());
+      return (await antwort.json()).session.modules;
     };
 
-    const module = await leseModule();
-    const schluessel = module.map((eintrag) => eintrag.key).sort();
-    assert.deepEqual(
-      schluessel,
-      ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
-    );
-    // Der Kern taucht bewusst nicht als abschaltbarer Bereich auf.
-    assert.ok(!schluessel.includes("time_tracking"));
-    // Regulaere Bereiche gehoeren zum Umfang und sind ohne Zutun eingeschaltet.
-    assert.equal(module.find((eintrag) => eintrag.key === "absences").enabled, true);
-
-    const schalte = async (key, enabled, rowVersion, erwarteterStatus = 200) => {
-      const response = await fetch(`${baseUrl}/api/v1/admin/modules/${key}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: cookie },
-        body: JSON.stringify({ enabled, rowVersion })
-      });
-      assert.equal(response.status, erwarteterStatus, await response.clone().text());
-      return response.json();
+    const schalteUeberPlattform = async (key, status) => {
+      const antwort = await fetch(
+        `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/${key}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Cookie: platformCookie },
+          body: JSON.stringify({
+            status,
+            includedInPlan: status !== "inactive",
+            separatelyBilled: false,
+            featureScope: {},
+            reason: `${key} im Integrationstest auf ${status} setzen`
+          })
+        }
+      );
+      assert.equal(antwort.status, 200, await antwort.clone().text());
+      return (await antwort.json()).entitlement;
     };
 
-    const vorher = (await leseModule()).find((eintrag) => eintrag.key === "absences");
-    const abgeschaltet = await schalte("absences", false, vorher.rowVersion);
-    assert.equal(abgeschaltet.module.enabled, false);
+    const vorher = await modulstand();
+    assert.equal(vorher.absences, true);
 
-    // Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
+    // Die Plattform nimmt der Firma die Urlaubsverwaltung.
+    await schalteUeberPlattform("absences", "inactive");
+    assert.equal((await modulstand()).absences, false);
+
+    // Ein gesperrter Bereich wird nicht nur ausgeblendet, sondern abgewiesen.
     const gesperrt = await fetch(`${baseUrl}/api/v1/absences`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
@@ -4495,21 +4474,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(gesperrt.status, 409, await gesperrt.clone().text());
     assert.equal((await gesperrt.json()).error.code, "module_disabled");
 
-    // Der Modulstand steht auch in der Sitzung, damit die App ihn ohne die
-    // Verwaltungsansicht kennt.
-    const sitzung = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });
-    assert.equal(sitzung.status, 200);
-    assert.equal((await sitzung.json()).session.modules.absences, false);
+    // Die Firma selbst hat keinen Weg mehr, das zurueckzunehmen.
+    for (const [methode, pfad] of [
+      ["GET", "/api/v1/admin/modules"],
+      ["PATCH", "/api/v1/admin/modules/absences"]
+    ]) {
+      const versuch = await fetch(`${baseUrl}${pfad}`, {
+        method: methode,
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: methode === "GET" ? undefined : JSON.stringify({ enabled: true, rowVersion: 0 })
+      });
+      assert.equal(versuch.status, 404, `${methode} ${pfad} antwortet noch`);
+    }
 
-    // Eine veraltete Fassung wird abgewiesen, damit zwei Bueros sich nicht
-    // gegenseitig ueberschreiben.
-    await schalte("absences", true, vorher.rowVersion, 409);
-
-    const zwischen = (await leseModule()).find((eintrag) => eintrag.key === "absences");
-    const wieder = await schalte("absences", true, zwischen.rowVersion);
-    assert.equal(wieder.module.enabled, true);
-
-    // Nach dem Wiedereinschalten funktioniert der Bereich unveraendert.
+    // Die Plattform gibt ihn wieder frei, danach arbeitet er unveraendert.
+    await schalteUeberPlattform("absences", "permanent");
+    assert.equal((await modulstand()).absences, true);
     const erlaubt = await fetch(`${baseUrl}/api/v1/absences`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
@@ -4517,21 +4497,16 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
         absenceType: "vacation",
         startDate: "2027-03-05",
         endDate: "2027-03-06",
-        note: "Urlaub nach dem Wiedereinschalten"
+        note: "Urlaub nach der erneuten Freigabe"
       })
     });
     assert.equal(erlaubt.status, 201, await erlaubt.clone().text());
 
-    // Ein unbekannter Bereich wird abgewiesen.
-    // Der Kern und die Einsatzplanung stehen nicht unter den abschaltbaren
-    // Bereichen: sie tragen die Zeitberechnung.
+    // Der Kern und die Einsatzplanung stehen nicht unter den Bereichen: sie
+    // tragen die Zeitberechnung und lassen sich nicht wegnehmen.
+    const stand = await modulstand();
     for (const fest of ["time_tracking", "scheduling"]) {
-      const unbekannt = await fetch(`${baseUrl}/api/v1/admin/modules/${fest}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: cookie },
-        body: JSON.stringify({ enabled: false, rowVersion: 0 })
-      });
-      assert.equal(unbekannt.status, 404, await unbekannt.clone().text());
+      assert.equal(stand[fest], undefined, `${fest} darf kein abschaltbarer Bereich sein`);
     }
   });
 

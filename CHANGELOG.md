@@ -4,6 +4,45 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Die Bereiche der App gehören der Plattformverwaltung. Eine Firma konnte sie
+  bisher selbst abschalten — der verkaufte Umfang lag damit in der Hand des
+  Kunden, und ein abgeschalteter Bereich ließ sich ohne fremde Hilfe nicht
+  zurückholen. Der Schalter ist aus der Firmenansicht verschwunden, der
+  Schreibweg (`PATCH /api/v1/admin/modules/:key`) ist entfallen, und über jeden
+  Bereich außerhalb des Kerns entscheidet jetzt die Freigabe der Plattform.
+  Migration 051 trägt allen bestehenden Firmen genau die Bereiche ein, die sie
+  heute sehen; neue Firmen bekommen sie beim Anlegen über einen Trigger. Der
+  Verlauf der früheren firmeneigenen Schalter bleibt erhalten, wird aber nicht
+  mehr ausgewertet und nicht mehr beschrieben.
+- Die Firmennummer wird nur noch bei der ersten Anmeldung abgefragt. Danach
+  steht die Firma fest und das Feld verschwindet; ein „Wechseln“ neben dem
+  Firmennamen führt zurück, damit ein einmal falsch eingerichtetes Gerät nicht
+  festsitzt.
+- Fehler behoben: die Büroverwaltung — Jahreskonten, Feiertagskalender und die
+  Regel für Zeitkorrekturen — stand in **allen drei** Verwaltungsansichten.
+  Einsätze, Baustellen und Mehr zeigten dieselben Karten, weil sie im
+  gemeinsamen Verwaltungsbereich lagen und keine eigene Zuordnung hatten.
+- Fehler behoben: in der Wochenansicht stand über dem nächsten Einsatz
+  „Invalid Date“. Die Schnittstelle liefert die Einsätze je Tag und trägt kein
+  Datum in den einzelnen Einsatz ein. `shortDate` gibt jetzt lieber nichts aus
+  als einen kaputten Text.
+- Fehler behoben: über den erfassten Arbeitstagen stand fest „Diese Woche“,
+  auch wenn eine früher liegende Woche geblättert war.
+- Fehler behoben: im Kopf der App stand das Firmenzeichen allein in einer
+  eigenen Zeile über dem Firmennamen. `.brand--small span` setzte weiter unten
+  `display: block` und stach die Regel für die Firmenzeile aus — dieselbe Falle
+  wie bei den Medienabfragen, nur ohne Medienabfrage. Ein Test hält sie fest.
+- Fehler behoben: bei abgeschlossenem Arbeitstag stand auf der großen
+  Schaltfläche Wort für Wort derselbe Satz wie in der Überschrift darüber. Eine
+  Schaltfläche, die nichts auslöst, wird jetzt gar nicht erst gezeigt.
+- Unter „Mehr“ stand für einen Monteur nur ein Hinweistext. Dort steht jetzt
+  sein Konto: Name, Personalnummer, Firma, Rolle — und „Abmelden“.
+- Jede ausgelieferte Javascript-Datei wird als Modul auf Syntax geprüft.
+  `node --check datei.js` prüft ohne `package.json` **nicht** als Modul: eine
+  überzählige Klammer mitten in `app.js` kam so durch die Prüfung, die App
+  startete nicht mehr, und alle Tests waren trotzdem grün.
+- Fassung 0.42.3, Speicher `schaefchen-online-v45`, Migration 052.
+
 - Fehler behoben: während einer Veröffentlichung ließ sich die App auf einem
   eingerichteten Gerät gar nicht mehr öffnen. Die Seite selbst wird immer frisch
   geholt; direkt nach einer Veröffentlichung verweist sie auf Dateien mit neuer
