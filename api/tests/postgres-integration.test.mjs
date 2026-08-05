@@ -530,14 +530,19 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     // Bereiche, die es noch nicht gibt, stehen nicht darin.
     assert.deepEqual(
       Object.keys(initialModules).sort(),
-      ["absences", "assembly_reports", "documents", "materials", "site_daily_reports", "site_qr", "vde"]
+      [
+        "absences", "apprentice_reports", "assembly_reports", "documents",
+        "materials", "site_daily_reports", "site_qr", "vde"
+      ]
     );
-    // Regulaere Bereiche gehoeren zum Umfang und stehen ohne Zutun offen.
-    // Das Spezialmodul VDE braucht zuerst die Freigabe der Plattform.
+    // Der Standardumfang steht ohne Zutun offen. Das Spezialmodul VDE und das
+    // Berichtsheft gehoeren nicht dazu: beide gibt die Plattform je Firma frei,
+    // VDE als Spezialmodul, das Berichtsheft als eigener verkaufter Bereich.
     assert.equal(initialModules.vde, false);
+    assert.equal(initialModules.apprentice_reports, false);
     assert.ok(
       Object.entries(initialModules)
-        .filter(([key]) => key !== "vde")
+        .filter(([key]) => !["vde", "apprentice_reports"].includes(key))
         .every(([, enabled]) => enabled === true)
     );
 

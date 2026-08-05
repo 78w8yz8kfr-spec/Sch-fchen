@@ -240,6 +240,10 @@ export function validateEmployeeUpdate(body) {
     email: optionalText(body.email, "E-Mail", 254),
     phone: optionalText(body.phone, "Telefon", 50),
     role,
+    // Berichtsheft: wer eines fuehrt und wer es unterschreibt. Beide Angaben
+    // gehoeren an den Mitarbeiter, nicht an eine eigene Verwaltung daneben.
+    isApprentice: boolean(body.isApprentice ?? false, "Auszubildender"),
+    trainerUserId: optionalUuid(body.trainerUserId, "Ausbilder"),
     rowVersion
   };
 }
@@ -1954,4 +1958,50 @@ export function validateTimeCorrectionPolicy(body) {
     throw new InputError("Die Korrekturregel ist ungültig.");
   }
   return { policy, reason: text(body.reason, "Begründung", 3, 500) };
+}
+
+// Ein Wochenbericht des Berichtshefts. Die Woche beginnt am Montag: die
+// Zeiterfassung rechnet ebenso, und zwei verschiedene Wochenschnitte in einer
+// App waeren fuer niemanden nachvollziehbar.
+export function validateApprenticeWeek(value) {
+  const weekStart = validateWorkDate(value);
+  const tag = new Date(`${weekStart}T12:00:00Z`).getUTCDay();
+  if (tag !== 1) {
+    throw new InputError("Ein Wochenbericht beginnt am Montag.");
+  }
+  return weekStart;
+}
+
+export function validateApprenticeReport(body) {
+  rejectTenantFields(body);
+  return {
+    companySummary: optionalText(body.companySummary, "Tätigkeiten im Betrieb", 4000) || "",
+    schoolSummary: optionalText(body.schoolSummary, "Berufsschule", 4000),
+    absenceNote: optionalText(body.absenceNote, "Urlaub und Krankheit", 1000)
+  };
+}
+
+// Freigabe oder Rueckgabe, einzeln oder als Sammelfreigabe. Eine Rueckgabe
+// ohne Begruendung waere fuer den Auszubildenden wertlos: er wuesste nicht,
+// was er nachbessern soll.
+export function validateApprenticeReview(body) {
+  rejectTenantFields(body);
+  const decision = text(body.decision, "Entscheidung", 6, 10).toLowerCase();
+  if (!["approved", "returned"].includes(decision)) {
+    throw new InputError("Die Entscheidung ist ungültig.");
+  }
+  const reportIds = Array.isArray(body.reportIds) ? body.reportIds : [];
+  if (reportIds.length < 1 || reportIds.length > 100) {
+    throw new InputError("Es müssen zwischen einem und hundert Berichten entschieden werden.");
+  }
+  for (const id of reportIds) {
+    if (typeof id !== "string" || !UUID.test(id)) {
+      throw new InputError("Eine Berichtskennung ist ungültig.");
+    }
+  }
+  const comment = optionalText(body.comment, "Bemerkung", 1000);
+  if (decision === "returned" && !comment) {
+    throw new InputError("Eine Rückgabe braucht eine Bemerkung.");
+  }
+  return { decision, reportIds: [...new Set(reportIds)], comment };
 }

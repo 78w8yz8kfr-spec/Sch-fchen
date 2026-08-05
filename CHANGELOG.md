@@ -4,6 +4,31 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Berichtsheft für Auszubildende** (erste Ausbaustufe des Azubi-Moduls,
+  V0.60 aus dem Fahrplan). Ohne vollständigen Ausbildungsnachweis lässt die
+  Kammer den Auszubildenden nicht zur Prüfung zu.
+  - Ein Wochenbericht je Auszubildendem: Tätigkeiten im Betrieb, Berufsschule,
+    Urlaub und Krankheit. Die geleistete Arbeitszeit wird **nicht eingetippt**,
+    sondern aus der Zeiterfassung übernommen.
+  - Ablauf: Entwurf → eingereicht → freigegeben, dazwischen die Rückgabe mit
+    Bemerkung. Eine Rückgabe ohne Bemerkung ist nicht möglich; ein
+    freigegebener Nachweis ist unveränderlich, auch für den Ausbilder.
+  - Der **Ausbilder** wird am Mitarbeiter hinterlegt und darf die Berichte
+    seiner Auszubildenden freigeben, auch ohne Planungsrolle — ein Vorarbeiter
+    bildet aus, ohne dadurch Einblick ins Büro zu bekommen. Die Planung sieht
+    alle. Sammelfreigabe für mehrere Wochen auf einmal.
+  - Die Unterschrift ist eine festgehaltene Bestätigung mit Namen und
+    Zeitpunkt. Der Name wird mitgeschrieben: er muss auch dann noch lesbar
+    sein, wenn der Mensch die Firma längst verlassen hat.
+  - Jeder Schritt bleibt in einem unveränderlichen Verlauf stehen, erzeugt vom
+    Datenbank-Trigger — nicht davon abhängig, dass die Schnittstelle daran
+    denkt.
+  - Das Berichtsheft gehört **nicht** zum Standardumfang: die
+    Plattformverwaltung gibt es je Firma frei.
+  - Noch nicht enthalten: PDF-Ausdruck für die Kammer, Erinnerungen an
+    fehlende Wochen, Tagesberichte. Siehe `docs/APPRENTICE_REPORTS.md`.
+- Fassung 0.42.7, Speicher `schaefchen-online-v49`, Migrationen 056 und 057.
+
 - **Fehler behoben: nach einem Benutzerwechsel auf demselben Gerät sah ein
   Monteur die Büroansichten der vorherigen Sitzung** — Stundenzettel-Export für
   alle Mitarbeiter, „Stundenzettel prüfen“, „Offene Korrekturen“ und

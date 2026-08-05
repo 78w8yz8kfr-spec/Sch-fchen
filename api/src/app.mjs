@@ -33,6 +33,15 @@ import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
 import { loadCompanyModules } from "./company-modules.mjs";
+import {
+  APPRENTICE_MODULE_KEY,
+  listApprenticeReviews,
+  listOwnApprenticeReports,
+  loadApprenticeProfile,
+  reviewApprenticeReports,
+  saveOwnApprenticeReport,
+  submitOwnApprenticeReport
+} from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import {
   expectedNextTypes,
@@ -41,6 +50,9 @@ import {
   readJson,
   validateAbsenceDecision,
   validateAbsenceRequest,
+  validateApprenticeReport,
+  validateApprenticeReview,
+  validateApprenticeWeek,
   validateAssignment,
   validateAssignmentBatch,
   validateAssignmentCancellation,
@@ -165,7 +177,7 @@ function json(response, status, body, headers = {}) {
 // Fassung dieses Servers. Sie stand frueher als Zeichenkette mitten in der
 // Fehleraufzeichnung und wurde beim Ausliefern regelmaessig vergessen; ein
 // Fehlerbericht nannte dann eine Fassung, die es laengst nicht mehr gab.
-export const APPLICATION_VERSION = "0.42.6";
+export const APPLICATION_VERSION = "0.42.7";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1687,6 +1699,8 @@ function employeeDto(row) {
     status: row.status || "active",
     archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : null,
     archivedReason: row.archived_reason || null,
+    isApprentice: Boolean(row.is_apprentice),
+    trainerUserId: row.trainer_user_id || null,
     rowVersion: Number(row.row_version || 1)
   };
 }
@@ -1800,6 +1814,71 @@ async function requireEnabledModule(client, context, moduleKey) {
     409,
     "module_disabled"
   );
+}
+
+// Berichtsheft
+//
+// Wer darf entscheiden? Die Planung sieht alle Auszubildenden. Ein Ausbilder
+// ohne Planungsrolle sieht nur seine eigenen: ein Vorarbeiter bildet aus, ohne
+// deshalb Einblick in das ganze Buero zu bekommen.
+async function apprenticeReviewScope(client, context) {
+  const roles = await activeRoleKeys(client, context);
+  const allApprentices = [...roles].some((role) => PLANNER_ROLES.has(role));
+  if (allApprentices) return { allApprentices };
+  const betreut = await client.query(
+    "SELECT 1 FROM users WHERE company_id = $1 AND trainer_user_id = $2 LIMIT 1",
+    [context.companyId, context.userId]
+  );
+  if (betreut.rowCount === 0) {
+    throw new InputError(
+      "Ausbildungsnachweise dürfen nur Ausbilder und die Planung prüfen.",
+      403,
+      "apprentice_review_forbidden"
+    );
+  }
+  return { allApprentices };
+}
+
+async function requireApprentice(client, context) {
+  await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
+  const profile = await loadApprenticeProfile(client, context);
+  if (!profile?.isApprentice) {
+    throw new InputError(
+      "Für dich ist kein Berichtsheft hinterlegt.",
+      403,
+      "not_an_apprentice"
+    );
+  }
+  return profile;
+}
+
+async function getOwnApprenticeReports(client, context, range) {
+  const profile = await requireApprentice(client, context);
+  const reports = await listOwnApprenticeReports(client, context, range);
+  return { profile, reports };
+}
+
+async function putOwnApprenticeReport(client, context, weekStart, input) {
+  await requireApprentice(client, context);
+  return saveOwnApprenticeReport(client, context, weekStart, input, { InputError });
+}
+
+async function submitApprenticeReport(client, context, weekStart) {
+  const profile = await requireApprentice(client, context);
+  return submitOwnApprenticeReport(client, context, weekStart, profile, { InputError });
+}
+
+async function getApprenticeReviews(client, context) {
+  await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
+  const scope = await apprenticeReviewScope(client, context);
+  return listApprenticeReviews(client, context, scope);
+}
+
+async function decideApprenticeReports(client, context, input) {
+  await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
+  const scope = await apprenticeReviewScope(client, context);
+  const reviewer = await loadApprenticeProfile(client, context);
+  return reviewApprenticeReports(client, context, input, reviewer, scope, { InputError });
 }
 
 async function getPlatformAnnouncements(client, context) {
@@ -4063,6 +4142,7 @@ async function adminOverview(client, context, date) {
               account.email, account.phone,
               account.must_change_password, account.status, account.archived_at,
               account.archived_reason, account.row_version,
+              account.is_apprentice, account.trainer_user_id,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
                   FILTER (WHERE role.id IS NOT NULL),
@@ -6406,6 +6486,7 @@ async function getEmployeeRecord(client, context, employeeId) {
             account.email, account.phone,
             account.must_change_password, account.status, account.archived_at,
             account.archived_reason, account.row_version,
+            account.is_apprentice, account.trainer_user_id,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
                 FILTER (WHERE role.id IS NOT NULL),
@@ -6589,10 +6670,27 @@ async function updateEmployee(client, context, employeeId, input) {
   );
   if (roleResult.rowCount !== 1) throw new InputError("Die gewählte Rolle ist nicht verfügbar.");
 
+  // Ein Ausbilder muss zur selben Firma gehoeren und darf nicht der
+  // Auszubildende selbst sein. Die Datenbank verlangt beides ohnehin; hier
+  // entsteht daraus eine verstaendliche Meldung statt eines Fremdschluessels.
+  if (input.trainerUserId) {
+    if (input.trainerUserId === employeeId) {
+      throw new InputError("Niemand bildet sich selbst aus.", 400, "trainer_is_self");
+    }
+    const trainer = await client.query(
+      "SELECT 1 FROM users WHERE company_id = $1 AND id = $2 AND status = 'active'",
+      [context.companyId, input.trainerUserId]
+    );
+    if (trainer.rowCount !== 1) {
+      throw new InputError("Der Ausbilder wurde nicht gefunden.", 404, "trainer_not_found");
+    }
+  }
+
   const updated = await client.query(
     `UPDATE users
      SET personnel_number = $3, first_name = $4, last_name = $5,
-         email = $6, phone = $7
+         email = $6, phone = $7,
+         is_apprentice = $9, trainer_user_id = $10
      WHERE company_id = $1 AND id = $2 AND row_version = $8
      RETURNING id`,
     [
@@ -6603,7 +6701,9 @@ async function updateEmployee(client, context, employeeId, input) {
       input.lastName,
       input.email,
       input.phone,
-      input.rowVersion
+      input.rowVersion,
+      input.isApprentice,
+      input.isApprentice ? input.trainerUserId : null
     ]
   );
   if (updated.rowCount !== 1) {
@@ -9966,6 +10066,56 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           )
         );
         return json(response, 200, { timeAccount });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/apprentice/reports") {
+        const range = timesheetExportRange(url);
+        const body = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getOwnApprenticeReports(client, context, range)
+        );
+        return json(response, 200, body);
+      }
+
+      const apprenticeWeekMatch =
+        /^\/api\/v1\/apprentice\/reports\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+      if (request.method === "PUT" && apprenticeWeekMatch) {
+        const weekStart = validateApprenticeWeek(apprenticeWeekMatch[1]);
+        const input = validateApprenticeReport(await readJson(request));
+        const report = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => putOwnApprenticeReport(client, context, weekStart, input)
+        );
+        return json(response, 200, { report });
+      }
+
+      const apprenticeSubmitMatch =
+        /^\/api\/v1\/apprentice\/reports\/(\d{4}-\d{2}-\d{2})\/submit$/.exec(url.pathname);
+      if (request.method === "POST" && apprenticeSubmitMatch) {
+        const weekStart = validateApprenticeWeek(apprenticeSubmitMatch[1]);
+        const report = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => submitApprenticeReport(client, context, weekStart)
+        );
+        return json(response, 200, { report });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/apprentice-reports") {
+        const reports = await withReadySession(pool, tokenHash, getApprenticeReviews);
+        return json(response, 200, { reports });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/apprentice-reports/review") {
+        const input = validateApprenticeReview(await readJson(request));
+        const reports = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => decideApprenticeReports(client, context, input)
+        );
+        return json(response, 200, { reports });
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/absences") {

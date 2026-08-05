@@ -195,7 +195,11 @@ Die VDE-Integration wurde technisch vorgezogen.
 
 ## Spätere Etappen
 
-- V0.60 Azubi-Modul: Später, noch nicht begonnen.
+- V0.60 Azubi-Modul: Erste Ausbaustufe gebaut — Wochenberichte, Berufsschule,
+  Urlaub/Krankheit, Unterschriften, Sammelfreigabe, Rückgabe und
+  unveränderlicher Verlauf (siehe `docs/APPRENTICE_REPORTS.md`). Offen
+  bleiben PDF-Ausdruck für die Kammer, Erinnerungen an fehlende Wochen und
+  Tagesberichte.
 - V0.90 Pilot: Externe Abnahme, noch nicht begonnen.
 - V1.0: Darf erst nach allen Produktions-, Rechts-, Geräte-, Last- und
   Vier-Wochen-Pilot-Gates freigegeben werden.

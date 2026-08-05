@@ -165,6 +165,16 @@ export async function sessionView(client, context) {
        account.first_name,
        account.last_name,
        account.must_change_password,
+       account.is_apprentice,
+       -- Fuehrt jemand ein Berichtsheft, das dieser Mensch unterschreibt? Ein
+       -- Ausbilder ist oft Vorarbeiter und hat keine Planungsrolle; ohne diese
+       -- Angabe bekaeme er die Pruefung gar nicht erst angeboten.
+       EXISTS (
+         SELECT 1 FROM users AS lehrling
+         WHERE lehrling.company_id = account.company_id
+           AND lehrling.trainer_user_id = account.id
+           AND lehrling.status = 'active'
+       ) AS is_trainer,
        COALESCE(
          jsonb_agg(role.role_key ORDER BY role.role_key)
            FILTER (WHERE role.id IS NOT NULL),
@@ -205,6 +215,8 @@ export async function sessionView(client, context) {
       firstName: row.first_name,
       lastName: row.last_name,
       mustChangePassword: row.must_change_password,
+      isApprentice: Boolean(row.is_apprentice),
+      isTrainer: Boolean(row.is_trainer),
       roles: row.roles
     }
   };

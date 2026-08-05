@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.6";
+} from "./core/work-time.js?v=0.42.7";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,13 +18,13 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.6";
+} from "./core/sync-queue.js?v=0.42.7";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees
-} from "./core/permissions.js?v=0.42.6";
+} from "./core/permissions.js?v=0.42.7";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -35,7 +35,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.6";
+} from "./core/state-store.js?v=0.42.7";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -193,6 +193,23 @@ import {
     weekStrip: document.querySelector("#week-strip"),
     weekPeriod: document.querySelector("#week-period"),
     weekDaysTitle: document.querySelector("#week-days-title"),
+    apprenticePanel: document.querySelector("#apprentice-panel"),
+    apprenticeStatus: document.querySelector("#apprentice-status"),
+    apprenticeWeek: document.querySelector("#apprentice-week"),
+    apprenticeReturn: document.querySelector("#apprentice-return"),
+    apprenticeForm: document.querySelector("#apprentice-form"),
+    apprenticeCompanySummary: document.querySelector("#apprentice-company-summary"),
+    apprenticeSchoolSummary: document.querySelector("#apprentice-school-summary"),
+    apprenticeAbsenceNote: document.querySelector("#apprentice-absence-note"),
+    apprenticeSave: document.querySelector("#apprentice-save"),
+    apprenticeSubmit: document.querySelector("#apprentice-submit"),
+    apprenticeMessage: document.querySelector("#apprentice-message"),
+    apprenticeHistory: document.querySelector("#apprentice-history"),
+    apprenticeReviewPanel: document.querySelector("#apprentice-review-panel"),
+    apprenticeReviewList: document.querySelector("#apprentice-review-list"),
+    apprenticeReviewCount: document.querySelector("#apprentice-review-count"),
+    apprenticeApproveAll: document.querySelector("#apprentice-approve-all"),
+    apprenticeReviewMessage: document.querySelector("#apprentice-review-message"),
     accountCard: document.querySelector("#account-card"),
     accountName: document.querySelector("#account-name"),
     accountPersonnelNumber: document.querySelector("#account-personnel-number"),
@@ -634,6 +651,9 @@ import {
     employeeEditPhone: document.querySelector("#employee-edit-phone"),
     employeeEditEmail: document.querySelector("#employee-edit-email"),
     employeeEditRole: document.querySelector("#employee-edit-role"),
+    employeeEditApprenticeship: document.querySelector("#employee-edit-apprenticeship"),
+    employeeEditApprentice: document.querySelector("#employee-edit-apprentice"),
+    employeeEditTrainer: document.querySelector("#employee-edit-trainer"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
     employeeEditRemove: document.querySelector("#employee-edit-remove"),
@@ -815,6 +835,8 @@ import {
   // Zu welchem Tag gehoeren die geladenen Einsaetze? Die Schnittstelle liefert
   // sie je Tag und traegt das Datum nicht in den einzelnen Einsatz ein.
   let assignmentsDate = null;
+  let apprenticeState = null;
+  let apprenticeReviewState = null;
   // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
   const expandedPlanningCells = new Set();
   let deviceCompany = null;
@@ -1046,7 +1068,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.6",
+          "X-Schaefchen-Version": "0.42.7",
           ...options.headers
         }
       });
@@ -1074,7 +1096,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.6" }
+        headers: { "X-Schaefchen-Version": "0.42.7" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1121,7 +1143,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.6 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.7 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -4659,6 +4681,26 @@ import {
     elements.employeeEditRole.value = employee.roles.find((role) => (
       ["installer", "foreman", "managing_director", "dispatch_office", "project_manager"].includes(role)
     )) || "installer";
+    // Berichtsheft nur zeigen, wenn die Firma es hat. Ein Kaestchen fuer einen
+    // Bereich, den es nicht gibt, verspricht mehr, als die App halten kann.
+    const berichtsheft = moduleEnabled("apprentice_reports");
+    elements.employeeEditApprenticeship.hidden = !berichtsheft;
+    if (berichtsheft) {
+      elements.employeeEditApprentice.checked = Boolean(employee.isApprentice);
+      elements.employeeEditTrainer.replaceChildren();
+      const leer = document.createElement("option");
+      leer.value = "";
+      leer.textContent = "Noch niemand";
+      elements.employeeEditTrainer.append(leer);
+      for (const person of plannableEmployees(adminState?.employees)) {
+        if (person.id === employee.id) continue;
+        const eintrag = document.createElement("option");
+        eintrag.value = person.id;
+        eintrag.textContent = `${person.firstName} ${person.lastName}`;
+        elements.employeeEditTrainer.append(eintrag);
+      }
+      elements.employeeEditTrainer.value = employee.trainerUserId || "";
+    }
     elements.employeeEditMessage.textContent = "";
     elements.employeeEditForm.hidden = false;
     elements.employeeEditForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -7206,6 +7248,8 @@ import {
     elements.weekStrip.replaceChildren();
     elements.weekTimesheetList.replaceChildren();
     renderEmployeeTimesheetExport(visibleWeek);
+    renderApprenticePanel();
+    renderApprenticeReviews();
     renderAbsences();
     renderTimeAccount();
     renderAdminTimeAccounts();
@@ -7755,6 +7799,222 @@ import {
     }
   }
 
+  // Berichtsheft
+  //
+  // Der Wochenbericht haengt an derselben Woche wie der Stundenzettel: wer
+  // zurueckblaettert, sieht den Bericht dieser Woche. Die geleistete Zeit
+  // schreibt der Azubi nicht ab, sie kommt aus der Zeiterfassung.
+  function apprenticeModuleReady() {
+    return !demoMode && moduleEnabled("apprentice_reports");
+  }
+
+  function isApprentice() {
+    return apprenticeModuleReady() && Boolean(session?.user.isApprentice);
+  }
+
+  function mayReviewApprentices() {
+    return apprenticeModuleReady() && (canPlan() || Boolean(session?.user.isTrainer));
+  }
+
+  async function refreshApprenticeData() {
+    if (!isApprentice() || !navigator.onLine) {
+      renderApprenticePanel();
+      return;
+    }
+    const jahr = selectedWeekStart.slice(0, 4);
+    try {
+      const body = await requestJson(
+        `./api/v1/apprentice/reports?from=${jahr}-01-01&to=${jahr}-12-31`
+      );
+      apprenticeState = body.reports;
+    } catch (error) {
+      if (error.status === 401) return showLogin();
+      apprenticeState = apprenticeState || [];
+    }
+    renderApprenticePanel();
+  }
+
+  async function refreshApprenticeReviews() {
+    if (!mayReviewApprentices() || !navigator.onLine) {
+      renderApprenticeReviews();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/apprentice-reports");
+      apprenticeReviewState = body.reports;
+    } catch (error) {
+      if (error.status === 401) return showLogin();
+      apprenticeReviewState = apprenticeReviewState || [];
+    }
+    renderApprenticeReviews();
+  }
+
+  const APPRENTICE_STATUS_LABEL = {
+    draft: "Entwurf",
+    submitted: "Eingereicht",
+    approved: "Freigegeben",
+    returned: "Zurückgegeben"
+  };
+
+  function currentApprenticeReport() {
+    return (apprenticeState || []).find((report) => report.weekStart === selectedWeekStart) || null;
+  }
+
+  function renderApprenticePanel() {
+    elements.apprenticePanel.hidden = !isApprentice();
+    if (elements.apprenticePanel.hidden) return;
+    const bericht = currentApprenticeReport();
+    const status = bericht?.status || "draft";
+    const offen = ["draft", "returned"].includes(status);
+    elements.apprenticeStatus.textContent = APPRENTICE_STATUS_LABEL[status];
+    elements.apprenticeWeek.textContent = `Woche ab ${shortDate(selectedWeekStart)} · ${
+      formatMinutes(bericht?.workedMinutes ?? weekState?.totals?.workMinutes ?? 0)
+    } h gearbeitet`;
+    elements.apprenticeReturn.hidden = status !== "returned";
+    elements.apprenticeReturn.textContent = bericht?.returnComment
+      ? `Zurückgegeben: ${bericht.returnComment}`
+      : "";
+
+    // Der Schluessel enthaelt die Fassung des Berichts, nicht nur die Woche.
+    // Sonst fuellte sich das Formular einmal beim Zeichnen - da lagen die
+    // Daten aber noch gar nicht vor - und danach nie wieder: der Azubi sah
+    // leere Felder und ueberschrieb damit beim Speichern seinen Bericht.
+    const formularSchluessel = `${selectedWeekStart}|${bericht?.rowVersion ?? 0}`;
+    if (elements.apprenticeForm.dataset.reportKey !== formularSchluessel) {
+      elements.apprenticeCompanySummary.value = bericht?.companySummary || "";
+      elements.apprenticeSchoolSummary.value = bericht?.schoolSummary || "";
+      elements.apprenticeAbsenceNote.value = bericht?.absenceNote || "";
+      elements.apprenticeForm.dataset.reportKey = formularSchluessel;
+      elements.apprenticeMessage.textContent = "";
+    }
+    for (const feld of [
+      elements.apprenticeCompanySummary,
+      elements.apprenticeSchoolSummary,
+      elements.apprenticeAbsenceNote
+    ]) {
+      feld.readOnly = !offen;
+    }
+    elements.apprenticeSave.hidden = !offen;
+    elements.apprenticeSubmit.hidden = !offen;
+
+    elements.apprenticeHistory.replaceChildren();
+    for (const eintrag of (apprenticeState || []).slice(0, 12)) {
+      const zeile = document.createElement("li");
+      const woche = document.createElement("strong");
+      const zustand = document.createElement("span");
+      woche.textContent = `Woche ab ${shortDate(eintrag.weekStart)}`;
+      zustand.textContent = `${APPRENTICE_STATUS_LABEL[eintrag.status]} · ${
+        formatMinutes(eintrag.workedMinutes)
+      } h`;
+      zeile.append(woche, zustand);
+      elements.apprenticeHistory.append(zeile);
+    }
+  }
+
+  function renderApprenticeReviews() {
+    elements.apprenticeReviewPanel.hidden = !mayReviewApprentices();
+    if (elements.apprenticeReviewPanel.hidden) return;
+    const berichte = apprenticeReviewState || [];
+    const offene = berichte.filter((bericht) => bericht.status === "submitted");
+    elements.apprenticeReviewCount.textContent = `${offene.length} offen`;
+    elements.apprenticeApproveAll.hidden = offene.length === 0;
+    elements.apprenticeReviewList.replaceChildren();
+
+    if (berichte.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "admin-list__empty";
+      leer.textContent = "Keine Wochenberichte vorhanden.";
+      elements.apprenticeReviewList.append(leer);
+      return;
+    }
+
+    for (const bericht of berichte.slice(0, 40)) {
+      const zeile = document.createElement("li");
+      const kopf = document.createElement("div");
+      const name = document.createElement("strong");
+      const zusatz = document.createElement("span");
+      name.textContent = `${bericht.apprenticeName} · Woche ab ${shortDate(bericht.weekStart)}`;
+      zusatz.textContent = `${APPRENTICE_STATUS_LABEL[bericht.status]} · ${
+        formatMinutes(bericht.workedMinutes)
+      } h`;
+      const inhalt = document.createElement("p");
+      inhalt.className = "apprentice-review-summary";
+      inhalt.textContent = bericht.companySummary;
+      kopf.append(name, zusatz, inhalt);
+      if (bericht.schoolSummary) {
+        const schule = document.createElement("p");
+        schule.className = "apprentice-review-summary";
+        schule.textContent = `Berufsschule: ${bericht.schoolSummary}`;
+        kopf.append(schule);
+      }
+      zeile.append(kopf);
+
+      if (bericht.status === "submitted") {
+        const knoepfe = document.createElement("div");
+        knoepfe.className = "apprentice-actions";
+        const freigeben = document.createElement("button");
+        freigeben.type = "button";
+        freigeben.className = "button button--primary";
+        freigeben.textContent = "Freigeben";
+        freigeben.addEventListener("click", () => decideApprentice([bericht.id], "approved"));
+        const zurueck = document.createElement("button");
+        zurueck.type = "button";
+        zurueck.className = "button button--secondary";
+        zurueck.textContent = "Zurückgeben";
+        zurueck.addEventListener("click", () => {
+          const bemerkung = window.prompt("Was soll nachgebessert werden?");
+          if (bemerkung?.trim()) decideApprentice([bericht.id], "returned", bemerkung.trim());
+        });
+        knoepfe.append(freigeben, zurueck);
+        zeile.append(knoepfe);
+      }
+      elements.apprenticeReviewList.append(zeile);
+    }
+  }
+
+  async function decideApprentice(reportIds, decision, comment = null) {
+    elements.apprenticeReviewMessage.textContent = decision === "approved"
+      ? "Freigabe wird gespeichert …"
+      : "Rückgabe wird gespeichert …";
+    try {
+      await requestJson("./api/v1/admin/apprentice-reports/review", {
+        method: "POST",
+        body: JSON.stringify({ reportIds, decision, comment })
+      });
+      elements.apprenticeReviewMessage.textContent = "";
+      await refreshApprenticeReviews();
+      showToast(decision === "approved"
+        ? `${reportIds.length === 1 ? "Wochenbericht" : "Wochenberichte"} freigegeben.`
+        : "Wochenbericht zurückgegeben.");
+    } catch (error) {
+      elements.apprenticeReviewMessage.textContent = error.message;
+    }
+  }
+
+  async function saveApprenticeReport(submit) {
+    elements.apprenticeMessage.textContent = "Wochenbericht wird gespeichert …";
+    try {
+      await requestJson(`./api/v1/apprentice/reports/${selectedWeekStart}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          companySummary: elements.apprenticeCompanySummary.value,
+          schoolSummary: elements.apprenticeSchoolSummary.value,
+          absenceNote: elements.apprenticeAbsenceNote.value
+        })
+      });
+      if (submit) {
+        await requestJson(`./api/v1/apprentice/reports/${selectedWeekStart}/submit`, {
+          method: "POST"
+        });
+      }
+      elements.apprenticeMessage.textContent = "";
+      await refreshApprenticeData();
+      showToast(submit ? "Wochenbericht eingereicht." : "Wochenbericht gespeichert.");
+    } catch (error) {
+      elements.apprenticeMessage.textContent = error.message;
+    }
+  }
+
   async function refreshAbsenceData() {
     if (demoMode) {
       absenceState = [];
@@ -7848,6 +8108,8 @@ import {
     await Promise.all([
       refreshWeekData(),
       refreshAbsenceData(),
+      refreshApprenticeData(),
+      refreshApprenticeReviews(),
       refreshTimeAccountData(),
       refreshAdminTimeAccounts()
     ]);
@@ -7918,6 +8180,8 @@ import {
       refreshLiveData(),
       refreshWeekData(),
       refreshAbsenceData(),
+      refreshApprenticeData(),
+      refreshApprenticeReviews(),
       refreshTimeAccountData(),
       refreshAdminTimeAccounts(),
       refreshAdmin(),
@@ -8088,6 +8352,10 @@ import {
           phone: elements.employeeEditPhone.value,
           email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,
+          // Ohne diese beiden Angaben wuerde jede Namensaenderung das
+          // Berichtsheft eines Auszubildenden stillschweigend abschalten.
+          isApprentice: elements.employeeEditApprentice.checked,
+          trainerUserId: elements.employeeEditTrainer.value || null,
           rowVersion: employee.rowVersion
         })
       });
@@ -9788,6 +10056,17 @@ import {
     } catch (error) {
       showToast(error.message);
     }
+  });
+  elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
+  elements.apprenticeForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void saveApprenticeReport(true);
+  });
+  elements.apprenticeApproveAll.addEventListener("click", () => {
+    const offene = (apprenticeReviewState || [])
+      .filter((bericht) => bericht.status === "submitted")
+      .map((bericht) => bericht.id);
+    if (offene.length) void decideApprentice(offene, "approved");
   });
   elements.accountLogout.addEventListener("click", () => elements.closePreview.click());
   elements.primaryAction.addEventListener("click", handlePrimaryAction);

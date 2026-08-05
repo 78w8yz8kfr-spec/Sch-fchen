@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.6">
-    <script type="module" src="./app.js?v=0.42.6"></script>
-    <script src="./version.js?v=0.42.6" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.7">
+    <script type="module" src="./app.js?v=0.42.7"></script>
+    <script src="./version.js?v=0.42.7" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.6</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.7</p>
         </div>
       </section>
 
@@ -623,6 +623,50 @@
               <h3 id="week-next-assignment-title">Nächster Einsatz</h3>
               <strong id="week-next-assignment-name"></strong>
               <p id="week-next-assignment-meta"></p>
+            </section>
+
+            <section id="apprentice-panel" class="week-review-panel apprentice-panel" aria-labelledby="apprentice-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Ausbildungsnachweis</p>
+                  <h3 id="apprentice-title">Berichtsheft</h3>
+                </div>
+                <span id="apprentice-status" class="site-list-summary" aria-live="polite">Entwurf</span>
+              </div>
+              <p id="apprentice-week" class="apprentice-week">Woche</p>
+              <p id="apprentice-return" class="apprentice-return" hidden></p>
+              <form id="apprentice-form" class="apprentice-form" novalidate>
+                <label for="apprentice-company-summary">Tätigkeiten im Betrieb</label>
+                <textarea id="apprentice-company-summary" rows="4" maxlength="4000"
+                  placeholder="Was hast du diese Woche gemacht?"></textarea>
+                <label for="apprentice-school-summary">Berufsschule</label>
+                <textarea id="apprentice-school-summary" rows="3" maxlength="4000"
+                  placeholder="Themen des Unterrichts"></textarea>
+                <label for="apprentice-absence-note">Urlaub und Krankheit</label>
+                <input id="apprentice-absence-note" type="text" maxlength="1000"
+                  placeholder="Nur ausfüllen, wenn zutreffend">
+                <div class="apprentice-actions">
+                  <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
+                  <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
+                </div>
+              </form>
+              <p id="apprentice-message" class="form-message" aria-live="polite"></p>
+              <ul id="apprentice-history" class="apprentice-history" aria-label="Bisherige Wochenberichte"></ul>
+            </section>
+
+            <section id="apprentice-review-panel" class="week-review-panel apprentice-review-panel" aria-labelledby="apprentice-review-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Ausbildung begleiten</p>
+                  <h3 id="apprentice-review-title">Berichtshefte prüfen</h3>
+                </div>
+                <span id="apprentice-review-count" class="site-list-summary" aria-live="polite">0</span>
+              </div>
+              <ul id="apprentice-review-list" class="apprentice-review-list" aria-label="Eingereichte Wochenberichte"></ul>
+              <div class="apprentice-actions">
+                <button id="apprentice-approve-all" class="button button--primary" type="button">Alle freigeben</button>
+              </div>
+              <p id="apprentice-review-message" class="form-message" aria-live="polite"></p>
             </section>
 
             <section id="week-days-section" class="week-content-section" aria-labelledby="week-days-title">
@@ -1658,6 +1702,17 @@
                   <option data-management-role value="project_manager">Projektleiter</option>
                 </select>
                 <p class="field-help">Die Rollenänderung gilt nach dem nächsten Laden der App. Startpasswörter werden hier nicht angezeigt.</p>
+                <div id="employee-edit-apprenticeship" hidden>
+                  <label class="employee-edit-check" for="employee-edit-apprentice">
+                    <input id="employee-edit-apprentice" type="checkbox">
+                    <span>Führt ein Berichtsheft</span>
+                  </label>
+                  <label for="employee-edit-trainer">Ausbilder</label>
+                  <select id="employee-edit-trainer">
+                    <option value="">Noch niemand</option>
+                  </select>
+                  <p class="field-help">Der Ausbilder gibt die Wochenberichte frei, auch ohne Planungsrolle.</p>
+                </div>
                 <div class="form-actions">
                   <button id="employee-edit-save" class="button button--primary" type="submit">Änderungen speichern</button>
                   <button id="employee-edit-cancel" class="button button--secondary" type="button">Abbrechen</button>
