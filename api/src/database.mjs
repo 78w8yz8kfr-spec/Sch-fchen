@@ -165,10 +165,11 @@ export async function sessionView(client, context) {
        account.first_name,
        account.last_name,
        account.must_change_password,
-       account.is_apprentice,
-       -- Fuehrt jemand ein Berichtsheft, das dieser Mensch unterschreibt? Ein
-       -- Ausbilder ist oft Vorarbeiter und hat keine Planungsrolle; ohne diese
-       -- Angabe bekaeme er die Pruefung gar nicht erst angeboten.
+       -- Fuehrt jemand ein Berichtsheft, das dieser Mensch unterschreibt?
+       -- Sehen und unterschreiben darf ausschliesslich der eingetragene
+       -- Ausbilder; ohne diese Angabe wuesste die App nicht, wem sie die
+       -- Pruefung ueberhaupt anbieten darf. Ob jemand selbst ein Berichtsheft
+       -- fuehrt, sagt seine Rolle - dafuer braucht es hier nichts.
        EXISTS (
          SELECT 1 FROM users AS lehrling
          WHERE lehrling.company_id = account.company_id
@@ -215,7 +216,6 @@ export async function sessionView(client, context) {
       firstName: row.first_name,
       lastName: row.last_name,
       mustChangePassword: row.must_change_password,
-      isApprentice: Boolean(row.is_apprentice),
       isTrainer: Boolean(row.is_trainer),
       roles: row.roles
     }

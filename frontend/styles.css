@@ -5921,3 +5921,20 @@ select:focus-visible {
   margin: 0;
   accent-color: var(--brand);
 }
+
+.apprentice-absence-label {
+  margin: 4px 0 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+/* Steht fest und wird nicht getippt: die Angabe kommt aus den genehmigten
+   Abwesenheiten. */
+.apprentice-absence-note {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}

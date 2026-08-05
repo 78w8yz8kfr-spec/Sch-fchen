@@ -80,13 +80,42 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
     return person.rows[0].id;
   };
 
-  const azubiId = await anlegen(`AZUBI-${kennung}`, "Anna", "Auszubildende", "installer");
+  const azubiId = await anlegen(`AZUBI-${kennung}`, "Anna", "Auszubildende", "apprentice");
   const ausbilderId = await anlegen(`AUSB-${kennung}`, "Adam", "Ausbilder", "foreman");
   const fremdId = await anlegen(`MONT-${kennung}`, "Mara", "Montage", "installer");
+  await anlegen(`CHEF-${kennung}`, "Clara", "Chefin", "managing_director");
 
   await ownerPool.query(
-    "UPDATE users SET is_apprentice = TRUE, trainer_user_id = $2 WHERE id = $1",
+    "UPDATE users SET trainer_user_id = $2 WHERE id = $1",
     [azubiId, ausbilderId]
+  );
+
+  // Genehmigter Urlaub in der Berichtswoche. Er soll im Bericht stehen, ohne
+  // dass ihn jemand abschreibt.
+  await ownerPool.query(
+    `INSERT INTO absence_requests (
+       company_id, user_id, requested_by_user_id, absence_type,
+       start_date, end_date, day_part, status
+     ) VALUES ($1, $2, $2, 'vacation', $3::DATE + 3, $3::DATE + 4, 'full_day', 'approved')
+     RETURNING id`,
+    [companyId, azubiId, woche]
+  );
+  // Der Antrag durchlaeuft dieselben Stufen wie im Betrieb: erst das Buero,
+  // dann die Geschaeftsfuehrung. Die Datenbank verlangt zu jeder Stufe den
+  // Pruefer und den Zeitpunkt - ein Sprung mitten hinein wird abgewiesen.
+  await ownerPool.query(
+    `UPDATE absence_requests
+     SET status = 'management_review',
+         office_reviewed_by_user_id = $3, office_reviewed_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND user_id = $2`,
+    [companyId, azubiId, ausbilderId]
+  );
+  await ownerPool.query(
+    `UPDATE absence_requests
+     SET status = 'approved',
+         management_reviewed_by_user_id = $3, management_reviewed_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND user_id = $2`,
+    [companyId, azubiId, fremdId]
   );
 
   const anmelden = async (personalnummer) => {
@@ -106,6 +135,7 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   const azubiCookie = await anmelden(`AZUBI-${kennung}`);
   const ausbilderCookie = await anmelden(`AUSB-${kennung}`);
   const fremdCookie = await anmelden(`MONT-${kennung}`);
+  const chefCookie = await anmelden(`CHEF-${kennung}`);
 
   const ruf = (pfad, cookie, optionen = {}) => fetch(`${baseUrl}${pfad}`, {
     ...optionen,
@@ -153,10 +183,7 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
 
   const entwurf = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
     method: "PUT",
-    body: JSON.stringify({
-      companySummary: "Unterverteilung verdrahtet und geprüft",
-      absenceNote: "Freitag Berufsschule"
-    })
+    body: JSON.stringify({ companySummary: "Unterverteilung verdrahtet und geprüft" })
   });
   assert.equal(entwurf.status, 200, await entwurf.clone().text());
   const entwurfBody = (await entwurf.json()).report;
@@ -181,6 +208,8 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   assert.equal(eingereichtBody.status, "submitted");
   assert.equal(eingereichtBody.workedMinutes, 935);
   assert.equal(eingereichtBody.apprenticeSignatureName, "Anna Auszubildende");
+  // Urlaub und Krankheit fuellen sich aus den genehmigten Abwesenheiten.
+  assert.equal(eingereichtBody.absenceNote, "Urlaub: Do, Fr");
 
   // Nach dem Einreichen schreibt der Azubi nicht weiter.
   const nachtraeglich = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
@@ -190,10 +219,13 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   assert.equal(nachtraeglich.status, 409, await nachtraeglich.clone().text());
   assert.equal((await nachtraeglich.json()).error.code, "apprentice_report_locked");
 
-  // Ein Monteur ohne Auszubildende darf nicht pruefen.
-  const fremdePruefung = await ruf("/api/v1/admin/apprentice-reports", fremdCookie);
-  assert.equal(fremdePruefung.status, 403, await fremdePruefung.clone().text());
-  assert.equal((await fremdePruefung.json()).error.code, "apprentice_review_forbidden");
+  // Ein Berichtsheft ist persoenlich: weder ein fremder Monteur noch die
+  // Geschaeftsfuehrung sehen es. Nur der eingetragene Ausbilder.
+  for (const [wer, cookie] of [["Monteur", fremdCookie], ["Geschäftsführung", chefCookie]]) {
+    const fremdePruefung = await ruf("/api/v1/admin/apprentice-reports", cookie);
+    assert.equal(fremdePruefung.status, 403, `${wer}: ${await fremdePruefung.clone().text()}`);
+    assert.equal((await fremdePruefung.json()).error.code, "apprentice_review_forbidden");
+  }
 
   // Der Ausbilder sieht seinen Auszubildenden, obwohl er keine Planungsrolle hat.
   const liste = await ruf("/api/v1/admin/apprentice-reports", ausbilderCookie);

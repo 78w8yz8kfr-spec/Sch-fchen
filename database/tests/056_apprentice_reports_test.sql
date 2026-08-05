@@ -17,8 +17,11 @@ BEGIN
             RAISE EXCEPTION 'Ohne Firma laesst sich das Berichtsheft nicht pruefen';
         END IF;
 
-        INSERT INTO users (company_id, personnel_number, first_name, last_name, is_apprentice)
-        VALUES (firma, 'ABNAHME-AZUBI', 'Anna', 'Auszubildende', TRUE)
+        -- Seit Migration 058 ist der Auszubildende eine Rolle, kein
+        -- Kennzeichen am Mitarbeiter. Fuer diese Abnahme zaehlt nur, dass es
+        -- den Menschen gibt; die Rolle prueft die Abnahme zu 058.
+        INSERT INTO users (company_id, personnel_number, first_name, last_name)
+        VALUES (firma, 'ABNAHME-AZUBI', 'Anna', 'Auszubildende')
         RETURNING id INTO azubi;
 
         INSERT INTO users (company_id, personnel_number, first_name, last_name)

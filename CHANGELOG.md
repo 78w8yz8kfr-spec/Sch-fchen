@@ -4,6 +4,28 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- Berichtsheft, drei Änderungen nach dem ersten Durchgang:
+  - **„Auszubildender" ist eine eigene Rolle** wie Monteur oder Vorarbeiter,
+    kein Kennzeichen am Mitarbeiter. Zwei Quellen für dieselbe Aussage wären
+    eine Einladung, dass sie auseinanderlaufen; das Kennzeichen ist entfallen.
+    Wer es bereits gesetzt hatte, bekommt die Rolle in Migration 058.
+  - **Urlaub und Krankheit füllen sich selbst** aus den genehmigten
+    Abwesenheiten der Woche („Krank: Do, Fr"). Das Feld wird nicht mehr
+    getippt. Ein offener Antrag gehört noch nicht in den Nachweis.
+  - **Sehen und unterschreiben darf nur der eingetragene Ausbilder.** Ein
+    Berichtsheft ist persönlich — es geht weder das Büro noch die
+    Geschäftsführung etwas an, solange sie nicht selbst ausbilden.
+- Fehler behoben, bevor er in Produktion kam: die Wochen- und Abwesenheitstage
+  wurden über ein Javascript-Datum gewandelt und hingen damit an der Zeitzone
+  des Servers. Mitternacht in Berlin ist in UTC der Vortag; der Wochenbericht
+  wäre auf den Sonntag davor gerutscht. Gefunden, indem der Test unter
+  `TZ=Europe/Berlin` lief — die Tage werden jetzt in SQL formatiert und der
+  Test läuft in drei Zeitzonen.
+- Die Abnahme zu Migration 003 zählte die Rollen einer Firma gegen eine feste
+  Neun. Sie prüft die Mandantentrennung; jetzt vergleicht sie mit der
+  tatsächlichen Rollenzahl und scheitert nicht mehr an jeder neuen Rolle.
+- Fassung 0.42.8, Speicher `schaefchen-online-v50`, Migrationen 058 und 059.
+
 - **Berichtsheft für Auszubildende** (erste Ausbaustufe des Azubi-Moduls,
   V0.60 aus dem Fahrplan). Ohne vollständigen Ausbildungsnachweis lässt die
   Kammer den Auszubildenden nicht zur Prüfung zu.

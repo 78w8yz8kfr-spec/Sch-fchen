@@ -177,7 +177,7 @@ function json(response, status, body, headers = {}) {
 // Fassung dieses Servers. Sie stand frueher als Zeichenkette mitten in der
 // Fehleraufzeichnung und wurde beim Ausliefern regelmaessig vergessen; ein
 // Fehlerbericht nannte dann eine Fassung, die es laengst nicht mehr gab.
-export const APPLICATION_VERSION = "0.42.7";
+export const APPLICATION_VERSION = "0.42.8";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1699,7 +1699,6 @@ function employeeDto(row) {
     status: row.status || "active",
     archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : null,
     archivedReason: row.archived_reason || null,
-    isApprentice: Boolean(row.is_apprentice),
     trainerUserId: row.trainer_user_id || null,
     rowVersion: Number(row.row_version || 1)
   };
@@ -1818,25 +1817,21 @@ async function requireEnabledModule(client, context, moduleKey) {
 
 // Berichtsheft
 //
-// Wer darf entscheiden? Die Planung sieht alle Auszubildenden. Ein Ausbilder
-// ohne Planungsrolle sieht nur seine eigenen: ein Vorarbeiter bildet aus, ohne
-// deshalb Einblick in das ganze Buero zu bekommen.
-async function apprenticeReviewScope(client, context) {
-  const roles = await activeRoleKeys(client, context);
-  const allApprentices = [...roles].some((role) => PLANNER_ROLES.has(role));
-  if (allApprentices) return { allApprentices };
+// Wer darf sehen und unterschreiben? Nur der eingetragene Ausbilder. Ein
+// Berichtsheft ist persoenlich - es geht weder das Buero noch die
+// Geschaeftsfuehrung etwas an, solange sie nicht selbst ausbilden.
+async function requireApprenticeTrainer(client, context) {
   const betreut = await client.query(
-    "SELECT 1 FROM users WHERE company_id = $1 AND trainer_user_id = $2 LIMIT 1",
+    "SELECT 1 FROM users WHERE company_id = $1 AND trainer_user_id = $2 AND status = 'active' LIMIT 1",
     [context.companyId, context.userId]
   );
   if (betreut.rowCount === 0) {
     throw new InputError(
-      "Ausbildungsnachweise dürfen nur Ausbilder und die Planung prüfen.",
+      "Ausbildungsnachweise sieht nur der eingetragene Ausbilder.",
       403,
       "apprentice_review_forbidden"
     );
   }
-  return { allApprentices };
 }
 
 async function requireApprentice(client, context) {
@@ -1870,15 +1865,15 @@ async function submitApprenticeReport(client, context, weekStart) {
 
 async function getApprenticeReviews(client, context) {
   await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
-  const scope = await apprenticeReviewScope(client, context);
-  return listApprenticeReviews(client, context, scope);
+  await requireApprenticeTrainer(client, context);
+  return listApprenticeReviews(client, context);
 }
 
 async function decideApprenticeReports(client, context, input) {
   await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
-  const scope = await apprenticeReviewScope(client, context);
+  await requireApprenticeTrainer(client, context);
   const reviewer = await loadApprenticeProfile(client, context);
-  return reviewApprenticeReports(client, context, input, reviewer, scope, { InputError });
+  return reviewApprenticeReports(client, context, input, reviewer, { InputError });
 }
 
 async function getPlatformAnnouncements(client, context) {
@@ -4142,7 +4137,7 @@ async function adminOverview(client, context, date) {
               account.email, account.phone,
               account.must_change_password, account.status, account.archived_at,
               account.archived_reason, account.row_version,
-              account.is_apprentice, account.trainer_user_id,
+              account.trainer_user_id,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
                   FILTER (WHERE role.id IS NOT NULL),
@@ -6486,7 +6481,7 @@ async function getEmployeeRecord(client, context, employeeId) {
             account.email, account.phone,
             account.must_change_password, account.status, account.archived_at,
             account.archived_reason, account.row_version,
-            account.is_apprentice, account.trainer_user_id,
+            account.trainer_user_id,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
                 FILTER (WHERE role.id IS NOT NULL),
@@ -6690,7 +6685,7 @@ async function updateEmployee(client, context, employeeId, input) {
     `UPDATE users
      SET personnel_number = $3, first_name = $4, last_name = $5,
          email = $6, phone = $7,
-         is_apprentice = $9, trainer_user_id = $10
+         trainer_user_id = $9
      WHERE company_id = $1 AND id = $2 AND row_version = $8
      RETURNING id`,
     [
@@ -6702,8 +6697,7 @@ async function updateEmployee(client, context, employeeId, input) {
       input.email,
       input.phone,
       input.rowVersion,
-      input.isApprentice,
-      input.isApprentice ? input.trainerUserId : null
+      input.trainerUserId
     ]
   );
   if (updated.rowCount !== 1) {

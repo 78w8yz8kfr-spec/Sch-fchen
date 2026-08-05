@@ -193,6 +193,7 @@ DECLARE
     visible_companies INTEGER;
     foreign_users INTEGER;
     visible_roles INTEGER;
+    own_roles INTEGER;
 BEGIN
     SELECT COUNT(*) INTO visible_companies FROM companies;
     SELECT COUNT(*)
@@ -203,6 +204,14 @@ BEGIN
         ''
     )::UUID;
     SELECT COUNT(*) INTO visible_roles FROM roles;
+    -- Gezaehlt wird gegen die tatsaechliche Rollenzahl dieser Firma, nicht
+    -- gegen eine feste Zahl. Geprueft wird hier die Mandantentrennung; eine
+    -- feste Zahl liesse den Test bei jeder neuen Rolle scheitern, ohne dass an
+    -- der Trennung etwas kaputt waere. Genau das ist mit der Rolle
+    -- "Auszubildender" passiert.
+    SELECT COUNT(*) INTO own_roles
+    FROM roles
+    WHERE company_id = NULLIF(CURRENT_SETTING('app.current_company_id', TRUE), '')::UUID;
 
     IF visible_companies <> 1 THEN
         RAISE EXCEPTION 'API-Rolle sieht % Firmen statt genau einer', visible_companies;
@@ -212,8 +221,11 @@ BEGIN
         RAISE EXCEPTION 'API-Rolle sieht firmenfremde Benutzer';
     END IF;
 
-    IF visible_roles <> 9 THEN
-        RAISE EXCEPTION 'API-Rolle sieht % Rollen statt der neun eigenen', visible_roles;
+    IF own_roles < 9 THEN
+        RAISE EXCEPTION 'Die Firma hat nur % Rollen', own_roles;
+    END IF;
+    IF visible_roles <> own_roles THEN
+        RAISE EXCEPTION 'API-Rolle sieht % Rollen statt der % eigenen', visible_roles, own_roles;
     END IF;
 END;
 $$;

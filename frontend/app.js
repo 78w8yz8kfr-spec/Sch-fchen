@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.7";
+} from "./core/work-time.js?v=0.42.8";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,13 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.7";
+} from "./core/sync-queue.js?v=0.42.8";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
-  plannableEmployees
-} from "./core/permissions.js?v=0.42.7";
+  plannableEmployees,
+  sessionRoles
+} from "./core/permissions.js?v=0.42.8";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -35,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.7";
+} from "./core/state-store.js?v=0.42.8";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -652,7 +653,6 @@ import {
     employeeEditEmail: document.querySelector("#employee-edit-email"),
     employeeEditRole: document.querySelector("#employee-edit-role"),
     employeeEditApprenticeship: document.querySelector("#employee-edit-apprenticeship"),
-    employeeEditApprentice: document.querySelector("#employee-edit-apprentice"),
     employeeEditTrainer: document.querySelector("#employee-edit-trainer"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
@@ -1068,7 +1068,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.7",
+          "X-Schaefchen-Version": "0.42.8",
           ...options.headers
         }
       });
@@ -1096,7 +1096,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.7" }
+        headers: { "X-Schaefchen-Version": "0.42.8" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1143,7 +1143,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.7 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.8 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -4670,6 +4670,13 @@ import {
     elements.employeeEditMessage.textContent = "";
   }
 
+  // Der Ausbilder wird nur bei einem Auszubildenden abgefragt.
+  function applyApprenticeFieldVisibility() {
+    elements.employeeEditApprenticeship.hidden =
+      !moduleEnabled("apprentice_reports")
+      || elements.employeeEditRole.value !== "apprentice";
+  }
+
   function openEmployeeEditor(employee) {
     editingEmployeeId = employee.id;
     elements.employeeEditTitle.textContent = `${employee.firstName} ${employee.lastName}`;
@@ -4681,12 +4688,12 @@ import {
     elements.employeeEditRole.value = employee.roles.find((role) => (
       ["installer", "foreman", "managing_director", "dispatch_office", "project_manager"].includes(role)
     )) || "installer";
-    // Berichtsheft nur zeigen, wenn die Firma es hat. Ein Kaestchen fuer einen
-    // Bereich, den es nicht gibt, verspricht mehr, als die App halten kann.
+    // Der Ausbilder gehoert nur zu einem Auszubildenden, und nur, wenn die
+    // Firma das Berichtsheft hat. Ein Feld fuer einen Bereich, den es nicht
+    // gibt, verspricht mehr, als die App halten kann.
     const berichtsheft = moduleEnabled("apprentice_reports");
-    elements.employeeEditApprenticeship.hidden = !berichtsheft;
+    applyApprenticeFieldVisibility();
     if (berichtsheft) {
-      elements.employeeEditApprentice.checked = Boolean(employee.isApprentice);
       elements.employeeEditTrainer.replaceChildren();
       const leer = document.createElement("option");
       leer.value = "";
@@ -7808,12 +7815,16 @@ import {
     return !demoMode && moduleEnabled("apprentice_reports");
   }
 
+  // Auszubildender ist eine Rolle wie Monteur oder Vorarbeiter.
   function isApprentice() {
-    return apprenticeModuleReady() && Boolean(session?.user.isApprentice);
+    return apprenticeModuleReady() && sessionRoles(session).includes("apprentice");
   }
 
+  // Sehen und unterschreiben darf ausschliesslich der eingetragene Ausbilder.
+  // Ein Berichtsheft ist persoenlich: es geht weder das Buero noch die
+  // Geschaeftsfuehrung etwas an, solange sie nicht selbst ausbilden.
   function mayReviewApprentices() {
-    return apprenticeModuleReady() && (canPlan() || Boolean(session?.user.isTrainer));
+    return apprenticeModuleReady() && Boolean(session?.user.isTrainer);
   }
 
   async function refreshApprenticeData() {
@@ -7883,15 +7894,15 @@ import {
     if (elements.apprenticeForm.dataset.reportKey !== formularSchluessel) {
       elements.apprenticeCompanySummary.value = bericht?.companySummary || "";
       elements.apprenticeSchoolSummary.value = bericht?.schoolSummary || "";
-      elements.apprenticeAbsenceNote.value = bericht?.absenceNote || "";
       elements.apprenticeForm.dataset.reportKey = formularSchluessel;
       elements.apprenticeMessage.textContent = "";
     }
-    for (const feld of [
-      elements.apprenticeCompanySummary,
-      elements.apprenticeSchoolSummary,
-      elements.apprenticeAbsenceNote
-    ]) {
+    // Urlaub und Krankheit werden nicht getippt: sie stehen bereits in den
+    // genehmigten Abwesenheiten und kommen vom Server. Abgeschrieben wuerden
+    // sie irgendwann falsch abgeschrieben.
+    elements.apprenticeAbsenceNote.textContent =
+      bericht?.absenceNote || "Keine genehmigte Abwesenheit in dieser Woche.";
+    for (const feld of [elements.apprenticeCompanySummary, elements.apprenticeSchoolSummary]) {
       feld.readOnly = !offen;
     }
     elements.apprenticeSave.hidden = !offen;
@@ -7998,8 +8009,7 @@ import {
         method: "PUT",
         body: JSON.stringify({
           companySummary: elements.apprenticeCompanySummary.value,
-          schoolSummary: elements.apprenticeSchoolSummary.value,
-          absenceNote: elements.apprenticeAbsenceNote.value
+          schoolSummary: elements.apprenticeSchoolSummary.value
         })
       });
       if (submit) {
@@ -8352,10 +8362,11 @@ import {
           phone: elements.employeeEditPhone.value,
           email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,
-          // Ohne diese beiden Angaben wuerde jede Namensaenderung das
-          // Berichtsheft eines Auszubildenden stillschweigend abschalten.
-          isApprentice: elements.employeeEditApprentice.checked,
-          trainerUserId: elements.employeeEditTrainer.value || null,
+          // Ohne diese Angabe wuerde jede Namensaenderung den Ausbilder eines
+          // Auszubildenden stillschweigend entfernen.
+          trainerUserId: elements.employeeEditRole.value === "apprentice"
+            ? elements.employeeEditTrainer.value || null
+            : null,
           rowVersion: employee.rowVersion
         })
       });
@@ -10057,6 +10068,7 @@ import {
       showToast(error.message);
     }
   });
+  elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
   elements.apprenticeForm.addEventListener("submit", (event) => {
     event.preventDefault();

@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.7">
-    <script type="module" src="./app.js?v=0.42.7"></script>
-    <script src="./version.js?v=0.42.7" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.8">
+    <script type="module" src="./app.js?v=0.42.8"></script>
+    <script src="./version.js?v=0.42.8" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.7</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.8</p>
         </div>
       </section>
 
@@ -642,9 +642,8 @@
                 <label for="apprentice-school-summary">Berufsschule</label>
                 <textarea id="apprentice-school-summary" rows="3" maxlength="4000"
                   placeholder="Themen des Unterrichts"></textarea>
-                <label for="apprentice-absence-note">Urlaub und Krankheit</label>
-                <input id="apprentice-absence-note" type="text" maxlength="1000"
-                  placeholder="Nur ausfüllen, wenn zutreffend">
+                <p class="apprentice-absence-label">Urlaub und Krankheit</p>
+                <p id="apprentice-absence-note" class="apprentice-absence-note">Keine Abwesenheit in dieser Woche.</p>
                 <div class="apprentice-actions">
                   <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
                   <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
@@ -1644,6 +1643,7 @@
                 <label for="employee-role">Rolle</label>
                 <select id="employee-role" required>
                   <option value="installer">Monteur</option>
+                  <option value="apprentice">Auszubildender</option>
                   <option value="foreman">Vorarbeiter</option>
                   <option data-management-role value="managing_director">Geschäftsführer</option>
                   <option data-management-role value="dispatch_office">Büro / Disposition</option>
@@ -1696,6 +1696,7 @@
                 <label for="employee-edit-role">Rolle</label>
                 <select id="employee-edit-role" required>
                   <option value="installer">Monteur</option>
+                  <option value="apprentice">Auszubildender</option>
                   <option value="foreman">Vorarbeiter</option>
                   <option data-management-role value="managing_director">Geschäftsführer</option>
                   <option data-management-role value="dispatch_office">Büro / Disposition</option>
@@ -1703,15 +1704,11 @@
                 </select>
                 <p class="field-help">Die Rollenänderung gilt nach dem nächsten Laden der App. Startpasswörter werden hier nicht angezeigt.</p>
                 <div id="employee-edit-apprenticeship" hidden>
-                  <label class="employee-edit-check" for="employee-edit-apprentice">
-                    <input id="employee-edit-apprentice" type="checkbox">
-                    <span>Führt ein Berichtsheft</span>
-                  </label>
                   <label for="employee-edit-trainer">Ausbilder</label>
                   <select id="employee-edit-trainer">
                     <option value="">Noch niemand</option>
                   </select>
-                  <p class="field-help">Der Ausbilder gibt die Wochenberichte frei, auch ohne Planungsrolle.</p>
+                  <p class="field-help">Nur der eingetragene Ausbilder sieht und unterschreibt das Berichtsheft.</p>
                 </div>
                 <div class="form-actions">
                   <button id="employee-edit-save" class="button button--primary" type="submit">Änderungen speichern</button>

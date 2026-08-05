@@ -14,16 +14,20 @@ mit einer Bemerkung zurück.
 
 | Rolle | Recht |
 | --- | --- |
-| Auszubildender (`users.is_apprentice`) | schreibt und reicht seine eigenen Wochenberichte ein |
-| Ausbilder (`users.trainer_user_id`) | sieht und entscheidet die Berichte **seiner** Auszubildenden, auch ohne Planungsrolle |
-| Planung (Büro, Geschäftsführung, …) | sieht und entscheidet alle Berichte der Firma |
+| Auszubildender (Rolle `apprentice`) | schreibt und reicht seine eigenen Wochenberichte ein |
+| Ausbilder (`users.trainer_user_id`) | sieht und unterschreibt die Berichte **seiner** Auszubildenden |
+| alle anderen — Büro, Geschäftsführung, Administrator | sehen nichts davon |
 
-Ein Ausbilder ist häufig Vorarbeiter und hat keine Planungsrolle. Deshalb
-hängt sein Recht an der Zuordnung, nicht an einer Rolle — er bekommt dadurch
-aber auch keinen weiteren Einblick ins Büro.
+**Ein Berichtsheft ist persönlich.** Darin steht, was jemand gelernt hat, wann
+er krank war und was ihm der Ausbilder zurückgegeben hat. Das geht das Büro
+nichts an, solange es nicht selbst ausbildet — und die Geschäftsführung
+ebenso wenig. Wer den Ausbilder wechselt, ändert damit auch, wer den Nachweis
+sehen darf; das ist gewollt und bleibt am Mitarbeiter nachvollziehbar.
 
-Beide Angaben werden am Mitarbeiter gepflegt (Verwaltung → Mitarbeiter
-bearbeiten), sichtbar nur, wenn die Firma das Modul hat.
+„Auszubildender" ist eine eigene Rolle wie Monteur oder Vorarbeiter. Der
+Ausbilder wird beim Auszubildenden hinterlegt (Verwaltung → Mitarbeiter
+bearbeiten), sichtbar nur, wenn die Firma das Modul hat und die Rolle gewählt
+ist.
 
 ## Ablauf
 
@@ -39,6 +43,11 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 * Die geleistete Arbeitszeit wird **nicht eingetippt**, sondern aus der
   Zeiterfassung übernommen. Wer sie abschreiben müsste, schriebe sie
   irgendwann falsch ab — und die Kammer sähe eine andere Zahl als das Büro.
+* **Urlaub und Krankheit füllen sich ebenso von selbst**, aus den genehmigten
+  Abwesenheiten der Woche („Krank: Do, Fr"). Ein offener Antrag gehört noch
+  nicht in den Nachweis. Die Tage werden in SQL formatiert, nicht über ein
+  Javascript-Datum: Mitternacht in Berlin ist in UTC der Vortag, und der
+  Eintrag rutschte sonst je nach Zeitzone des Servers um einen Tag.
 * Eine **Rückgabe ohne Bemerkung** ist nicht möglich: der Auszubildende wüsste
   sonst nicht, was er nachbessern soll.
 * Ein **freigegebener** Nachweis ist unveränderlich, auch für den Ausbilder.

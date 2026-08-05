@@ -10,6 +10,7 @@ const ENTRY_TYPES = new Set([
 const SITE_TYPES = new Set(["site_arrival", "site_departure", "next_site"]);
 const EMPLOYEE_ROLES = new Set([
   "installer",
+  "apprentice",
   "foreman",
   "managing_director",
   "dispatch_office",
@@ -240,9 +241,8 @@ export function validateEmployeeUpdate(body) {
     email: optionalText(body.email, "E-Mail", 254),
     phone: optionalText(body.phone, "Telefon", 50),
     role,
-    // Berichtsheft: wer eines fuehrt und wer es unterschreibt. Beide Angaben
-    // gehoeren an den Mitarbeiter, nicht an eine eigene Verwaltung daneben.
-    isApprentice: boolean(body.isApprentice ?? false, "Auszubildender"),
+    // Der Ausbilder gehoert an den Mitarbeiter, nicht in eine eigene
+    // Verwaltung daneben. Ob jemand ein Berichtsheft fuehrt, sagt seine Rolle.
     trainerUserId: optionalUuid(body.trainerUserId, "Ausbilder"),
     rowVersion
   };
@@ -1972,12 +1972,14 @@ export function validateApprenticeWeek(value) {
   return weekStart;
 }
 
+// Urlaub und Krankheit stehen nicht darin: sie kommen aus den genehmigten
+// Abwesenheiten. Wer sie abschreiben muesste, schriebe sie irgendwann falsch
+// ab, und im Berichtsheft stuende etwas anderes als im Urlaubskonto.
 export function validateApprenticeReport(body) {
   rejectTenantFields(body);
   return {
     companySummary: optionalText(body.companySummary, "Tätigkeiten im Betrieb", 4000) || "",
-    schoolSummary: optionalText(body.schoolSummary, "Berufsschule", 4000),
-    absenceNote: optionalText(body.absenceNote, "Urlaub und Krankheit", 1000)
+    schoolSummary: optionalText(body.schoolSummary, "Berufsschule", 4000)
   };
 }
 
