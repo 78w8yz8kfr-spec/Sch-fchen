@@ -33,8 +33,10 @@ import { buildTimesheetWorkbook } from "./timesheet-export.mjs";
 import { buildTimesheetPdf } from "./timesheet-pdf.mjs";
 import { buildVdeInspectionPdf } from "./vde-pdf.mjs";
 import { loadCompanyModules } from "./company-modules.mjs";
+import { buildApprenticeReportPdf, trainingYear } from "./apprentice-pdf.mjs";
 import {
   APPRENTICE_MODULE_KEY,
+  apprenticeReportDto,
   listApprenticeReviews,
   listOwnApprenticeReports,
   loadApprenticeProfile,
@@ -177,7 +179,10 @@ function json(response, status, body, headers = {}) {
 // Fassung dieses Servers. Sie stand frueher als Zeichenkette mitten in der
 // Fehleraufzeichnung und wurde beim Ausliefern regelmaessig vergessen; ein
 // Fehlerbericht nannte dann eine Fassung, die es laengst nicht mehr gab.
-export const APPLICATION_VERSION = "0.42.8";
+// Kennungsform, wie sie die Datenbank vergibt.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const APPLICATION_VERSION = "0.42.9";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1861,6 +1866,62 @@ async function putOwnApprenticeReport(client, context, weekStart, input) {
 async function submitApprenticeReport(client, context, weekStart) {
   const profile = await requireApprentice(client, context);
   return submitOwnApprenticeReport(client, context, weekStart, profile, { InputError });
+}
+
+// Der gedruckte Nachweis. Der Auszubildende darf seinen eigenen holen, sein
+// Ausbilder ebenfalls - sonst niemand.
+async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, staticDirectory) {
+  await requireEnabledModule(client, context, APPRENTICE_MODULE_KEY);
+  const eigener = !apprenticeUserId || apprenticeUserId === context.userId;
+  const profile = await loadApprenticeProfile(client, context, apprenticeUserId || context.userId);
+  if (!profile) {
+    throw new InputError("Der Auszubildende wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  if (eigener) {
+    if (!profile.isApprentice) {
+      throw new InputError("Für dich ist kein Berichtsheft hinterlegt.", 403, "not_an_apprentice");
+    }
+  } else if (profile.trainerUserId !== context.userId) {
+    throw new InputError(
+      "Ausbildungsnachweise sieht nur der eingetragene Ausbilder.",
+      403,
+      "apprentice_review_forbidden"
+    );
+  }
+
+  const result = await client.query(
+    `SELECT *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text
+     FROM apprentice_reports
+     WHERE company_id = $1 AND apprentice_user_id = $2 AND week_start = $3::DATE`,
+    [context.companyId, profile.userId, weekStart]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError(
+      "Für diese Woche gibt es noch keinen Bericht.",
+      404,
+      "apprentice_report_not_found"
+    );
+  }
+  const company = await client.query(
+    "SELECT legal_name, display_name, logo_object_key FROM companies WHERE id = $1",
+    [context.companyId]
+  );
+  const row = company.rows[0];
+  const report = apprenticeReportDto(result.rows[0]);
+  const pdf = await buildApprenticeReportPdf({
+    report,
+    apprentice: {
+      name: profile.name,
+      occupation: profile.occupation,
+      trainingYear: trainingYear(profile.startedOn, report.weekStart)
+    },
+    company: { legalName: row.legal_name, displayName: row.display_name },
+    companyLogo: await readCompanyLogo(staticDirectory, row.logo_object_key)
+  });
+  return {
+    content: pdf,
+    fileName: `Berichtsheft-${report.weekStart}-${profile.name.replace(/[^A-Za-zÄÖÜäöüß-]+/g, "-")}.pdf`
+  };
 }
 
 async function getApprenticeReviews(client, context) {
@@ -10076,7 +10137,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         /^\/api\/v1\/apprentice\/reports\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
       if (request.method === "PUT" && apprenticeWeekMatch) {
         const weekStart = validateApprenticeWeek(apprenticeWeekMatch[1]);
-        const input = validateApprenticeReport(await readJson(request));
+        const input = validateApprenticeReport(await readJson(request), weekStart);
         const report = await withReadySession(
           pool,
           tokenHash,
@@ -10095,6 +10156,24 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => submitApprenticeReport(client, context, weekStart)
         );
         return json(response, 200, { report });
+      }
+
+      const apprenticePdfMatch =
+        /^\/api\/v1\/apprentice\/reports\/(\d{4}-\d{2}-\d{2})\/pdf$/.exec(url.pathname);
+      if (request.method === "GET" && apprenticePdfMatch) {
+        const weekStart = validateApprenticeWeek(apprenticePdfMatch[1]);
+        const apprenticeUserId = url.searchParams.get("apprenticeUserId");
+        if (apprenticeUserId && !UUID_PATTERN.test(apprenticeUserId)) {
+          throw new InputError("Die Kennung des Auszubildenden ist ungültig.");
+        }
+        const datei = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => buildApprenticePdf(
+            client, context, weekStart, apprenticeUserId, config.staticDirectory
+          )
+        );
+        return binaryAttachment(response, { ...datei, mimeType: "application/pdf" });
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/admin/apprentice-reports") {

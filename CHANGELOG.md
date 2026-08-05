@@ -4,6 +4,40 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Berichtsheft wird täglich geschrieben und wöchentlich ausgedruckt.**
+  Der Wochentext ist entfallen — er sagte nicht, an welchem Tag was war, und
+  genau das will die Kammer sehen.
+  - Eine **Zeile je Tag**: Tag, Datum, Tätigkeiten, Arbeitszeit. Montag bis
+    Freitag stehen immer da; Samstag und Sonntag nur, wenn an ihnen etwas war.
+    Dazu die „Bemerkungen zur Woche“ der Vorlage.
+  - **Wochenbericht als A4-PDF**, eine Seite je Woche: Logo, Kopfdaten mit
+    Lehrjahr und Ausbildungsberuf, Tagestabelle, Bemerkungen und beide
+    Unterschriften mit Namen und Datum. Das Lehrjahr rechnet sich aus dem
+    Ausbildungsbeginn aus — von Hand gepflegt wäre es spätestens im zweiten
+    Jahr falsch.
+  - Die Seite passt sich an: die Tabelle verkleinert ihre Schrift, bis die
+    Woche auf das Blatt passt. Erst wenn selbst die kleinste noch lesbare
+    Schrift nicht reicht, kommt ein zweites Blatt. Geschriebenes abzuschneiden
+    wäre der schlechtere Handel — der Nachweis wäre unvollständig.
+  - Gefunden und behoben, bevor es jemand ausgedruckt hätte: die Tabelle wuchs
+    mit dem Text und schob Bemerkungen und Unterschriften unter den Blattrand.
+    Das PDF hatte trotzdem genau eine Seite, auf dem Papier fehlte die halbe
+    Woche. Der Test misst jetzt nach, wo tatsächlich gezeichnet wird.
+- **Das Berichtsheft kommt zum Feierabend.** Es lag allein im Wochenbereich —
+  dort sucht am Feierabend niemand danach, und wer erst am Freitag anfängt,
+  weiß den Montag nicht mehr. Wer als Auszubildender Feierabend stempelt, wird
+  jetzt gefragt, was er heute gemacht hat; die Zeitbuchung wartet dabei auf
+  nichts. Auf der Startseite steht das Heft außerdem als eigene Karte, direkt
+  unter dem Arbeitstag.
+- Zwei Anzeigefehler behoben:
+  - Ein Auszubildender las in seinem eigenen Konto **„Monteur“**. Die
+    Rollenbezeichnung kannte die neue Rolle nicht und fiel auf den Monteur
+    zurück — in der Planung ebenso.
+  - Die **Konto-Karte stand nach jeder Anmeldung auch auf der Startseite**. Der
+    Bereichswechsel hatte sie richtig verborgen, das spätere Zeichnen holte sie
+    wieder hervor.
+- Fassung 0.42.9, Speicher `schaefchen-online-v51`, Migrationen 060 und 061.
+
 - Berichtsheft, drei Änderungen nach dem ersten Durchgang:
   - **„Auszubildender" ist eine eigene Rolle** wie Monteur oder Vorarbeiter,
     kein Kennzeichen am Mitarbeiter. Zwei Quellen für dieselbe Aussage wären

@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.8";
+} from "./core/work-time.js?v=0.42.9";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.8";
+} from "./core/sync-queue.js?v=0.42.9";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.8";
+} from "./core/permissions.js?v=0.42.9";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.8";
+} from "./core/state-store.js?v=0.42.9";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -199,13 +199,26 @@ import {
     apprenticeWeek: document.querySelector("#apprentice-week"),
     apprenticeReturn: document.querySelector("#apprentice-return"),
     apprenticeForm: document.querySelector("#apprentice-form"),
-    apprenticeCompanySummary: document.querySelector("#apprentice-company-summary"),
-    apprenticeSchoolSummary: document.querySelector("#apprentice-school-summary"),
-    apprenticeAbsenceNote: document.querySelector("#apprentice-absence-note"),
+    apprenticeDays: document.querySelector("#apprentice-days"),
+    apprenticeWeekRemark: document.querySelector("#apprentice-week-remark"),
     apprenticeSave: document.querySelector("#apprentice-save"),
+    apprenticePrint: document.querySelector("#apprentice-print"),
     apprenticeSubmit: document.querySelector("#apprentice-submit"),
     apprenticeMessage: document.querySelector("#apprentice-message"),
     apprenticeHistory: document.querySelector("#apprentice-history"),
+    apprenticeTodaySection: document.querySelector("#apprentice-today-section"),
+    apprenticeTodayState: document.querySelector("#apprentice-today-state"),
+    apprenticeTodaySummary: document.querySelector("#apprentice-today-summary"),
+    apprenticeTodayOpen: document.querySelector("#apprentice-today-open"),
+    apprenticeWeekOpen: document.querySelector("#apprentice-week-open"),
+    apprenticeTodayDialog: document.querySelector("#apprentice-today-dialog"),
+    apprenticeTodayForm: document.querySelector("#apprentice-today-form"),
+    apprenticeTodayEyebrow: document.querySelector("#apprentice-today-eyebrow"),
+    apprenticeTodayMeta: document.querySelector("#apprentice-today-meta"),
+    apprenticeTodayText: document.querySelector("#apprentice-today-text"),
+    apprenticeTodayClose: document.querySelector("#apprentice-today-close"),
+    apprenticeTodayLater: document.querySelector("#apprentice-today-later"),
+    apprenticeTodayMessage: document.querySelector("#apprentice-today-message"),
     apprenticeReviewPanel: document.querySelector("#apprentice-review-panel"),
     apprenticeReviewList: document.querySelector("#apprentice-review-list"),
     apprenticeReviewCount: document.querySelector("#apprentice-review-count"),
@@ -1068,7 +1081,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.8",
+          "X-Schaefchen-Version": "0.42.9",
           ...options.headers
         }
       });
@@ -1096,7 +1109,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.8" }
+        headers: { "X-Schaefchen-Version": "0.42.9" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1143,7 +1156,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.8 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.9 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -4908,7 +4921,8 @@ import {
         project_manager: "Projektleiter",
         executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
         foreman: "Vorarbeiter",
-        installer: "Monteur"
+        installer: "Monteur",
+        apprentice: "Auszubildender"
       };
       appendAdminListItem(
         elements.employeeList,
@@ -7711,6 +7725,13 @@ import {
         element.hidden = !canPlan() || !adminPanes.has(pane);
         return;
       }
+      // Die Berichtsheft-Karte gehoert zur Startseite, aber nur fuer
+      // Auszubildende. Ohne diese Ausnahme zeigte der Wechsel auf "Start" sie
+      // jedem - der Bereichswechsel kennt die Rolle sonst nicht.
+      if (element === elements.apprenticeTodaySection) {
+        element.hidden = pane !== "start" || !isApprentice();
+        return;
+      }
       element.hidden = element.dataset.dashboardPane !== pane;
     });
 
@@ -7744,6 +7765,8 @@ import {
       more: elements.navMore
     }[pane] || elements.navStart;
     activateNavigation(activeButton);
+    // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
+    renderAccountCard();
     const title = {
       week: "Woche",
       site: "Baustelle",
@@ -7872,6 +7895,7 @@ import {
   }
 
   function renderApprenticePanel() {
+    renderApprenticeToday();
     elements.apprenticePanel.hidden = !isApprentice();
     if (elements.apprenticePanel.hidden) return;
     const bericht = currentApprenticeReport();
@@ -7890,23 +7914,17 @@ import {
     // Sonst fuellte sich das Formular einmal beim Zeichnen - da lagen die
     // Daten aber noch gar nicht vor - und danach nie wieder: der Azubi sah
     // leere Felder und ueberschrieb damit beim Speichern seinen Bericht.
-    const formularSchluessel = `${selectedWeekStart}|${bericht?.rowVersion ?? 0}`;
+    const formularSchluessel = `${selectedWeekStart}|${bericht?.rowVersion ?? 0}|${offen}`;
     if (elements.apprenticeForm.dataset.reportKey !== formularSchluessel) {
-      elements.apprenticeCompanySummary.value = bericht?.companySummary || "";
-      elements.apprenticeSchoolSummary.value = bericht?.schoolSummary || "";
+      renderApprenticeDays(bericht, offen);
+      elements.apprenticeWeekRemark.value = bericht?.weekRemark || "";
       elements.apprenticeForm.dataset.reportKey = formularSchluessel;
       elements.apprenticeMessage.textContent = "";
     }
-    // Urlaub und Krankheit werden nicht getippt: sie stehen bereits in den
-    // genehmigten Abwesenheiten und kommen vom Server. Abgeschrieben wuerden
-    // sie irgendwann falsch abgeschrieben.
-    elements.apprenticeAbsenceNote.textContent =
-      bericht?.absenceNote || "Keine genehmigte Abwesenheit in dieser Woche.";
-    for (const feld of [elements.apprenticeCompanySummary, elements.apprenticeSchoolSummary]) {
-      feld.readOnly = !offen;
-    }
+    elements.apprenticeWeekRemark.readOnly = !offen;
     elements.apprenticeSave.hidden = !offen;
     elements.apprenticeSubmit.hidden = !offen;
+    elements.apprenticePrint.hidden = !bericht;
 
     elements.apprenticeHistory.replaceChildren();
     for (const eintrag of (apprenticeState || []).slice(0, 12)) {
@@ -7920,6 +7938,76 @@ import {
       zeile.append(woche, zustand);
       elements.apprenticeHistory.append(zeile);
     }
+  }
+
+  // Eine Zeile je Tag - so, wie der Nachweis am Ende ausgedruckt wird.
+  //
+  // Montag bis Freitag stehen immer da, damit kein Tag stillschweigend fehlt.
+  // Samstag und Sonntag erscheinen nur, wenn an ihnen etwas war: gearbeitet,
+  // krank oder aufgeschrieben. Ein leeres Wochenende jede Woche mitzuschleppen
+  // waere auf dem Handy nur Scrollweg.
+  function renderApprenticeDays(bericht, offen) {
+    const geschrieben = new Map(
+      (bericht?.dailyEntries || []).map((zeile) => [zeile.workDate, zeile])
+    );
+    const tageDerWoche = weekState?.weekStart === selectedWeekStart
+      ? new Map(weekState.days.map(({ workDate, workDay }) => [workDate, workDay]))
+      : new Map();
+
+    elements.apprenticeDays.replaceChildren();
+    for (let abstand = 0; abstand < 7; abstand += 1) {
+      const datum = addIsoDays(selectedWeekStart, abstand);
+      const zeile = geschrieben.get(datum);
+      const arbeitstag = tageDerWoche.get(datum);
+      const minuten = zeile?.workedMinutes ?? Number(arbeitstag?.workMinutes || 0);
+      const genehmigt = approvedAbsenceForDate(datum);
+      const abwesenheit = zeile?.absence
+        || (genehmigt ? absenceTypeLabel(genehmigt.absenceType) : null);
+      const taetigkeiten = zeile?.activities || [];
+      if (abstand > 4 && minuten === 0 && !abwesenheit && taetigkeiten.length === 0) continue;
+
+      const block = document.createElement("div");
+      block.className = "apprentice-day";
+      block.dataset.workDate = datum;
+
+      const kopf = document.createElement("div");
+      kopf.className = "apprentice-day__head";
+      const name = document.createElement("strong");
+      name.textContent = dateFromIso(datum).toLocaleDateString("de-DE", {
+        weekday: "long", day: "2-digit", month: "2-digit"
+      });
+      const zusatz = document.createElement("span");
+      // Arbeitszeit und Abwesenheit werden nicht getippt: sie stehen bereits in
+      // der Zeiterfassung und in den genehmigten Abwesenheiten. Abgeschrieben
+      // wuerden sie irgendwann falsch abgeschrieben.
+      zusatz.textContent = [
+        abwesenheit,
+        minuten > 0 ? `${formatMinutes(minuten)} h` : null
+      ].filter(Boolean).join(" · ");
+      kopf.append(name, zusatz);
+
+      const feld = document.createElement("textarea");
+      feld.rows = 2;
+      feld.maxLength = 3600;
+      feld.placeholder = "Was hast du heute gemacht? Eine Zeile je Tätigkeit.";
+      feld.value = taetigkeiten.join("\n");
+      feld.readOnly = !offen;
+      feld.setAttribute("aria-label", `Tätigkeiten am ${name.textContent}`);
+
+      block.append(kopf, feld);
+      elements.apprenticeDays.append(block);
+    }
+  }
+
+  // Was in den Tagesfeldern steht, als Tageszeilen fuer den Server. Leere Tage
+  // fallen weg; der Server ergaenzt sie ohnehin, wenn an ihnen etwas war.
+  function collectApprenticeDays() {
+    return [...elements.apprenticeDays.querySelectorAll(".apprentice-day")]
+      .map((block) => ({
+        workDate: block.dataset.workDate,
+        activities: block.querySelector("textarea").value
+      }))
+      .filter((zeile) => zeile.activities.trim());
   }
 
   function renderApprenticeReviews() {
@@ -7948,21 +8036,40 @@ import {
       zusatz.textContent = `${APPRENTICE_STATUS_LABEL[bericht.status]} · ${
         formatMinutes(bericht.workedMinutes)
       } h`;
-      const inhalt = document.createElement("p");
-      inhalt.className = "apprentice-review-summary";
-      inhalt.textContent = bericht.companySummary;
-      kopf.append(name, zusatz, inhalt);
-      if (bericht.schoolSummary) {
-        const schule = document.createElement("p");
-        schule.className = "apprentice-review-summary";
-        schule.textContent = `Berufsschule: ${bericht.schoolSummary}`;
-        kopf.append(schule);
+      kopf.append(name, zusatz);
+      // Der Ausbilder soll sehen, was an welchem Tag war, bevor er
+      // unterschreibt. Ein Wochentext sagte ihm das nicht.
+      for (const tag of bericht.dailyEntries || []) {
+        const inhalt = document.createElement("p");
+        inhalt.className = "apprentice-review-summary";
+        const eintraege = [
+          ...(tag.absence ? [tag.absence] : []),
+          ...(tag.activities || [])
+        ];
+        inhalt.textContent = `${shortDate(tag.workDate)}: ${eintraege.join(" · ") || "–"}`;
+        kopf.append(inhalt);
+      }
+      if (bericht.weekRemark) {
+        const bemerkung = document.createElement("p");
+        bemerkung.className = "apprentice-review-summary";
+        bemerkung.textContent = `Bemerkung: ${bericht.weekRemark}`;
+        kopf.append(bemerkung);
       }
       zeile.append(kopf);
 
+      const knoepfe = document.createElement("div");
+      knoepfe.className = "apprentice-actions";
+      const drucken = document.createElement("button");
+      drucken.type = "button";
+      drucken.className = "button button--secondary";
+      drucken.textContent = "Drucken";
+      drucken.addEventListener("click", () => printApprenticeReport(
+        bericht.weekStart, bericht.apprenticeUserId
+      ));
+      knoepfe.append(drucken);
+      zeile.append(knoepfe);
+
       if (bericht.status === "submitted") {
-        const knoepfe = document.createElement("div");
-        knoepfe.className = "apprentice-actions";
         const freigeben = document.createElement("button");
         freigeben.type = "button";
         freigeben.className = "button button--primary";
@@ -7977,9 +8084,26 @@ import {
           if (bemerkung?.trim()) decideApprentice([bericht.id], "returned", bemerkung.trim());
         });
         knoepfe.append(freigeben, zurueck);
-        zeile.append(knoepfe);
       }
       elements.apprenticeReviewList.append(zeile);
+    }
+  }
+
+  // Der Wochenbericht als A4-Blatt. Die Kammer will Papier, kein Konto in
+  // einer App - und im Ordner steht am Ende genau eine Seite je Woche.
+  async function printApprenticeReport(weekStart, apprenticeUserId = null) {
+    const feld = apprenticeUserId ? elements.apprenticeReviewMessage : elements.apprenticeMessage;
+    feld.textContent = "Der Wochenbericht wird erstellt …";
+    try {
+      await downloadFile(
+        `./api/v1/apprentice/reports/${weekStart}/pdf${
+          apprenticeUserId ? `?apprenticeUserId=${apprenticeUserId}` : ""
+        }`,
+        `Berichtsheft-${weekStart}.pdf`
+      );
+      feld.textContent = "";
+    } catch (error) {
+      feld.textContent = error.message;
     }
   }
 
@@ -8008,8 +8132,8 @@ import {
       await requestJson(`./api/v1/apprentice/reports/${selectedWeekStart}`, {
         method: "PUT",
         body: JSON.stringify({
-          companySummary: elements.apprenticeCompanySummary.value,
-          schoolSummary: elements.apprenticeSchoolSummary.value
+          dailyEntries: collectApprenticeDays(),
+          weekRemark: elements.apprenticeWeekRemark.value
         })
       });
       if (submit) {
@@ -8023,6 +8147,108 @@ import {
     } catch (error) {
       elements.apprenticeMessage.textContent = error.message;
     }
+  }
+
+  // Das Berichtsheft ist Tagesarbeit, kein Wochenrueckblick. Wer erst am
+  // Freitag anfaengt, weiss den Montag nicht mehr - und im Wochenbereich, wo
+  // das Heft bisher allein stand, sucht am Feierabend niemand danach. Darum
+  // fragt Schaefchen genau dann, wenn der Tag zu Ende geht.
+  //
+  // Der Tageseintrag haengt immer an der laufenden Woche, nicht an der Woche,
+  // die gerade angezeigt wird: wer im Stundenzettel zurueckblaettert und dann
+  // Feierabend macht, traegt sonst in die falsche Woche ein.
+  function apprenticeTodayReport() {
+    return (apprenticeState || []).find((bericht) => bericht.weekStart === currentWeekStart())
+      || null;
+  }
+
+  function apprenticeTodayEntry() {
+    const heute = localDateKey();
+    return (apprenticeTodayReport()?.dailyEntries || [])
+      .find((zeile) => zeile.workDate === heute) || null;
+  }
+
+  function apprenticeTodayEditable() {
+    return isApprentice()
+      && ["draft", "returned"].includes(apprenticeTodayReport()?.status || "draft");
+  }
+
+  function renderApprenticeToday() {
+    elements.apprenticeTodaySection.hidden = !isApprentice() || currentDashboardPane !== "start";
+    if (!isApprentice()) return;
+    const bericht = apprenticeTodayReport();
+    const taetigkeiten = apprenticeTodayEntry()?.activities || [];
+    const offen = apprenticeTodayEditable();
+    elements.apprenticeTodayState.textContent = APPRENTICE_STATUS_LABEL[bericht?.status || "draft"];
+    elements.apprenticeTodaySummary.textContent = taetigkeiten.length
+      ? `Heute: ${taetigkeiten.join(" · ")}`
+      : offen
+        ? "Für heute steht noch nichts im Berichtsheft."
+        : "Diese Woche ist bereits eingereicht.";
+    elements.apprenticeTodaySection.classList.toggle(
+      "apprentice-today-section--offen", offen && taetigkeiten.length === 0
+    );
+    elements.apprenticeTodayOpen.hidden = !offen;
+  }
+
+  function openApprenticeToday({ feierabend = false } = {}) {
+    if (!apprenticeTodayEditable()) return;
+    const heute = localDateKey();
+    const eintrag = apprenticeTodayEntry();
+    const genehmigt = approvedAbsenceForDate(heute);
+    const abwesenheit = eintrag?.absence
+      || (genehmigt ? absenceTypeLabel(genehmigt.absenceType) : null);
+    const minuten = eintrag?.workedMinutes ?? calculatedTimes().work;
+    elements.apprenticeTodayEyebrow.textContent = feierabend
+      ? "Ausbildungsnachweis · Feierabend"
+      : "Ausbildungsnachweis · Heute";
+    elements.apprenticeTodayMeta.textContent = [
+      dateFromIso(heute).toLocaleDateString("de-DE", {
+        weekday: "long", day: "2-digit", month: "2-digit"
+      }),
+      abwesenheit,
+      minuten > 0 ? `${formatMinutes(minuten)} h` : null
+    ].filter(Boolean).join(" · ");
+    elements.apprenticeTodayText.value = (eintrag?.activities || []).join("\n");
+    elements.apprenticeTodayMessage.textContent = "";
+    if (!elements.apprenticeTodayDialog.open) elements.apprenticeTodayDialog.showModal();
+    elements.apprenticeTodayText.focus();
+  }
+
+  // Die Schnittstelle nimmt immer die ganze Woche entgegen. Die uebrigen Tage
+  // gehen darum unveraendert mit - haetten sie gefehlt, waeren sie geloescht.
+  async function saveApprenticeToday() {
+    const heute = localDateKey();
+    const bericht = apprenticeTodayReport();
+    const text = elements.apprenticeTodayText.value;
+    const zeilen = (bericht?.dailyEntries || [])
+      .filter((zeile) => zeile.workDate !== heute)
+      .map((zeile) => ({ workDate: zeile.workDate, activities: zeile.activities }));
+    if (text.trim()) zeilen.push({ workDate: heute, activities: text });
+
+    elements.apprenticeTodayMessage.textContent = "Der Eintrag wird gespeichert …";
+    try {
+      await requestJson(`./api/v1/apprentice/reports/${currentWeekStart()}`, {
+        method: "PUT",
+        body: JSON.stringify({ dailyEntries: zeilen, weekRemark: bericht?.weekRemark || "" })
+      });
+      elements.apprenticeTodayMessage.textContent = "";
+      elements.apprenticeTodayDialog.close();
+      await refreshApprenticeData();
+      showToast("Im Berichtsheft eingetragen.");
+    } catch (error) {
+      elements.apprenticeTodayMessage.textContent = error.message;
+    }
+  }
+
+  // Feierabend: erst die Zeitbuchung, dann die Frage nach dem Tag. Die Buchung
+  // wartet auf nichts - ein spaeter gestempelter Feierabend waere eine falsche
+  // Arbeitszeit, und die faellt schwerer ins Gewicht als ein fehlender Satz.
+  function endWorkday() {
+    addEntry("clock_out");
+    if (!navigator.onLine) return;
+    if (apprenticeTodayEntry()?.activities?.length) return;
+    openApprenticeToday({ feierabend: true });
   }
 
   async function refreshAbsenceData() {
@@ -10038,9 +10264,16 @@ import {
   // Unter "Mehr" stand fuer einen Monteur bisher nur ein Hinweistext. Wer
   // seine Personalnummer oder die Firma nachsehen wollte, fand sie nirgends,
   // und abmelden ging nur ueber das kleine Zeichen oben rechts.
+  //
+  // Sie gehoert unter "Mehr" und nirgendwo sonst. Ohne den Bereich in dieser
+  // Bedingung stand sie nach jeder Anmeldung auch auf der Startseite: der
+  // Bereichswechsel hatte sie richtig verborgen, das spaetere Zeichnen holte
+  // sie wieder hervor.
   function renderAccountCard() {
-    elements.accountCard.hidden = demoMode || !session;
-    if (elements.accountCard.hidden) return;
+    elements.accountCard.hidden = demoMode || !session || currentDashboardPane !== "more";
+    // Beschriftet wird sie trotzdem: der Bereichswechsel blendet sie ein, ohne
+    // sie zu fuellen - sonst stuenden dort vier Striche.
+    if (demoMode || !session) return;
     elements.accountName.textContent = `${session.user.firstName} ${session.user.lastName}`;
     elements.accountPersonnelNumber.textContent = session.user.personnelNumber;
     elements.accountCompany.textContent = `${session.company.displayName} · ${session.company.number}`;
@@ -10070,10 +10303,24 @@ import {
   });
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
+  elements.apprenticePrint.addEventListener("click", () => printApprenticeReport(selectedWeekStart));
   elements.apprenticeForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void saveApprenticeReport(true);
   });
+  elements.apprenticeTodayOpen.addEventListener("click", () => openApprenticeToday());
+  elements.apprenticeWeekOpen.addEventListener("click", () => {
+    selectedWeekStart = currentWeekStart();
+    showDashboardPane("week");
+    void refreshWeekData();
+    elements.apprenticePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  elements.apprenticeTodayForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void saveApprenticeToday();
+  });
+  elements.apprenticeTodayClose.addEventListener("click", () => elements.apprenticeTodayDialog.close());
+  elements.apprenticeTodayLater.addEventListener("click", () => elements.apprenticeTodayDialog.close());
   elements.apprenticeApproveAll.addEventListener("click", () => {
     const offene = (apprenticeReviewState || [])
       .filter((bericht) => bericht.status === "submitted")
@@ -10082,7 +10329,7 @@ import {
   });
   elements.accountLogout.addEventListener("click", () => elements.closePreview.click());
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
-  elements.secondaryAction.addEventListener("click", () => addEntry("clock_out"));
+  elements.secondaryAction.addEventListener("click", () => endWorkday());
   // Ohne die eigene Funktion bekaeme openEmployeeSiteWorkspace das Klickereignis
   // als angeforderten Einsatz. Es ist wahr, hat aber keine Baustelle: die Akte
   // brach dann mit "Für heute ist keine Baustelle freigegeben" ab, obwohl ein

@@ -1972,14 +1972,53 @@ export function validateApprenticeWeek(value) {
   return weekStart;
 }
 
-// Urlaub und Krankheit stehen nicht darin: sie kommen aus den genehmigten
-// Abwesenheiten. Wer sie abschreiben muesste, schriebe sie irgendwann falsch
-// ab, und im Berichtsheft stuende etwas anderes als im Urlaubskonto.
-export function validateApprenticeReport(body) {
+// Ein Wochenbericht besteht aus Tageszeilen: was an diesem Tag getan wurde.
+// Die Arbeitszeit und die Abwesenheiten stehen nicht darin - sie kommen aus
+// der Zeiterfassung und den genehmigten Abwesenheiten. Wer sie abschreiben
+// muesste, schriebe sie irgendwann falsch ab.
+export function validateApprenticeReport(body, weekStart) {
   rejectTenantFields(body);
+  const entries = Array.isArray(body.dailyEntries) ? body.dailyEntries : [];
+  if (entries.length > 7) {
+    throw new InputError("Eine Woche hat höchstens sieben Tage.");
+  }
+  const wochenende = new Date(`${weekStart}T00:00:00Z`);
+  wochenende.setUTCDate(wochenende.getUTCDate() + 6);
+  const letzterTag = wochenende.toISOString().slice(0, 10);
+
+  const gesehen = new Set();
+  const dailyEntries = [];
+  for (const eintrag of entries) {
+    if (!eintrag || typeof eintrag !== "object") {
+      throw new InputError("Eine Tageszeile ist ungültig.");
+    }
+    const workDate = validateWorkDate(eintrag.workDate);
+    if (workDate < weekStart || workDate > letzterTag) {
+      throw new InputError("Eine Tageszeile liegt außerhalb der Woche.");
+    }
+    if (gesehen.has(workDate)) {
+      throw new InputError("Für einen Tag gibt es nur eine Zeile.");
+    }
+    gesehen.add(workDate);
+    const roh = Array.isArray(eintrag.activities)
+      ? eintrag.activities
+      : String(eintrag.activities ?? "").split("\n");
+    const activities = roh
+      .map((zeile) => String(zeile ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 12);
+    for (const zeile of activities) {
+      if (zeile.length > 300) {
+        throw new InputError("Eine Tätigkeit ist zu lang.");
+      }
+    }
+    if (activities.length === 0) continue;
+    dailyEntries.push({ workDate, activities });
+  }
+  dailyEntries.sort((links, rechts) => links.workDate.localeCompare(rechts.workDate));
   return {
-    companySummary: optionalText(body.companySummary, "Tätigkeiten im Betrieb", 4000) || "",
-    schoolSummary: optionalText(body.schoolSummary, "Berufsschule", 4000)
+    dailyEntries,
+    weekRemark: optionalText(body.weekRemark, "Bemerkungen zur Woche", 1000)
   };
 }
 

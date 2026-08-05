@@ -5922,19 +5922,62 @@ select:focus-visible {
   accent-color: var(--brand);
 }
 
-.apprentice-absence-label {
-  margin: 4px 0 0;
-  font-size: 0.74rem;
+/* Das Berichtsheft auf der Startseite: solange fuer heute nichts eingetragen
+   ist, faellt die Karte auf - danach ist sie eine ruhige Bestaetigung. */
+.apprentice-today-summary {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.apprentice-today-section--offen {
+  border-color: var(--brand);
+}
+
+.apprentice-today-section--offen .apprentice-today-summary {
+  color: var(--ink);
   font-weight: 700;
 }
 
-/* Steht fest und wird nicht getippt: die Angabe kommt aus den genehmigten
-   Abwesenheiten. */
-.apprentice-absence-note {
-  margin: 0;
-  padding: 11px 14px;
-  border: 1px dashed var(--line);
+/* Eine Zeile je Tag, so wie der Nachweis ausgedruckt wird. */
+.apprentice-days {
+  display: grid;
+  gap: 8px;
+}
+
+.apprentice-day {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
   border-radius: 14px;
+  background: var(--surface);
+}
+
+.apprentice-day__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  font-size: 0.74rem;
+}
+
+/* Arbeitszeit und Abwesenheit stehen fest: sie kommen aus der Zeiterfassung
+   und den genehmigten Abwesenheiten, nicht aus der Tastatur. */
+.apprentice-day__head span {
   color: var(--muted);
-  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.apprentice-day textarea {
+  width: 100%;
+  border: 1px solid #cfd9d3;
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 0.78rem;
+  resize: vertical;
 }

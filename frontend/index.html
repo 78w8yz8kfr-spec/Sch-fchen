@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.8">
-    <script type="module" src="./app.js?v=0.42.8"></script>
-    <script src="./version.js?v=0.42.8" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.9">
+    <script type="module" src="./app.js?v=0.42.9"></script>
+    <script src="./version.js?v=0.42.9" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.8</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.9</p>
         </div>
       </section>
 
@@ -441,6 +441,28 @@
             </div>
           </section>
 
+          <section id="apprentice-today-section" class="section apprentice-today-section"
+            data-dashboard-pane="start" aria-labelledby="apprentice-today-heading" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Ausbildungsnachweis</p>
+                <h2 id="apprentice-today-heading">Berichtsheft</h2>
+              </div>
+              <span id="apprentice-today-state" class="site-list-summary" aria-live="polite"></span>
+            </div>
+            <p id="apprentice-today-summary" class="apprentice-today-summary"></p>
+            <div class="assignment-quick-actions">
+              <button id="apprentice-today-open" class="assignment-quick-action" type="button">
+                <span aria-hidden="true">✎</span>
+                <strong>Heutigen Tag eintragen</strong>
+              </button>
+              <button id="apprentice-week-open" class="assignment-quick-action" type="button">
+                <span aria-hidden="true">▤</span>
+                <strong>Ganze Woche</strong>
+              </button>
+            </div>
+          </section>
+
           <section class="section" data-dashboard-pane="start" aria-labelledby="today-assignment-title">
             <div class="section-heading">
               <h2 id="today-assignment-title">Heutiger Einsatz</h2>
@@ -636,16 +658,13 @@
               <p id="apprentice-week" class="apprentice-week">Woche</p>
               <p id="apprentice-return" class="apprentice-return" hidden></p>
               <form id="apprentice-form" class="apprentice-form" novalidate>
-                <label for="apprentice-company-summary">Tätigkeiten im Betrieb</label>
-                <textarea id="apprentice-company-summary" rows="4" maxlength="4000"
-                  placeholder="Was hast du diese Woche gemacht?"></textarea>
-                <label for="apprentice-school-summary">Berufsschule</label>
-                <textarea id="apprentice-school-summary" rows="3" maxlength="4000"
-                  placeholder="Themen des Unterrichts"></textarea>
-                <p class="apprentice-absence-label">Urlaub und Krankheit</p>
-                <p id="apprentice-absence-note" class="apprentice-absence-note">Keine Abwesenheit in dieser Woche.</p>
+                <div id="apprentice-days" class="apprentice-days"></div>
+                <label for="apprentice-week-remark">Bemerkungen zur Woche</label>
+                <textarea id="apprentice-week-remark" rows="2" maxlength="1000"
+                  placeholder="Besonderes in dieser Woche"></textarea>
                 <div class="apprentice-actions">
                   <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
+                  <button id="apprentice-print" class="button button--secondary" type="button">Wochenbericht drucken</button>
                   <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
                 </div>
               </form>
@@ -2373,6 +2392,26 @@
               <button id="report-return-submit" class="button button--primary" type="submit">Mit Kommentar zurückgeben</button>
               <p class="time-correction-note">Der Bericht bleibt mit vollständiger Historie erhalten und kann nur vom ursprünglichen Verfasser erneut eingereicht werden.</p>
               <p id="report-return-message" class="form-message" aria-live="polite"></p>
+            </form>
+          </dialog>
+
+          <dialog id="apprentice-today-dialog" class="time-correction-dialog" aria-labelledby="apprentice-today-title">
+            <form id="apprentice-today-form" class="time-correction-form" method="dialog" novalidate>
+              <div class="time-correction-form__heading">
+                <div>
+                  <p id="apprentice-today-eyebrow" class="eyebrow">Ausbildungsnachweis · Feierabend</p>
+                  <h2 id="apprentice-today-title">Was hast du heute gemacht?</h2>
+                  <p id="apprentice-today-meta" class="time-correction-original"></p>
+                </div>
+                <button id="apprentice-today-close" class="dialog-close" type="button" aria-label="Eintrag schließen">×</button>
+              </div>
+              <label for="apprentice-today-text">Tätigkeiten · eine Zeile je Tätigkeit</label>
+              <textarea id="apprentice-today-text" maxlength="3600" rows="5"
+                placeholder="Steckdosen gesetzt&#10;Leitungen im Obergeschoss verlegt"></textarea>
+              <button id="apprentice-today-save" class="button button--primary" type="submit">Eintragen</button>
+              <button id="apprentice-today-later" class="button button--secondary" type="button">Später</button>
+              <p class="time-correction-note">Arbeitszeit und Abwesenheit trägt Schäfchen selbst ein. Am Ende der Woche wird daraus ein Blatt zum Ausdrucken.</p>
+              <p id="apprentice-today-message" class="form-message" aria-live="polite"></p>
             </form>
           </dialog>
 

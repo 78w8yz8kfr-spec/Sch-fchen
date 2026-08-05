@@ -40,9 +40,8 @@ export function apprenticeReportDto(row) {
     id: row.id,
     weekStart: row.week_start_text,
     status: row.status,
-    companySummary: row.company_summary || "",
-    schoolSummary: row.school_summary || null,
-    absenceNote: row.absence_note || null,
+    dailyEntries: Array.isArray(row.daily_entries) ? row.daily_entries : [],
+    weekRemark: row.week_remark || null,
     workedMinutes: Number(row.worked_minutes || 0),
     submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : null,
     apprenticeSignatureName: row.apprentice_signature_name || null,
@@ -64,6 +63,7 @@ export function apprenticeReportDto(row) {
 export async function loadApprenticeProfile(client, context, userId = context.userId) {
   const result = await client.query(
     `SELECT person.id, person.first_name, person.last_name,
+            person.apprenticeship_occupation,
             TO_CHAR(person.apprenticeship_started_on, 'YYYY-MM-DD') AS started_on,
             TO_CHAR(person.apprenticeship_ends_on, 'YYYY-MM-DD') AS ends_on,
             person.trainer_user_id,
@@ -92,6 +92,7 @@ export async function loadApprenticeProfile(client, context, userId = context.us
     userId: row.id,
     name: fullName(row),
     isApprentice: row.is_apprentice,
+    occupation: row.apprenticeship_occupation || null,
     startedOn: row.started_on,
     endsOn: row.ends_on,
     trainerUserId: row.trainer_user_id,
@@ -101,45 +102,57 @@ export async function loadApprenticeProfile(client, context, userId = context.us
   };
 }
 
-// Urlaub und Krankheit der Woche aus den genehmigten Abwesenheiten.
-//
-// Frueher tippte der Auszubildende das ein. Die Angaben stehen aber laengst in
-// der App: wer sie abschreibt, schreibt sie irgendwann falsch ab, und im
-// Berichtsheft stuende dann etwas anderes als im Urlaubskonto. Genehmigt heisst
-// genehmigt - ein offener Antrag gehoert noch nicht in den Nachweis.
-export async function weekAbsenceNote(client, context, userId, weekStart) {
-  const result = await client.query(
-    // Die Tage kommen als Zeichenkette aus der Datenbank. Ueber ein
-    // Javascript-Datum gewandelt haengen sie an der Zeitzone des Prozesses:
-    // Mitternacht in Berlin ist in UTC der Vortag, und im Berichtsheft stuende
-    // ein Tag zu frueh.
-    `SELECT absence_type, day_part,
-            TO_CHAR(start_date, 'YYYY-MM-DD') AS von,
-            TO_CHAR(end_date, 'YYYY-MM-DD') AS bis
-     FROM absence_requests
-     WHERE company_id = $1 AND user_id = $2 AND status = 'approved'
-       AND start_date < $3::DATE + 7 AND end_date >= $3::DATE
-     ORDER BY start_date`,
-    [context.companyId, userId, weekStart]
+// Ergaenzt die geschriebenen Tageszeilen um das, was die App ohnehin weiss:
+// die Arbeitszeit des Tages und eine genehmigte Abwesenheit. Ein Urlaubstag
+// bekommt dabei eine eigene Zeile, auch wenn der Auszubildende nichts
+// geschrieben hat - im Nachweis darf kein Tag fehlen.
+export async function buildDailyEntries(client, context, userId, weekStart, geschrieben) {
+  const [zeiten, abwesenheiten] = await Promise.all([
+    client.query(
+      `SELECT TO_CHAR(work_date, 'YYYY-MM-DD') AS tag, work_minutes
+       FROM work_days
+       WHERE company_id = $1 AND user_id = $2
+         AND work_date >= $3::DATE AND work_date < $3::DATE + 7`,
+      [context.companyId, userId, weekStart]
+    ),
+    client.query(
+      `SELECT absence_type, day_part,
+              TO_CHAR(start_date, 'YYYY-MM-DD') AS von,
+              TO_CHAR(end_date, 'YYYY-MM-DD') AS bis
+       FROM absence_requests
+       WHERE company_id = $1 AND user_id = $2 AND status = 'approved'
+         AND start_date < $3::DATE + 7 AND end_date >= $3::DATE`,
+      [context.companyId, userId, weekStart]
+    )
+  ]);
+  const minutenJeTag = new Map(zeiten.rows.map((zeile) => [zeile.tag, Number(zeile.work_minutes || 0)]));
+  const geschriebeneZeilen = new Map(
+    (geschrieben || []).map((eintrag) => [eintrag.workDate, eintrag.activities])
   );
-  if (result.rowCount === 0) return null;
 
   const wochenbeginn = new Date(`${weekStart}T12:00:00Z`);
-  const teile = [];
-  for (const zeile of result.rows) {
-    const tage = [];
-    for (let index = 0; index < 7; index += 1) {
-      const tag = new Date(wochenbeginn);
-      tag.setUTCDate(tag.getUTCDate() + index);
-      const datum = tag.toISOString().slice(0, 10);
-      if (datum >= zeile.von && datum <= zeile.bis) tage.push(WEEKDAY_LABELS[index]);
-    }
-    if (tage.length === 0) continue;
-    const bezeichnung = ABSENCE_LABELS[zeile.absence_type] || ABSENCE_LABELS.other;
-    const halb = zeile.day_part && zeile.day_part !== "full_day" ? " (halber Tag)" : "";
-    teile.push(`${bezeichnung}: ${tage.join(", ")}${halb}`);
+  const zeilen = [];
+  for (let index = 0; index < 7; index += 1) {
+    const tag = new Date(wochenbeginn);
+    tag.setUTCDate(tag.getUTCDate() + index);
+    const datum = tag.toISOString().slice(0, 10);
+    // Geschriebenes und Abgeleitetes bleiben getrennt. Beides in dasselbe Feld
+    // zu mischen hiesse, es beim naechsten Speichern erneut hineinzumischen -
+    // nach dem dritten Mal stuende "Urlaub" dreimal in der Zeile.
+    const taetigkeiten = [...(geschriebeneZeilen.get(datum) || [])];
+    const abwesend = abwesenheiten.rows.find(
+      (eintrag) => datum >= eintrag.von && datum <= eintrag.bis
+    );
+    const abwesenheit = abwesend
+      ? `${ABSENCE_LABELS[abwesend.absence_type] || ABSENCE_LABELS.other}${
+        abwesend.day_part && abwesend.day_part !== "full_day" ? " (halber Tag)" : ""
+      }`
+      : null;
+    const minuten = minutenJeTag.get(datum) || 0;
+    if (taetigkeiten.length === 0 && !abwesenheit && minuten === 0) continue;
+    zeilen.push({ workDate: datum, activities: taetigkeiten, absence: abwesenheit, workedMinutes: minuten });
   }
-  return teile.length ? teile.join(" · ") : null;
+  return zeilen;
 }
 
 // Geleistete Arbeitszeit der Woche aus der Zeiterfassung.
@@ -190,25 +203,24 @@ export async function saveOwnApprenticeReport(client, context, weekStart, input,
     );
   }
   const minuten = await weekWorkedMinutes(client, context, context.userId, weekStart);
-  // Urlaub und Krankheit kommen aus den genehmigten Abwesenheiten, nicht aus
-  // der Eingabe. Der Auszubildende soll sie nicht abschreiben muessen.
-  const abwesenheit = await weekAbsenceNote(client, context, context.userId, weekStart);
+  const zeilen = await buildDailyEntries(
+    client, context, context.userId, weekStart, input.dailyEntries
+  );
   const result = await client.query(
     `INSERT INTO apprentice_reports (
        company_id, apprentice_user_id, week_start, status,
-       company_summary, school_summary, absence_note, worked_minutes
-     ) VALUES ($1,$2,$3::DATE,'draft',$4,$5,$6,$7)
+       daily_entries, week_remark, worked_minutes
+     ) VALUES ($1,$2,$3::DATE,'draft',$4::JSONB,$5,$6)
      ON CONFLICT (company_id, apprentice_user_id, week_start) DO UPDATE
        SET status = 'draft',
-           company_summary = EXCLUDED.company_summary,
-           school_summary = EXCLUDED.school_summary,
-           absence_note = EXCLUDED.absence_note,
+           daily_entries = EXCLUDED.daily_entries,
+           week_remark = EXCLUDED.week_remark,
            worked_minutes = EXCLUDED.worked_minutes,
            return_comment = NULL
      RETURNING *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text`,
     [
       context.companyId, context.userId, weekStart,
-      input.companySummary, input.schoolSummary, abwesenheit, minuten
+      JSON.stringify(zeilen), input.weekRemark, minuten
     ]
   );
   return apprenticeReportDto(result.rows[0]);
@@ -230,25 +242,26 @@ export async function submitOwnApprenticeReport(client, context, weekStart, prof
       "apprentice_report_locked"
     );
   }
-  if (!String(vorhanden.company_summary || "").trim()) {
+  const geschrieben = Array.isArray(vorhanden.daily_entries) ? vorhanden.daily_entries : [];
+  if (geschrieben.every((zeile) => (zeile.activities || []).length === 0)) {
     throw new errors.InputError(
-      "Ohne Tätigkeiten im Betrieb lässt sich der Bericht nicht einreichen.",
+      "Ohne einen einzigen Tag lässt sich der Bericht nicht einreichen.",
       400,
       "apprentice_report_empty"
     );
   }
   const minuten = await weekWorkedMinutes(client, context, context.userId, weekStart);
-  const abwesenheit = await weekAbsenceNote(client, context, context.userId, weekStart);
+  const zeilen = await buildDailyEntries(client, context, context.userId, weekStart, geschrieben);
   const result = await client.query(
     `UPDATE apprentice_reports
      SET status = 'submitted',
          worked_minutes = $4,
-         absence_note = $6,
+         daily_entries = $6::JSONB,
          apprentice_signature_name = $5,
          submitted_at = CURRENT_TIMESTAMP
      WHERE company_id = $1 AND apprentice_user_id = $2 AND week_start = $3::DATE
      RETURNING *, TO_CHAR(week_start, 'YYYY-MM-DD') AS week_start_text`,
-    [context.companyId, context.userId, weekStart, minuten, profile.name, abwesenheit]
+    [context.companyId, context.userId, weekStart, minuten, profile.name, JSON.stringify(zeilen)]
   );
   return apprenticeReportDto(result.rows[0]);
 }

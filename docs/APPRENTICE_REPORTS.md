@@ -5,10 +5,13 @@ Erste Ausbaustufe des Azubi-Moduls aus dem Fahrplan (V0.60).
 ## Warum
 
 Ein Auszubildender muss seine Ausbildung schriftlich nachweisen. Ohne
-vollständiges Berichtsheft lässt die Kammer ihn nicht zur Prüfung zu. Üblich
-ist ein Bericht je Woche: was im Betrieb getan wurde, was die Berufsschule
-behandelt hat, dazu Urlaub und Krankheit. Der Ausbilder gibt frei oder gibt
-mit einer Bemerkung zurück.
+vollständiges Berichtsheft lässt die Kammer ihn nicht zur Prüfung zu.
+
+**Geschrieben wird täglich, ausgedruckt wöchentlich.** Der Nachweis besteht aus
+einer Zeile je Tag — Tag, Datum, was an diesem Tag getan wurde, Arbeitszeit —
+und daraus entsteht eine A4-Seite je Woche. Ein einzelner Wochentext täte das
+nicht: er sagt nicht, an welchem Tag was war, und genau das will die Kammer
+sehen. Der Ausbilder gibt frei oder gibt mit einer Bemerkung zurück.
 
 ## Wer ist beteiligt
 
@@ -44,10 +47,17 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
   Zeiterfassung übernommen. Wer sie abschreiben müsste, schriebe sie
   irgendwann falsch ab — und die Kammer sähe eine andere Zahl als das Büro.
 * **Urlaub und Krankheit füllen sich ebenso von selbst**, aus den genehmigten
-  Abwesenheiten der Woche („Krank: Do, Fr"). Ein offener Antrag gehört noch
-  nicht in den Nachweis. Die Tage werden in SQL formatiert, nicht über ein
-  Javascript-Datum: Mitternacht in Berlin ist in UTC der Vortag, und der
-  Eintrag rutschte sonst je nach Zeitzone des Servers um einen Tag.
+  Abwesenheiten der Woche. Sie stehen in einem eigenen Feld `absence` der
+  Tageszeile, nicht zwischen den geschriebenen Tätigkeiten: beides in dasselbe
+  Feld zu mischen hieße, es beim nächsten Speichern erneut hineinzumischen —
+  nach dem dritten Mal stünde „Urlaub" dreimal in der Zeile. Ein offener
+  Antrag gehört noch nicht in den Nachweis. Die Tage werden in SQL formatiert,
+  nicht über ein Javascript-Datum: Mitternacht in Berlin ist in UTC der
+  Vortag, und der Eintrag rutschte sonst je nach Zeitzone des Servers um einen
+  Tag.
+* Ein Tag, an dem **gearbeitet wurde oder eine Abwesenheit lag**, bekommt seine
+  Zeile auch dann, wenn nichts geschrieben wurde. Im Nachweis darf kein Tag
+  fehlen.
 * Eine **Rückgabe ohne Bemerkung** ist nicht möglich: der Auszubildende wüsste
   sonst nicht, was er nachbessern soll.
 * Ein **freigegebener** Nachweis ist unveränderlich, auch für den Ausbilder.
@@ -66,17 +76,56 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 | `GET /api/v1/apprentice/reports?from=&to=` | Auszubildender, eigene Berichte |
 | `PUT /api/v1/apprentice/reports/:montag` | Auszubildender, Entwurf speichern |
 | `POST /api/v1/apprentice/reports/:montag/submit` | Auszubildender, einreichen |
-| `GET /api/v1/admin/apprentice-reports` | Ausbilder und Planung |
-| `POST /api/v1/admin/apprentice-reports/review` | Ausbilder und Planung, einzeln oder als Sammelfreigabe |
+| `GET /api/v1/apprentice/reports/:montag/pdf` | Auszubildender, eigene Woche als A4-Blatt |
+| `GET …/pdf?apprenticeUserId=` | Ausbilder, Woche eines seiner Auszubildenden |
+| `GET /api/v1/admin/apprentice-reports` | Ausbilder |
+| `POST /api/v1/admin/apprentice-reports/review` | Ausbilder, einzeln oder als Sammelfreigabe |
 
 Alle Wege setzen voraus, dass die Plattformverwaltung das Modul
 `apprentice_reports` für die Firma freigegeben hat; sonst antworten sie mit
 409 `module_disabled`. Das Berichtsheft gehört **nicht** zum Standardumfang:
 es ist ein eigener verkaufter Bereich.
 
+## Der Ausdruck
+
+Eine Woche ist **eine A4-Seite**: Logo oder Firmenname, „BERICHTSHEFT" mit
+Kalenderwoche nach ISO 8601 und Datumsspanne, ein Kopfkasten mit Azubi,
+Lehrjahr, Ausbildungsberuf und Intervall, die Tagestabelle, „Bemerkungen zur
+Woche" und beide Unterschriften mit Namen und Datum. Am Fuß steht, dass der
+Nachweis ohne Unterschriften ungültig ist.
+
+* Das **Lehrjahr** wird aus dem Ausbildungsbeginn gerechnet, nicht gepflegt:
+  von Hand gepflegt wäre es spätestens im zweiten Jahr falsch.
+* Der Fußbereich steht **fest**. Die Tagestabelle bekommt den Platz darüber und
+  verkleinert ihre Schrift, bis sie hineinpasst. Erst wenn selbst die kleinste
+  noch lesbare Schrift nicht reicht, läuft die Woche auf ein zweites Blatt —
+  geschriebene Zeilen abzuschneiden wäre der schlechtere Handel, der Nachweis
+  wäre dann unvollständig. Die Seitenzahl am Fuß sagt, wie viele Blätter es
+  geworden sind.
+* Ein **Entwurf** lässt sich ebenfalls drucken und von Hand unterschreiben.
+
+## Wann es auftaucht
+
+Das Heft lag zuerst allein im Wochenbereich. Dort sucht am Feierabend niemand
+danach, und wer erst am Freitag anfängt, weiß den Montag nicht mehr. Es kommt
+deshalb von selbst:
+
+* **Beim Feierabend.** Stempelt ein Auszubildender Feierabend und steht für
+  heute noch nichts im Heft, fragt Schäfchen, was er heute gemacht hat. Die
+  Zeitbuchung wartet dabei auf nichts: sie ist bereits gebucht, bevor die Frage
+  kommt — ein später gestempelter Feierabend wäre eine falsche Arbeitszeit, und
+  die wiegt schwerer als ein fehlender Satz. „Später" schließt die Frage.
+* **Auf der Startseite**, als eigene Karte direkt unter dem Arbeitstag. Solange
+  für heute nichts eingetragen ist, fällt sie auf; danach ist sie eine ruhige
+  Bestätigung.
+
+Der Tageseintrag hängt immer an der **laufenden** Woche, nicht an der
+angezeigten: wer im Stundenzettel zurückblättert und dann Feierabend macht,
+trüge sonst in die falsche Woche ein.
+
 ## Noch nicht enthalten
 
-* **PDF-Ausdruck** des Berichtshefts für die Kammer.
 * **Erinnerungen** an fehlende Wochen (heute sieht man offene Berichte nur,
   wenn man in die Liste schaut).
-* **Tagesberichte** als Alternative zum Wochenbericht.
+* **Ein Ausdruck über mehrere Wochen** am Stück, etwa ein ganzes Lehrjahr in
+  einer Datei.

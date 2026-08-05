@@ -48,9 +48,18 @@ BEGIN
             NULL;
         END;
 
+        -- Seit Migration 060 stehen die Taetigkeiten in Tageszeilen. Diese
+        -- Abnahme laeuft wie alle gegen das Schema nach allen Migrationen.
         INSERT INTO apprentice_reports (
-            company_id, apprentice_user_id, week_start, company_summary, worked_minutes
-        ) VALUES (firma, azubi, montag, 'Unterverteilung verdrahtet', 2010)
+            company_id, apprentice_user_id, week_start, daily_entries, worked_minutes
+        ) VALUES (
+            firma, azubi, montag,
+            JSONB_BUILD_ARRAY(JSONB_BUILD_OBJECT(
+                'workDate', TO_CHAR(montag, 'YYYY-MM-DD'),
+                'activities', JSONB_BUILD_ARRAY('Unterverteilung verdrahtet'),
+                'workedMinutes', 465)),
+            2010
+        )
         RETURNING id INTO bericht;
 
         -- Je Woche und Mensch nur ein Bericht.
@@ -91,7 +100,7 @@ BEGIN
 
         UPDATE apprentice_reports
         SET status = 'submitted', apprentice_signature_name = 'Anna Auszubildende',
-            school_summary = 'Grundlagen der Messtechnik'
+            week_remark = 'Berufsschule am Freitag'
         WHERE id = bericht;
 
         UPDATE apprentice_reports
@@ -101,7 +110,7 @@ BEGIN
 
         -- Ein freigegebener Nachweis ist unveraenderlich.
         BEGIN
-            UPDATE apprentice_reports SET company_summary = 'Nachtraeglich umgeschrieben'
+            UPDATE apprentice_reports SET week_remark = 'Nachtraeglich umgeschrieben'
             WHERE id = bericht;
             RAISE EXCEPTION 'Ein freigegebener Nachweis liess sich aendern';
         EXCEPTION WHEN raise_exception THEN

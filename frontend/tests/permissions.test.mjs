@@ -100,6 +100,10 @@ test("Die Bezeichnung nennt den Vorarbeiter zuerst", () => {
   assert.equal(employeeRoleLabel(["installer"]), "Monteur");
   assert.equal(employeeRoleLabel([]), "Monteur");
   assert.equal(employeeRoleLabel(), "Monteur");
+  // Ein Auszubildender ist kein Monteur. In seinem eigenen Konto stand bisher
+  // genau das - und in der Planung ebenso.
+  assert.equal(employeeRoleLabel(["apprentice"]), "Auszubildender");
+  assert.equal(employeeRoleLabel(["apprentice", "installer"]), "Auszubildender");
 });
 
 test("Der Vorarbeiter wird an seiner Rolle erkannt", () => {

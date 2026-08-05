@@ -60,6 +60,10 @@ export function plannableEmployees(employees) {
 // Kurze Bezeichnung fuer die Listen der Planung. Die Berichtsverantwortung
 // bleibt dem Vorarbeiter vorbehalten, deshalb steht sie zuerst.
 export function employeeRoleLabel(roles = []) {
+  // Der Auszubildende steht zuerst: es ist die Angabe, die zaehlt - fuer die
+  // Kammer, fuer den Ausbilder und fuer den Azubi selbst, der in seinem Konto
+  // sonst "Monteur" las.
+  if ((roles || []).includes("apprentice")) return "Auszubildender";
   if (isForeman(roles)) return "Vorarbeiter";
   if (hatEine(roles, PLANNING_ROLES)) return "Planung";
   return "Monteur";

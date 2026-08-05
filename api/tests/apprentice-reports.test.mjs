@@ -173,9 +173,16 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   // Eine Woche beginnt am Montag.
   const falscheWoche = await ruf(`/api/v1/apprentice/reports/2026-03-03`, azubiCookie, {
     method: "PUT",
-    body: JSON.stringify({ companySummary: "Mitten in der Woche" })
+    body: JSON.stringify({ dailyEntries: [{ workDate: "2026-03-03", activities: ["Mitten in der Woche"] }] })
   });
   assert.equal(falscheWoche.status, 400, await falscheWoche.clone().text());
+
+  // Eine Tageszeile ausserhalb der Woche gehoert nicht in diesen Bericht.
+  const fremderTag = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
+    method: "PUT",
+    body: JSON.stringify({ dailyEntries: [{ workDate: "2026-03-16", activities: ["Falsche Woche"] }] })
+  });
+  assert.equal(fremderTag.status, 400, await fremderTag.clone().text());
 
   // Einreichen ohne Bericht geht nicht.
   const leer = await ruf(`/api/v1/apprentice/reports/${woche}/submit`, azubiCookie, { method: "POST" });
@@ -183,7 +190,13 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
 
   const entwurf = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
     method: "PUT",
-    body: JSON.stringify({ companySummary: "Unterverteilung verdrahtet und geprüft" })
+    body: JSON.stringify({
+      dailyEntries: [
+        { workDate: woche, activities: ["Unterverteilung verdrahtet", "Anschlüsse geprüft"] },
+        { workDate: `2026-03-03`, activities: "Kabel verlegt\nVerteilerkasten angeschlossen" }
+      ],
+      weekRemark: "Ruhige Woche"
+    })
   });
   assert.equal(entwurf.status, 200, await entwurf.clone().text());
   const entwurfBody = (await entwurf.json()).report;
@@ -208,13 +221,24 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   assert.equal(eingereichtBody.status, "submitted");
   assert.equal(eingereichtBody.workedMinutes, 935);
   assert.equal(eingereichtBody.apprenticeSignatureName, "Anna Auszubildende");
-  // Urlaub und Krankheit fuellen sich aus den genehmigten Abwesenheiten.
-  assert.equal(eingereichtBody.absenceNote, "Urlaub: Do, Fr");
+  // Die Tageszeilen tragen die Arbeitszeit des Tages, und ein genehmigter
+  // Urlaub bekommt eine eigene Zeile - im Nachweis darf kein Tag fehlen.
+  const tage = eingereichtBody.dailyEntries;
+  assert.deepEqual(tage.map((zeile) => zeile.workDate), [woche, "2026-03-03", "2026-03-05", "2026-03-06"]);
+  assert.deepEqual(tage[0].activities, ["Unterverteilung verdrahtet", "Anschlüsse geprüft"]);
+  assert.equal(tage[0].workedMinutes, 465);
+  assert.deepEqual(tage[1].activities, ["Kabel verlegt", "Verteilerkasten angeschlossen"]);
+  // Geschriebenes und Abgeleitetes bleiben getrennt: sonst stuende "Urlaub"
+  // nach dem dritten Speichern dreimal in derselben Zeile.
+  assert.deepEqual(tage[2].activities, []);
+  assert.equal(tage[2].absence, "Urlaub");
+  assert.equal(tage[0].absence, null);
+  assert.equal(eingereichtBody.weekRemark, "Ruhige Woche");
 
   // Nach dem Einreichen schreibt der Azubi nicht weiter.
   const nachtraeglich = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
     method: "PUT",
-    body: JSON.stringify({ companySummary: "Nachträglich geändert" })
+    body: JSON.stringify({ dailyEntries: [{ workDate: woche, activities: ["Nachträglich geändert"] }] })
   });
   assert.equal(nachtraeglich.status, 409, await nachtraeglich.clone().text());
   assert.equal((await nachtraeglich.json()).error.code, "apprentice_report_locked");
@@ -257,8 +281,10 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   const nachgebessert = await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
     method: "PUT",
     body: JSON.stringify({
-      companySummary: "Unterverteilung verdrahtet und geprüft",
-      schoolSummary: "Grundlagen der Messtechnik"
+      dailyEntries: [
+        { workDate: woche, activities: ["Unterverteilung verdrahtet", "Anschlüsse geprüft"] },
+        { workDate: "2026-03-06", activities: ["Berufsschule: Grundlagen der Messtechnik"] }
+      ]
     })
   });
   assert.equal(nachgebessert.status, 200, await nachgebessert.clone().text());
@@ -292,6 +318,31 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
     verlauf.rows.map((zeile) => zeile.status),
     ["draft", "submitted", "returned", "draft", "submitted", "approved"]
   );
+
+  // Der Ausdruck fuer die Kammer. Ohne diesen Test lief die Route nie: sie
+  // stuerzte an einer fehlenden Einbindung ab, und alle uebrigen Tests waren
+  // trotzdem gruen - sie riefen sie nicht auf.
+  const eigenerAusdruck = await ruf(`/api/v1/apprentice/reports/${woche}/pdf`, azubiCookie);
+  assert.equal(eigenerAusdruck.status, 200, await eigenerAusdruck.clone().text());
+  assert.match(eigenerAusdruck.headers.get("content-type"), /application\/pdf/);
+  const blatt = Buffer.from(await eigenerAusdruck.arrayBuffer());
+  assert.equal(blatt.subarray(0, 5).toString("ascii"), "%PDF-");
+
+  // Der Ausbilder druckt den Nachweis seines Auszubildenden.
+  const ausbilderAusdruck = await ruf(
+    `/api/v1/apprentice/reports/${woche}/pdf?apprenticeUserId=${azubiId}`, ausbilderCookie
+  );
+  assert.equal(ausbilderAusdruck.status, 200, await ausbilderAusdruck.clone().text());
+
+  // Ein Monteur nicht.
+  const fremderAusdruck = await ruf(
+    `/api/v1/apprentice/reports/${woche}/pdf?apprenticeUserId=${azubiId}`, fremdCookie
+  );
+  assert.equal(fremderAusdruck.status, 403, await fremderAusdruck.clone().text());
+
+  // Eine Woche ohne Bericht gibt es nicht zu drucken.
+  const leereWoche = await ruf("/api/v1/apprentice/reports/2026-04-06/pdf", azubiCookie);
+  assert.equal(leereWoche.status, 404, await leereWoche.clone().text());
 
   // Mandantentrennung: die Nachbarfirma sieht den Bericht nicht.
   const nachbar = await ownerPool.query(
