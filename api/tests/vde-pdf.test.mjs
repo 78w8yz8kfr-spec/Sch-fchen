@@ -10,6 +10,7 @@ import {
   splitPdfWord,
   wrapText
 } from "../src/vde-pdf.mjs";
+import { ausserhalbDesBlattes, lesbarerText, seitenStroeme } from "./helpers/pdf-messen.mjs";
 
 test("VDE-Abschluss beginnt Messwerte auf Seite zwei und setzt das Stromkreisverzeichnis auf eine eigene Folgeseite", async () => {
   const signature = Buffer.from(
@@ -300,4 +301,125 @@ test("Ein leerer Text wird zu einem Strich statt zu einer leeren Zeile", () => {
   assert.deepEqual(wrapText(null, font, 10, 100), ["-"]);
   // Absaetze bleiben erhalten.
   assert.deepEqual(wrapText("eins\n\nzwei", font, 10, 100), ["eins", "", "zwei"]);
+});
+
+// Nachmessen statt Seiten zaehlen. Ein Pruefprotokoll waechst mit der Anlage:
+// eine Gewerbeanlage hat mehrere Verteilungen mit vielen Stromkreisen, und die
+// Bezeichnungen kommen aus dem Feld, nicht aus einer Liste. Wenn dabei etwas
+// neben das Blatt rutscht, faellt es erst beim Ausdruck fuer den Kunden auf.
+test("Auch eine große Anlage bleibt vollständig auf den Blättern", async () => {
+  const signature = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64"
+  );
+  const messwerte = {
+    rpe: "0.18", riso: "200", zi: "0.31", zs: "0.54", ik: "426",
+    rcdTripTime: "24", rcdTripCurrent: "22",
+    risoL1Pe: "200", risoL2Pe: "200", risoL3Pe: "200", risoNPe: "200"
+  };
+  const stromkreis = (index, name) => ({
+    clientId: `circuit-${index}`,
+    name: name || `Stromkreis ${index + 1}`,
+    cableType: "NYM-J", cores: "3", crossSection: "2.5",
+    protectiveDevice: { type: "mcb", characteristic: "B", ratedCurrent: "16", designation: null },
+    measurements: messwerte,
+    note: null
+  });
+
+  const anlage = ({ verteilungen, fiJeVerteilung, kreiseJeFi, langeNamen = false, defects }) => ({
+    inspection: {
+      id: "11111111-1111-4111-8111-111111111111",
+      number: "SE-VDE-2026-00001",
+      name: "Erstprüfung Haupt- und Unterverteilung",
+      date: "2026-07-29"
+    },
+    protocol: {
+      schemaVersion: 1, networkType: "TN-S", nominalVoltage: "230/400 V",
+      inspectionKinds: { initial: true, recurring: false, alteration: false },
+      visualChecks: {
+        electric_shock_protection: "ok", protective_conductor: "ok",
+        equipment_selection: "ok", circuit_labelling: "ok", rcd_test_button: "ok",
+        phase_sequence: "ok", polarity: "ok", disconnection_conditions: "ok"
+      },
+      incomingSupply: {
+        designation: "Hausanschlusskasten", location: "Hausanschlussraum",
+        upstreamProtection: "NH00 63 A", source: "Netzbetreiber",
+        cableType: "NYY-J", cores: "5", crossSection: "16"
+      },
+      circuitDirectoryIncluded: true,
+      detailedInsulationMeasurement: true,
+      distributions: Array.from({ length: verteilungen }, (_, v) => ({
+        clientId: `uv-${v}`,
+        name: langeNamen
+          ? `Unterverteilung im zweiten Obergeschoss, Flur rechts hinten, Nummer ${v + 1}`
+          : `UV ${v + 1}`,
+        source: "HAK", feedCableType: "NYY-J", feedCores: "5", feedCrossSection: "10",
+        feedProtection: "35 A", location: "Flur",
+        rcds: Array.from({ length: fiJeVerteilung }, (_, f) => ({
+          clientId: `rcd-${v}-${f}`,
+          name: langeNamen
+            ? `Fehlerstromschutzschalter für Bad, Küche und Hauswirtschaftsraum ${f + 1}`
+            : `FI ${f + 1}`,
+          type: "A", characteristic: "unverzögert", ratedCurrent: "40",
+          ratedResidualCurrent: "30", testButton: true,
+          circuits: Array.from({ length: kreiseJeFi }, (_, c) => stromkreis(
+            c,
+            langeNamen ? `Steckdosen Küche, Arbeitsplatte links und rechts ${c + 1}` : null
+          ))
+        })),
+        directCircuits: [stromkreis(99, "Herd")]
+      })),
+      testEquipment: {
+        manufacturer: "Gossen Metrawatt", type: "Profitest",
+        serialNumber: "GM-2026-1", calibrationValidUntil: "2027-07-29"
+      },
+      defects: defects || "Keine Mängel festgestellt.",
+      result: "ok",
+      nextInspectionDate: "2030-07-29"
+    },
+    company: {
+      legalName: "Schaaf Elektro GmbH", displayName: "Schaaf Elektro GmbH",
+      street: "Dresdner Straße", houseNumber: "30b", postalCode: "04720",
+      city: "Döbeln", phone: "03431 717830", email: "info@example.test"
+    },
+    context: {
+      customerName: "Musterkunde GmbH", projectNumber: "SE-P-2026-00001",
+      projectName: "Umbau Verwaltung", siteNumber: "SE-B-2026-00001",
+      siteName: "Verwaltungsgebäude", siteAddress: "Musterstraße 1, 04720 Döbeln",
+      inspectorName: "Vera Vorarbeiterin"
+    },
+    inspectorSignature: signature,
+    completedAt: "2026-07-29T16:30:00.000Z"
+  });
+
+  const langeMaengel = Array.from({ length: 60 }, (_, index) =>
+    `Mangel ${index + 1}: Die Klemmstelle war lose und wurde nachgezogen.`
+  ).join(" ");
+
+  for (const [name, form] of Object.entries({
+    "kleine Anlage": { verteilungen: 1, fiJeVerteilung: 1, kreiseJeFi: 1 },
+    "Wohnhaus": { verteilungen: 2, fiJeVerteilung: 4, kreiseJeFi: 6 },
+    "Gewerbeanlage": { verteilungen: 4, fiJeVerteilung: 6, kreiseJeFi: 8 },
+    "lange Bezeichnungen aus dem Feld": {
+      verteilungen: 2, fiJeVerteilung: 3, kreiseJeFi: 4, langeNamen: true
+    },
+    "sehr lange Mängelliste": {
+      verteilungen: 1, fiJeVerteilung: 1, kreiseJeFi: 1, defects: langeMaengel
+    }
+  })) {
+    const pdf = await buildVdeInspectionPdf(anlage(form));
+    const { seiten } = await seitenStroeme(pdf);
+    const daneben = ausserhalbDesBlattes(seiten);
+    assert.deepEqual(daneben, [], `${name}: gezeichnet bei ${daneben.slice(0, 3).join(", ")}`);
+  }
+
+  // Ein langer Mangeltext wird nicht stillschweigend gekuerzt: was der Pruefer
+  // festgehalten hat, steht auch im Protokoll.
+  const mitMaengeln = await buildVdeInspectionPdf(anlage({
+    verteilungen: 1, fiJeVerteilung: 1, kreiseJeFi: 1, defects: langeMaengel
+  }));
+  const { seiten: maengelSeiten } = await seitenStroeme(mitMaengeln);
+  const text = maengelSeiten.map(lesbarerText).join(" ");
+  assert.ok(text.includes("Mangel 1:"), "Der erste Mangel fehlt");
+  assert.ok(text.includes("Mangel 60:"), "Der letzte Mangel fehlt");
 });

@@ -1,83 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument, decodePDFRawStream } from "pdf-lib";
 import {
   buildApprenticeReportBookPdf,
   buildApprenticeReportPdf,
   isoWeekNumber,
   trainingYear
 } from "../src/apprentice-pdf.mjs";
+import {
+  A4_BREITE,
+  A4_HOEHE,
+  lesbarerText,
+  seitenStroeme,
+  zeichenpunkte
+} from "./helpers/pdf-messen.mjs";
 
-// Den Inhaltsstrom jeder Seite als Text zurueckgeben. Nur so laesst sich
-// pruefen, was wirklich auf dem Papier landet.
-async function seitenStroeme(bytes) {
-  const document = await PDFDocument.load(bytes);
-  const seiten = [];
-  for (let index = 0; index < document.getPageCount(); index += 1) {
-    const page = document.getPage(index);
-    const contents = page.node.Contents();
-    const refs = typeof contents.asArray === "function" ? contents.asArray() : [contents];
-    let strom = "";
-    for (const ref of refs) {
-      const stream = page.node.context.lookup(ref);
-      strom += Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1");
-    }
-    seiten.push(strom);
-  }
-  return { document, seiten };
-}
-
-// Ein PDF sieht auch dann heil aus, wenn die Haelfte davon neben dem Blatt
-// liegt: pdf-lib zaehlt Inhalt ausserhalb der Seite mit, das Papier zeigt ihn
-// nicht. Deshalb wird hier nachgemessen, wo tatsaechlich gezeichnet wurde.
-//
-// Kaesten zeichnet pdf-lib verschoben: erst "1 0 0 1 x y cm", dann die Ecken
-// relativ dazu. Wer die Verschiebung nicht mitrechnet, misst bei jedem Kasten
-// den Nullpunkt statt seiner Lage. Darum wird der Strom hier Zeile fuer Zeile
-// gelesen und der Stapel aus q/Q mitgefuehrt.
-function zeichenpunkte(seiten) {
-  const punkte = [];
-  for (const seite of seiten) {
-    let verschiebung = { x: 0, y: 0 };
-    const stapel = [];
-    for (const zeile of seite.split("\n").map((eintrag) => eintrag.trim())) {
-      if (zeile === "q") {
-        stapel.push(verschiebung);
-        continue;
-      }
-      if (zeile === "Q") {
-        verschiebung = stapel.pop() || { x: 0, y: 0 };
-        continue;
-      }
-      const verschoben = /^1 0 0 1 (-?[\d.]+) (-?[\d.]+) cm$/.exec(zeile);
-      if (verschoben) {
-        verschiebung = {
-          x: verschiebung.x + Number(verschoben[1]),
-          y: verschiebung.y + Number(verschoben[2])
-        };
-        continue;
-      }
-      const gezeichnet = /^(?:1 0 0 1 )?(-?[\d.]+) (-?[\d.]+) (?:Tm|m|l)$/.exec(zeile);
-      if (gezeichnet) {
-        punkte.push({
-          x: verschiebung.x + Number(gezeichnet[1]),
-          y: verschiebung.y + Number(gezeichnet[2])
-        });
-      }
-    }
-  }
-  return punkte;
-}
-
-// Die Zeichenketten stehen hexadezimal im Strom; hier wieder als Text.
-function lesbarerText(seite) {
-  return [...seite.matchAll(/<([0-9A-Fa-f]+)> Tj/g)]
-    .map((treffer) => Buffer.from(treffer[1], "hex").toString("latin1"))
-    .join(" ");
-}
-
-const A4_HOEHE = 841.89;
-const A4_BREITE = 595.28;
 
 const tag = (datum, anzahl, laenge = "kurz") => ({
   workDate: datum,
@@ -272,7 +208,7 @@ test("Ein unlesbares Firmenlogo verhindert den Ausdruck nicht", async () => {
     company: firma,
     companyLogo: Buffer.from("kein brauchbares Bild")
   });
-  const document = await PDFDocument.load(content);
+  const { document } = await seitenStroeme(content);
   assert.equal(document.getPageCount(), 1);
 });
 

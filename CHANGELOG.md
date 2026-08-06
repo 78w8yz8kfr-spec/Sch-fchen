@@ -4,6 +4,28 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Alle vier PDF-Arten werden jetzt nachgemessen, nicht nur gezählt.** Beim
+  Berichtsheft war ein Fehler aufgefallen, den die Seitenzahl nicht sieht: der
+  Inhalt lief unten aus dem Blatt heraus, und das PDF hatte trotzdem „eine
+  Seite“ — pdf-lib zählt Inhalt außerhalb der Seite mit, das Papier zeigt ihn
+  nicht. Dieselbe Messung fehlte für Montageschein, Stundenzettel und
+  VDE-Protokoll.
+  - Die Messung liegt jetzt als gemeinsames Testwerkzeug
+    (`api/tests/helpers/pdf-messen.mjs`) vor: sie liest den Inhaltsstrom jeder
+    Seite und sagt, wohin gezeichnet wurde und welcher Text dort steht.
+  - Geprüft mit harten Fällen: 120 Zeilen Bericht, 40 Mitarbeiter auf einem
+    Montageschein, drei Jahre Stundenzettel am Stück, eine Gewerbeanlage mit
+    4 Verteilungen × 6 FI × 8 Stromkreisen, sehr lange Bezeichnungen aus dem
+    Feld und eine Mängelliste über 60 Einträge.
+  - **Ergebnis: kein Fehler.** Die drei anderen PDFs halten alles auf dem
+    Blatt und kürzen nichts stillschweigend — der Fehler im Berichtsheft war
+    seiner festen Fußzeile geschuldet, kein durchgehendes Muster.
+  - Dass die neuen Tests nicht hohl sind, ist gegengeprüft: mit ausgehebeltem
+    Seitenumbruch beziehungsweise verschobenem Rand fallen sie um.
+  - Damit ist die Erzeugungsseite von Release-Gate #21 abgedeckt. Die Prüfung
+    **in den Ziel-Viewern** steht weiter aus — die braucht einen Menschen vor
+    Acrobat, Vorschau und dem PDF-Betrachter des Telefons.
+
 - **Der große Integrationstest läuft wiederholt gegen dieselbe Datenbank.**
   Bisher setzte er eine leere voraus, sagte das aber nirgends: ein zweiter Lauf
   ohne Neuaufbau scheiterte mit sechzehn Fehlern auf einmal, und wer das sah,
