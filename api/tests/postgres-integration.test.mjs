@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { APPLICATION_VERSION, createApp } from "../src/app.mjs";
 import { createPool } from "../src/database.mjs";
+import { hashPassword } from "../src/password.mjs";
 import { localDate } from "../src/validation.mjs";
 
 const enabled = process.env.API_INTEGRATION_TEST === "true";
@@ -24,6 +25,46 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
   const suffix = Date.now().toString(36).toUpperCase();
   const personnelNumber = `API-${suffix}`;
   const password = "API-Integration-2026!";
+  // Eine Fassungsnummer, die es nur in diesem Lauf gibt.
+  const entwurfsVersion = `0.43.${Number(String(Date.now()).slice(-6))}`;
+
+  const database = {
+    host: process.env.POSTGRES_HOST,
+    port: Number(process.env.POSTGRES_PORT || 5432),
+    database: process.env.POSTGRES_DB,
+    user: process.env.API_DB_USER,
+    password: process.env.API_DB_PASSWORD,
+    max: 4
+  };
+  // Getrennter Lesezugang mit Eigentümerrechten. Die API-Rolle greift nur
+  // innerhalb ihrer Transaktionen mit Mandantenkontext; für die Prüfung des
+  // Protokolls wird dagegen unmittelbar in die Tabellen geschaut.
+  const inspectionPool = createPool({
+    ...database,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
+
+  // Der Test bringt seine eigene Firma mit.
+  //
+  // Vorher richtete er die mitgelieferte F-000001 ein und setzte damit
+  // voraus, dass sie noch keinen einzigen Benutzer hat. Das gilt genau einmal
+  // je Datenbank: ein zweiter Lauf ohne Neuaufbau scheiterte an
+  // "setupRequired: false", und weil alle folgenden Abschnitte auf der
+  // Anmeldung des ersten aufbauen, fielen sechzehn Prüfungen auf einmal um.
+  // Wer das sah, suchte den Fehler in seiner Änderung statt im Zustand der
+  // Datenbank - genau diese Fährte hat schon zweimal Zeit gekostet.
+  //
+  // Eine frisch angelegte Firma bekommt ihre Rollen und Module von selbst;
+  // der geprüfte Weg der Ersteinrichtung bleibt derselbe. Das Logo wird
+  // mitgegeben, weil der Einrichtungsbildschirm es anzeigt.
+  const eigeneFirma = await inspectionPool.query(
+    `INSERT INTO companies (legal_name, display_name, logo_object_key)
+     VALUES ($1, $2, 'company-logos/schaaf-elektro.webp')
+     RETURNING company_number`,
+    [`Integrationstest ${suffix} GmbH`, `Integrationstest ${suffix}`]
+  );
+  const companyNumber = eigeneFirma.rows[0].company_number;
 
   const config = {
     port: 0,
@@ -31,28 +72,13 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     timeZone: "Europe/Berlin",
     sessionTtlSeconds: 3600,
     cookieSecure: false,
-    initialCompanyNumber: "F-000001",
+    initialCompanyNumber: companyNumber,
     initialSetupToken: "CI-SETUP-TOKEN-2026-ONLY-TEST",
     platformSetupToken: "CI-PLATFORM-SETUP-2026-ONLY-TEST",
     staticDirectory: frontendDirectory,
-    database: {
-      host: process.env.POSTGRES_HOST,
-      port: Number(process.env.POSTGRES_PORT || 5432),
-      database: process.env.POSTGRES_DB,
-      user: process.env.API_DB_USER,
-      password: process.env.API_DB_PASSWORD,
-      max: 4
-    }
+    database
   };
   const apiPool = createPool(config.database);
-  // Getrennter Lesezugang mit Eigentümerrechten. Die API-Rolle greift nur
-  // innerhalb ihrer Transaktionen mit Mandantenkontext; für die Prüfung des
-  // Protokolls wird dagegen unmittelbar in die Tabellen geschaut.
-  const inspectionPool = createPool({
-    ...config.database,
-    user: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD
-  });
   const server = createServer(createApp({ pool: apiPool, config, logger: { error() {} } }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -129,12 +155,12 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const login = await fetch(`${baseUrl}/api/v1/session`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
-      body: JSON.stringify({ companyNumber: "F-000001", personnelNumber, password })
+      body: JSON.stringify({ companyNumber, personnelNumber, password })
     });
     assert.equal(login.status, 201);
     cookie = login.headers.get("set-cookie").split(";", 1)[0];
     const loginBody = await login.json();
-    assert.equal(loginBody.session.company.number, "F-000001");
+    assert.equal(loginBody.session.company.number, companyNumber);
     assert.equal(loginBody.session.company.logoUrl, "./assets/company-logos/schaaf-elektro.webp");
     assert.deepEqual(loginBody.session.user.roles, ["admin"]);
 
@@ -146,18 +172,58 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const platformShell = await fetch(`${baseUrl}/platform-admin.html`);
     assert.equal(platformShell.status, 200);
     assert.match(await platformShell.text(), /id="platform-navigation"/);
-    const platformSetup = await fetch(`${baseUrl}/api/v1/platform/setup`, {
+    // Die Plattformverwaltung wird einmal je Installation eingerichtet, nicht
+    // je Firma - anders als der Mandant kann der Test sie sich nicht selbst
+    // mitbringen. Beim ersten Lauf gegen eine frische Datenbank geht er den
+    // Weg der Ersteinrichtung; danach legt er sein Konto unmittelbar an. In
+    // beiden Faellen prueft er, dass ein zweiter Aufruf abgewiesen wird.
+    const platformEinrichtung = await fetch(`${baseUrl}/api/v1/platform/setup`);
+    assert.equal(platformEinrichtung.status, 200);
+    const platformOffen = (await platformEinrichtung.json()).setup.setupRequired;
+
+    if (platformOffen) {
+      const platformSetup = await fetch(`${baseUrl}/api/v1/platform/setup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          setupToken: config.platformSetupToken,
+          firstName: "Sina",
+          lastName: "System",
+          email: `platform-${suffix.toLowerCase()}@example.test`,
+          password: "Plattform-Integration-2026!"
+        })
+      });
+      assert.equal(platformSetup.status, 201, await platformSetup.clone().text());
+    } else {
+      const konto = await inspectionPool.query(
+        `INSERT INTO platform_users (first_name, last_name, email, password_hash)
+         VALUES ('Sina', 'System', $1, $2) RETURNING id`,
+        [`platform-${suffix.toLowerCase()}@example.test`, await hashPassword("Plattform-Integration-2026!")]
+      );
+      await inspectionPool.query(
+        `INSERT INTO platform_user_roles (platform_user_id, platform_role_id, reason)
+         SELECT $1, id, 'Aufbau des Integrationstests'
+         FROM platform_roles WHERE role_key = 'superadmin'`,
+        [konto.rows[0].id]
+      );
+    }
+
+    // Eingerichtet wird genau einmal. Danach ist der Weg verschlossen, egal
+    // wer den Schluessel hat.
+    const zweiteEinrichtung = await fetch(`${baseUrl}/api/v1/platform/setup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         setupToken: config.platformSetupToken,
-        firstName: "Sina",
-        lastName: "System",
-        email: `platform-${suffix.toLowerCase()}@example.test`,
+        firstName: "Zweite",
+        lastName: "Einrichtung",
+        email: `zweite-${suffix.toLowerCase()}@example.test`,
         password: "Plattform-Integration-2026!"
       })
     });
-    assert.equal(platformSetup.status, 201, await platformSetup.clone().text());
+    assert.equal(zweiteEinrichtung.status, 409, await zweiteEinrichtung.clone().text());
+    assert.equal((await zweiteEinrichtung.json()).error.code, "setup_completed");
+
     const platformLogin = await fetch(`${baseUrl}/api/v1/platform/session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -182,12 +248,12 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(Object.hasOwn(platformOverview, "workMinutes"), false);
 
     const platformCompaniesResponse = await fetch(
-      `${baseUrl}/api/v1/platform/companies?search=F-000001`,
+      `${baseUrl}/api/v1/platform/companies?search=${companyNumber}`,
       { headers: { Cookie: platformCookie } }
     );
     assert.equal(platformCompaniesResponse.status, 200);
     tenantCompany = (await platformCompaniesResponse.json()).companies.items
-      .find((company) => company.companyNumber === "F-000001");
+      .find((company) => company.companyNumber === companyNumber);
     assert.ok(tenantCompany);
 
     const registrationResponse = await fetch(`${baseUrl}/api/v1/platform/registrations`, {
@@ -435,7 +501,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
       body: JSON.stringify({
-        companyNumber: "F-000001",
+        companyNumber,
         personnelNumber: plannerPersonnelNumber,
         password: plannerTemporaryPassword
       })
@@ -487,7 +553,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
       body: JSON.stringify({
-        companyNumber: "F-000001",
+        companyNumber,
         personnelNumber: directorPersonnelNumber,
         password: directorTemporaryPassword
       })
@@ -593,7 +659,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
       body: JSON.stringify({
-        companyNumber: "F-000001",
+        companyNumber,
         personnelNumber: projectManagerPersonnelNumber,
         password: projectManagerTemporaryPassword
       })
@@ -964,7 +1030,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
       body: JSON.stringify({
-        companyNumber: "F-000001",
+        companyNumber,
         personnelNumber: foremanPersonnelNumber,
         password: foremanTemporaryPassword
       })
@@ -2408,7 +2474,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
       body: JSON.stringify({
-        companyNumber: "F-000001",
+        companyNumber,
         personnelNumber: employeePersonnelNumber,
         password: employeeTemporaryPassword
       })
@@ -2434,6 +2500,34 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal((await changedPassword.json()).session.user.mustChangePassword, false);
 
     const timeAccountYear = Number(assignmentDate.slice(0, 4));
+
+    // Den Feiertagskalender richtet der Test selbst ein.
+    //
+    // Vorher stand er in der mitgelieferten Firma bereits auf Sachsen, und der
+    // Test las ihn als gegeben. Eine frisch angelegte Firma hat keinen - was
+    // hier geprueft wird, ist aber das Verhalten der Schnittstelle, nicht der
+    // Inhalt der Startdaten.
+    const kalenderStand = await fetch(
+      `${baseUrl}/api/v1/admin/holiday-calendar?year=${timeAccountYear}`,
+      { headers: { Cookie: cookie } }
+    );
+    assert.equal(kalenderStand.status, 200, await kalenderStand.clone().text());
+    const vorhandenerKalender = (await kalenderStand.json()).holidayCalendar;
+    if (vorhandenerKalender.federalStateCode !== "SN") {
+      const kalenderAnlegen = await fetch(`${baseUrl}/api/v1/admin/holiday-calendar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({
+          year: timeAccountYear,
+          countryCode: "DE",
+          federalStateCode: "SN",
+          rowVersion: vorhandenerKalender.rowVersion
+        })
+      });
+      assert.equal(kalenderAnlegen.status, 200, await kalenderAnlegen.clone().text());
+      assert.equal((await kalenderAnlegen.json()).holidayCalendar.federalStateCode, "SN");
+    }
+
     const ownTimeAccountResponse = await fetch(
       `${baseUrl}/api/v1/time-account?year=${timeAccountYear}`,
       { headers: { Cookie: employeeCookie } }
@@ -3936,7 +4030,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
       body: JSON.stringify({
-        companyNumber: "F-000001",
+        companyNumber,
         personnelNumber: timeEmployeePersonnelNumber,
         password: timeEmployeeTemporaryPassword
       })
@@ -4268,7 +4362,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       const login = await fetch(`${baseUrl}/api/v1/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
-        body: JSON.stringify({ companyNumber: "F-000001", personnelNumber, password: temporary })
+        body: JSON.stringify({ companyNumber, personnelNumber, password: temporary })
       });
       assert.equal(login.status, 201);
       const ownCookie = login.headers.get("set-cookie").split(";", 1)[0];
@@ -5328,7 +5422,11 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: platformCookie },
       body: JSON.stringify({
-        version: "0.43.0",
+        // Die Fassungsnummer traegt den Lauf im Namen. Fest verdrahtet legte
+        // der Test sie beim zweiten Mal erneut an und lief in einen
+        // Schluesselkonflikt, den die Schnittstelle nur als "internal_error"
+        // meldete.
+        version: entwurfsVersion,
         status: "draft",
         changelog: "Entwurfsversion für den Integrationstest",
         reason: "Entwurfsversion im Integrationstest anlegen"

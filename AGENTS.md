@@ -28,6 +28,11 @@ Neue Funktionen bleiben in ihrer Phase, sofern der Nutzer keine ausdrückliche �
 - Bereits veröffentlichte Migrationen werden nicht umgeschrieben; Änderungen erfolgen in einer neuen Migration.
 - Jede Migration muss idempotent ausführbar sein, einen SQL-Test besitzen und in `docs/PROJECT_STATUS.md` sowie `CHANGELOG.md` dokumentiert werden.
 - Mandantenfilter und Berechtigungen werden serverseitig erzwungen und automatisiert getestet.
+- Tests bringen ihre Daten selbst mit und laufen wiederholt gegen dieselbe
+  Datenbank. Ein Test, der eine leere Datenbank voraussetzt, scheitert beim
+  zweiten Lauf an Altdaten statt an einem Fehler — und schickt den Nächsten
+  auf die falsche Fährte. Fest verdrahtete Firmennummern, Fassungsnummern oder
+  Startdaten sind dafür die üblichen Ursachen.
 
 ## Prüfung
 

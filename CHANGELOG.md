@@ -4,6 +4,29 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der große Integrationstest läuft wiederholt gegen dieselbe Datenbank.**
+  Bisher setzte er eine leere voraus, sagte das aber nirgends: ein zweiter Lauf
+  ohne Neuaufbau scheiterte mit sechzehn Fehlern auf einmal, und wer das sah,
+  suchte den Fehler in seiner eigenen Änderung statt im Zustand der Datenbank.
+  Drei Ursachen, alle vom selben Muster — fest verdrahtete Annahmen über die
+  Startdaten:
+  - Er richtete die **mitgelieferte Firma F-000001** ein und setzte damit
+    voraus, dass sie noch keinen Benutzer hat. Er bringt jetzt seine eigene
+    Firma mit; der geprüfte Weg der Ersteinrichtung bleibt derselbe.
+  - Er las den **Feiertagskalender** als gegeben, weil er in den Startdaten auf
+    Sachsen stand. Er richtet ihn jetzt selbst ein — geprüft wird das Verhalten
+    der Schnittstelle, nicht der Inhalt der Startdaten.
+  - Er legte eine **feste Fassungsnummer** (`0.43.0`) an und lief beim zweiten
+    Mal in einen Schlüsselkonflikt, den die Schnittstelle nur als
+    `internal_error` meldete. Die Nummer trägt jetzt den Lauf im Namen.
+  - Die **Plattformverwaltung** wird einmal je Installation eingerichtet, nicht
+    je Firma — die kann sich der Test nicht mitbringen. Beim ersten Lauf geht
+    er den Weg der Ersteinrichtung, danach legt er sein Konto unmittelbar an;
+    in beiden Fällen prüft er, dass ein zweiter Aufruf abgewiesen wird.
+  - Nachgewiesen mit drei Läufen hintereinander ohne Neuaufbau, danach zwei
+    vollständigen Läufen der gesamten Schnittstellenprüfung.
+  - `AGENTS.md` hält die Regel jetzt fest.
+
 - **Nachlese zum Berichtsheft-Bereich.** Die App wurde als Ganzes durchgemessen
   — sechs Rollen, alle Bereiche, jeweils auf waagerechtes Überlaufen, doppelte
   oder leere Überschriften, stumme Schaltflächen und Konsolenfehler geprüft.
