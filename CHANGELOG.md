@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die App sagt jetzt, wenn sie veraltet ist.** Ein Telefon mit eingerichteter
+  App konnte tagelang eine alte Oberfläche zeigen: der Dienst-Worker täuscht
+  dabei eine funktionierende Welt vor, und niemand erfährt, dass es eine neuere
+  gibt.
+  - Jede Antwort des Servers nennt jetzt **seine Fassung**. Die App vergleicht
+    sie mit ihrer eigenen und bietet oben das Neuladen an — und zwingt
+    niemanden: mitten in einer Eingabe neu zu laden wäre schlimmer als eine
+    alte Oberfläche.
+  - „Jetzt neu laden“ wirft dabei die alten Dateien weg. Ein bloßes Neuladen
+    holte bei einer eingerichteten App wieder dieselben aus dem Speicher.
+  - Der Vergleich geschieht **zahlenweise**. Als Zeichenketten wäre „0.42.9“
+    größer als „0.42.28“, und der Hinweis bliebe genau dann aus, wenn er
+    gebraucht wird.
+- **Die untere Leiste am Telefon trägt sechs Einträge.** Mit den Namen aus dem
+  Entwurf wurde sie eng: „Einsatzplanung“ ist dreimal so breit wie „Azubi“.
+  Unten steht deshalb die kurze Beschriftung — **Start, Baustellen, Planung,
+  Zeiten, Azubi, Mehr**. Der lange Name bleibt im Dokument stehen: er ist der
+  Name des Bereichs, den ein Vorleser nennt, und er steht am Rechner in der
+  Seitenleiste.
+- Fassung 0.42.29, Speicher `schaefchen-online-v71`, Migration 084.
+
 - **Der Fuhrpark.** Das Modul stand seit Migration 040 im Katalog, dahinter lag
   nichts — es war als „noch nicht angebunden“ geführt und ließ sich gar nicht
   einschalten. Jetzt gibt es die Fahrzeuge wirklich: **Kennzeichen,

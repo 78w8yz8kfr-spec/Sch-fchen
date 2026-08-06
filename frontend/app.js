@@ -11,7 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.28";
+} from "./core/work-time.js?v=0.42.29";
+import { serverIsNewer } from "./core/versions.js?v=0.42.29";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.28";
+} from "./core/sync-queue.js?v=0.42.29";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.28";
+} from "./core/permissions.js?v=0.42.29";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.28";
+} from "./core/state-store.js?v=0.42.29";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -535,6 +536,9 @@ import {
     dispatchLicenceWarning: document.querySelector("#dispatch-licence-warning"),
     dispatchLicenceTitle: document.querySelector("#dispatch-licence-title"),
     dispatchLicenceList: document.querySelector("#dispatch-licence-list"),
+    updateBanner: document.querySelector("#update-banner"),
+    updateBannerText: document.querySelector("#update-banner-text"),
+    updateBannerReload: document.querySelector("#update-banner-reload"),
     topbarSearch: document.querySelector("#topbar-search"),
     globalSearch: document.querySelector("#global-search"),
     globalSearchResults: document.querySelector("#global-search-results"),
@@ -1230,7 +1234,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.28",
+          "X-Schaefchen-Version": "0.42.29",
           ...options.headers
         }
       });
@@ -1239,6 +1243,8 @@ import {
       error.network = true;
       throw error;
     }
+
+    pruefeServerfassung(response.headers.get("X-Schaefchen-Server-Version"));
 
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -1258,7 +1264,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.28" }
+        headers: { "X-Schaefchen-Version": "0.42.29" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1305,7 +1311,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.28 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.29 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2561,6 +2567,25 @@ import {
     elements.reportReturnSubmit.disabled = false;
     elements.reportReturnDialog.showModal();
     window.setTimeout(() => elements.reportReturnComment.focus(), 100);
+  }
+
+  // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
+  // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
+  // wird.
+  const EIGENE_FASSUNG = "0.42.29";
+
+  // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
+  // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
+  // alte Oberflaeche.
+  function pruefeServerfassung(serverFassung) {
+    if (!serverFassung || demoMode) return;
+    if (!serverIsNewer(EIGENE_FASSUNG, serverFassung)) return;
+    elements.updateBannerText.textContent =
+      `Schäfchen ${serverFassung} ist verfügbar. Diese Ansicht ist noch ${EIGENE_FASSUNG}.`;
+    elements.updateBanner.hidden = false;
+    // Der Balken liegt fest oben. Ohne diesen Schalter verdeckt er die
+    // Kopfzeile - im Browser genau so gesehen.
+    document.body.classList.add("hat-fassungshinweis");
   }
 
   // ---------------------------------------------------------------------
@@ -12544,6 +12569,30 @@ import {
   elements.navMore.addEventListener("click", () => {
     showDashboardPane("more");
   });
+  // Neu laden heisst hier: die alten Dateien wegwerfen und den Dienst-Worker
+  // erneuern. Ein blosses location.reload() holte bei einer eingerichteten App
+  // wieder dieselben Dateien aus dem Speicher.
+  elements.updateBannerReload.addEventListener("click", async () => {
+    elements.updateBannerReload.disabled = true;
+    try {
+      if ("caches" in window) {
+        const namen = await caches.keys();
+        await Promise.all(
+          namen
+            .filter((name) => name.startsWith("schaefchen-online-"))
+            .map((name) => caches.delete(name))
+        );
+      }
+      if (navigator.serviceWorker?.getRegistrations) {
+        const eintraege = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(eintraege.map((eintrag) => eintrag.update()));
+      }
+    } catch {
+      // Wenn das Aufraeumen nicht geht, hilft das Neuladen vielleicht trotzdem.
+    }
+    window.location.reload();
+  });
+
   elements.globalSearch.addEventListener("input", renderSearchResults);
   elements.globalSearch.addEventListener("keydown", (ereignis) => {
     if (ereignis.key === "Escape") closeSearch();

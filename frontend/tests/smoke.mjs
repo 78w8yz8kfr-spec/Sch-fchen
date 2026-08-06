@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.28/);
-assert.match(html, /app\.js\?v=0\.42\.28/);
-assert.match(html, /version\.js\?v=0\.42\.28/);
+assert.match(html, /styles\.css\?v=0\.42\.29/);
+assert.match(html, /app\.js\?v=0\.42\.29/);
+assert.match(html, /version\.js\?v=0\.42\.29/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -784,6 +784,34 @@ assert.ok(
   html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
   "Die Uebersichtskarten stehen vor dem Wochenbereich"
 );
+
+// Ein Telefon mit eingerichteter App kann tagelang eine alte Oberflaeche
+// zeigen: der Dienst-Worker taeuscht eine funktionierende Welt vor, und
+// niemand erfaehrt, dass es eine neuere gibt. Jede Antwort des Servers nennt
+// deshalb seine Fassung, und die App vergleicht sie mit ihrer eigenen.
+assert.match(html, /id="update-banner"/);
+assert.match(app, /function pruefeServerfassung\(/);
+assert.match(app, /X-Schaefchen-Server-Version/);
+assert.match(app, /import \{ serverIsNewer \} from "\.\/core\/versions\.js\?v=/);
+assert.match(styles, /\.update-banner \{/);
+// Der Balken liegt fest oben; ohne diesen Schalter verdeckt er die Kopfzeile.
+assert.match(app, /classList\.add\("hat-fassungshinweis"\)/);
+assert.match(styles, /body\.hat-fassungshinweis \{/);
+// Das Neuladen wirft die alten Dateien weg. Ein blosses reload holte bei einer
+// eingerichteten App wieder dieselben aus dem Speicher.
+assert.match(app, /caches\.delete\(name\)/);
+
+// Am Telefon traegt die Leiste bis zu sechs Eintraege. Mit den langen Namen aus
+// der Seitenleiste passt das nicht: "Einsatzplanung" ist dreimal so breit wie
+// "Azubi". Unten steht deshalb die kurze Beschriftung; der lange Name bleibt
+// im Dokument, weil ein Vorleser ihn nennt.
+for (const [kennung, kurz] of [
+  ["nav-start", "Start"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
+  ["nav-week", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
+]) {
+  assert.match(html, new RegExp(`id="${kennung}"[^>]*data-kurz="${kurz}"`), `${kennung} ohne kurze Beschriftung`);
+}
+assert.match(styles, /\.bottom-nav > \.nav-item\[data-kurz\]::after \{\s*\n\s*content: attr\(data-kurz\);/);
 
 // Der Fuhrpark. Das Modul stand seit Migration 040 im Katalog, dahinter lag
 // nichts; jetzt gibt es die Fahrzeuge samt Bildschirm.
@@ -1155,16 +1183,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.28"'));
-assert.ok(worker.includes('"./app.js?v=0.42.28"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.28"'));
-assert.ok(worker.includes('"./version.js?v=0.42.28"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.29"'));
+assert.ok(worker.includes('"./app.js?v=0.42.29"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.29"'));
+assert.ok(worker.includes('"./version.js?v=0.42.29"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.28"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.28";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.29"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.29";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1192,7 +1220,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.28$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.29$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1200,11 +1228,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.28"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.28"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.29"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.29"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.28"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.28"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.29"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.29"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1251,8 +1279,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.28/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.28/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.29/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.29/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

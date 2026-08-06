@@ -7898,3 +7898,78 @@ select:focus-visible {
     --tabellen-spalten: minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.8fr) 92px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Hinweis auf eine neuere Fassung
+   ---------------------------------------------------------------------------
+
+   Ein Telefon mit eingerichteter App kann tagelang eine alte Oberflaeche
+   zeigen: der Dienst-Worker taeuscht eine funktionierende Welt vor, und
+   niemand erfaehrt, dass es eine neuere gibt. Der Balken sagt es - und zwingt
+   niemanden. Mitten in einer Eingabe neu zu laden waere schlimmer als eine
+   alte Oberflaeche.
+   ------------------------------------------------------------------------ */
+
+.update-banner {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
+  color: #ffffff;
+  background: #1b1b1d;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+.update-banner__button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: var(--brand);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+@media (max-width: 1079px) {
+  /* Am Telefon traegt die Leiste bis zu sechs Eintraege - Dashboard, Baustellen,
+     Einsatzplanung, Zeiterfassung, Azubi und Einstellungen. Mit den langen
+     Namen aus der Seitenleiste passt das nicht: "Einsatzplanung" ist dreimal so
+     breit wie "Azubi", und die Leiste wird ungleichmaessig und eng.
+
+     Deshalb steht unten die kurze Beschriftung. Der lange Name bleibt im
+     Dokument stehen: er ist der Name des Bereichs, den ein Vorleser nennt, und
+     er steht am Rechner in der Seitenleiste. */
+  .bottom-nav > .nav-item[data-kurz] > span {
+    display: none;
+  }
+
+  .bottom-nav > .nav-item[data-kurz]::after {
+    content: attr(data-kurz);
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: 1.1;
+  }
+}
+
+/* Der Balken liegt fest oben; der Inhalt rueckt darunter. Ohne das verdeckt er
+   die Kopfzeile. */
+body.hat-fassungshinweis {
+  padding-top: 46px;
+}
+
+@media (max-width: 1079px) {
+  body.hat-fassungshinweis {
+    padding-top: 58px;
+  }
+}

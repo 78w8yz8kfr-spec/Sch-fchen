@@ -181,6 +181,13 @@ function json(response, status, body, headers = {}) {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(encoded),
     "Cache-Control": "no-store",
+    // Jede Antwort nennt die Fassung dieses Servers. Die App vergleicht sie mit
+    // ihrer eigenen und bietet das Neuladen an, wenn sie hinterherhaengt.
+    //
+    // Vorher konnte ein Telefon tagelang eine alte Oberflaeche zeigen: der
+    // Dienst-Worker taeuscht bei einer eingerichteten App eine funktionierende
+    // Welt vor, und niemand erfuhr, dass es eine neuere gibt.
+    "X-Schaefchen-Server-Version": APPLICATION_VERSION,
     ...securityHeaders(),
     ...headers
   });
@@ -193,7 +200,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.28";
+export const APPLICATION_VERSION = "0.42.29";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
