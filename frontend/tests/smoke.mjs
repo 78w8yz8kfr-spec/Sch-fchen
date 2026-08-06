@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.25/);
-assert.match(html, /app\.js\?v=0\.42\.25/);
-assert.match(html, /version\.js\?v=0\.42\.25/);
+assert.match(html, /styles\.css\?v=0\.42\.26/);
+assert.match(html, /app\.js\?v=0\.42\.26/);
+assert.match(html, /version\.js\?v=0\.42\.26/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -783,6 +783,27 @@ assert.ok(
   html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
   "Die Uebersichtskarten stehen vor dem Wochenbereich"
 );
+
+// Fuehrerscheinklassen am Mitarbeiter, und die Disposition warnt, wenn auf
+// einer Baustelle des Tages niemand mit Schein eingeteilt ist. Ohne
+// Fuehrerschein kommt niemand mit dem Fahrzeug hin - das faellt heute erst am
+// Morgen auf.
+assert.match(html, /id="employee-licences"/);
+assert.match(html, /id="employee-edit-licences"/);
+assert.match(html, /id="employee-detail-licences"/);
+assert.match(html, /id="dispatch-licence-warning"/);
+assert.match(app, /function renderLicenceWarning\(/);
+assert.match(app, /function fillLicenceField\(/);
+assert.match(app, /function readLicenceField\(/);
+assert.match(app, /drivingLicenceClasses: readLicenceField\(elements\.employeeLicences\)/);
+assert.match(app, /drivingLicenceClasses: readLicenceField\(elements\.employeeEditLicences\)/);
+assert.match(styles, /\.licence-field \{/);
+assert.match(styles, /\.dispatch-warning \{/);
+// Die Klassen sind eine feste Liste, kein freier Text: "Klasse 3" und "B"
+// waeren sonst zwei verschiedene Dinge.
+for (const klasse of ["AM", "B", "B96", "BE", "C1E", "CE", "D1E", "T"]) {
+  assert.match(app, new RegExp(`\\["${klasse}", "`), `Die Klasse ${klasse} fehlt`);
+}
 
 // Der Wochenstreifen traegt seine Zahlen selbst, wie im Entwurf: Wochentag,
 // Datum, Haken, Kommen, Gehen und die Stunden. Der heutige Tag ist rot
@@ -1094,16 +1115,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.25"'));
-assert.ok(worker.includes('"./app.js?v=0.42.25"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.25"'));
-assert.ok(worker.includes('"./version.js?v=0.42.25"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.26"'));
+assert.ok(worker.includes('"./app.js?v=0.42.26"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.26"'));
+assert.ok(worker.includes('"./version.js?v=0.42.26"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.25"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.25";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.26"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.26";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1131,7 +1152,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.25$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.26$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1139,11 +1160,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.25"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.25"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.26"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.26"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.25"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.25"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.26"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.26"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1190,8 +1211,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.25/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.25/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.26/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.26/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

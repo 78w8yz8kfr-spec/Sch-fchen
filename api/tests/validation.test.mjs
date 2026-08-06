@@ -798,6 +798,10 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   });
   assert.equal(employeeUpdate.phone, "+49 170 7654321");
   assert.equal(employeeUpdate.rowVersion, 2);
+  // Ohne Angabe bleibt die Menge leer, nicht undefiniert: die Einsatzplanung
+  // fragt sie bei jedem Mitarbeiter ab.
+  assert.deepEqual(employee.drivingLicenceClasses, []);
+  assert.deepEqual(employeeUpdate.drivingLicenceClasses, []);
   for (const role of ["managing_director", "dispatch_office", "project_manager"]) {
     assert.equal(
       validateEmployee({ ...employee, role, temporaryPassword: "Startpasswort-2026" }).role,
@@ -1397,5 +1401,51 @@ test("Die Korrekturregel der Firma erlaubt nur die drei vorgesehenen Werte", () 
       policy: "same_day", reason: "Test", companyId: "11111111-1111-4111-8111-111111111111"
     }),
     /ausschließlich vom Server/
+  );
+});
+
+test("Führerscheinklassen werden aufgeräumt und geprüft", () => {
+  const basis = {
+    personnelNumber: "M-18",
+    firstName: "Frank",
+    lastName: "Fahrer",
+    role: "installer",
+    temporaryPassword: "Startpasswort-2026"
+  };
+
+  // Kleinschreibung, Leerzeichen und Dopplungen sind kein Fehler des Nutzers,
+  // sondern der Eingabe. Sie werden aufgeraeumt, nicht abgelehnt.
+  assert.deepEqual(
+    validateEmployee({ ...basis, drivingLicenceClasses: ["b", " BE ", "B"] }).drivingLicenceClasses,
+    ["B", "BE"]
+  );
+
+  // Feste Reihenfolge: sonst haetten zwei gleiche Angaben zwei verschiedene
+  // Zeilenversionen zur Folge.
+  assert.deepEqual(
+    validateEmployee({ ...basis, drivingLicenceClasses: ["C1", "B"] }).drivingLicenceClasses,
+    ["B", "C1"]
+  );
+
+  // Eine erfundene Klasse ist ein Tippfehler und wird benannt.
+  assert.throws(
+    () => validateEmployee({ ...basis, drivingLicenceClasses: ["Klasse 3"] }),
+    /Führerscheinklasse/
+  );
+  assert.throws(
+    () => validateEmployee({ ...basis, drivingLicenceClasses: "B" }),
+    /Führerscheinklassen/
+  );
+  assert.throws(
+    () => validateEmployee({ ...basis, drivingLicenceClasses: [17] }),
+    /Führerscheinklassen/
+  );
+
+  assert.deepEqual(
+    validateEmployeeUpdate({
+      personnelNumber: "M-18", firstName: "Frank", lastName: "Fahrer",
+      role: "installer", rowVersion: 3, drivingLicenceClasses: ["ce", "c"]
+    }).drivingLicenceClasses,
+    ["C", "CE"]
   );
 });

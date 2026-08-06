@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.25";
+} from "./core/work-time.js?v=0.42.26";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.25";
+} from "./core/sync-queue.js?v=0.42.26";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.25";
+} from "./core/permissions.js?v=0.42.26";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.25";
+} from "./core/state-store.js?v=0.42.26";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -513,6 +513,11 @@ import {
     inspectionSearchField: document.querySelector("#inspection-search-field"),
     inspectionOverviewList: document.querySelector("#inspection-overview-list"),
     paneMenu: document.querySelector("#pane-menu"),
+    dispatchLicenceWarning: document.querySelector("#dispatch-licence-warning"),
+    dispatchLicenceTitle: document.querySelector("#dispatch-licence-title"),
+    dispatchLicenceList: document.querySelector("#dispatch-licence-list"),
+    employeeLicences: document.querySelector("#employee-licences"),
+    employeeEditLicences: document.querySelector("#employee-edit-licences"),
     employeeDetail: document.querySelector("#employee-detail"),
     employeeDetailName: document.querySelector("#employee-detail-name"),
     employeeDetailRole: document.querySelector("#employee-detail-role"),
@@ -520,6 +525,7 @@ import {
     employeeDetailMail: document.querySelector("#employee-detail-mail"),
     employeeDetailPhone: document.querySelector("#employee-detail-phone"),
     employeeDetailBalance: document.querySelector("#employee-detail-balance"),
+    employeeDetailLicences: document.querySelector("#employee-detail-licences"),
     employeeDetailEdit: document.querySelector("#employee-detail-edit"),
     quickAccess: document.querySelector("#quick-access"),
     quickAccessMenu: document.querySelector("#quick-access-menu"),
@@ -1195,7 +1201,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.25",
+          "X-Schaefchen-Version": "0.42.26",
           ...options.headers
         }
       });
@@ -1223,7 +1229,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.25" }
+        headers: { "X-Schaefchen-Version": "0.42.26" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1270,7 +1276,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.25 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.26 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -5424,6 +5430,9 @@ import {
     elements.employeeDetailMail.textContent = employee.email || "–";
     elements.employeeDetailPhone.textContent = employee.phone || "–";
     elements.employeeDetailBalance.textContent = employeeBalanceText(employee.id) || "–";
+    elements.employeeDetailLicences.textContent = (employee.drivingLicenceClasses || []).length
+      ? employee.drivingLicenceClasses.join(", ")
+      : "kein Führerschein hinterlegt";
     elements.employeeDetailEdit.hidden = employee.roles.includes("admin")
       || Boolean(adminState?.projectScopeRestricted);
     elements.employeeDetailEdit.onclick = () => openEmployeeEditor(employee);
@@ -5499,8 +5508,57 @@ import {
       || elements.employeeEditRole.value !== "apprentice";
   }
 
+  // Die Klassen des deutschen Fuehrerscheins. Dieselbe Liste steht in der
+  // Schnittstelle und als Pruefung am Bestand: hier ist sie das, was man
+  // ankreuzen kann.
+  const FUEHRERSCHEINKLASSEN = [
+    ["AM", "Kleinkraftrad"],
+    ["A1", "Leichtkraftrad"],
+    ["A2", "Motorrad bis 35 kW"],
+    ["A", "Motorrad"],
+    ["B", "Pkw bis 3,5 t"],
+    ["B96", "Pkw mit Anhänger bis 4,25 t"],
+    ["BE", "Pkw mit Anhänger"],
+    ["C1", "Lkw bis 7,5 t"],
+    ["C1E", "Lkw bis 7,5 t mit Anhänger"],
+    ["C", "Lkw"],
+    ["CE", "Lkw mit Anhänger"],
+    ["D1", "Kleinbus"],
+    ["D1E", "Kleinbus mit Anhänger"],
+    ["D", "Bus"],
+    ["DE", "Bus mit Anhänger"],
+    ["L", "Zugmaschine bis 40 km/h"],
+    ["T", "Zugmaschine"]
+  ];
+
+  function fillLicenceField(feldsatz, klassen) {
+    const gesetzt = new Set(klassen || []);
+    const behaelter = feldsatz.querySelector(".licence-field__classes");
+    behaelter.replaceChildren();
+    for (const [klasse, beschreibung] of FUEHRERSCHEINKLASSEN) {
+      const beschriftung = document.createElement("label");
+      const kaestchen = document.createElement("input");
+      const name = document.createElement("strong");
+      const erklaerung = document.createElement("span");
+      kaestchen.type = "checkbox";
+      kaestchen.value = klasse;
+      kaestchen.checked = gesetzt.has(klasse);
+      name.textContent = klasse;
+      erklaerung.textContent = beschreibung;
+      beschriftung.className = "licence-field__class";
+      beschriftung.title = beschreibung;
+      beschriftung.append(kaestchen, name, erklaerung);
+      behaelter.append(beschriftung);
+    }
+  }
+
+  function readLicenceField(feldsatz) {
+    return [...feldsatz.querySelectorAll("input:checked")].map((kaestchen) => kaestchen.value);
+  }
+
   function openEmployeeEditor(employee) {
     editingEmployeeId = employee.id;
+    fillLicenceField(elements.employeeEditLicences, employee.drivingLicenceClasses);
     elements.employeeEditTitle.textContent = `${employee.firstName} ${employee.lastName}`;
     elements.employeeEditFirstName.value = employee.firstName;
     elements.employeeEditLastName.value = employee.lastName;
@@ -5595,6 +5653,61 @@ import {
       notes.push("keine offene Zeitprüfung");
     }
     elements.dispatchSummaryNote.textContent = `${notes.join(" · ")}.`;
+    renderLicenceWarning(dayAssignments);
+  }
+
+  // Wer auf eine Baustelle faehrt, braucht jemanden mit Fuehrerschein dabei.
+  // Steht auf einer Baustelle des Tages niemand mit Schein, steht am Morgen
+  // das Fahrzeug in der Halle und die Mannschaft am Betriebshof - und das
+  // faellt heute erst auf, wenn es zu spaet ist.
+  //
+  // Gewarnt wird auch, wenn bei niemandem ein Schein hinterlegt ist: dann ist
+  // nicht die Planung falsch, sondern die Stammdaten sind unvollstaendig. Der
+  // Hinweis sagt beides getrennt, damit niemand das eine fuer das andere
+  // haelt.
+  function renderLicenceWarning(dayAssignments) {
+    const fahrer = new Map(
+      (adminState.employees || []).map((employee) => [
+        employee.id,
+        (employee.drivingLicenceClasses || []).length > 0
+      ])
+    );
+    const irgendwerHatSchein = [...fahrer.values()].some(Boolean);
+
+    const proBaustelle = new Map();
+    for (const assignment of dayAssignments) {
+      const eintrag = proBaustelle.get(assignment.constructionSiteId) || {
+        name: assignment.siteName || "Ohne Baustelle",
+        mitSchein: 0,
+        leute: 0
+      };
+      eintrag.leute += 1;
+      if (fahrer.get(assignment.employeeId)) eintrag.mitSchein += 1;
+      proBaustelle.set(assignment.constructionSiteId, eintrag);
+    }
+    const ohneFahrer = [...proBaustelle.values()]
+      .filter((eintrag) => eintrag.mitSchein === 0)
+      .sort((links, rechts) => links.name.localeCompare(rechts.name, "de-DE"));
+
+    elements.dispatchLicenceWarning.hidden = ohneFahrer.length === 0;
+    elements.dispatchLicenceList.replaceChildren();
+    if (ohneFahrer.length === 0) return;
+
+    elements.dispatchLicenceTitle.textContent = irgendwerHatSchein
+      ? `${ohneFahrer.length} Baustelle${ohneFahrer.length === 1 ? "" : "n"} ohne Fahrer`
+      : "Noch kein Führerschein hinterlegt";
+    if (!irgendwerHatSchein) {
+      const hinweis = document.createElement("li");
+      hinweis.textContent = "Bei keinem Mitarbeiter ist eine Führerscheinklasse eingetragen. "
+        + "Solange das so ist, kann die Planung nicht prüfen, wer fahren darf.";
+      elements.dispatchLicenceList.append(hinweis);
+      return;
+    }
+    for (const eintrag of ohneFahrer) {
+      const zeile = document.createElement("li");
+      zeile.textContent = `${eintrag.name} · ${eintrag.leute} Mitarbeiter, keiner mit Führerschein`;
+      elements.dispatchLicenceList.append(zeile);
+    }
   }
 
   function renderAdmin() {
@@ -9755,12 +9868,14 @@ import {
         phone: elements.employeePhone.value,
         email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
+        drivingLicenceClasses: readLicenceField(elements.employeeLicences),
         temporaryPassword: elements.employeeTemporaryPassword.value
       },
       "Mitarbeiter angelegt · Startpasswort sicher übergeben."
     );
     if (!saved) return;
     elements.employeeForm.reset();
+    fillLicenceField(elements.employeeLicences, []);
     await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
   });
 
@@ -9789,6 +9904,7 @@ import {
           trainerUserId: elements.employeeEditRole.value === "apprentice"
             ? elements.employeeEditTrainer.value || null
             : null,
+          drivingLicenceClasses: readLicenceField(elements.employeeEditLicences),
           rowVersion: employee.rowVersion
         })
       });
@@ -12090,6 +12206,8 @@ import {
   elements.absenceEndDate.value = localDateKey();
   syncAbsenceDateFields();
   elements.todayLabel.textContent = dashboardDateFormatter.format(new Date());
+  fillLicenceField(elements.employeeLicences, []);
+  fillLicenceField(elements.employeeEditLicences, []);
   deviceCompany = loadRememberedCompany();
   if (deviceCompany?.number) {
     elements.companyNumber.value = normalizeCompanyNumber(deviceCompany.number);

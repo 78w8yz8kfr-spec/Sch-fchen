@@ -7579,3 +7579,85 @@ select:focus-visible {
     --tabellen-spalten: minmax(0, 1.4fr) 122px minmax(0, 1fr) 104px 74px 92px;
   }
 }
+
+/* Die Warnung der Disposition. Gelb, nicht rot: es ist noch nichts kaputt,
+   aber es wird etwas kaputtgehen, wenn niemand hinschaut. */
+.dispatch-warning {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  border: 1px solid #edcf8a;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fdf7e8;
+}
+
+.dispatch-warning > strong {
+  color: #7a5200;
+  font-size: 0.76rem;
+}
+
+.dispatch-warning ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 16px;
+  color: #7a5200;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+/* Die Fuehrerscheinklassen zum Ankreuzen. Die Erklaerung steht daneben, nicht
+   in einem Hilfetext darunter: "C1E" sagt niemandem etwas, "Lkw bis 7,5 t mit
+   Anhaenger" schon. */
+.licence-field {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+}
+
+.licence-field > legend {
+  padding: 0 6px;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.licence-field > legend span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.licence-field__classes {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+
+.licence-field__class {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.licence-field__class input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--brand);
+}
+
+.licence-field__class strong {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+}
+
+.licence-field__class span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

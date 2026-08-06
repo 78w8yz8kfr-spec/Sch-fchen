@@ -191,7 +191,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.25";
+export const APPLICATION_VERSION = "0.42.26";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1719,6 +1719,9 @@ function employeeDto(row) {
     archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : null,
     archivedReason: row.archived_reason || null,
     trainerUserId: row.trainer_user_id || null,
+    // Die Einsatzplanung warnt, wenn auf einer Baustelle niemand mit
+    // Fuehrerschein steht - dafuer muss sie die Klassen kennen.
+    drivingLicenceClasses: row.driving_licence_classes || [],
     rowVersion: Number(row.row_version || 1)
   };
 }
@@ -4287,6 +4290,7 @@ async function adminOverview(client, context, date) {
               account.must_change_password, account.status, account.archived_at,
               account.archived_reason, account.row_version,
               account.trainer_user_id,
+              account.driving_licence_classes,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
                   FILTER (WHERE role.id IS NOT NULL),
@@ -6631,6 +6635,7 @@ async function getEmployeeRecord(client, context, employeeId) {
             account.must_change_password, account.status, account.archived_at,
             account.archived_reason, account.row_version,
             account.trainer_user_id,
+            account.driving_licence_classes,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
                 FILTER (WHERE role.id IS NOT NULL),
@@ -6695,8 +6700,8 @@ async function createEmployee(client, context, input) {
   const inserted = await client.query(
     `INSERT INTO users (
        company_id, personnel_number, first_name, last_name, email, phone,
-       password_hash, must_change_password
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+       password_hash, must_change_password, driving_licence_classes
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
      RETURNING id, personnel_number, first_name, last_name, email, phone, must_change_password`,
     [
       context.companyId,
@@ -6705,7 +6710,8 @@ async function createEmployee(client, context, input) {
       input.lastName,
       input.email,
       input.phone,
-      passwordHash
+      passwordHash,
+      input.drivingLicenceClasses
     ]
   );
   await client.query(
@@ -6834,7 +6840,8 @@ async function updateEmployee(client, context, employeeId, input) {
     `UPDATE users
      SET personnel_number = $3, first_name = $4, last_name = $5,
          email = $6, phone = $7,
-         trainer_user_id = $9
+         trainer_user_id = $9,
+         driving_licence_classes = $10
      WHERE company_id = $1 AND id = $2 AND row_version = $8
      RETURNING id`,
     [
@@ -6846,7 +6853,8 @@ async function updateEmployee(client, context, employeeId, input) {
       input.email,
       input.phone,
       input.rowVersion,
-      input.trainerUserId
+      input.trainerUserId,
+      input.drivingLicenceClasses
     ]
   );
   if (updated.rowCount !== 1) {

@@ -8,6 +8,40 @@ const ENTRY_TYPES = new Set([
   "clock_out"
 ]);
 const SITE_TYPES = new Set(["site_arrival", "site_departure", "next_site"]);
+// Die Klassen des deutschen Fuehrerscheins. Dieselbe Liste steht in der
+// Migration 078 als Pruefung am Bestand: hier faengt sie den Tippfehler
+// freundlich ab, dort schuetzt sie die Daten auch vor jedem anderen Weg.
+export const DRIVING_LICENCE_CLASSES = Object.freeze([
+  "AM", "A1", "A2", "A",
+  "B", "B96", "BE",
+  "C1", "C1E", "C", "CE",
+  "D1", "D1E", "D", "DE",
+  "L", "T"
+]);
+
+function drivingLicenceClasses(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > DRIVING_LICENCE_CLASSES.length) {
+    throw new InputError("Die Führerscheinklassen sind ungültig.");
+  }
+  const erlaubt = new Set(DRIVING_LICENCE_CLASSES);
+  const klassen = new Set();
+  for (const eintrag of value) {
+    if (typeof eintrag !== "string") {
+      throw new InputError("Die Führerscheinklassen sind ungültig.");
+    }
+    const klasse = eintrag.trim().toUpperCase();
+    if (!klasse) continue;
+    if (!erlaubt.has(klasse)) {
+      throw new InputError(`Die Führerscheinklasse „${eintrag}" ist unbekannt.`);
+    }
+    klassen.add(klasse);
+  }
+  // Feste Reihenfolge, wie im Bestand: sonst haetten zwei gleiche Angaben
+  // zwei verschiedene Zeilenversionen zur Folge.
+  return [...klassen].sort();
+}
+
 const EMPLOYEE_ROLES = new Set([
   "installer",
   "apprentice",
@@ -222,6 +256,7 @@ export function validateEmployee(body) {
     email: optionalText(body.email, "E-Mail", 254),
     phone: optionalText(body.phone, "Telefon", 50),
     role,
+    drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
     temporaryPassword: password(body.temporaryPassword)
   };
 }
@@ -244,6 +279,7 @@ export function validateEmployeeUpdate(body) {
     // Der Ausbilder gehoert an den Mitarbeiter, nicht in eine eigene
     // Verwaltung daneben. Ob jemand ein Berichtsheft fuehrt, sagt seine Rolle.
     trainerUserId: optionalUuid(body.trainerUserId, "Ausbilder"),
+    drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
     rowVersion
   };
 }

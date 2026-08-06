@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Führerschein am Mitarbeiter, und die Einsatzplanung warnt.** Auf einer
+  Baustelle, auf der niemand mit Führerschein eingeteilt ist, steht am Morgen
+  das Fahrzeug in der Halle und die Mannschaft am Betriebshof. Das fiel bisher
+  erst auf, wenn es zu spät war.
+  - Die **Disposition sagt es beim Planen**: welche Baustellen des Tages ohne
+    Fahrer dastehen und wie viele Leute dort sind.
+  - Ist bei **niemandem** ein Schein hinterlegt, sagt der Hinweis das getrennt
+    — dann ist nicht die Planung falsch, sondern die Stammdaten sind
+    unvollständig, und niemand soll das eine für das andere halten.
+  - Die Klassen sind die des deutschen Führerscheins als **feste Liste** mit
+    Erklärung daneben („C1E · Lkw bis 7,5 t mit Anhänger“). „Klasse 3“ und „B“
+    wären sonst zwei verschiedene Dinge, und keine Auswertung würde beide
+    finden. Kleinschreibung, Leerzeichen und Dopplungen räumt der Bestand
+    selbst auf.
+  - Gepflegt wird beim Anlegen und Bearbeiten, angezeigt in der
+    Mitarbeiterspalte.
+- Fassung 0.42.26, Speicher `schaefchen-online-v68`, Migrationen 078 und 079.
+
 - **Neues Design, achter Schritt: Wochenstreifen und Mitarbeiterliste.**
   - Der **Wochenstreifen** zeigte bisher nur Wochentag und Tageszahl. Wer
     wissen wollte, wann er am Dienstag angefangen hat, musste den Tag
