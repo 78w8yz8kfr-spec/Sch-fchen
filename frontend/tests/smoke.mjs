@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.29/);
-assert.match(html, /app\.js\?v=0\.42\.29/);
-assert.match(html, /version\.js\?v=0\.42\.29/);
+assert.match(html, /styles\.css\?v=0\.42\.30/);
+assert.match(html, /app\.js\?v=0\.42\.30/);
+assert.match(html, /version\.js\?v=0\.42\.30/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -1183,16 +1183,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.29"'));
-assert.ok(worker.includes('"./app.js?v=0.42.29"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.29"'));
-assert.ok(worker.includes('"./version.js?v=0.42.29"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.30"'));
+assert.ok(worker.includes('"./app.js?v=0.42.30"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.30"'));
+assert.ok(worker.includes('"./version.js?v=0.42.30"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.29"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.29";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.30"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.30";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1220,7 +1220,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.29$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.30$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1228,11 +1228,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.29"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.29"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.30"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.30"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.29"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.29"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.30"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.30"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1279,8 +1279,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.29/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.29/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.30/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.30/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1338,6 +1338,18 @@ assert.match(refreshScript, /serviceWorker\.getRegistrations/);
 assert.match(refreshScript, /key\.startsWith\("schaefchen-"\)/);
 assert.doesNotMatch(refreshScript, /localStorage|indexedDB/,
   "Die Cache-Aktualisierung darf lokale Offline-Fachdaten nicht löschen");
+
+// Die Baustellenakte liegt im Bereich "Baustellen". Wird sie von woanders
+// geoeffnet - aus der Berichtszentrale, aus der Suche, vom Dashboard -, muss
+// der Bereich mitwechseln, sonst geht die Akte in einem unsichtbaren Bereich
+// auf und der Knopf scheint nichts zu tun. Der Wechsel gehoert deshalb in
+// openSiteDashboard selbst und nicht zu jedem einzelnen Aufrufer.
+assert.match(
+  app,
+  /function openSiteDashboard\(site\) \{\s*if \(currentDashboardPane !== "sites"\) showDashboardPane\("sites", false\);/,
+  "openSiteDashboard muss selbst in den Bereich \"Baustellen\" wechseln"
+);
+assert.match(styles, /\.site-dashboard \{[\s\S]*?scroll-margin-top: 88px/);
 
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);

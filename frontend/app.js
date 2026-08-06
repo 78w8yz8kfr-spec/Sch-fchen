@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.29";
-import { serverIsNewer } from "./core/versions.js?v=0.42.29";
+} from "./core/work-time.js?v=0.42.30";
+import { serverIsNewer } from "./core/versions.js?v=0.42.30";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.29";
+} from "./core/sync-queue.js?v=0.42.30";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.29";
+} from "./core/permissions.js?v=0.42.30";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.29";
+} from "./core/state-store.js?v=0.42.30";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1234,7 +1234,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.29",
+          "X-Schaefchen-Version": "0.42.30",
           ...options.headers
         }
       });
@@ -1264,7 +1264,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.29" }
+        headers: { "X-Schaefchen-Version": "0.42.30" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1311,7 +1311,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.29 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.30 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2572,7 +2572,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.29";
+  const EIGENE_FASSUNG = "0.42.30";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2609,10 +2609,7 @@ import {
         art: "Baustelle",
         titel: site.name,
         unter: [site.customerName, siteAddressText(site)].filter(Boolean).join(" · "),
-        handler: () => {
-          showDashboardPane("sites");
-          openSiteDashboard(site);
-        }
+        handler: () => openSiteDashboard(site)
       });
     }
     for (const customer of adminState.customers || []) {
@@ -2938,9 +2935,7 @@ import {
         rechts: zeit,
         handler: () => {
           const site = adminState.sites.find((eintrag2) => eintrag2.id === siteId);
-          if (!site) return;
-          showDashboardPane("sites");
-          openSiteDashboard(site);
+          if (site) openSiteDashboard(site);
         }
       });
     }
@@ -4337,7 +4332,16 @@ import {
     });
   }
 
+  // Die Akte einer Baustelle liegt im Bereich "Baustellen". Wer sie von
+  // woanders aus oeffnet - aus der Berichtszentrale, aus der Suche, vom
+  // Dashboard -, muss deshalb zuerst dorthin.
+  //
+  // Der Wechsel steht hier und nicht bei jedem Aufrufer: solange jeder es
+  // selbst tun musste, hat es einer vergessen. In der Berichtszentrale tat
+  // "Baustelle oeffnen" deshalb nichts Sichtbares - die Akte ging auf, aber in
+  // einem Bereich, den man gerade nicht ansieht.
   function openSiteDashboard(site) {
+    if (currentDashboardPane !== "sites") showDashboardPane("sites", false);
     const address = siteAddressText(site);
     const assignedEmployees = new Map();
     planningAssignments()
@@ -6347,7 +6351,6 @@ import {
         showToast("Die verlinkte Baustelle ist nicht vorhanden oder nicht zugänglich.");
         return;
       }
-      showDashboardPane("sites");
       openSiteDashboard(site);
       return;
     }

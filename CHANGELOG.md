@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **„Baustelle öffnen“ funktioniert wieder von überall.** In der
+  Berichtszentrale, unter „Fehlende Pflichtberichte“, tat der Knopf nichts
+  Sichtbares.
+  - Die Akte einer Baustelle liegt im Bereich **Baustellen**. Solange es nur
+    einen Bereich gab, war das keine Frage. Seit die Berichtszentrale, die
+    Suche und das Dashboard eigene Bereiche sind, muss der Bereich beim Öffnen
+    mitwechseln — sonst geht die Akte auf, aber in einem Bereich, den man
+    gerade nicht ansieht.
+  - Der Wechsel steht jetzt **in der Funktion, die die Akte öffnet**, und nicht
+    mehr bei jedem Aufrufer. Genau daran lag es: die Aufrufer mussten es selbst
+    tun, und einer hatte es nicht. So kann es keiner mehr vergessen. Alle fünf
+    Wege in die Akte — Baustellenliste, Suche, Dashboard, fehlender
+    Pflichtbericht, Bericht — sind nachgemessen.
+  - Dazu eine Kleinigkeit derselben Art: die Akte scrollte so weit hoch, dass
+    **ihr eigener Name unter der Kopfzeile verschwand**. Man sah die geöffnete
+    Baustelle, aber nicht, welche es ist.
+- Fassung 0.42.30, Speicher `schaefchen-online-v72`, Migration 085.
+
 - **Die App sagt jetzt, wenn sie veraltet ist.** Ein Telefon mit eingerichteter
   App konnte tagelang eine alte Oberfläche zeigen: der Dienst-Worker täuscht
   dabei eine funktionierende Welt vor, und niemand erfährt, dass es eine neuere
