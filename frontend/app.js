@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.31";
-import { serverIsNewer } from "./core/versions.js?v=0.42.31";
+} from "./core/work-time.js?v=0.42.32";
+import { serverIsNewer } from "./core/versions.js?v=0.42.32";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.31";
+} from "./core/sync-queue.js?v=0.42.32";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.31";
+} from "./core/permissions.js?v=0.42.32";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.31";
+} from "./core/state-store.js?v=0.42.32";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1235,7 +1235,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.31",
+          "X-Schaefchen-Version": "0.42.32",
           ...options.headers
         }
       });
@@ -1265,7 +1265,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.31" }
+        headers: { "X-Schaefchen-Version": "0.42.32" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1312,7 +1312,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.31 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.32 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1354,10 +1354,14 @@ import {
     element.append(image);
   }
 
-  function showDashboard() {
-    elements.loginView.hidden = true;
-    elements.passwordChangeView.hidden = true;
-    elements.dashboardView.hidden = false;
+  // Welche Eintraege stehen in der Leiste?
+  //
+  // Das haengt an zwei Dingen: was jemand darf, und welche Bereiche seine
+  // Firma hat. Das Zweite kann sich waehrend einer laufenden Sitzung aendern -
+  // die Plattformverwaltung schaltet einen Bereich frei oder ab. Deshalb steht
+  // das hier fuer sich und nicht mehr mitten in showDashboard: es muss auch
+  // dann laufen, wenn die Anmeldung laengst vorbei ist.
+  function applyNavigationAccess() {
     const planner = canPlan();
     elements.navAssignments.hidden = !planner;
     elements.navSites.hidden = !planner;
@@ -1385,6 +1389,13 @@ import {
       (knopf) => !knopf.hidden && !knopf.classList.contains("nav-item--desktop")
     ).length;
     elements.bottomNav.classList.toggle("bottom-nav--compact", sichtbare >= 5);
+  }
+
+  function showDashboard() {
+    elements.loginView.hidden = true;
+    elements.passwordChangeView.hidden = true;
+    elements.dashboardView.hidden = false;
+    applyNavigationAccess();
     document.title = "Dashboard · Schäfchen";
     render();
     showDashboardPane("start", false);
@@ -2573,7 +2584,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.31";
+  const EIGENE_FASSUNG = "0.42.32";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3229,6 +3240,48 @@ import {
   function moduleEnabled(key) {
     const ausDerSitzung = session?.modules?.[key];
     return ausDerSitzung === undefined ? true : Boolean(ausDerSitzung);
+  }
+
+  // Den Stand der Bereiche nachholen.
+  //
+  // Die Liste kam bisher nur beim Anmelden. Schaltet die Plattformverwaltung
+  // danach einen Bereich frei, merkt die App davon nichts: der Server laesst
+  // ihn sofort zu, aber der Eintrag in der Leiste bleibt weg, bis die Seite
+  // vollstaendig neu geladen wird. Auf einem Telefon mit eingerichteter App
+  // passiert das tagelang nicht - dort heisst "erst nach dem Neuladen" in der
+  // Praxis "gar nicht". Genau so ist der Fuhrpark gemeldet worden:
+  // eingeschaltet, und trotzdem nicht da.
+  //
+  // Gefragt wird beim Zurueckkommen in die App und in ruhigem Abstand. Ein
+  // haeufigeres Nachfragen brauchte es nicht: eine Freigabe ist nichts, was
+  // sekundengenau ankommen muss.
+  async function refreshModuleAccess() {
+    if (demoMode || !session || elements.dashboardView.hidden) return;
+    let neue;
+    try {
+      neue = (await requestJson("./api/v1/session")).session?.modules;
+    } catch (error) {
+      // Offline oder ein Serverfehler: der bekannte Stand bleibt stehen.
+      // Bereiche wegzunehmen, nur weil gerade niemand antwortet, waere
+      // schlimmer als eine Liste, die eine Weile alt ist.
+      if (error.status === 401) showLogin();
+      return;
+    }
+    if (!neue) return;
+    if (JSON.stringify(neue) === JSON.stringify(session.modules || {})) return;
+    session = { ...session, modules: neue };
+    saveState();
+    applyNavigationAccess();
+    // Wer gerade in einem Bereich steht, der eben abgeschaltet wurde, kann
+    // dort nicht bleiben - der Bildschirm waere noch da, die Schnittstelle
+    // dahinter aber schon gesperrt.
+    // Die Bereiche heissen wie ihre Schaltflaechen: "vehicles" gehoert zu
+    // #nav-vehicles. Deshalb genuegt der Name, um zu sehen, ob es den Bereich
+    // fuer diesen Angemeldeten noch gibt.
+    const aktuellerKnopf = document.querySelector(`#nav-${currentDashboardPane}`);
+    if (aktuellerKnopf?.hidden) showDashboardPane("start", false);
+    render();
+    await refreshVehicles();
   }
 
   function vdeModuleEnabled() {
@@ -12738,11 +12791,20 @@ import {
     pendingCarryOverNotice = null;
   }
   window.setInterval(renderTimes, 15000);
+  // Freigegebene Bereiche nachholen: beim Zurueckkommen in die App, beim
+  // Wiederfinden der Verbindung und alle fuenf Minuten. Wer in der
+  // Plattformverwaltung etwas freischaltet, sieht es sonst erst nach einem
+  // vollstaendigen Neuladen - auf dem Telefon also praktisch nie.
+  window.setInterval(() => void refreshModuleAccess(), 300000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void refreshModuleAccess();
+  });
   window.addEventListener("online", () => {
     updateConnectionState();
     void syncPendingEntries();
     void refreshLiveData();
     void refreshAbsenceData();
+    void refreshModuleAccess();
   });
   window.addEventListener("offline", updateConnectionState);
   window.addEventListener("resize", applyPlanningBoardWidths);

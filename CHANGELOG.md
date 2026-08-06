@@ -4,6 +4,26 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Freigegebene Bereiche kommen jetzt ohne Neuladen an.** Gemeldet wurde es am
+  Fuhrpark: in der Plattformverwaltung eingeschaltet, in der App trotzdem nicht
+  da. Der Fehler lag nicht am Fuhrpark.
+  - Die Liste der freigegebenen Bereiche kam bisher **nur beim Anmelden** mit.
+    Wird danach etwas freigeschaltet, lässt der Server es sofort zu — die App
+    weiß aber nichts davon und blendet den Eintrag weiter aus. Erst ein
+    vollständiges Neuladen brachte ihn. Auf einem Telefon mit eingerichteter App
+    passiert das tagelang nicht; dort heißt „erst nach dem Neuladen" in der
+    Praxis **„gar nicht"**.
+  - Die App fragt den Stand jetzt nach: **beim Zurückkommen aus dem
+    Hintergrund**, beim Wiederfinden der Verbindung und alle fünf Minuten.
+    Häufiger braucht es nicht — eine Freigabe muss nicht sekundengenau ankommen.
+  - Es gilt in **beide Richtungen**. Wird ein Bereich abgeschaltet, während
+    jemand darin steht, wird er auf die Startseite gesetzt: der Bildschirm wäre
+    sonst noch da, die Schnittstelle dahinter aber schon gesperrt.
+  - Bleibt die Antwort aus — offline, Serverfehler —, bleibt der bekannte Stand
+    stehen. Bereiche wegzunehmen, nur weil gerade niemand antwortet, wäre
+    schlimmer als eine Liste, die eine Weile alt ist.
+- Fassung 0.42.32, Speicher `schaefchen-online-v74`, Migration 087.
+
 - **Der Resturlaub steht jetzt neben den Stunden.** Auf der Übersicht stand
   bisher nur eine Zahl — der Stand des Arbeitskontos. Der Resturlaub lag im
   Wochenbereich, einen Bereichswechsel entfernt.
