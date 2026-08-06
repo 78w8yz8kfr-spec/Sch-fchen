@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Aus dem Viewer-Durchgang: die Mängelliste im VDE-Protokoll war zerrissen.**
+  Auf dem Deckblatt ist bei fünf Zeilen Schluss, damit Ergebnis und
+  Unterschriften darauf Platz behalten. Der Rest stand danach **hinter den
+  Messwerten** — wer das Protokoll las, fand mitten zwischen Ohm-Werten eine
+  „Fortsetzung“ der Mängel von Seite 1. Bei einem Prüfprotokoll sind die
+  Mängel das, was zählt; sie stehen jetzt unmittelbar hinter dem Deckblatt und
+  vor den Messwerten. Ein Test hält die Reihenfolge fest.
+  - Gefunden hat das kein Test, sondern ein Blick in den PDF-Betrachter des
+    Telefons. Die Messung prüft, ob etwas neben dem Blatt liegt — dass eine
+    Rubrik durch eine andere unterbrochen wird, sieht nur ein Mensch.
+- Fassung 0.42.15, Speicher `schaefchen-online-v57`, Migration 067.
+
 - **Alle vier PDF-Arten werden jetzt nachgemessen, nicht nur gezählt.** Beim
   Berichtsheft war ein Fehler aufgefallen, den die Seitenzahl nicht sieht: der
   Inhalt lief unten aus dem Blatt heraus, und das PDF hatte trotzdem „eine

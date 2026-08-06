@@ -423,3 +423,86 @@ test("Auch eine große Anlage bleibt vollständig auf den Blättern", async () =
   assert.ok(text.includes("Mangel 1:"), "Der erste Mangel fehlt");
   assert.ok(text.includes("Mangel 60:"), "Der letzte Mangel fehlt");
 });
+
+test("Eine lange Mängelliste bleibt zusammen und steht vor den Messwerten", async () => {
+  // Auf dem Deckblatt ist bei fuenf Zeilen Schluss, damit Ergebnis und
+  // Unterschriften darauf Platz behalten. Der Rest stand danach hinter den
+  // Messwerten: wer das Protokoll las, fand mitten zwischen Ohm-Werten eine
+  // "Fortsetzung" der Maengel von Seite 1. Bei einem Pruefprotokoll sind die
+  // Maengel das, was zaehlt.
+  const signature = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64"
+  );
+  const messwerte = {
+    rpe: "0.18", riso: "200", zi: "0.31", zs: "0.54", ik: "426",
+    rcdTripTime: "24", rcdTripCurrent: "22",
+    risoL1Pe: "200", risoL2Pe: "200", risoL3Pe: "200", risoNPe: "200"
+  };
+  const kreis = (index) => ({
+    clientId: `circuit-${index}`, name: `Stromkreis ${index + 1}`,
+    cableType: "NYM-J", cores: "3", crossSection: "2.5",
+    protectiveDevice: { type: "mcb", characteristic: "B", ratedCurrent: "16", designation: null },
+    measurements: messwerte, note: null
+  });
+  const pdf = await buildVdeInspectionPdf({
+    inspection: {
+      id: "11111111-1111-4111-8111-111111111111", number: "SE-VDE-2026-00001",
+      name: "Erstprüfung", date: "2026-07-29"
+    },
+    protocol: {
+      schemaVersion: 1, networkType: "TN-S", nominalVoltage: "230/400 V",
+      inspectionKinds: { initial: true, recurring: false, alteration: false },
+      visualChecks: {
+        electric_shock_protection: "ok", protective_conductor: "ok",
+        equipment_selection: "ok", circuit_labelling: "ok", rcd_test_button: "ok",
+        phase_sequence: "ok", polarity: "ok", disconnection_conditions: "ok"
+      },
+      incomingSupply: {
+        designation: "Hausanschlusskasten", location: "Hausanschlussraum",
+        upstreamProtection: "NH00 63 A", source: "Netzbetreiber",
+        cableType: "NYY-J", cores: "5", crossSection: "16"
+      },
+      circuitDirectoryIncluded: true, detailedInsulationMeasurement: true,
+      distributions: [{
+        clientId: "uv-1", name: "UV 1", source: "HAK", feedCableType: "NYY-J",
+        feedCores: "5", feedCrossSection: "10", feedProtection: "35 A", location: "Flur",
+        rcds: [{
+          clientId: "rcd-1", name: "FI 1", type: "A", characteristic: "unverzögert",
+          ratedCurrent: "40", ratedResidualCurrent: "30", testButton: true,
+          circuits: [kreis(0)]
+        }],
+        directCircuits: [kreis(1)]
+      }],
+      testEquipment: {
+        manufacturer: "Gossen Metrawatt", type: "Profitest",
+        serialNumber: "GM-2026-1", calibrationValidUntil: "2027-07-29"
+      },
+      defects: Array.from({ length: 60 }, (_, index) =>
+        `Mangel ${index + 1}: Die Klemmstelle war lose und wurde nachgezogen.`
+      ).join(" "),
+      result: "ok", nextInspectionDate: "2030-07-29"
+    },
+    company: { legalName: "Schaaf Elektro GmbH", displayName: "Schaaf Elektro GmbH" },
+    context: { customerName: "Musterkunde GmbH", inspectorName: "Vera Vorarbeiterin" },
+    inspectorSignature: signature, completedAt: "2026-07-29T16:30:00.000Z"
+  });
+
+  const { seiten } = await seitenStroeme(pdf);
+  const maengelSeiten = seiten
+    .map((seite, index) => ({ index, text: lesbarerText(seite) }))
+    .filter(({ text }) => /Mangel \d+:/.test(text))
+    .map(({ index }) => index);
+  // Die Maengel stehen auf aufeinanderfolgenden Blaettern, ohne Unterbrechung.
+  assert.deepEqual(
+    maengelSeiten,
+    maengelSeiten.map((_, lauf) => maengelSeiten[0] + lauf),
+    "Die Mängelliste ist durch eine andere Rubrik unterbrochen"
+  );
+  // Und sie stehen vor den Messwerten.
+  const messwerteSeite = seiten.findIndex(
+    (seite) => lesbarerText(seite).includes("Messwerte und Plausibilität")
+  );
+  assert.ok(messwerteSeite > maengelSeiten.at(-1),
+    `Die Messwerte stehen auf Seite ${messwerteSeite + 1} und damit vor dem Ende der Mängel`);
+});

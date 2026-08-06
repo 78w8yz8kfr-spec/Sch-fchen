@@ -573,6 +573,18 @@ export async function buildVdeInspectionPdf({
     color: MUTED
   });
 
+  // Der Rest der Maengelliste kommt unmittelbar nach dem Deckblatt.
+  //
+  // Auf dem Deckblatt ist bei fuenf Zeilen Schluss, damit Ergebnis und
+  // Unterschriften darauf Platz behalten. Der Rest stand bisher erst hinter
+  // den Messwerten - wer das Protokoll las, fand mitten zwischen Ohm-Werten
+  // eine "Fortsetzung" der Maengel von Seite 1. Bei einem Pruefprotokoll sind
+  // die Maengel das, was zaehlt; sie gehoeren zusammen und nach vorn.
+  if (remainingDefectLines.length > 0) {
+    addPage("Mängel und Hinweise · Fortsetzung");
+    paragraph(remainingDefectLines.join("\n"));
+  }
+
   addPage("Messwerte und Plausibilität");
   const circuitRows = allCircuits(protocol);
 
@@ -733,11 +745,6 @@ export async function buildVdeInspectionPdf({
       font: regular,
       color: MUTED
     });
-  }
-
-  if (remainingDefectLines.length > 0) {
-    section("Mängel und Hinweise · Fortsetzung");
-    paragraph(remainingDefectLines.join("\n"));
   }
 
   const circuitAppendix = circuitRows.filter(({ circuit, distribution }) => (
