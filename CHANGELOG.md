@@ -4,6 +4,26 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, sechster Schritt: das Dashboard.** Begrüßung mit Namen und
+  Winkhand, darunter das volle Datum, rechts der Schnellzugriff. Dann **vier
+  Kennzahlen** nebeneinander — laufende Baustellen, Mitarbeiter im Einsatz,
+  offene Berichte, Überstunden der Woche — und darunter **„Heute im
+  Überblick“** mit zwei Feldern: die Baustellen, auf denen heute jemand steht,
+  und was zuletzt im Betrieb passiert ist.
+  - Die Kennzahlen gelten **nur für die Planung**. Ein Monteur oder Vorarbeiter
+    sieht auf seinem Dashboard weiterhin den Arbeitstag; mit der Zahl der
+    laufenden Baustellen des ganzen Betriebs kann er nichts anfangen.
+  - Gezählt wird nur, was ohnehin geladen ist — eine eigene Abfrage wäre eine
+    zweite Quelle für dieselben Zahlen. Die Überstunden kommen aus der
+    Wochenansicht selbst: dieselbe Rechnung zweimal aufzuschreiben ist die
+    sicherste Art, zwei verschiedene Zahlen zu bekommen.
+  - Der **Schnellzugriff** führt nur zu Dingen, die es wirklich gibt —
+    Baustelle, Einsatz, Mitarbeiter, Kunde. Jeder Eintrag öffnet den Bereich
+    und klappt dort das Formular auf.
+  - **Nicht enthalten:** die Glocke und die Suche aus dem Entwurf. Ein
+    Bedienelement, das nichts tut, ist schlechter als keines.
+- Fassung 0.42.23, Speicher `schaefchen-online-v65`, Migration 075.
+
 - **Neues Design, fünfter Schritt: die Seitenleiste mit allen Bereichen.**
   Bisher führte die Leiste fünf Einträge, und dahinter lagen drei Bildschirme.
   Unter „Mehr“ stand alles andere untereinander — Mitarbeiter, Jahreskonten,

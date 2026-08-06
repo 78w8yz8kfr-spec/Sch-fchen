@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.22/);
-assert.match(html, /app\.js\?v=0\.42\.22/);
-assert.match(html, /version\.js\?v=0\.42\.22/);
+assert.match(html, /styles\.css\?v=0\.42\.23/);
+assert.match(html, /app\.js\?v=0\.42\.23/);
+assert.match(html, /version\.js\?v=0\.42\.23/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -783,6 +783,35 @@ assert.ok(
   html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
   "Die Uebersichtskarten stehen vor dem Wochenbereich"
 );
+
+// Das Dashboard nach dem Entwurf: Begruessung mit Namen, darunter das volle
+// Datum, rechts der Schnellzugriff. Dann vier Kennzahlen und "Heute im
+// Ueberblick" mit zwei Feldern.
+assert.match(html, /id="dashboard-metrics"[^>]*data-dashboard-pane="start"/);
+for (const kennung of ["metric-sites", "metric-employees", "metric-reports", "metric-overtime"]) {
+  assert.match(html, new RegExp(`id="${kennung}"`), `${kennung} fehlt`);
+}
+assert.match(html, /id="today-overview"/);
+assert.match(html, /id="today-sites"/);
+assert.match(html, /id="today-activity"/);
+assert.match(html, /class="welcome-date"/);
+assert.match(app, /function renderDashboardMetrics\(/);
+assert.match(app, /function renderTodayOverview\(/);
+assert.match(app, /function latestActivity\(/);
+assert.match(app, /function renderQuickAccess\(/);
+// Die Kennzahlen gelten nur fuer die Planung: ein Monteur sieht auf seinem
+// Dashboard den Arbeitstag, nicht die Zahlen des ganzen Betriebs.
+assert.match(app, /const zeigen = Boolean\(adminState\) && canPlan\(\) && !demoMode;/);
+// Die Ueberstunden kommen aus der Wochenansicht selbst - dieselbe Rechnung
+// zweimal aufzuschreiben waere die sicherste Art, zwei Zahlen zu bekommen.
+assert.match(app, /const differenz = wochenDifferenzMinuten;/);
+assert.match(app, /wochenDifferenzMinuten = differenceMinutes;/);
+assert.match(styles, /\.dashboard-metrics \{/);
+assert.match(styles, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+assert.match(styles, /\.today-overview__panels \{/);
+// Der Schnellzugriff fuehrt nur zu Dingen, die es wirklich gibt.
+assert.match(html, /id="quick-access"/);
+assert.doesNotMatch(app, /"Material anlegen"|"Fahrzeug anlegen"|"Rechnung schreiben"/);
 
 // Jeder Eintrag der Leiste hat einen eigenen Bereich mit eigener Huelle.
 for (const huelle of [
@@ -1011,16 +1040,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.22"'));
-assert.ok(worker.includes('"./app.js?v=0.42.22"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.22"'));
-assert.ok(worker.includes('"./version.js?v=0.42.22"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.23"'));
+assert.ok(worker.includes('"./app.js?v=0.42.23"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.23"'));
+assert.ok(worker.includes('"./version.js?v=0.42.23"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.22"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.22";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.23"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.23";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1048,7 +1077,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.22$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.23$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1056,11 +1085,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.22"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.22"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.23"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.23"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.22"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.22"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.23"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.23"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1107,8 +1136,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.22/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.22/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.23/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.23/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

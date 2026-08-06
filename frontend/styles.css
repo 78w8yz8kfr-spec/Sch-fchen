@@ -7019,3 +7019,257 @@ select:focus-visible {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Das Dashboard nach dem Entwurf
+   ---------------------------------------------------------------------------
+
+   Begruessung mit Namen, darunter das volle Datum, rechts der Schnellzugriff.
+   Dann vier Kennzahlen nebeneinander und darunter "Heute im Ueberblick" mit
+   zwei Feldern.
+
+   Die Kennzahlen gelten nur fuer die Planung. Ein Monteur sieht auf seinem
+   Dashboard den Arbeitstag - mit der Zahl der laufenden Baustellen des
+   Betriebs kann er nichts anfangen.
+   ------------------------------------------------------------------------ */
+
+.welcome-date {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.quick-access {
+  position: relative;
+}
+
+.quick-access > summary {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 0.74rem;
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+
+.quick-access > summary::-webkit-details-marker {
+  display: none;
+}
+
+.quick-access > summary::after {
+  content: "⌄";
+  margin-top: -4px;
+  color: var(--muted);
+}
+
+.quick-access__menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 210px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.quick-access__menu button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-align: left;
+}
+
+.quick-access__menu button:hover {
+  background: #f2f3f2;
+}
+
+.dashboard-metrics {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.metric-card__label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.metric-card__value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.metric-card__value--brand {
+  color: var(--brand);
+}
+
+.metric-card__value small {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.metric-card__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.today-overview {
+  margin: 0 0 22px;
+}
+
+.today-overview > h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.today-overview__panels {
+  display: grid;
+  gap: 12px;
+}
+
+.today-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.today-panel__head {
+  margin: 0;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f5f6f5;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.today-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.today-list__item {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  padding: 10px 16px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.today-list__item:hover {
+  background: #fafafa;
+}
+
+.today-list__text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.today-list__text strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-list__text small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.today-list__aside {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.today-list__empty {
+  padding: 18px 16px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.today-list__more {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  padding: 0 16px;
+  color: var(--brand);
+  background: transparent;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 750;
+  text-align: left;
+}
+
+@media (min-width: 1080px) {
+  .dashboard-metrics {
+    gap: 18px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .metric-card {
+    padding: 18px 20px;
+  }
+
+  .metric-card__value {
+    font-size: 2.2rem;
+  }
+
+  .today-overview__panels {
+    gap: 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

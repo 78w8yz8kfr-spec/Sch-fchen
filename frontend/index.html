@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.22">
-    <script type="module" src="./app.js?v=0.42.22"></script>
-    <script src="./version.js?v=0.42.22" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.23">
+    <script type="module" src="./app.js?v=0.42.23"></script>
+    <script src="./version.js?v=0.42.23" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.22</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.23</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -206,14 +206,60 @@
         <div class="dashboard-content">
           <div class="welcome-row" data-dashboard-pane="start">
             <div>
-              <p id="today-label" class="eyebrow">Heute</p>
               <h1 id="dashboard-title">Guten Morgen</h1>
+              <p id="today-label" class="welcome-date">Heute</p>
             </div>
             <div class="welcome-badges">
+              <details id="quick-access" class="quick-access" hidden>
+                <summary>Schnellzugriff</summary>
+                <div id="quick-access-menu" class="quick-access__menu"></div>
+              </details>
               <span id="foreman-badge" class="role-badge" hidden>Vorarbeiter</span>
               <span id="mode-badge" class="preview-badge">Vorschau</span>
             </div>
           </div>
+
+          <!-- Die Kennzahlen des Betriebs. Sie gelten nur fuer die Planung:
+               ein Monteur sieht hier seinen Arbeitstag, nicht die Zahlen des
+               ganzen Betriebs. -->
+          <div id="dashboard-metrics" class="dashboard-metrics" data-dashboard-pane="start" aria-label="Kennzahlen" hidden>
+            <article class="metric-card">
+              <p class="metric-card__label">Laufende Baustellen</p>
+              <strong id="metric-sites" class="metric-card__value metric-card__value--brand">0</strong>
+              <p class="metric-card__note">heute aktiv</p>
+            </article>
+            <article class="metric-card">
+              <p class="metric-card__label">Mitarbeiter im Einsatz</p>
+              <strong class="metric-card__value">
+                <span id="metric-employees">0</span><small id="metric-employees-total">/ 0</small>
+              </strong>
+              <p class="metric-card__note" id="metric-employees-note">heute eingeplant</p>
+            </article>
+            <article class="metric-card">
+              <p class="metric-card__label">Offene Berichte</p>
+              <strong id="metric-reports" class="metric-card__value metric-card__value--brand">0</strong>
+              <p class="metric-card__note">zur Freigabe</p>
+            </article>
+            <article class="metric-card">
+              <p class="metric-card__label" id="metric-overtime-label">Überstunden</p>
+              <strong id="metric-overtime" class="metric-card__value metric-card__value--brand">±00:00</strong>
+              <p class="metric-card__note">dein Zeitkonto</p>
+            </article>
+          </div>
+
+          <section id="today-overview" class="today-overview" data-dashboard-pane="start" aria-labelledby="today-overview-title" hidden>
+            <h2 id="today-overview-title">Heute im Überblick</h2>
+            <div class="today-overview__panels">
+              <div class="today-panel">
+                <p class="today-panel__head">Baustellen heute</p>
+                <ul id="today-sites" class="today-list" aria-label="Baustellen heute"></ul>
+              </div>
+              <div class="today-panel">
+                <p class="today-panel__head">Neueste Aktivitäten</p>
+                <ul id="today-activity" class="today-list" aria-label="Neueste Aktivitäten"></ul>
+              </div>
+            </div>
+          </section>
 
           <section class="status-card" data-dashboard-pane="start" aria-labelledby="workday-title">
             <div class="status-card__top">

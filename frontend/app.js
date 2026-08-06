@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.22";
+} from "./core/work-time.js?v=0.42.23";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.22";
+} from "./core/sync-queue.js?v=0.42.23";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.22";
+} from "./core/permissions.js?v=0.42.23";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.22";
+} from "./core/state-store.js?v=0.42.23";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -505,6 +505,19 @@ import {
     inspectionSearchField: document.querySelector("#inspection-search-field"),
     inspectionOverviewList: document.querySelector("#inspection-overview-list"),
     paneMenu: document.querySelector("#pane-menu"),
+    quickAccess: document.querySelector("#quick-access"),
+    quickAccessMenu: document.querySelector("#quick-access-menu"),
+    dashboardMetrics: document.querySelector("#dashboard-metrics"),
+    metricSites: document.querySelector("#metric-sites"),
+    metricEmployees: document.querySelector("#metric-employees"),
+    metricEmployeesTotal: document.querySelector("#metric-employees-total"),
+    metricEmployeesNote: document.querySelector("#metric-employees-note"),
+    metricReports: document.querySelector("#metric-reports"),
+    metricOvertime: document.querySelector("#metric-overtime"),
+    metricOvertimeLabel: document.querySelector("#metric-overtime-label"),
+    todayOverview: document.querySelector("#today-overview"),
+    todaySites: document.querySelector("#today-sites"),
+    todayActivity: document.querySelector("#today-activity"),
     businessStructurePanel: document.querySelector("#business-structure-panel"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminCustomerCount: document.querySelector("#admin-customer-count"),
@@ -889,10 +902,13 @@ import {
   elements.assignmentForm.querySelector('button[type="submit"]').after(elements.assignmentImportPanel);
   elements.siteForm.querySelector('button[type="submit"]').after(elements.siteImportPanel);
 
-  const dateFormatter = new Intl.DateTimeFormat("de-DE", {
+  // Auf dem Dashboard steht das volle Datum unter der Begruessung, mit Jahr:
+  // dort ist es die Angabe, auf die sich alles darunter bezieht.
+  const dashboardDateFormatter = new Intl.DateTimeFormat("de-DE", {
     weekday: "long",
-    day: "2-digit",
-    month: "long"
+    day: "numeric",
+    month: "long",
+    year: "numeric"
   });
   const timeFormatter = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
@@ -915,6 +931,9 @@ import {
   let apprenticeMissingState = [];
   let apprenticeProfileState = null;
   let apprenticeReviewState = null;
+  // Die Differenz der angezeigten Woche. Die Wochenansicht rechnet sie aus,
+  // das Dashboard zeigt sie noch einmal als Kennzahl.
+  let wochenDifferenzMinuten = 0;
   let apprenticeGapState = [];
   // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
   const expandedPlanningCells = new Set();
@@ -1147,7 +1166,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.22",
+          "X-Schaefchen-Version": "0.42.23",
           ...options.headers
         }
       });
@@ -1175,7 +1194,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.22" }
+        headers: { "X-Schaefchen-Version": "0.42.23" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1222,7 +1241,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.22 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.23 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2477,6 +2496,264 @@ import {
     elements.reportReturnSubmit.disabled = false;
     elements.reportReturnDialog.showModal();
     window.setTimeout(() => elements.reportReturnComment.focus(), 100);
+  }
+
+  // Der Schnellzugriff aus dem Entwurf. Er fuehrt nur zu Dingen, die es
+  // wirklich gibt - jeder Eintrag oeffnet den Bereich und klappt dort das
+  // Formular auf, in das man sonst erst hineinklicken muesste.
+  function renderQuickAccess() {
+    const wege = [];
+    if (canPlan()) {
+      wege.push(["Baustelle anlegen", () => {
+        showDashboardPane("sites");
+        elements.siteMasterDataTools.hidden = false;
+        elements.siteMasterDataTools.open = true;
+        elements.siteFormPanel.open = true;
+      }]);
+      wege.push(["Einsatz planen", () => {
+        showDashboardPane("assignments");
+        elements.assignmentPanel.open = true;
+      }]);
+      if (!isProjectScopedSession()) {
+        wege.push(["Mitarbeiter anlegen", () => {
+          showDashboardPane("employees");
+          elements.employeePanel.open = true;
+        }]);
+      }
+      wege.push(["Kunde anlegen", () => {
+        showDashboardPane("customers");
+        elements.customerPanel.hidden = false;
+        elements.customerPanel.open = true;
+      }]);
+    }
+    elements.quickAccess.hidden = wege.length === 0 || currentDashboardPane !== "start";
+    elements.quickAccessMenu.replaceChildren();
+    for (const [beschriftung, handler] of wege) {
+      const knopf = document.createElement("button");
+      knopf.type = "button";
+      knopf.textContent = beschriftung;
+      knopf.addEventListener("click", () => {
+        elements.quickAccess.open = false;
+        handler();
+      });
+      elements.quickAccessMenu.append(knopf);
+    }
+  }
+
+  // Die vier Kennzahlen des Betriebs auf dem Dashboard. Sie zaehlen nur, was
+  // ohnehin schon geladen ist - eine eigene Abfrage waere eine zweite Quelle
+  // fuer dieselben Zahlen.
+  //
+  // Fuer einen Monteur stehen sie nicht da: er hat mit den Zahlen des ganzen
+  // Betriebs nichts zu tun, und sein Dashboard zeigt stattdessen seinen
+  // Arbeitstag.
+  function renderDashboardMetrics() {
+    const zeigen = Boolean(adminState) && canPlan() && !demoMode;
+    elements.dashboardMetrics.hidden = !zeigen || currentDashboardPane !== "start";
+    if (!zeigen) return;
+
+    const laufende = adminState.sites.filter(
+      (site) => siteStatusGroup(site.status) === "active"
+    );
+    elements.metricSites.textContent = String(laufende.length);
+
+    const eingeplant = new Set(
+      (adminState.assignments || []).map((assignment) => assignment.employeeId)
+    );
+    const mannschaft = plannableEmployees(adminState.employees);
+    elements.metricEmployees.textContent = String(eingeplant.size);
+    elements.metricEmployeesTotal.textContent = `/ ${mannschaft.length}`;
+    elements.metricEmployeesNote.textContent = adminState.date === localDateKey()
+      ? "heute eingeplant"
+      : `eingeplant am ${shortDate(adminState.date)}`;
+
+    const berichte = reportCenterReports();
+    elements.metricReports.textContent = String(
+      berichte.filter((report) => report.status === "submitted").length
+    );
+
+    // Das eigene Zeitkonto, nicht das des Betriebs: eine Summe ueber alle
+    // Mitarbeiter waere eine Zahl, mit der niemand etwas anfangen kann.
+    //
+    // Die Zahl kommt aus der Wochenansicht selbst - dieselbe Rechnung zweimal
+    // aufzuschreiben ist die sicherste Art, zwei verschiedene Zahlen zu
+    // bekommen.
+    elements.metricOvertimeLabel.textContent = `Überstunden (${isoWeekLabel(selectedWeekStart)})`;
+    const differenz = wochenDifferenzMinuten;
+    elements.metricOvertime.textContent = formatSignedMinutes(differenz);
+    elements.metricOvertime.className = `metric-card__value${
+      differenz < 0 ? "" : " metric-card__value--brand"
+    }`;
+  }
+
+  function isoWeekLabel(montag) {
+    const datum = dateFromIso(montag);
+    const donnerstag = new Date(datum);
+    donnerstag.setDate(datum.getDate() + 3);
+    const jahresbeginn = new Date(donnerstag.getFullYear(), 0, 1);
+    const tage = Math.floor((donnerstag - jahresbeginn) / 86400000);
+    return `KW ${Math.floor(tage / 7) + 1}`;
+  }
+
+  // "Heute im Ueberblick": links die Baustellen, auf denen heute jemand steht,
+  // rechts das, was zuletzt im Betrieb passiert ist.
+  function renderTodayOverview() {
+    const zeigen = Boolean(adminState) && canPlan() && !demoMode;
+    elements.todayOverview.hidden = !zeigen || currentDashboardPane !== "start";
+    if (!zeigen) return;
+
+    const proBaustelle = new Map();
+    for (const assignment of adminState.assignments || []) {
+      const eintrag = proBaustelle.get(assignment.constructionSiteId) || {
+        name: assignment.siteName || "Ohne Baustelle",
+        leute: 0,
+        von: null,
+        bis: null
+      };
+      eintrag.leute += 1;
+      const start = assignment.plannedStartTime?.slice(0, 5) || null;
+      // Die Endzeit steht nicht im Einsatz; sie ergibt sich aus Start und
+      // geplanter Dauer - dieselbe Rechnung wie auf der Plantafel.
+      const startMinuten = assignmentStartMinutes(assignment.plannedStartTime);
+      const ende = startMinuten !== null && assignment.plannedDurationMinutes
+        ? uhrzeitAusMinuten(startMinuten + assignment.plannedDurationMinutes)
+        : null;
+      if (start && (!eintrag.von || start < eintrag.von)) eintrag.von = start;
+      if (ende && (!eintrag.bis || ende > eintrag.bis)) eintrag.bis = ende;
+      proBaustelle.set(assignment.constructionSiteId, eintrag);
+    }
+    const baustellen = [...proBaustelle.entries()]
+      .sort(([, links], [, rechts]) => (links.von || "99:99").localeCompare(rechts.von || "99:99"));
+
+    elements.todaySites.replaceChildren();
+    if (baustellen.length === 0) {
+      appendTodayEmpty(elements.todaySites, "Für heute ist noch kein Einsatz freigegeben.");
+    }
+    for (const [siteId, eintrag] of baustellen.slice(0, 3)) {
+      const zeit = eintrag.von && eintrag.bis
+        ? `${eintrag.von} – ${eintrag.bis}`
+        : eintrag.von ? `ab ${eintrag.von}` : "ohne Startzeit";
+      appendTodayRow(elements.todaySites, {
+        titel: eintrag.name,
+        unter: `${eintrag.leute} Mitarbeiter`,
+        rechts: zeit,
+        handler: () => {
+          const site = adminState.sites.find((eintrag2) => eintrag2.id === siteId);
+          if (!site) return;
+          showDashboardPane("sites");
+          openSiteDashboard(site);
+        }
+      });
+    }
+    if (baustellen.length > 3) {
+      const weitere = baustellen.length - 3;
+      appendTodayMore(
+        elements.todaySites,
+        `${weitere} weitere Baustelle${weitere === 1 ? "" : "n"}`,
+        () => showDashboardPane("assignments")
+      );
+    }
+
+    elements.todayActivity.replaceChildren();
+    const aktivitaeten = latestActivity();
+    if (aktivitaeten.length === 0) {
+      appendTodayEmpty(elements.todayActivity, "Noch keine Aktivität im Betrieb.");
+    }
+    for (const eintrag of aktivitaeten) {
+      appendTodayRow(elements.todayActivity, eintrag);
+    }
+  }
+
+  // Was zuletzt passiert ist - aus dem, was ohnehin geladen ist: Berichte,
+  // Pruefprotokolle und eingereichte Wochen des Berichtshefts.
+  function latestActivity() {
+    const eintraege = [];
+    const baustellenname = (id) => adminState.sites.find((site) => site.id === id)?.name;
+    for (const report of adminState.siteReports || []) {
+      eintraege.push({
+        zeit: report.updatedAt || report.createdAt,
+        titel: `${reportTypeLabel(report.reportType)} – ${
+          baustellenname(report.constructionSiteId) || "Baustelle"
+        }`,
+        unter: `${reportStatusLabel(report.status)} · ${report.authorName || ""}`.trim(),
+        handler: () => showDashboardPane("reports")
+      });
+    }
+    for (const inspection of adminState.vdeInspections || []) {
+      const site = adminState.sites.find(
+        (eintrag) => eintrag.id === inspection.constructionSiteId
+      );
+      eintraege.push({
+        zeit: inspection.updatedAt || inspection.createdAt,
+        titel: `Prüfprotokoll – ${site?.name || inspection.name}`,
+        unter: inspection.status === "completed"
+          ? `abgeschlossen von ${inspection.completedByName || inspection.inspectorName}`
+          : `in Arbeit · ${inspection.inspectorName}`,
+        handler: () => showDashboardPane("inspections")
+      });
+    }
+    for (const bericht of apprenticeReviewState || []) {
+      eintraege.push({
+        zeit: bericht.submittedAt || bericht.updatedAt,
+        titel: `Azubi-Berichtsheft – Woche ab ${shortDate(bericht.weekStart)}`,
+        unter: `eingereicht von ${bericht.apprenticeName}`,
+        handler: () => showDashboardPane("apprentice")
+      });
+    }
+    return eintraege
+      .filter((eintrag) => eintrag.zeit)
+      .sort((links, rechts) => String(rechts.zeit).localeCompare(String(links.zeit)))
+      .slice(0, 3);
+  }
+
+  // Minuten seit Mitternacht als Uhrzeit. Ueber 24 Uhr hinaus rechnet die
+  // Einsatzpruefung ohnehin nicht - dort ist bei 1440 Minuten Schluss.
+  function uhrzeitAusMinuten(minuten) {
+    const stunde = String(Math.floor(minuten / 60) % 24).padStart(2, "0");
+    const minute = String(minuten % 60).padStart(2, "0");
+    return `${stunde}:${minute}`;
+  }
+
+  function appendTodayRow(list, { titel, unter, rechts = null, handler }) {
+    const zeile = document.createElement("li");
+    const knopf = document.createElement("button");
+    const text = document.createElement("span");
+    const name = document.createElement("strong");
+    const meta = document.createElement("small");
+    knopf.type = "button";
+    knopf.className = "today-list__item";
+    name.textContent = titel;
+    meta.textContent = unter;
+    text.className = "today-list__text";
+    text.append(name, meta);
+    knopf.append(text);
+    if (rechts) {
+      const zeit = document.createElement("span");
+      zeit.className = "today-list__aside";
+      zeit.textContent = rechts;
+      knopf.append(zeit);
+    }
+    knopf.addEventListener("click", handler);
+    zeile.append(knopf);
+    list.append(zeile);
+  }
+
+  function appendTodayEmpty(list, text) {
+    const zeile = document.createElement("li");
+    zeile.className = "today-list__empty";
+    zeile.textContent = text;
+    list.append(zeile);
+  }
+
+  function appendTodayMore(list, text, handler) {
+    const zeile = document.createElement("li");
+    const knopf = document.createElement("button");
+    knopf.type = "button";
+    knopf.className = "today-list__more";
+    knopf.textContent = `→ ${text}`;
+    knopf.addEventListener("click", handler);
+    zeile.append(knopf);
+    list.append(zeile);
   }
 
   function renderReportCenter() {
@@ -5271,6 +5548,8 @@ import {
     renderCustomerList();
     renderCustomerOverview();
     renderInspectionOverview();
+    renderDashboardMetrics();
+    renderTodayOverview();
     renderProjectList();
     renderSiteList();
     renderDocumentList();
@@ -7587,6 +7866,7 @@ import {
     const differenceMinutes = workMinutes - targetMinutes;
     elements.weekTotalWork.textContent = formatMinutes(workMinutes);
     elements.weekTotalTarget.textContent = formatMinutes(targetMinutes);
+    wochenDifferenzMinuten = differenceMinutes;
     elements.weekTotalDifference.textContent = formatSignedMinutes(differenceMinutes);
     elements.weekTotalDifference.className = differenceMinutes > 0
       ? "time-account-balance--positive"
@@ -7638,6 +7918,7 @@ import {
     });
     elements.weekOpenActions.hidden = openActions.length === 0;
     renderOverviewCards();
+    renderDashboardMetrics();
 
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
@@ -8151,6 +8432,9 @@ import {
     }[pane] || elements.navStart;
     activateNavigation(activeButton);
     renderPaneMenu();
+    renderDashboardMetrics();
+    renderTodayOverview();
+    renderQuickAccess();
     // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
     renderAccountCard();
     renderOverviewCards();
@@ -9090,7 +9374,7 @@ import {
     elements.dashboardCompany.textContent = session.company.displayName;
     setCompanyMark(elements.dashboardCompanyMark, session.company.displayName, session.company.logoUrl);
     elements.companyNumber.value = session.company.number;
-    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName}`;
+    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName} \u{1F44B}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
     if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();
@@ -11575,7 +11859,7 @@ import {
   elements.absenceStartDate.value = localDateKey();
   elements.absenceEndDate.value = localDateKey();
   syncAbsenceDateFields();
-  elements.todayLabel.textContent = dateFormatter.format(new Date());
+  elements.todayLabel.textContent = dashboardDateFormatter.format(new Date());
   deviceCompany = loadRememberedCompany();
   if (deviceCompany?.number) {
     elements.companyNumber.value = normalizeCompanyNumber(deviceCompany.number);
