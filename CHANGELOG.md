@@ -4,6 +4,31 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, zweiter Schritt: Listen werden am Rechner zu Tabellen.**
+  Mitarbeiter und Baustellen standen bisher auch auf 1440 Pixeln so da wie auf
+  dem Telefon: Name fett, darunter alle Angaben in einer Zeile mit
+  Mittelpunkten dazwischen. Wer zwölf Mitarbeiter nach einer Telefonnummer
+  durchsucht, muss dabei jede Zeile lesen. Jetzt steht am Rechner eine
+  **Kopfzeile** darüber und jede Angabe in **ihrer Spalte** — man fährt die
+  Spalte mit den Augen ab und ist fertig.
+  - **Mitarbeiter:** Name, Personalnummer, Rolle, Telefon, E-Mail.
+  - **Baustellen:** Baustelle, Kunde, Adresse, Auftrag, Dokumente, Status.
+    Die Liste bekommt dafür die volle Breite; sie stand in einer 511 Pixel
+    schmalen Spalte neben der Berichtszentrale, in der eine Tabelle nur
+    abgeschnitten hätte werden können. Suchen, Status und „Baustelle anlegen“
+    stehen jetzt in einer Zeile über der Tabelle.
+  - Kopfzeile und Datenzeilen lesen **dieselbe** Spaltenangabe, damit sie nicht
+    auseinanderlaufen können. Die Spalte für „Bearbeiten“ beziehungsweise
+    „Öffnen“ ist fest breit: wäre sie automatisch breit, hätten Zeilen ohne
+    Schaltfläche dort null Pixel, und alle übrigen Spalten würden gegenüber der
+    Kopfzeile verrutschen. Genau das war beim ersten Anlauf zu sehen.
+  - **Auf dem Telefon bleibt alles, wie es war:** dieselben Angaben gestapelt
+    unter dem Namen, leere Angaben fallen weg statt als „–“ dazustehen, und die
+    Statusmarke bekommt eine eigene Zeile statt eines Mittelpunkts davor.
+  - Eine vom Monteur angelegte Baustelle trägt ihre offene Büroprüfung jetzt
+    als **gelbe Marke** in der Statusspalte.
+- Fassung 0.42.19, Speicher `schaefchen-online-v61`, Migration 071.
+
 - **Neues Design, erster Schritt: der Rahmen.** Nach dem Gesamtentwurf bekommt
   Schäfchen am Rechner eine **dunkle Seitenleiste** mit rotem aktivem Eintrag
   und dem Namen der App darüber, dazu **Benutzername und Rolle in der

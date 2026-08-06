@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.18/);
-assert.match(html, /app\.js\?v=0\.42\.18/);
-assert.match(html, /version\.js\?v=0\.42\.18/);
+assert.match(html, /styles\.css\?v=0\.42\.19/);
+assert.match(html, /app\.js\?v=0\.42\.19/);
+assert.match(html, /version\.js\?v=0\.42\.19/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -722,6 +722,25 @@ assert.match(app, /function renderTopbarUser\(/);
 assert.match(html, /<span>Übersicht<\/span>/);
 assert.match(html, /<span>Einsatzplanung<\/span>/);
 assert.match(html, /<span>Azubi-Berichtsheft<\/span>/);
+
+// Listen als Tabelle: am Rechner Kopfzeile und Spalten, am Telefon dieselben
+// Angaben gestapelt. Kopfzeile und Datenzeilen lesen dieselbe Spaltenangabe,
+// damit sie nicht auseinanderlaufen; die letzte Spalte ist fest breit, sonst
+// waere sie in Zeilen ohne Schaltflaeche null Pixel breit.
+assert.match(app, /function appendAdminListHead\(/);
+assert.match(app, /function adminListCells\(/);
+assert.match(app, /appendAdminListHead\(elements\.employeeList, \["Name", "Personalnummer", "Rolle", "Telefon", "E-Mail"\]\)/);
+assert.match(app, /appendAdminListHead\(list, \["Baustelle", "Kunde", "Adresse", "Auftrag", "Dokumente", "Status"\]\)/);
+assert.match(styles, /grid-template-columns: var\(--tabellen-spalten/);
+assert.match(styles, /#employee-list \{\s*\n\s*--tabellen-spalten:[^;]*92px;/);
+assert.match(styles, /\.hierarchy-site-table \{\s*\n\s*--tabellen-spalten:[^;]*70px;/);
+assert.match(styles, /\.admin-list--table \.admin-list__cells \{\s*\n\s*display: contents;/);
+// Am Telefon bleibt es eine Zeile unter dem Namen: keine Kopfzeile, leere
+// Angaben fallen weg, die Statusmarke bekommt eine eigene Zeile.
+assert.match(styles, /\.admin-list \.admin-list__head \{\s*\n\s*display: none;/);
+assert.match(styles, /\.admin-list__cells > span\[data-leer\] \{\s*\n\s*display: none;/);
+assert.match(styles, /\.admin-list__cells > span\[data-marke\] \{\s*\n\s*display: block;/);
+assert.match(styles, /\.site-status--pending/);
 
 // Desktop: dieselbe Seite, zweite Gestalt. Am Rechner sitzt das Buero, und
 // dort war von 1440 Pixeln Breite die Haelfte genutzt - die Plantafel zeigte
@@ -914,16 +933,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.18"'));
-assert.ok(worker.includes('"./app.js?v=0.42.18"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.18"'));
-assert.ok(worker.includes('"./version.js?v=0.42.18"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.19"'));
+assert.ok(worker.includes('"./app.js?v=0.42.19"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.19"'));
+assert.ok(worker.includes('"./version.js?v=0.42.19"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.18"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.18";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.19"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.19";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -951,7 +970,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.18$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.19$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -959,11 +978,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.18"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.18"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.19"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.19"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.18"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.18"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.19"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.19"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1010,8 +1029,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.18/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.18/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.19/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.19/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

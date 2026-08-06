@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.18">
-    <script type="module" src="./app.js?v=0.42.18"></script>
-    <script src="./version.js?v=0.42.18" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.19">
+    <script type="module" src="./app.js?v=0.42.19"></script>
+    <script src="./version.js?v=0.42.19" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.18</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.19</p>
         </div>
       </section>
 
@@ -1194,11 +1194,11 @@
                     <option value="all">Alle</option>
                   </select>
                 </label>
-              </div>
-              <div class="hierarchy-create-actions" aria-label="Stammdaten anlegen">
-                <button id="hierarchy-new-customer" class="text-button" type="button" hidden>＋ Kunde</button>
-                <button id="hierarchy-new-project" class="text-button" type="button" hidden>＋ Projekt</button>
-                <button id="hierarchy-new-site" class="button button--primary" type="button">＋ Baustelle anlegen</button>
+                <div class="hierarchy-create-actions" aria-label="Stammdaten anlegen">
+                  <button id="hierarchy-new-customer" class="text-button" type="button" hidden>＋ Kunde</button>
+                  <button id="hierarchy-new-project" class="text-button" type="button" hidden>＋ Projekt</button>
+                  <button id="hierarchy-new-site" class="button button--primary" type="button">＋ Baustelle anlegen</button>
+                </div>
               </div>
               <div id="business-hierarchy" class="business-hierarchy"></div>
             </details>
@@ -1751,7 +1751,7 @@
                 <button class="button button--primary" type="submit">Mitarbeiter sicher anlegen</button>
                 <p id="employee-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="employee-list" class="admin-list" aria-label="Aktive Mitarbeiter"></ul>
+              <ul id="employee-list" class="admin-list admin-list--table" aria-label="Aktive Mitarbeiter"></ul>
               <details id="archived-employee-panel" class="archived-employee-panel">
                 <summary>
                   Archivierte Mitarbeiter

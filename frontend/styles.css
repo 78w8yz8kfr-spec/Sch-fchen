@@ -3886,7 +3886,8 @@ select:focus-visible {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 7px;
-  padding: 10px 12px 0;
+  padding: 0;
+  grid-column: 1 / -1;
 }
 
 .hierarchy-create-actions .button {
@@ -4215,6 +4216,52 @@ select:focus-visible {
   line-height: 1.4;
 }
 
+/* Eine Zeile mit einzelnen Zellen. Auf dem Telefon stehen sie als eine
+   umbrechende Zeile unter dem Namen, durch Mittelpunkte getrennt - so, wie sie
+   frueher zu einer Zeichenkette zusammengesetzt waren. */
+.admin-list .admin-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.admin-list .admin-list__row > strong,
+.admin-list .admin-list__row > .admin-list__cells {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.admin-list .admin-list__row > .text-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+/* Kein Raster wie bei den uebrigen Huellen in dieser Liste: die Zellen sollen
+   am Handy als fortlaufender Text umbrechen. */
+.admin-list .admin-list__cells {
+  display: block;
+  margin-top: 3px;
+}
+
+.admin-list__cells > span[data-leer] {
+  display: none;
+}
+
+.admin-list__cells > span[data-trenner]::before {
+  content: " · ";
+}
+
+.admin-list__cells > span[data-marke] {
+  display: block;
+  margin-top: 5px;
+}
+
+/* Die Kopfzeile ergibt nur in der Tabellenansicht Sinn. */
+.admin-list .admin-list__head {
+  display: none;
+}
+
 .admin-list .admin-list__empty {
   display: block;
   color: var(--muted);
@@ -4338,6 +4385,20 @@ select:focus-visible {
 .site-status--archived {
   color: #7a141b !important;
   background: #f8dadd;
+}
+
+/* Wartet auf das Buero: gelb, weil es weder erledigt noch verworfen ist. */
+.site-status--pending {
+  color: #7a5200 !important;
+  background: #fdf0d2;
+}
+
+/* Statusmarken einer Zeile stehen untereinander, nicht nebeneinander: sonst
+   waere die Spalte je nach Baustelle unterschiedlich breit. */
+.site-status-cell {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
 }
 
 .site-dashboard {
@@ -6318,9 +6379,7 @@ select:focus-visible {
 
   #time-account-admin-panel,
   #holiday-calendar-admin,
-  #time-correction-policy-admin,
-  #report-center,
-  #site-planning-shell {
+  #time-correction-policy-admin {
     grid-column: auto;
   }
 
@@ -6560,5 +6619,117 @@ select:focus-visible {
   /* Auf dem Telefon ist in der Kopfzeile kein Platz dafuer. */
   .topbar-user {
     display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Listen als Tabelle
+   ---------------------------------------------------------------------------
+
+   Am Rechner ist eine Mitarbeiterliste eine Tabelle: eine Kopfzeile und
+   darunter Spalten, die man mit den Augen von oben nach unten abfahren kann.
+   Am Telefon bleibt es eine gestapelte Liste - dort ist fuer Spalten kein
+   Platz und die Reihenfolge sagt schon genug.
+
+   Die Spaltenbreiten stehen je Liste in --tabellen-spalten. Kopfzeile und
+   Datenzeilen lesen dieselbe Angabe, deshalb koennen sie nicht auseinander-
+   laufen.
+   ------------------------------------------------------------------------ */
+
+@media (min-width: 1080px) {
+  .admin-list--table > .admin-list__head,
+  .admin-list--table > .admin-list__row {
+    display: grid;
+    grid-template-columns: var(--tabellen-spalten, minmax(0, 1fr));
+    align-items: center;
+    column-gap: 14px;
+  }
+
+  /* Alle Zeilen gleich hoch, ob mit Schaltflaeche oder ohne: sonst springt das
+     Auge beim Abfahren der Spalten. Die Hoehe kommt vom Zeilenraster, nicht
+     mehr vom Innenabstand - so bleibt "Bearbeiten" trotzdem gross genug. */
+  .admin-list--table > .admin-list__row {
+    min-height: 46px;
+    padding: 0;
+  }
+
+  /* Die Huelle loest sich auf, damit die Zellen selbst in den Spalten des
+     Rasters stehen. */
+  .admin-list--table .admin-list__cells {
+    display: contents;
+  }
+
+  .admin-list--table .admin-list__cells > span {
+    min-width: 0;
+    margin-top: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* In der Tabelle hat jede Zelle ihre eigene Spalte: keine Mittelpunkte, und
+     der Gedankenstrich fuer eine leere Angabe steht wieder da - sonst waere
+     die Spalte nicht mehr abzufahren. */
+  .admin-list--table .admin-list__cells > span[data-leer],
+  .admin-list--table .admin-list__cells > span[data-marke] {
+    display: block;
+    margin-top: 0;
+  }
+
+  .admin-list--table .admin-list__cells > span[data-trenner]::before {
+    content: none;
+  }
+
+  .admin-list--table > .admin-list__head {
+    display: grid;
+    padding: 8px 0;
+    border-top: 0;
+  }
+
+  .admin-list--table > .admin-list__head strong,
+  .admin-list--table > .admin-list__head span {
+    color: var(--muted);
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Am Telefon steht die Schaltflaeche rechts neben zwei gestapelten Zeilen.
+     In der Tabelle ist sie einfach die letzte Spalte. */
+  .admin-list--table > .admin-list__row > .text-button {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: end;
+  }
+
+  /* Die letzte Spalte ist fest breit, nicht "auto": sonst waere sie in Zeilen
+     ohne Schaltflaeche null Pixel breit und alle uebrigen Spalten wuerden
+     gegenueber der Kopfzeile verrutschen. */
+  #employee-list {
+    --tabellen-spalten: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.4fr) 92px;
+  }
+
+  .hierarchy-site-table {
+    --tabellen-spalten: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.6fr) minmax(0, 0.7fr) 70px;
+  }
+
+  /* Die Marken duerfen nicht abgeschnitten werden - sie sind kurz genug. */
+  .admin-list--table .admin-list__cells > span:has(.site-status) {
+    overflow: visible;
+  }
+}
+
+@media (min-width: 1080px) {
+  /* Suchen, Status und "Baustelle anlegen" gehoeren in eine Zeile ueber der
+     Tabelle. Am Handy stehen sie untereinander, weil die Breite fehlt. */
+  .hierarchy-toolbar {
+    align-items: end;
+    grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr) auto;
+  }
+
+  .hierarchy-create-actions {
+    grid-column: 3;
+    align-self: end;
   }
 }

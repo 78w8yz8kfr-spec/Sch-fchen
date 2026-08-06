@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.18";
+} from "./core/work-time.js?v=0.42.19";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.18";
+} from "./core/sync-queue.js?v=0.42.19";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.18";
+} from "./core/permissions.js?v=0.42.19";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.18";
+} from "./core/state-store.js?v=0.42.19";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1110,7 +1110,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.18",
+          "X-Schaefchen-Version": "0.42.19",
           ...options.headers
         }
       });
@@ -1138,7 +1138,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.18" }
+        headers: { "X-Schaefchen-Version": "0.42.19" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1185,7 +1185,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.18 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.19 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1567,15 +1567,72 @@ import {
     container.append(warning);
   }
 
+  // Die Zellen stecken in einer eigenen Huelle. Am Handy stehen sie damit als
+  // eine umbrechende Zeile unter dem Namen, am Rechner loest die Huelle sich
+  // auf (display: contents) und die Zellen reihen sich in die Spalten der
+  // Tabelle ein - ohne dass die Liste zweimal gebaut werden muss.
+  // Leere Angaben stehen am Rechner als Gedankenstrich in ihrer Spalte, damit
+  // die Tabelle nicht verrutscht. Am Handy faellt der Strich weg - dort waere
+  // er nur Rauschen. Deshalb merkt sich jede Zelle hier, ob sie leer ist und
+  // ob vor ihr ein Mittelpunkt gehoert; das kann nur, wer die Werte kennt.
+  function adminListCells(werte) {
+    const huelle = document.createElement("div");
+    huelle.className = "admin-list__cells";
+    let ersteGefuellteSteht = false;
+    for (const wert of werte) {
+      const span = document.createElement("span");
+      const marke = wert instanceof Node;
+      const gefuellt = marke || Boolean(wert);
+      if (marke) span.append(wert);
+      else span.textContent = gefuellt ? wert : "–";
+      // Eine Statusmarke ist kein Satzteil: sie bekommt am Handy eine eigene
+      // Zeile statt eines Mittelpunkts davor.
+      if (marke) span.dataset.marke = "true";
+      else if (!gefuellt) span.dataset.leer = "true";
+      else if (ersteGefuellteSteht) span.dataset.trenner = "true";
+      if (gefuellt && !marke) ersteGefuellteSteht = true;
+      huelle.append(span);
+    }
+    return huelle;
+  }
+
+  // Die Kopfzeile gehoert zur Liste und wird deshalb hier gebaut: der
+  // Rendervorgang leert die Liste bei jedem Durchlauf, eine fest im HTML
+  // stehende Kopfzeile waere sofort weg.
+  function appendAdminListHead(list, labels) {
+    const [erste, ...rest] = labels;
+    const head = document.createElement("li");
+    head.className = "admin-list__head";
+    head.setAttribute("aria-hidden", "true");
+    const strong = document.createElement("strong");
+    strong.textContent = erste;
+    head.append(strong, adminListCells(rest));
+    list.append(head);
+  }
+
+  // meta darf eine Zeichenkette sein oder eine Liste von Zellen.
+  //
+  // Als Liste stehen die Angaben am Rechner in Spalten unter einer Kopfzeile -
+  // so, wie eine Mitarbeiterliste aussehen soll, wenn man sie ueberfliegt. Am
+  // Handy bleiben sie eine Zeile unter dem Namen: dort ist fuer Spalten kein
+  // Platz, und die Reihenfolge sagt schon genug.
   function appendAdminListItem(list, title, meta, action = null) {
     const item = document.createElement("li");
-    const content = document.createElement("div");
     const strong = document.createElement("strong");
-    const span = document.createElement("span");
     strong.textContent = title;
-    span.textContent = meta;
-    content.append(strong, span);
-    item.append(content);
+    item.append(strong);
+
+    if (Array.isArray(meta)) {
+      item.classList.add("admin-list__row");
+      item.append(adminListCells(meta));
+    } else {
+      const content = document.createElement("div");
+      const span = document.createElement("span");
+      span.textContent = meta;
+      content.append(span);
+      item.append(content);
+      content.prepend(strong);
+    }
     if (action) {
       const button = document.createElement("button");
       button.type = "button";
@@ -3554,35 +3611,45 @@ import {
       return;
     }
 
+    // Am Rechner ist das eine Tabelle mit Kopfzeile, am Handy bleibt es eine
+    // gestapelte Liste. Beides entsteht aus denselben Zellen.
     const list = document.createElement("ul");
-    list.className = "hierarchy-sites hierarchy-sites--flat";
+    list.className = "admin-list admin-list--table hierarchy-site-table";
+    list.id = "hierarchy-site-table";
+    appendAdminListHead(list, ["Baustelle", "Kunde", "Adresse", "Auftrag", "Dokumente", "Status"]);
     sites.forEach((site) => {
       const item = document.createElement("li");
-      const button = document.createElement("button");
-      const content = document.createElement("span");
       const title = document.createElement("strong");
-      const meta = document.createElement("span");
-      const badge = document.createElement("small");
+      const badge = document.createElement("span");
+      const button = document.createElement("button");
       const address = [
         `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
         `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
       ].filter(Boolean).join(", ");
-      button.type = "button";
+      const documents = documentsForEntity("construction_site", site.id).length;
+      item.className = "admin-list__row";
       title.textContent = site.name;
-      meta.textContent = [
-        site.customerName,
-        address,
-        site.shortText,
-        `${documentsForEntity("construction_site", site.id).length} Dokumente`
-      ].filter(Boolean).join(" · ");
-      badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
+      badge.className = `site-status site-status--${
+        site.fieldReviewStatus === "pending" ? "pending" : siteStatusGroup(site.status)
+      }`;
       badge.textContent = site.fieldReviewStatus === "pending"
         ? "Büroprüfung"
         : siteStatusLabel(site.status);
-      content.append(title, meta);
-      button.append(content, badge);
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = "Öffnen";
       button.addEventListener("click", () => openSiteDashboard(site));
-      item.append(button);
+      item.append(
+        title,
+        adminListCells([
+          site.customerName,
+          address,
+          site.shortText,
+          `${documents} Dokument${documents === 1 ? "" : "e"}`,
+          badge
+        ]),
+        button
+      );
       list.append(item);
     });
     elements.businessHierarchy.append(list);
@@ -4945,6 +5012,9 @@ import {
     );
 
     elements.employeeList.replaceChildren();
+    if (adminState.employees.length > 0) {
+      appendAdminListHead(elements.employeeList, ["Name", "Personalnummer", "Rolle", "Telefon", "E-Mail"]);
+    }
     elements.archivedEmployeeList.replaceChildren();
     const archivedEmployees = adminState.archivedEmployees || [];
     elements.archivedEmployeeCount.textContent = String(archivedEmployees.length);
@@ -4970,7 +5040,7 @@ import {
           employee.roles.map((role) => roleLabels[role] || role).join(", "),
           employee.phone,
           employee.email
-        ].filter(Boolean).join(" · "),
+        ],
         employee.roles.includes("admin") || projectScoped
           ? null
           : { label: "Bearbeiten", handler: () => openEmployeeEditor(employee) }
