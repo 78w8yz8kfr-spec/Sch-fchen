@@ -284,6 +284,74 @@ export function validateEmployeeUpdate(body) {
   };
 }
 
+// Fahrzeuge des Fuhrparks.
+//
+// Das Kennzeichen ist die Kennung, die im Betrieb benutzt wird. Es wird
+// aufgeraeumt und nicht abgelehnt: wer " es-se 123 " tippt, meint ES-SE 123.
+export const VEHICLE_TYPES = Object.freeze(["van", "truck", "car", "trailer", "machine"]);
+export const VEHICLE_STATUSES = Object.freeze(["active", "workshop", "retired"]);
+export const VEHICLE_LICENCE_CLASSES = Object.freeze([
+  "B", "B96", "BE", "C1", "C1E", "C", "CE", "T", "L"
+]);
+
+function vehicleFields(body) {
+  const licencePlate = text(body.licencePlate, "Kennzeichen", 2, 15)
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+  const vehicleType = text(body.vehicleType ?? "van", "Fahrzeugart", 2, 20).toLowerCase();
+  if (!VEHICLE_TYPES.includes(vehicleType)) {
+    throw new InputError("Die Fahrzeugart ist ungültig.");
+  }
+  const status = text(body.status ?? "active", "Zustand", 2, 20).toLowerCase();
+  if (!VEHICLE_STATUSES.includes(status)) {
+    throw new InputError("Der Zustand des Fahrzeugs ist ungültig.");
+  }
+  const requiredLicenceClass = text(
+    body.requiredLicenceClass ?? "B", "Führerscheinklasse", 1, 4
+  ).toUpperCase();
+  if (!VEHICLE_LICENCE_CLASSES.includes(requiredLicenceClass)) {
+    throw new InputError("Für diese Führerscheinklasse fährt kein Fahrzeug.");
+  }
+  return {
+    licencePlate,
+    label: optionalText(body.label, "Bezeichnung", 120),
+    vehicleType,
+    requiredLicenceClass,
+    assignedUserId: optionalUuid(body.assignedUserId, "Fahrer"),
+    status,
+    nextInspectionOn: optionalDate(body.nextInspectionOn, "Hauptuntersuchung"),
+    nextServiceOn: optionalDate(body.nextServiceOn, "Nächster Service"),
+    note: optionalText(body.note, "Notiz", 1000)
+  };
+}
+
+function optionalDate(value, label) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new InputError(`${label}: Das Datum muss dem Format JJJJ-MM-TT entsprechen.`);
+  }
+  const datum = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(datum.valueOf())) {
+    throw new InputError(`${label}: Das Datum gibt es nicht.`);
+  }
+  return value;
+}
+
+export function validateVehicle(body) {
+  rejectTenantFields(body);
+  return vehicleFields(body);
+}
+
+export function validateVehicleUpdate(body) {
+  rejectTenantFields(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Fahrzeugversion ist ungültig.");
+  }
+  return { ...vehicleFields(body), rowVersion };
+}
+
 export function validateSiteBundle(body) {
   rejectTenantFields(body);
   return {

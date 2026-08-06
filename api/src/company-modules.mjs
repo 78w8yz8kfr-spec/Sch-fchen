@@ -20,7 +20,6 @@
 const NICHT_ANGEBUNDEN = new Set([
   "dguv",
   "electrical_special",
-  "fleet",
   "advanced_exports",
   "integrations"
 ]);

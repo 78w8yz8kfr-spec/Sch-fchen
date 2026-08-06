@@ -7885,3 +7885,16 @@ select:focus-visible {
     display: none;
   }
 }
+
+/* Eine abgelaufene Hauptuntersuchung ist kein Termin mehr, sondern ein
+   Fahrverbot. */
+.vehicle-overdue {
+  color: var(--brand) !important;
+  font-weight: 800;
+}
+
+@media (min-width: 1080px) {
+  #vehicle-list {
+    --tabellen-spalten: minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.8fr) 92px;
+  }
+}

@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.27/);
-assert.match(html, /app\.js\?v=0\.42\.27/);
-assert.match(html, /version\.js\?v=0\.42\.27/);
+assert.match(html, /styles\.css\?v=0\.42\.28/);
+assert.match(html, /app\.js\?v=0\.42\.28/);
+assert.match(html, /version\.js\?v=0\.42\.28/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -725,7 +725,8 @@ assert.match(app, /function renderTopbarUser\(/);
 // keiner.
 const leisteReihenfolge = [
   "Dashboard", "Baustellen", "Einsatzplanung", "Zeiterfassung", "Berichte",
-  "Prüfprotokolle", "Azubi", "Mitarbeiter", "Kunden", "Dokumente", "Einstellungen"
+  "Prüfprotokolle", "Azubi", "Mitarbeiter", "Kunden", "Fahrzeuge", "Dokumente",
+  "Einstellungen"
 ];
 const leiste = html.slice(
   html.indexOf('<nav class="bottom-nav"'),
@@ -783,6 +784,23 @@ assert.ok(
   html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
   "Die Uebersichtskarten stehen vor dem Wochenbereich"
 );
+
+// Der Fuhrpark. Das Modul stand seit Migration 040 im Katalog, dahinter lag
+// nichts; jetzt gibt es die Fahrzeuge samt Bildschirm.
+assert.match(html, /id="vehicles-shell"/);
+assert.match(html, /id="vehicle-list"/);
+assert.match(html, /id="vehicle-form"/);
+assert.match(html, /<span>Fahrzeuge<\/span>/);
+assert.match(app, /function renderVehicleList\(/);
+assert.match(app, /function openVehicleEditor\(/);
+assert.match(app, /async function refreshVehicles\(/);
+assert.match(app, /elements\.vehiclesShell\.hidden = pane !== "vehicles"/);
+// Der Eintrag steht nur da, wenn die Firma den Fuhrpark hat.
+assert.match(app, /elements\.navVehicles\.hidden = !planner \|\| !moduleEnabled\("fleet"\)/);
+// Eine abgelaufene Hauptuntersuchung ist kein Termin mehr, sondern ein
+// Fahrverbot.
+assert.match(app, /vehicle-overdue/);
+assert.match(styles, /\.vehicle-overdue \{/);
 
 // Suche und Glocke in der Kopfzeile. Beide arbeiten mit dem, was ohnehin
 // geladen ist: eine Suche, die etwas findet, was der Bildschirm daneben nicht
@@ -907,7 +925,8 @@ assert.match(styles, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
 assert.match(styles, /\.today-overview__panels \{/);
 // Der Schnellzugriff fuehrt nur zu Dingen, die es wirklich gibt.
 assert.match(html, /id="quick-access"/);
-assert.doesNotMatch(app, /"Material anlegen"|"Fahrzeug anlegen"|"Rechnung schreiben"/);
+// Was es noch nicht gibt, steht auch nicht im Schnellzugriff.
+assert.doesNotMatch(app, /"Material anlegen"|"Rechnung schreiben"/);
 
 // Jeder Eintrag der Leiste hat einen eigenen Bereich mit eigener Huelle.
 for (const huelle of [
@@ -1136,16 +1155,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.27"'));
-assert.ok(worker.includes('"./app.js?v=0.42.27"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.27"'));
-assert.ok(worker.includes('"./version.js?v=0.42.27"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.28"'));
+assert.ok(worker.includes('"./app.js?v=0.42.28"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.28"'));
+assert.ok(worker.includes('"./version.js?v=0.42.28"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.27"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.27";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.28"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.28";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1173,7 +1192,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.27$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.28$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1181,11 +1200,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.27"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.27"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.28"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.28"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.27"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.27"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.28"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.28"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1232,8 +1251,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.27/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.27/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.28/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.28/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

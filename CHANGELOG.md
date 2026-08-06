@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Fuhrpark.** Das Modul stand seit Migration 040 im Katalog, dahinter lag
+  nichts — es war als „noch nicht angebunden“ geführt und ließ sich gar nicht
+  einschalten. Jetzt gibt es die Fahrzeuge wirklich: **Kennzeichen,
+  Bezeichnung, Art, benötigte Führerscheinklasse, fester Fahrer, Zustand,
+  nächste HU und nächster Service.**
+  - Eine **abgelaufene Hauptuntersuchung** ist kein Termin mehr, sondern ein
+    Fahrverbot. Sie steht rot in der Liste.
+  - Das Kennzeichen ist je Firma nur einmal vergeben, **auch anders
+    geschrieben**: „ES-SE 123“ und „es-se123“ sind derselbe Wagen. Gespeichert
+    wird eine Schreibweise.
+  - Ein ausgemustertes Fahrzeug wird **nicht gelöscht** — es steht in alten
+    Berichten. Die Schnittstelle darf gar nicht löschen.
+  - Der Fuhrpark gehört ab jetzt zum **Standardumfang**, dorthin, wo Dokumente
+    und Material schon stehen. Bestandsfirmen bekommen ihn nachträglich.
+- Fassung 0.42.28, Speicher `schaefchen-online-v70`, Migrationen 081 bis 083.
+
 - **Suche und Glocke in der Kopfzeile.** Beide standen im Entwurf und fehlten
   bisher mit Absicht — ein Bedienelement, das nichts tut, ist schlechter als
   keines. Jetzt tun sie etwas.

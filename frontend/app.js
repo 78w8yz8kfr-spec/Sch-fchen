@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.27";
+} from "./core/work-time.js?v=0.42.28";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.27";
+} from "./core/sync-queue.js?v=0.42.28";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.27";
+} from "./core/permissions.js?v=0.42.28";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.27";
+} from "./core/state-store.js?v=0.42.28";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -458,6 +458,7 @@ import {
     navInspections: document.querySelector("#nav-inspections"),
     navEmployees: document.querySelector("#nav-employees"),
     navCustomers: document.querySelector("#nav-customers"),
+    navVehicles: document.querySelector("#nav-vehicles"),
     navDocuments: document.querySelector("#nav-documents"),
     navMore: document.querySelector("#nav-more"),
     infoCard: document.querySelector(".info-card"),
@@ -509,6 +510,24 @@ import {
     customerOverviewList: document.querySelector("#customer-overview-list"),
     documentsShell: document.querySelector("#documents-shell"),
     documentsContent: document.querySelector("#documents-content"),
+    vehiclesShell: document.querySelector("#vehicles-shell"),
+    vehicleSearchField: document.querySelector("#vehicle-search-field"),
+    vehicleNew: document.querySelector("#vehicle-new"),
+    vehicleList: document.querySelector("#vehicle-list"),
+    vehicleForm: document.querySelector("#vehicle-form"),
+    vehicleFormTitle: document.querySelector("#vehicle-form-title"),
+    vehiclePlate: document.querySelector("#vehicle-plate"),
+    vehicleLabel: document.querySelector("#vehicle-label"),
+    vehicleType: document.querySelector("#vehicle-type"),
+    vehicleLicenceClass: document.querySelector("#vehicle-licence-class"),
+    vehicleDriver: document.querySelector("#vehicle-driver"),
+    vehicleInspection: document.querySelector("#vehicle-inspection"),
+    vehicleService: document.querySelector("#vehicle-service"),
+    vehicleStatus: document.querySelector("#vehicle-status"),
+    vehicleNote: document.querySelector("#vehicle-note"),
+    vehicleSave: document.querySelector("#vehicle-save"),
+    vehicleCancel: document.querySelector("#vehicle-cancel"),
+    vehicleMessage: document.querySelector("#vehicle-message"),
     inspectionsShell: document.querySelector("#inspections-shell"),
     inspectionSearchField: document.querySelector("#inspection-search-field"),
     inspectionOverviewList: document.querySelector("#inspection-overview-list"),
@@ -975,6 +994,10 @@ import {
   let wochenDifferenzMinuten = 0;
   // Der Mitarbeiter, dessen Spalte rechts neben der Liste steht.
   let selectedEmployeeId = null;
+  // Die Fahrzeuge des Fuhrparks und das gerade bearbeitete.
+  let vehicleState = [];
+  let editingVehicleId = null;
+  let editingVehicleRowVersion = null;
   let apprenticeGapState = [];
   // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
   const expandedPlanningCells = new Set();
@@ -1207,7 +1230,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.27",
+          "X-Schaefchen-Version": "0.42.28",
           ...options.headers
         }
       });
@@ -1235,7 +1258,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.27" }
+        headers: { "X-Schaefchen-Version": "0.42.28" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1282,7 +1305,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.27 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.28 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1342,6 +1365,7 @@ import {
     elements.navEmployees.hidden = !planner || isProjectScopedSession();
     elements.navCustomers.hidden = !planner;
     elements.navDocuments.hidden = !planner;
+    elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
     elements.navInspections.hidden = !planner || !vdeModuleEnabled();
@@ -2768,6 +2792,13 @@ import {
         elements.customerPanel.hidden = false;
         elements.customerPanel.open = true;
       }]);
+      if (moduleEnabled("fleet")) {
+        wege.push(["Fahrzeug anlegen", () => {
+          showDashboardPane("vehicles");
+          void refreshVehicles();
+          openVehicleEditor(null);
+        }]);
+      }
     }
     elements.quickAccess.hidden = wege.length === 0 || currentDashboardPane !== "start";
     elements.quickAccessMenu.replaceChildren();
@@ -3721,6 +3752,152 @@ import {
       );
       elements.customerOverviewList.append(zeile);
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // Fuhrpark
+  // ---------------------------------------------------------------------
+
+  const FAHRZEUGARTEN = {
+    van: "Transporter",
+    car: "Pkw",
+    truck: "Lkw",
+    trailer: "Anhänger",
+    machine: "Maschine"
+  };
+
+  const FAHRZEUGZUSTAND = {
+    active: ["Im Einsatz", "active"],
+    workshop: ["Werkstatt", "pending"],
+    retired: ["Ausgemustert", "archived"]
+  };
+
+  function renderVehicleList() {
+    if (!elements.vehicleList) return;
+    const query = elements.vehicleSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const fahrzeuge = (vehicleState || []).filter((fahrzeug) => !query || [
+      fahrzeug.licencePlate, fahrzeug.label, fahrzeug.assignedUserName,
+      FAHRZEUGARTEN[fahrzeug.vehicleType]
+    ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query));
+
+    elements.vehicleList.replaceChildren();
+    if (fahrzeuge.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "admin-list__empty";
+      leer.textContent = query
+        ? "Kein Fahrzeug passt zur Suche."
+        : "Noch kein Fahrzeug eingetragen.";
+      elements.vehicleList.append(leer);
+      return;
+    }
+
+    appendAdminListHead(
+      elements.vehicleList,
+      ["Kennzeichen", "Bezeichnung", "Art", "Fahrer", "Nächste HU", "Zustand"]
+    );
+    const heute = localDateKey();
+    for (const fahrzeug of fahrzeuge) {
+      const zeile = document.createElement("li");
+      const kennzeichen = document.createElement("strong");
+      const marke = document.createElement("span");
+      const knopf = document.createElement("button");
+      const [zustandText, zustandGruppe] = FAHRZEUGZUSTAND[fahrzeug.status]
+        || [fahrzeug.status, "active"];
+      zeile.className = "admin-list__row";
+      kennzeichen.textContent = fahrzeug.licencePlate;
+      marke.className = `site-status site-status--${zustandGruppe}`;
+      marke.textContent = zustandText;
+
+      // Eine abgelaufene Hauptuntersuchung ist kein Termin mehr, sondern ein
+      // Fahrverbot. Sie steht deshalb rot da.
+      const hu = document.createElement("span");
+      if (!fahrzeug.nextInspectionOn) {
+        hu.textContent = "–";
+      } else {
+        hu.textContent = shortDate(fahrzeug.nextInspectionOn);
+        if (fahrzeug.nextInspectionOn < heute) {
+          hu.className = "vehicle-overdue";
+          hu.textContent = `${shortDate(fahrzeug.nextInspectionOn)} · überfällig`;
+        }
+      }
+
+      knopf.type = "button";
+      knopf.className = "text-button";
+      knopf.textContent = "Bearbeiten";
+      knopf.addEventListener("click", () => openVehicleEditor(fahrzeug));
+      zeile.append(
+        kennzeichen,
+        adminListCells([
+          fahrzeug.label,
+          `${FAHRZEUGARTEN[fahrzeug.vehicleType] || fahrzeug.vehicleType} · ${fahrzeug.requiredLicenceClass}`,
+          fahrzeug.assignedUserName,
+          hu,
+          marke
+        ]),
+        knopf
+      );
+      elements.vehicleList.append(zeile);
+    }
+  }
+
+  function fillVehicleDrivers(selected) {
+    elements.vehicleDriver.replaceChildren();
+    const leer = document.createElement("option");
+    leer.value = "";
+    leer.textContent = "Steht im Hof";
+    elements.vehicleDriver.append(leer);
+    for (const employee of plannableEmployees(adminState?.employees)) {
+      const eintrag = document.createElement("option");
+      eintrag.value = employee.id;
+      eintrag.textContent = `${employee.firstName} ${employee.lastName} · ${employee.personnelNumber}`;
+      elements.vehicleDriver.append(eintrag);
+    }
+    elements.vehicleDriver.value = selected || "";
+  }
+
+  function openVehicleEditor(fahrzeug = null) {
+    editingVehicleId = fahrzeug?.id || null;
+    editingVehicleRowVersion = fahrzeug?.rowVersion || null;
+    elements.vehicleFormTitle.textContent = fahrzeug
+      ? `${fahrzeug.licencePlate} bearbeiten`
+      : "Fahrzeug anlegen";
+    elements.vehiclePlate.value = fahrzeug?.licencePlate || "";
+    elements.vehicleLabel.value = fahrzeug?.label || "";
+    elements.vehicleType.value = fahrzeug?.vehicleType || "van";
+    elements.vehicleLicenceClass.value = fahrzeug?.requiredLicenceClass || "B";
+    fillVehicleDrivers(fahrzeug?.assignedUserId);
+    elements.vehicleInspection.value = fahrzeug?.nextInspectionOn || "";
+    elements.vehicleService.value = fahrzeug?.nextServiceOn || "";
+    elements.vehicleStatus.value = fahrzeug?.status || "active";
+    elements.vehicleNote.value = fahrzeug?.note || "";
+    elements.vehicleMessage.textContent = "";
+    elements.vehicleForm.hidden = false;
+    elements.vehicleForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function closeVehicleEditor() {
+    editingVehicleId = null;
+    editingVehicleRowVersion = null;
+    elements.vehicleForm.hidden = true;
+    elements.vehicleMessage.textContent = "";
+  }
+
+  async function refreshVehicles() {
+    if (!canPlan() || demoMode || !moduleEnabled("fleet")) {
+      vehicleState = [];
+      renderVehicleList();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/vehicles");
+      vehicleState = body.vehicles;
+      renderVehicleList();
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      // Ein abgeschaltetes Modul ist kein Fehler, den man melden muesste: der
+      // Eintrag in der Leiste steht dann ohnehin nicht da.
+      else if (error.status !== 404) showToast(error.message);
+    }
   }
 
   // Alle VDE-Pruefungen des Betriebs an einer Stelle. Bisher waren sie nur in
@@ -8898,7 +9075,8 @@ import {
     if (pane !== "start") closeMobileReportForm();
     if (pane !== "week") closeTimeCorrectionForm();
     const adminPanes = new Set([
-      "assignments", "sites", "reports", "employees", "customers", "documents", "inspections", "more"
+      "assignments", "sites", "reports", "employees", "customers", "vehicles",
+      "documents", "inspections", "more"
     ]);
     elements.dashboardPanes.forEach((element) => {
       if (element === elements.adminSection) {
@@ -8937,6 +9115,7 @@ import {
       elements.reportsShell.hidden = pane !== "reports";
       elements.employeesShell.hidden = pane !== "employees";
       elements.customersShell.hidden = pane !== "customers";
+      elements.vehiclesShell.hidden = pane !== "vehicles";
       elements.documentsShell.hidden = pane !== "documents";
       elements.inspectionsShell.hidden = pane !== "inspections";
       elements.reportCenter.hidden = pane !== "reports"
@@ -8951,6 +9130,7 @@ import {
         reports: ["Montage und Tagesberichte", "Berichte", "Offene, zurückgegebene und abgeschlossene Berichte an einer Stelle."],
         employees: ["Mannschaft", "Mitarbeiter", "Konten anlegen, Rollen vergeben und Stammdaten pflegen."],
         customers: ["Stammdaten", "Kunden", "Kunden und ihre Aufträge an einer Stelle."],
+        vehicles: ["Fuhrpark", "Fahrzeuge", "Transporter, Anhänger und Maschinen mit Fahrer und Terminen."],
         documents: ["Einmal speichern · überall verwenden", "Dokumente", "Pläne, Protokolle und Rechnungen zentral ablegen."],
         inspections: ["Elektrische Anlagen", "Prüfprotokolle", "Alle VDE-Prüfungen des Betriebs auf einen Blick."],
         more: ["Verwaltung", "Einstellungen", "Arbeitszeitregeln, Feiertage und Zugang verwalten."]
@@ -8973,6 +9153,7 @@ import {
       reports: elements.navReports,
       employees: elements.navEmployees,
       customers: elements.navCustomers,
+      vehicles: elements.navVehicles,
       documents: elements.navDocuments,
       inspections: elements.navInspections,
       more: elements.navMore
@@ -8993,6 +9174,7 @@ import {
       reports: "Berichte",
       employees: "Mitarbeiter",
       customers: "Kunden",
+      vehicles: "Fahrzeuge",
       documents: "Dokumente",
       inspections: "Prüfprotokolle",
       site: "Baustelle",
@@ -9940,7 +10122,8 @@ import {
       refreshTimeAccountData(),
       refreshAdminTimeAccounts(),
       refreshAdmin(),
-      refreshPlatformAnnouncements()
+      refreshPlatformAnnouncements(),
+      refreshVehicles()
     ]);
     await maybeOpenDeepLinkedSite();
     await syncPendingEntries();
@@ -12313,6 +12496,50 @@ import {
   elements.navEmployees.addEventListener("click", () => showDashboardPane("employees"));
   elements.navCustomers.addEventListener("click", () => showDashboardPane("customers"));
   elements.navDocuments.addEventListener("click", () => showDashboardPane("documents"));
+  elements.navVehicles.addEventListener("click", () => {
+    showDashboardPane("vehicles");
+    void refreshVehicles();
+  });
+  elements.vehicleSearchField.addEventListener("input", renderVehicleList);
+  elements.vehicleNew.addEventListener("click", () => openVehicleEditor(null));
+  elements.vehicleCancel.addEventListener("click", closeVehicleEditor);
+  elements.vehicleForm.addEventListener("submit", async (ereignis) => {
+    ereignis.preventDefault();
+    const koerper = {
+      licencePlate: elements.vehiclePlate.value,
+      label: elements.vehicleLabel.value,
+      vehicleType: elements.vehicleType.value,
+      requiredLicenceClass: elements.vehicleLicenceClass.value,
+      assignedUserId: elements.vehicleDriver.value || null,
+      status: elements.vehicleStatus.value,
+      nextInspectionOn: elements.vehicleInspection.value || null,
+      nextServiceOn: elements.vehicleService.value || null,
+      note: elements.vehicleNote.value
+    };
+    elements.vehicleSave.disabled = true;
+    elements.vehicleMessage.textContent = "Wird gespeichert …";
+    try {
+      if (editingVehicleId) {
+        await requestJson(`./api/v1/admin/vehicles/${encodeURIComponent(editingVehicleId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...koerper, rowVersion: editingVehicleRowVersion })
+        });
+        showToast("Fahrzeug aktualisiert.");
+      } else {
+        await requestJson("./api/v1/admin/vehicles", {
+          method: "POST",
+          body: JSON.stringify(koerper)
+        });
+        showToast("Fahrzeug angelegt.");
+      }
+      closeVehicleEditor();
+      await refreshVehicles();
+    } catch (error) {
+      elements.vehicleMessage.textContent = error.message;
+    } finally {
+      elements.vehicleSave.disabled = false;
+    }
+  });
   elements.navInspections.addEventListener("click", () => showDashboardPane("inspections"));
   elements.navMore.addEventListener("click", () => {
     showDashboardPane("more");

@@ -98,6 +98,8 @@ import {
   validateSiteTask,
   validateSiteTaskUpdate,
   validateSiteBundle,
+  validateVehicle,
+  validateVehicleUpdate,
   validateTimeEntry,
   validateTimeEntryAddition,
   validateTimeCorrectionPolicy,
@@ -191,7 +193,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.27";
+export const APPLICATION_VERSION = "0.42.28";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -2142,6 +2144,176 @@ async function requireVdeModuleEnabled(client, context) {
       "vde_module_disabled"
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Fuhrpark
+// ---------------------------------------------------------------------------
+
+async function requireFleetModuleEnabled(client, context) {
+  const modules = await loadCompanyModules(client, context);
+  const fleet = modules.find((module) => module.key === "fleet");
+  if (!fleet?.enabled) {
+    throw new InputError(
+      "Der Fuhrpark ist für diese Firma nicht aktiviert.",
+      404,
+      "fleet_module_disabled"
+    );
+  }
+}
+
+function vehicleDto(row) {
+  return {
+    id: row.id,
+    licencePlate: row.licence_plate,
+    label: row.label || null,
+    vehicleType: row.vehicle_type,
+    requiredLicenceClass: row.required_licence_class,
+    assignedUserId: row.assigned_user_id || null,
+    assignedUserName: row.assigned_user_name || null,
+    status: row.status,
+    nextInspectionOn: databaseDate(row.next_inspection_on),
+    nextServiceOn: databaseDate(row.next_service_on),
+    note: row.note || null,
+    rowVersion: Number(row.row_version),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString()
+  };
+}
+
+const VEHICLE_SELECT = `
+  SELECT vehicle.*,
+         CASE WHEN fahrer.id IS NULL THEN NULL
+              ELSE fahrer.first_name || ' ' || fahrer.last_name
+         END AS assigned_user_name
+  FROM vehicles AS vehicle
+  LEFT JOIN users AS fahrer
+    ON fahrer.company_id = vehicle.company_id
+   AND fahrer.id = vehicle.assigned_user_id
+`;
+
+async function listVehicles(client, context) {
+  await requirePlanner(client, context);
+  await requireFleetModuleEnabled(client, context);
+  const result = await client.query(
+    `${VEHICLE_SELECT}
+     WHERE vehicle.company_id = $1
+     ORDER BY vehicle.status, vehicle.licence_plate`,
+    [context.companyId]
+  );
+  return result.rows.map(vehicleDto);
+}
+
+async function createVehicle(client, context, input) {
+  await requireFullPlanner(client, context);
+  await requireFleetModuleEnabled(client, context);
+  let inserted;
+  try {
+    inserted = await client.query(
+      `INSERT INTO vehicles (
+         company_id, licence_plate, label, vehicle_type, required_licence_class,
+         assigned_user_id, status, next_inspection_on, next_service_on, note
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id`,
+      [
+        context.companyId,
+        input.licencePlate,
+        input.label,
+        input.vehicleType,
+        input.requiredLicenceClass,
+        input.assignedUserId,
+        input.status,
+        input.nextInspectionOn,
+        input.nextServiceOn,
+        input.note
+      ]
+    );
+  } catch (error) {
+    // Ein doppeltes Kennzeichen ist ein Tippfehler, kein Serverfehler.
+    if (error.code === "23505") {
+      throw new InputError(
+        "Ein Fahrzeug mit diesem Kennzeichen ist bereits eingetragen.",
+        409,
+        "vehicle_plate_taken"
+      );
+    }
+    if (error.code === "23503") {
+      throw new InputError("Der gewählte Fahrer wurde nicht gefunden.", 404, "employee_not_found");
+    }
+    throw error;
+  }
+  return getVehicleRecord(client, context, inserted.rows[0].id);
+}
+
+async function getVehicleRecord(client, context, vehicleId) {
+  const result = await client.query(
+    `${VEHICLE_SELECT} WHERE vehicle.company_id = $1 AND vehicle.id = $2`,
+    [context.companyId, vehicleId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Das Fahrzeug wurde nicht gefunden.", 404, "vehicle_not_found");
+  }
+  return vehicleDto(result.rows[0]);
+}
+
+async function updateVehicle(client, context, vehicleId, input) {
+  await requireFullPlanner(client, context);
+  await requireFleetModuleEnabled(client, context);
+  let updated;
+  try {
+    updated = await client.query(
+      `UPDATE vehicles
+       SET licence_plate = $3, label = $4, vehicle_type = $5,
+           required_licence_class = $6, assigned_user_id = $7, status = $8,
+           next_inspection_on = $9, next_service_on = $10, note = $11
+       WHERE company_id = $1 AND id = $2 AND row_version = $12
+       RETURNING id`,
+      [
+        context.companyId,
+        vehicleId,
+        input.licencePlate,
+        input.label,
+        input.vehicleType,
+        input.requiredLicenceClass,
+        input.assignedUserId,
+        input.status,
+        input.nextInspectionOn,
+        input.nextServiceOn,
+        input.note,
+        input.rowVersion
+      ]
+    );
+  } catch (error) {
+    if (error.code === "23505") {
+      throw new InputError(
+        "Ein Fahrzeug mit diesem Kennzeichen ist bereits eingetragen.",
+        409,
+        "vehicle_plate_taken"
+      );
+    }
+    if (error.code === "23503") {
+      throw new InputError("Der gewählte Fahrer wurde nicht gefunden.", 404, "employee_not_found");
+    }
+    throw error;
+  }
+  if (updated.rowCount !== 1) {
+    // Entweder gibt es das Fahrzeug nicht, oder jemand war schneller. Beides
+    // getrennt zu melden hilft dem Buero, das eine vom anderen zu
+    // unterscheiden.
+    const vorhanden = await client.query(
+      "SELECT 1 FROM vehicles WHERE company_id = $1 AND id = $2",
+      [context.companyId, vehicleId]
+    );
+    if (vorhanden.rowCount !== 1) {
+      throw new InputError("Das Fahrzeug wurde nicht gefunden.", 404, "vehicle_not_found");
+    }
+    throw new InputError(
+      "Das Fahrzeug wurde zwischenzeitlich geändert. Bitte die Liste aktualisieren.",
+      409,
+      "row_version_conflict"
+    );
+  }
+  return getVehicleRecord(client, context, vehicleId);
 }
 
 function vdePermissions(roles, assigned, planner = hasFullPlannerAccess(roles)) {
@@ -10629,6 +10801,39 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => adminOverview(client, context, date)
         );
         return json(response, 200, { overview });
+      }
+
+      // Fuhrpark. Lesen darf die Planung, aendern nur die volle Planung -
+      // dieselbe Trennung wie bei den Mitarbeitern.
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/vehicles") {
+        const vehicles = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => listVehicles(client, context)
+        );
+        return json(response, 200, { vehicles });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/vehicles") {
+        const input = validateVehicle(await readJson(request));
+        const vehicle = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createVehicle(client, context, input)
+        );
+        return json(response, 201, { vehicle });
+      }
+
+      const vehicleMatch = /^\/api\/v1\/admin\/vehicles\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && vehicleMatch) {
+        const vehicleId = validateId(vehicleMatch[1], "Fahrzeug-ID");
+        const input = validateVehicleUpdate(await readJson(request));
+        const vehicle = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateVehicle(client, context, vehicleId, input)
+        );
+        return json(response, 200, { vehicle });
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/admin/holiday-calendar") {

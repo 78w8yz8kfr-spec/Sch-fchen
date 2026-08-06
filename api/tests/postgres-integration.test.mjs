@@ -598,7 +598,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       Object.keys(initialModules).sort(),
       [
         "absences", "apprentice_reports", "assembly_reports", "documents",
-        "materials", "site_daily_reports", "site_qr", "vde"
+        "fleet", "materials", "site_daily_reports", "site_qr", "vde"
       ]
     );
     // Der Standardumfang steht ohne Zutun offen. Das Spezialmodul VDE und das
@@ -4521,6 +4521,106 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(unknownPolicy.status, 400);
 
     await setPolicy("review_required");
+  });
+
+  await t.test("Fuhrpark: nur mit Modul, Kennzeichen nur einmal", async () => {
+    const schalteFuhrpark = async (status) => {
+      const antwort = await fetch(
+        `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/fleet`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Cookie: platformCookie },
+          body: JSON.stringify({
+            status,
+            includedInPlan: status !== "inactive",
+            separatelyBilled: false,
+            featureScope: {},
+            reason: `Fuhrpark im Integrationstest auf ${status} setzen`
+          })
+        }
+      );
+      assert.equal(antwort.status, 200, await antwort.clone().text());
+    };
+
+    // Ohne freigeschaltetes Modul gibt es den Fuhrpark nicht - und zwar mit
+    // 404, nicht mit einer leeren Liste: eine leere Liste behauptet, es gebe
+    // keine Fahrzeuge.
+    await schalteFuhrpark("inactive");
+    const gesperrt = await fetch(`${baseUrl}/api/v1/admin/vehicles`, {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(gesperrt.status, 404, await gesperrt.clone().text());
+    assert.equal((await gesperrt.json()).error.code, "fleet_module_disabled");
+
+    await schalteFuhrpark("permanent");
+
+    const leer = await fetch(`${baseUrl}/api/v1/admin/vehicles`, { headers: { Cookie: cookie } });
+    assert.equal(leer.status, 200, await leer.clone().text());
+    assert.deepEqual((await leer.json()).vehicles, []);
+
+    // Das Kennzeichen wird aufgeraeumt: wer " es-se 123 " tippt, meint
+    // ES-SE 123.
+    const angelegt = await fetch(`${baseUrl}/api/v1/admin/vehicles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        licencePlate: " es-se 123 ",
+        label: "Transporter Werkstatt",
+        vehicleType: "van",
+        requiredLicenceClass: "B",
+        nextInspectionOn: "2027-03-01"
+      })
+    });
+    assert.equal(angelegt.status, 201, await angelegt.clone().text());
+    const fahrzeug = (await angelegt.json()).vehicle;
+    assert.equal(fahrzeug.licencePlate, "ES-SE 123");
+    assert.equal(fahrzeug.nextInspectionOn, "2027-03-01");
+    assert.equal(fahrzeug.status, "active");
+
+    // Dasselbe Kennzeichen ein zweites Mal ist ein Tippfehler, kein
+    // Serverfehler.
+    const doppelt = await fetch(`${baseUrl}/api/v1/admin/vehicles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ licencePlate: "ES-SE123" })
+    });
+    assert.equal(doppelt.status, 409, await doppelt.clone().text());
+    assert.equal((await doppelt.json()).error.code, "vehicle_plate_taken");
+
+    // Aendern zaehlt die Zeilenversion hoch; die alte Version wird abgewiesen.
+    const geaendert = await fetch(`${baseUrl}/api/v1/admin/vehicles/${fahrzeug.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        licencePlate: "ES-SE 123",
+        label: "Transporter Werkstatt",
+        vehicleType: "van",
+        requiredLicenceClass: "B",
+        status: "workshop",
+        rowVersion: fahrzeug.rowVersion
+      })
+    });
+    assert.equal(geaendert.status, 200, await geaendert.clone().text());
+    assert.equal((await geaendert.json()).vehicle.status, "workshop");
+
+    const veraltet = await fetch(`${baseUrl}/api/v1/admin/vehicles/${fahrzeug.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        licencePlate: "ES-SE 123",
+        status: "active",
+        rowVersion: fahrzeug.rowVersion
+      })
+    });
+    assert.equal(veraltet.status, 409, await veraltet.clone().text());
+    assert.equal((await veraltet.json()).error.code, "row_version_conflict");
+
+    // Der Monteur hat im Fuhrpark nichts zu suchen.
+    const monteurSicht = await fetch(`${baseUrl}/api/v1/admin/vehicles`, {
+      headers: { Cookie: employeeCookie }
+    });
+    assert.equal(monteurSicht.status, 403, await monteurSicht.clone().text());
+
   });
 
   await t.test("Nur die Plattform gibt Bereiche frei", async () => {
