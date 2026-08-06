@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.32";
-import { serverIsNewer } from "./core/versions.js?v=0.42.32";
+} from "./core/work-time.js?v=0.42.33";
+import { serverIsNewer } from "./core/versions.js?v=0.42.33";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.32";
+} from "./core/sync-queue.js?v=0.42.33";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.32";
+} from "./core/permissions.js?v=0.42.33";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.32";
+} from "./core/state-store.js?v=0.42.33";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1235,7 +1235,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.32",
+          "X-Schaefchen-Version": "0.42.33",
           ...options.headers
         }
       });
@@ -1265,7 +1265,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.32" }
+        headers: { "X-Schaefchen-Version": "0.42.33" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1312,7 +1312,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.32 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.33 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2584,7 +2584,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.32";
+  const EIGENE_FASSUNG = "0.42.33";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2598,6 +2598,77 @@ import {
     // Der Balken liegt fest oben. Ohne diesen Schalter verdeckt er die
     // Kopfzeile - im Browser genau so gesehen.
     document.body.classList.add("hat-fassungshinweis");
+  }
+
+  // Die abgelegten Dateien wegwerfen. Ein blosses Neuladen holte bei einer
+  // eingerichteten App wieder dieselben aus dem Speicher.
+  async function verwerfeAbgelegteDateien() {
+    try {
+      if ("caches" in window) {
+        const namen = await caches.keys();
+        await Promise.all(
+          namen
+            .filter((name) => name.startsWith("schaefchen-online-"))
+            .map((name) => caches.delete(name))
+        );
+      }
+      if (navigator.serviceWorker?.getRegistrations) {
+        const eintraege = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(eintraege.map((eintrag) => eintrag.update()));
+      }
+    } catch {
+      // Wenn das Aufraeumen nicht geht, hilft das Neuladen vielleicht trotzdem.
+    }
+  }
+
+  // Laeuft hier die Datei, die die Seite angefordert hat?
+  //
+  // Das Dokument laedt "app.js?v=0.42.33". Der Dienst-Worker darf im Notfall
+  // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
+  // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
+  // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
+  // neues Geruest mit alter Anwendung oder umgekehrt. Beides sieht nicht
+  // kaputt aus, es fehlt nur etwas - eine Schaltflaeche, eine Zahl neben einer
+  // anderen. Man sucht den Fehler dann in der Fachlichkeit, wo keiner ist.
+  //
+  // Die angeforderte Fassung steht in der eigenen Adresse, die eingebaute in
+  // EIGENE_FASSUNG. Gehen sie auseinander, raeumt die App einmal auf und laedt
+  // neu. Einmal: liefert der Server selbst noch die alte Datei aus, waere ein
+  // zweiter Versuch eine Schleife. Dann bleibt der Hinweisbalken.
+  const ANGEFORDERTE_FASSUNG = (() => {
+    try {
+      return new URL(import.meta.url).searchParams.get("v");
+    } catch {
+      return null;
+    }
+  })();
+
+  async function pruefeEigeneFassung() {
+    if (!ANGEFORDERTE_FASSUNG || ANGEFORDERTE_FASSUNG === EIGENE_FASSUNG) return false;
+    const merker = "schaefchen-fassungsbruch";
+    let schonVersucht = null;
+    try {
+      schonVersucht = window.sessionStorage.getItem(merker);
+    } catch {
+      // Ohne Sitzungsspeicher gibt es keinen Schutz vor der Schleife. Dann
+      // lieber gar nicht neu laden als endlos.
+      schonVersucht = ANGEFORDERTE_FASSUNG;
+    }
+    if (schonVersucht === ANGEFORDERTE_FASSUNG) {
+      elements.updateBannerText.textContent =
+        `Diese Ansicht ist gemischt: angefordert war ${ANGEFORDERTE_FASSUNG}, geladen wurde ${EIGENE_FASSUNG}.`;
+      elements.updateBanner.hidden = false;
+      document.body.classList.add("hat-fassungshinweis");
+      return false;
+    }
+    try {
+      window.sessionStorage.setItem(merker, ANGEFORDERTE_FASSUNG);
+    } catch {
+      return false;
+    }
+    await verwerfeAbgelegteDateien();
+    window.location.reload();
+    return true;
   }
 
   // ---------------------------------------------------------------------
@@ -12646,22 +12717,7 @@ import {
   // wieder dieselben Dateien aus dem Speicher.
   elements.updateBannerReload.addEventListener("click", async () => {
     elements.updateBannerReload.disabled = true;
-    try {
-      if ("caches" in window) {
-        const namen = await caches.keys();
-        await Promise.all(
-          namen
-            .filter((name) => name.startsWith("schaefchen-online-"))
-            .map((name) => caches.delete(name))
-        );
-      }
-      if (navigator.serviceWorker?.getRegistrations) {
-        const eintraege = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(eintraege.map((eintrag) => eintrag.update()));
-      }
-    } catch {
-      // Wenn das Aufraeumen nicht geht, hilft das Neuladen vielleicht trotzdem.
-    }
+    await verwerfeAbgelegteDateien();
     window.location.reload();
   });
 
@@ -12809,7 +12865,13 @@ import {
   window.addEventListener("offline", updateConnectionState);
   window.addEventListener("resize", applyPlanningBoardWidths);
 
-  if (!demoMode) void initialiseOnline();
+  // Zuerst die eigene Fassung pruefen. Steht hier eine andere Datei als die
+  // angeforderte, ist alles Weitere Rateraten: die App raeumt auf und laedt
+  // neu, statt halb zu laufen.
+  void (async () => {
+    if (await pruefeEigeneFassung()) return;
+    if (!demoMode) void initialiseOnline();
+  })();
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

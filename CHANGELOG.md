@@ -4,6 +4,26 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die App merkt jetzt, wenn sie halb alt läuft.** Das Dokument fordert eine
+  bestimmte Fassung an — `app.js?v=0.42.33`. Der Dienst-Worker darf im Notfall
+  eine ältere Fassung derselben Datei zurückgeben; während einer
+  Veröffentlichung ist eine Fassung zu alt besser als eine weiße Seite. Nur
+  geht dieser Notfall vorbei, **ohne dass es jemand merkt**: dann läuft neues
+  Gerüst mit alter Anwendung oder umgekehrt.
+  - Das sieht nicht kaputt aus. Es fehlt nur etwas — eine Schaltfläche, eine
+    Zahl neben einer anderen. Man sucht den Fehler dann in der Fachlichkeit,
+    wo keiner ist.
+  - Die angeforderte Fassung steht in der eigenen Adresse, die eingebaute im
+    Quelltext. Gehen sie auseinander, räumt die App die abgelegten Dateien weg
+    und lädt neu — **genau einmal**. Liefert der Server selbst noch die alte
+    Datei aus, wäre ein zweiter Versuch eine Schleife; dann bleibt der
+    Hinweisbalken stehen und sagt, was auseinandergeht.
+  - Kleinigkeit derselben Art: neben „Resturlaub" stand als Platzhalter
+    „0 Tage". Solange die Zahl nicht geladen ist, wäre jede Zahl eine
+    **Behauptung über den Urlaubsanspruch eines Menschen**. Dort steht jetzt
+    ein Strich.
+- Fassung 0.42.33, Speicher `schaefchen-online-v75`, Migration 088.
+
 - **Freigegebene Bereiche kommen jetzt ohne Neuladen an.** Gemeldet wurde es am
   Fuhrpark: in der Plattformverwaltung eingeschaltet, in der App trotzdem nicht
   da. Der Fehler lag nicht am Fuhrpark.
