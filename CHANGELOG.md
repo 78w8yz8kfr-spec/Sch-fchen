@@ -4,6 +4,37 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Schäfchen bekommt eine Desktop-Gestalt.** Gebaut ist die App für die
+  Baustelle: eine Spalte, Daumenbedienung, Navigation unten. Am Rechner sitzt
+  aber das Büro — Einsatzplanung, Baustellen, Stundenzettel prüfen. Dort galt
+  bisher dieselbe schmale Spalte: von 1440 Pixeln Breite war **die Hälfte
+  genutzt**, und die Plantafel zeigte **drei von fünf Wochentagen**, den Rest
+  hinter einem Schiebebalken — obwohl die ganze Woche zweimal hingepasst hätte.
+  - Ab **1080 Pixeln** wandert die Navigation nach **links** und bleibt beim
+    Blättern stehen. Sie nimmt keine Höhe weg; die Plantafel zeigt seitdem alle
+    Wochentage ohne Schiebebalken.
+  - Der Inhalt nutzt die Breite bis höchstens 1360 Pixel. Breiter wird kein
+    Text besser lesbar.
+  - Karten, die fachlich zusammengehören, stehen nebeneinander: Arbeitstag und
+    heutiger Einsatz, Arbeitskonto und Abwesenheit, Berichtszentrale und
+    Baustellenplanung. Im Berichtsheft stehen die Tagesfelder zu zweit und der
+    Verlauf daneben — ein Eingabefeld über 1000 Pixel für „Steckdosen gesetzt“
+    war kein Gewinn.
+  - Formulare bleiben schmal. Ein Namensfeld über die halbe Bildschirmbreite
+    lädt niemanden zum Ausfüllen ein.
+  - Die Bereiche werden dabei **benannt platziert**, nicht automatisch
+    umgebrochen: nichts soll an einer Stelle landen, an der es keinen Sinn
+    ergibt.
+  - **Am Aufbau der Seite ändert sich nichts** — keine zweite Fassung, kein
+    Umschalter, dieselben Bausteine ordnen sich anders an. Die Handy-Ansicht
+    ist unberührt; nachgemessen bei 390, 768, 1023 und 1079 Pixeln.
+  - Geprüft an sieben Breiten von 390 bis 1920 Pixeln und in allen Bereichen
+    als Büro, Auszubildender und Monteur: nirgends ein waagerechter
+    Schiebebalken. Die Wochenansicht ist von 2645 auf 1984 Pixel Höhe
+    geschrumpft, die Baustellenplanung von 1372 auf 986 — sie passt jetzt auf
+    einen Bildschirm.
+- Fassung 0.42.16, Speicher `schaefchen-online-v58`, Migration 068.
+
 - **Aus dem Viewer-Durchgang: die Mängelliste im VDE-Protokoll war zerrissen.**
   Auf dem Deckblatt ist bei fünf Zeilen Schluss, damit Ergebnis und
   Unterschriften darauf Platz behalten. Der Rest stand danach **hinter den

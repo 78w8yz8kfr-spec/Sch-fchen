@@ -94,3 +94,30 @@ Rollen direkt unter dem Wochen-Stundenzettel mit alter Uhrzeit, neuer Uhrzeit
 und Begründung.
 
 Passwörter, Passwort-Hashes und `company_id` werden nie vom Frontend verwaltet.
+
+## Zwei Gestalten derselben Seite
+
+Schäfchen ist für die Baustelle gebaut: eine Spalte, Daumenbedienung, die
+Navigation unten am Rand. Am Rechner sitzt aber das Büro — Einsatzplanung,
+Baustellen, Stundenzettel prüfen. Dort galt bis dahin dieselbe schmale Spalte:
+von 1440 Pixeln Breite war die Hälfte genutzt, und die Plantafel zeigte drei
+von fünf Wochentagen, den Rest hinter einem Schiebebalken.
+
+Ab **1080 Pixeln** bekommt dieselbe Seite deshalb eine zweite Gestalt:
+
+- Die Navigation wandert nach **links** und bleibt beim Blättern stehen. Sie
+  nimmt keine Höhe weg — das kommt vor allem der Plantafel zugute, die damit
+  alle Wochentage ohne Schiebebalken zeigt.
+- Der Inhalt nutzt die Breite bis höchstens 1360 Pixel. Breiter wird kein Text
+  besser lesbar.
+- Karten, die fachlich nebeneinander gehören, stehen nebeneinander:
+  Arbeitstag und heutiger Einsatz, Arbeitskonto und Abwesenheit,
+  Berichtszentrale und Baustellenplanung, im Berichtsheft die Tagesfelder zu
+  zweit und der Verlauf daneben.
+- Formulare bleiben schmal. Ein Namensfeld über die halbe Bildschirmbreite lädt
+  niemanden zum Ausfüllen ein.
+
+**Am Aufbau der Seite ändert sich dabei nichts.** Es gibt keine zweite Fassung
+und keinen Umschalter: dieselben Bausteine ordnen sich anders an. Was auf dem
+Telefon funktioniert, funktioniert dadurch weiter — und was am Rechner
+dazukommt, muss nicht getrennt gepflegt werden.

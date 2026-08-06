@@ -6099,3 +6099,234 @@ select:focus-visible {
   font-size: 0.78rem;
   resize: vertical;
 }
+
+/* ---------------------------------------------------------------------------
+   Desktop
+   ---------------------------------------------------------------------------
+
+   Schäfchen ist für die Baustelle gebaut: eine Spalte, Daumenbedienung, die
+   Navigation unten am Rand. Am Rechner sitzt aber das Büro - Einsatzplanung,
+   Baustellen, Stundenzettel prüfen -, und dort war von 1440 Pixeln Breite nur
+   die Hälfte genutzt. Die Plantafel zeigte drei von fünf Wochentagen, den Rest
+   hinter einem Schiebebalken, obwohl die ganze Woche zweimal hingepasst hätte.
+
+   Ab hier bekommt dieselbe Seite eine zweite Gestalt: die Leiste wandert nach
+   links und bleibt stehen, der Inhalt nutzt die Breite, und die Bereiche
+   ordnen sich nebeneinander statt untereinander. Am Aufbau der Seite ändert
+   sich nichts - die Handy-Ansicht bleibt unberührt.
+
+   Die Schwelle liegt bei 1080 Pixeln: darunter ist eine Seitenleiste neben
+   dem Inhalt zu eng, darüber ist sie gewonnener Platz.
+   ------------------------------------------------------------------------ */
+
+@media (min-width: 1080px) {
+  .dashboard-view {
+    display: grid;
+    min-height: 100vh;
+    grid-template-areas:
+      "seitenleiste kopf"
+      "seitenleiste hinweise"
+      "seitenleiste inhalt";
+    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+  }
+
+  .dashboard-view > .topbar {
+    grid-area: kopf;
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+
+  .dashboard-view > .platform-announcements {
+    grid-area: hinweise;
+    width: 100%;
+    padding: 0 32px;
+    margin: 14px 0 -8px;
+  }
+
+  .dashboard-view > .dashboard-content {
+    width: 100%;
+    max-width: 1360px;
+    grid-area: inhalt;
+    padding: 28px 32px 48px;
+  }
+
+  /* Die Leiste steht links und bleibt beim Blättern stehen. Sie nimmt keine
+     Höhe weg - das kommt vor allem der Plantafel zugute. */
+  .dashboard-view > .bottom-nav {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
+    align-content: start;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 22px 14px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    grid-area: seitenleiste;
+    box-shadow: none;
+  }
+
+  /* Beschriftung neben dem Zeichen statt darunter: in einer schmalen Spalte
+     liest sich eine Zeile leichter als zwei. */
+  .dashboard-view > .bottom-nav .nav-item {
+    display: grid;
+    min-height: 44px;
+    align-items: center;
+    justify-items: start;
+    gap: 12px;
+    padding: 0 14px;
+    grid-template-columns: 22px 1fr;
+    font-size: 0.82rem;
+    text-align: left;
+  }
+
+  .dashboard-view > .bottom-nav .nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .dashboard-view > .bottom-nav .nav-item span {
+    justify-self: start;
+  }
+
+  /* Der Platz unter der letzten Karte war für die untere Leiste reserviert. */
+  .dashboard-view > .dashboard-content > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* Aufteilung je Bereich.
+   Eine 1360 Pixel breite Spalte ist keine Desktop-Ansicht, sondern eine sehr
+   breite Handy-Ansicht: ein Eingabefeld über die ganze Breite liest sich
+   schlechter als eines von 500 Pixeln, und wer scrollen muss, um zwei
+   zusammengehörende Karten zu sehen, hat nichts gewonnen. Deshalb ordnen sich
+   die Karten hier nebeneinander - bewusst benannt und nicht automatisch, damit
+   nichts an einer Stelle landet, an der es keinen Sinn ergibt. */
+@media (min-width: 1080px) {
+  .dashboard-view > .dashboard-content {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-view > .dashboard-content > * {
+    margin: 0;
+    grid-column: 1 / -1;
+  }
+
+  /* Startseite: Arbeitstag und heutiger Einsatz stehen nebeneinander - beim
+     Beginn der Schicht schaut man auf beides zugleich. */
+  .dashboard-view > .dashboard-content > .status-card,
+  .dashboard-view > .dashboard-content > #apprentice-today-section,
+  .dashboard-view > .dashboard-content > [aria-labelledby="today-assignment-title"] {
+    grid-column: auto;
+  }
+
+  /* Wochenansicht: Streifen, Summen und die Tagesliste über die volle Breite,
+     die einzelnen Karten paarweise daneben. */
+  #week-section,
+  #apprentice-section {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #week-section > *,
+  #apprentice-section > * {
+    margin: 0;
+    grid-column: 1 / -1;
+  }
+
+  #time-account-panel,
+  /* Der Aufklapper ist das Kind des Rasters, nicht die Karte darin. */
+  #absence-area,
+  #week-next-assignment,
+  #week-open-actions,
+  #next-holiday-card,
+  #employee-timesheet-export-panel,
+  #timesheet-export-panel,
+  #work-day-review-panel,
+  #time-correction-review-panel,
+  #absence-review-panel {
+    grid-column: auto;
+  }
+
+  /* Berichtsheft: links geschrieben, rechts nachgesehen. Die Tagesfelder
+     stehen zu zweit - ein Feld über 1000 Pixel für "Steckdosen gesetzt" ist
+     kein Gewinn. */
+  #apprentice-panel {
+    display: grid;
+    align-content: start;
+    column-gap: 26px;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+
+  #apprentice-panel > .site-management-panel__heading {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  #apprentice-week { grid-row: 2; grid-column: 1; }
+  #apprentice-return { grid-row: 3; grid-column: 1; }
+  #apprentice-lock { grid-row: 4; grid-column: 1; }
+  #apprentice-open { grid-row: 5; grid-column: 1; }
+  #apprentice-form { grid-row: 6; grid-column: 1; }
+  #apprentice-message { grid-row: 7; grid-column: 1; }
+  #apprentice-missing { grid-row: 2 / 6; grid-column: 2; align-self: start; }
+  #apprentice-history { grid-row: 6 / 8; grid-column: 2; align-self: start; margin-top: 0; }
+
+  .apprentice-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .apprentice-actions {
+    justify-content: flex-start;
+  }
+
+  /* Zeitraum und Wochenwechsel in einer Zeile neben der Überschrift. Am Handy
+     stehen sie untereinander, weil die Breite fehlt; hier fehlt sie nicht. */
+  .week-heading__controls {
+    align-items: center;
+    gap: 14px;
+    grid-auto-flow: column;
+  }
+
+  /* Verwaltung, Baustellen und Einsatzplanung. Die Plantafel bleibt über die
+     volle Breite - sie ist der Grund, warum jemand am Rechner sitzt. Was
+     daneben steht, sind eigenständige Karten und passt paarweise. */
+  #admin-section {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #admin-section > * {
+    margin: 0;
+    grid-column: 1 / -1;
+  }
+
+  #time-account-admin-panel,
+  #holiday-calendar-admin,
+  #time-correction-policy-admin,
+  #report-center,
+  #site-planning-shell {
+    grid-column: auto;
+  }
+
+  /* Formulare in der Verwaltung: die Felder stehen zu zweit, das Formular
+     bleibt aber schmal genug, um lesbar zu sein. Ein Namensfeld über die
+     halbe Bildschirmbreite lädt niemanden zum Ausfüllen ein. */
+  .admin-form {
+    max-width: 720px;
+  }
+}
