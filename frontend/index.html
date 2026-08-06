@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.24">
-    <script type="module" src="./app.js?v=0.42.24"></script>
-    <script src="./version.js?v=0.42.24" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.25">
+    <script type="module" src="./app.js?v=0.42.25"></script>
+    <script src="./version.js?v=0.42.25" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.24</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.25</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -617,12 +617,15 @@
                 <h2 id="week-title">Woche</h2>
               </div>
               <div class="week-heading__controls">
-                <strong id="week-period" class="week-period">Diese Woche</strong>
+                <!-- Kalenderwoche mit Pfeilen, daneben der Zeitraum und der
+                     Sprung zu heute - genau die Reihenfolge des Entwurfs. -->
                 <div class="week-navigation" aria-label="Angezeigte Woche wechseln">
                   <button id="week-previous" class="week-button" type="button" aria-label="Vorherige Woche">‹</button>
-                  <button id="week-current" class="week-navigation__today" type="button">Diese Woche</button>
+                  <strong id="week-number" class="week-number">KW</strong>
                   <button id="week-next" class="week-button" type="button" aria-label="Nächste Woche">›</button>
                 </div>
+                <strong id="week-period" class="week-period">Diese Woche</strong>
+                <button id="week-current" class="week-navigation__today" type="button">Heute</button>
               </div>
             </div>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
@@ -1884,7 +1887,22 @@
                 <button class="button button--primary" type="submit">Mitarbeiter sicher anlegen</button>
                 <p id="employee-message" class="form-message" aria-live="polite"></p>
               </form>
-              <ul id="employee-list" class="admin-list admin-list--table" aria-label="Aktive Mitarbeiter"></ul>
+              <!-- Liste links, ausgewaehlter Mitarbeiter rechts - wie im
+                   Entwurf. Am Telefon steht die Spalte unter der Liste. -->
+              <div class="employee-split">
+                <ul id="employee-list" class="admin-list admin-list--table" aria-label="Aktive Mitarbeiter"></ul>
+                <aside id="employee-detail" class="employee-detail" aria-label="Ausgewählter Mitarbeiter" hidden>
+                  <p id="employee-detail-name" class="employee-detail__name"></p>
+                  <p id="employee-detail-role" class="employee-detail__role"></p>
+                  <dl class="employee-detail__facts">
+                    <div><dt>Personalnummer</dt><dd id="employee-detail-number">–</dd></div>
+                    <div><dt>Mail</dt><dd id="employee-detail-mail">–</dd></div>
+                    <div><dt>Tel.</dt><dd id="employee-detail-phone">–</dd></div>
+                    <div><dt>Saldo (Monat)</dt><dd id="employee-detail-balance">–</dd></div>
+                  </dl>
+                  <button id="employee-detail-edit" class="button button--secondary" type="button">Bearbeiten</button>
+                </aside>
+              </div>
               <details id="archived-employee-panel" class="archived-employee-panel">
                 <summary>
                   Archivierte Mitarbeiter

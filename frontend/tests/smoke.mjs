@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.24/);
-assert.match(html, /app\.js\?v=0\.42\.24/);
-assert.match(html, /version\.js\?v=0\.42\.24/);
+assert.match(html, /styles\.css\?v=0\.42\.25/);
+assert.match(html, /app\.js\?v=0\.42\.25/);
+assert.match(html, /version\.js\?v=0\.42\.25/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -746,7 +746,7 @@ assert.match(styles, /\.nav-brand \{[\s\S]{0,260}text-transform: uppercase;/);
 // waere sie in Zeilen ohne Schaltflaeche null Pixel breit.
 assert.match(app, /function appendAdminListHead\(/);
 assert.match(app, /function adminListCells\(/);
-assert.match(app, /appendAdminListHead\(elements\.employeeList, \["Name", "Personalnummer", "Rolle", "Telefon", "E-Mail"\]\)/);
+assert.match(app, /\["Mitarbeiter", "Personalnummer", "Rolle", "Saldo \(Monat\)", "Status"\]/);
 assert.match(app, /appendAdminListHead\(list, \["Baustelle", "Kunde", "Adresse", "Auftrag", "Dokumente", "Status"\]\)/);
 assert.match(styles, /grid-template-columns: var\(--tabellen-spalten/);
 assert.match(styles, /#employee-list \{\s*\n\s*--tabellen-spalten:[^;]*92px;/);
@@ -783,6 +783,34 @@ assert.ok(
   html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
   "Die Uebersichtskarten stehen vor dem Wochenbereich"
 );
+
+// Der Wochenstreifen traegt seine Zahlen selbst, wie im Entwurf: Wochentag,
+// Datum, Haken, Kommen, Gehen und die Stunden. Der heutige Tag ist rot
+// umrandet, nicht rot gefuellt - gefuellt waeren die Zahlen darin schlechter
+// zu lesen.
+assert.match(app, /kommenZeile\.className = "day-pill__in";/);
+assert.match(app, /gehenZeile\.className = "day-pill__out";/);
+assert.match(app, /stunden\.className = "day-pill__hours";/);
+assert.match(styles, /\.day-pill--today \{[\s\S]{0,160}border-color: var\(--brand\);/);
+assert.doesNotMatch(styles, /\.day-pill--today \{[\s\S]{0,160}background: var\(--brand\);/);
+// Am Telefon muessen alle sieben Tage nebeneinander passen: ein halb
+// abgeschnittener Sonntag sieht aus wie ein Fehler.
+assert.match(styles, /@media \(max-width: 1079px\) \{\s*\n(?:\s*\/\*[\s\S]*?\*\/\s*\n)?\s*\.week-strip \{[\s\S]{0,140}grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/);
+// Kalenderwoche zwischen den Pfeilen, daneben der Zeitraum und "Heute".
+assert.match(html, /id="week-number"/);
+assert.match(app, /elements\.weekNumber\.textContent = isoWeekLabel\(/);
+
+// Die Mitarbeiterliste nach dem Entwurf: Kuerzel vor dem Namen, Saldo als
+// eigene Spalte, Statusmarke und rechts die Spalte des Ausgewaehlten.
+assert.match(html, /id="employee-detail"/);
+assert.match(html, /id="employee-detail-balance"/);
+assert.match(app, /function renderEmployeeList\(/);
+assert.match(app, /function renderEmployeeDetail\(/);
+assert.match(app, /function employeeBalanceText\(/);
+assert.match(styles, /\.employee-split \{/);
+assert.match(styles, /\.employee-avatar \{/);
+// Der Saldo kommt aus dem Jahreskonto, nicht aus einer zweiten Rechnung.
+assert.match(app, /timeAccountsState\?\.accounts \|\| \[\]/);
 
 // Die Baustellenakte nach dem Entwurf: "Baustelle ausgewaehlt", darunter die
 // Reiterleiste und vier Felder - Adresse, Vorarbeiter, wer heute vor Ort ist
@@ -1066,16 +1094,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.24"'));
-assert.ok(worker.includes('"./app.js?v=0.42.24"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.24"'));
-assert.ok(worker.includes('"./version.js?v=0.42.24"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.25"'));
+assert.ok(worker.includes('"./app.js?v=0.42.25"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.25"'));
+assert.ok(worker.includes('"./version.js?v=0.42.25"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.24"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.24";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.25"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.25";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1103,7 +1131,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.24$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.25$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1111,11 +1139,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.24"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.24"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.25"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.25"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.24"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.24"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.25"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.25"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1162,8 +1190,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.24/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.24/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.25/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.25/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

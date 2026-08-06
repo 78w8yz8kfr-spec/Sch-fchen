@@ -4,6 +4,30 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, achter Schritt: Wochenstreifen und Mitarbeiterliste.**
+  - Der **Wochenstreifen** zeigte bisher nur Wochentag und Tageszahl. Wer
+    wissen wollte, wann er am Dienstag angefangen hat, musste den Tag
+    anklicken. Jetzt trägt jeder Tag seine Zahlen selbst: **Wochentag, Datum,
+    grüner Haken, Kommen, Gehen, Stunden**. Wer den Streifen überfliegt, sieht
+    ohne Klick, wo etwas fehlt.
+  - Der heutige Tag ist **rot umrandet statt rot gefüllt** — gefüllt zog er
+    alle Aufmerksamkeit auf sich, und die Zahlen darin wären gegen Rot
+    schlechter zu lesen.
+  - **Am Telefon passen alle sieben Tage nebeneinander.** Vorher scrollte der
+    Streifen und der Sonntag war halb abgeschnitten, was aussieht wie ein
+    Fehler.
+  - Über dem Streifen steht die **Kalenderwoche zwischen den Pfeilen**, daneben
+    der Zeitraum und der Sprung auf „Heute“ — die Reihenfolge des Entwurfs.
+  - Die **Mitarbeiterliste** trägt das Kürzel vor dem Namen, den **Saldo des
+    Monats** als eigene Spalte und eine Statusmarke. Rechts daneben steht die
+    **Spalte des Ausgewählten** mit Rolle, Personalnummer, Mail, Telefon und
+    Saldo. Der Saldo kommt aus dem Jahreskonto — dieselbe Zahl, die die
+    Büroverwaltung unter „Jahreskonten“ auflistet.
+  - **Noch nicht enthalten:** ein echtes Foto (es gibt keins — ein erfundener
+    Kopf wäre schlimmer als zwei Buchstaben) und die *Qualifikationen* aus dem
+    Entwurf: dafür gibt es im Datenbestand noch kein Feld.
+- Fassung 0.42.25, Speicher `schaefchen-online-v67`, Migration 077.
+
 - **Neues Design, siebter Schritt: Büro-Dashboard und Baustellenakte.**
   - Wer plant, sitzt im Büro: sein Dashboard **endet jetzt nach „Heute im
     Überblick“** — genau da, wo es im Entwurf endet. Arbeitstag, heutiger

@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.24";
+} from "./core/work-time.js?v=0.42.25";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.24";
+} from "./core/sync-queue.js?v=0.42.25";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.24";
+} from "./core/permissions.js?v=0.42.25";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.24";
+} from "./core/state-store.js?v=0.42.25";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -194,6 +194,7 @@ import {
     todayLabel: document.querySelector("#today-label"),
     weekStrip: document.querySelector("#week-strip"),
     weekPeriod: document.querySelector("#week-period"),
+    weekNumber: document.querySelector("#week-number"),
     weekDaysTitle: document.querySelector("#week-days-title"),
     apprenticePanel: document.querySelector("#apprentice-panel"),
     apprenticeStatus: document.querySelector("#apprentice-status"),
@@ -512,6 +513,14 @@ import {
     inspectionSearchField: document.querySelector("#inspection-search-field"),
     inspectionOverviewList: document.querySelector("#inspection-overview-list"),
     paneMenu: document.querySelector("#pane-menu"),
+    employeeDetail: document.querySelector("#employee-detail"),
+    employeeDetailName: document.querySelector("#employee-detail-name"),
+    employeeDetailRole: document.querySelector("#employee-detail-role"),
+    employeeDetailNumber: document.querySelector("#employee-detail-number"),
+    employeeDetailMail: document.querySelector("#employee-detail-mail"),
+    employeeDetailPhone: document.querySelector("#employee-detail-phone"),
+    employeeDetailBalance: document.querySelector("#employee-detail-balance"),
+    employeeDetailEdit: document.querySelector("#employee-detail-edit"),
     quickAccess: document.querySelector("#quick-access"),
     quickAccessMenu: document.querySelector("#quick-access-menu"),
     dashboardMetrics: document.querySelector("#dashboard-metrics"),
@@ -952,6 +961,8 @@ import {
   // Die Differenz der angezeigten Woche. Die Wochenansicht rechnet sie aus,
   // das Dashboard zeigt sie noch einmal als Kennzahl.
   let wochenDifferenzMinuten = 0;
+  // Der Mitarbeiter, dessen Spalte rechts neben der Liste steht.
+  let selectedEmployeeId = null;
   let apprenticeGapState = [];
   // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
   const expandedPlanningCells = new Set();
@@ -1184,7 +1195,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.24",
+          "X-Schaefchen-Version": "0.42.25",
           ...options.headers
         }
       });
@@ -1212,7 +1223,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.24" }
+        headers: { "X-Schaefchen-Version": "0.42.25" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1259,7 +1270,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.24 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.25 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -5267,6 +5278,157 @@ import {
     });
   }
 
+  // Die Mitarbeiterliste mit der Spalte daneben. Sie steht in einer eigenen
+  // Funktion, weil der Saldo erst mit den Jahreskonten eintrifft: bis dahin
+  // stand in der Spalte ein Strich, und niemand zeichnete sie noch einmal.
+  function renderEmployeeList() {
+    if (!adminState) return;
+    const projectScoped = Boolean(adminState.projectScopeRestricted);
+    elements.employeeList.replaceChildren();
+    if (adminState.employees.length > 0) {
+      appendAdminListHead(
+        elements.employeeList,
+        ["Mitarbeiter", "Personalnummer", "Rolle", "Saldo (Monat)", "Status"]
+      );
+    }
+    elements.archivedEmployeeList.replaceChildren();
+    const archivedEmployees = adminState.archivedEmployees || [];
+    elements.archivedEmployeeCount.textContent = String(archivedEmployees.length);
+    elements.archivedEmployeePanel.hidden = projectScoped;
+    adminState.employees.forEach((employee) => {
+      const roleLabels = {
+        admin: "Administrator",
+        managing_director: "Geschäftsführer",
+        dispatch_office: "Büro / Disposition",
+        office: "Planung (Bestand)",
+        planner: "Planer (Bestand)",
+        project_manager: "Projektleiter",
+        executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
+        foreman: "Vorarbeiter",
+        installer: "Monteur",
+        apprentice: "Auszubildender"
+      };
+      const marke = document.createElement("span");
+      marke.className = "site-status site-status--active";
+      marke.textContent = "Aktiv";
+      const zeile = document.createElement("li");
+      const name = document.createElement("strong");
+      zeile.className = "admin-list__row";
+      // Das Kuerzel vor dem Namen, wie im Entwurf. Ein echtes Bild gibt es
+      // nicht; ein erfundener Kopf waere schlimmer als zwei Buchstaben.
+      const zeichen = document.createElement("span");
+      zeichen.className = "employee-avatar";
+      zeichen.setAttribute("aria-hidden", "true");
+      zeichen.textContent = initialen(`${employee.firstName} ${employee.lastName}`);
+      name.className = "employee-name";
+      name.append(zeichen, document.createTextNode(`${employee.firstName} ${employee.lastName}`));
+      zeile.append(
+        name,
+        adminListCells([
+          employee.personnelNumber,
+          employee.roles.map((role) => roleLabels[role] || role).join(", "),
+          employeeBalanceText(employee.id),
+          marke
+        ])
+      );
+      if (!employee.roles.includes("admin") && !projectScoped) {
+        const knopf = document.createElement("button");
+        knopf.type = "button";
+        knopf.className = "text-button";
+        knopf.textContent = "Bearbeiten";
+        knopf.addEventListener("click", (ereignis) => {
+          ereignis.stopPropagation();
+          openEmployeeEditor(employee);
+        });
+        zeile.append(knopf);
+      }
+      zeile.addEventListener("click", () => selectEmployee(employee));
+      elements.employeeList.append(zeile);
+    });
+    renderEmployeeDetail();
+    archivedEmployees.forEach((employee) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const reactivate = document.createElement("button");
+      title.textContent = `${employee.firstName} ${employee.lastName}`;
+      meta.textContent = [
+        employee.personnelNumber,
+        employee.archivedAt ? `archiviert ${shortDate(localDateKey(new Date(employee.archivedAt)))}` : null,
+        employee.archivedReason
+      ].filter(Boolean).join(" · ");
+      reactivate.type = "button";
+      reactivate.className = "text-button";
+      reactivate.textContent = "Reaktivieren";
+      reactivate.hidden = !adminState.canCreateManagementRoles;
+      reactivate.addEventListener("click", async () => {
+        const reason = window.prompt("Warum wird dieser Mitarbeiter reaktiviert?");
+        if (!reason || reason.trim().length < 3) return;
+        if (!window.confirm(`${employee.firstName} ${employee.lastName} wieder für Anmeldung und Planung freigeben?`)) return;
+        reactivate.disabled = true;
+        try {
+          await requestJson(
+            `./api/v1/admin/employees/${encodeURIComponent(employee.id)}/reactivate`,
+            {
+              method: "POST",
+              body: JSON.stringify({ reason, rowVersion: employee.rowVersion })
+            }
+          );
+          showToast("Mitarbeiter reaktiviert · Anmeldung und Planung sind wieder möglich.");
+          await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
+        } catch (error) {
+          showToast(error.message);
+          reactivate.disabled = false;
+        }
+      });
+      copy.append(title, meta);
+      item.append(copy, reactivate);
+      elements.archivedEmployeeList.append(item);
+    });
+    if (archivedEmployees.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = "Keine archivierten Mitarbeiter.";
+      elements.archivedEmployeeList.append(empty);
+    }
+  }
+
+  // Der Saldo steht im Jahreskonto - dieselbe Zahl, die die Bueroverwaltung
+  // unter "Jahreskonten" auffuehrt. Sie hier noch einmal auszurechnen waere
+  // die sicherste Art, zwei verschiedene Zahlen zu bekommen.
+  function employeeBalanceText(employeeId) {
+    const konto = (timeAccountsState?.accounts || []).find(
+      (eintrag) => eintrag.employeeId === employeeId
+    );
+    if (!konto) return null;
+    return konto.enabled ? formatSignedMinutes(konto.totals.balanceMinutes) : "Deaktiviert";
+  }
+
+  function selectEmployee(employee) {
+    selectedEmployeeId = employee.id;
+    renderEmployeeDetail();
+  }
+
+  // Die Spalte rechts neben der Liste, wie im Entwurf: wer ist das, wie
+  // erreicht man ihn, wie steht sein Konto.
+  function renderEmployeeDetail() {
+    const employee = (adminState?.employees || []).find(
+      (eintrag) => eintrag.id === selectedEmployeeId
+    );
+    elements.employeeDetail.hidden = !employee;
+    if (!employee) return;
+    elements.employeeDetailName.textContent = `${employee.firstName} ${employee.lastName}`;
+    elements.employeeDetailRole.textContent = employeeRoleLabel(employee.roles);
+    elements.employeeDetailNumber.textContent = employee.personnelNumber;
+    elements.employeeDetailMail.textContent = employee.email || "–";
+    elements.employeeDetailPhone.textContent = employee.phone || "–";
+    elements.employeeDetailBalance.textContent = employeeBalanceText(employee.id) || "–";
+    elements.employeeDetailEdit.hidden = employee.roles.includes("admin")
+      || Boolean(adminState?.projectScopeRestricted);
+    elements.employeeDetailEdit.onclick = () => openEmployeeEditor(employee);
+  }
+
   function renderTimesheetExport() {
     elements.timesheetExportPanel.hidden = !canPlan();
     if (!canPlan() || !adminState) return;
@@ -5553,87 +5715,7 @@ import {
       (site) => `${site.name} · ${site.address.city}`
     );
 
-    elements.employeeList.replaceChildren();
-    if (adminState.employees.length > 0) {
-      appendAdminListHead(elements.employeeList, ["Name", "Personalnummer", "Rolle", "Telefon", "E-Mail"]);
-    }
-    elements.archivedEmployeeList.replaceChildren();
-    const archivedEmployees = adminState.archivedEmployees || [];
-    elements.archivedEmployeeCount.textContent = String(archivedEmployees.length);
-    elements.archivedEmployeePanel.hidden = projectScoped;
-    adminState.employees.forEach((employee) => {
-      const roleLabels = {
-        admin: "Administrator",
-        managing_director: "Geschäftsführer",
-        dispatch_office: "Büro / Disposition",
-        office: "Planung (Bestand)",
-        planner: "Planer (Bestand)",
-        project_manager: "Projektleiter",
-        executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
-        foreman: "Vorarbeiter",
-        installer: "Monteur",
-        apprentice: "Auszubildender"
-      };
-      appendAdminListItem(
-        elements.employeeList,
-        `${employee.firstName} ${employee.lastName}`,
-        [
-          employee.personnelNumber,
-          employee.roles.map((role) => roleLabels[role] || role).join(", "),
-          employee.phone,
-          employee.email
-        ],
-        employee.roles.includes("admin") || projectScoped
-          ? null
-          : { label: "Bearbeiten", handler: () => openEmployeeEditor(employee) }
-      );
-    });
-    archivedEmployees.forEach((employee) => {
-      const item = document.createElement("li");
-      const copy = document.createElement("div");
-      const title = document.createElement("strong");
-      const meta = document.createElement("span");
-      const reactivate = document.createElement("button");
-      title.textContent = `${employee.firstName} ${employee.lastName}`;
-      meta.textContent = [
-        employee.personnelNumber,
-        employee.archivedAt ? `archiviert ${shortDate(localDateKey(new Date(employee.archivedAt)))}` : null,
-        employee.archivedReason
-      ].filter(Boolean).join(" · ");
-      reactivate.type = "button";
-      reactivate.className = "text-button";
-      reactivate.textContent = "Reaktivieren";
-      reactivate.hidden = !adminState.canCreateManagementRoles;
-      reactivate.addEventListener("click", async () => {
-        const reason = window.prompt("Warum wird dieser Mitarbeiter reaktiviert?");
-        if (!reason || reason.trim().length < 3) return;
-        if (!window.confirm(`${employee.firstName} ${employee.lastName} wieder für Anmeldung und Planung freigeben?`)) return;
-        reactivate.disabled = true;
-        try {
-          await requestJson(
-            `./api/v1/admin/employees/${encodeURIComponent(employee.id)}/reactivate`,
-            {
-              method: "POST",
-              body: JSON.stringify({ reason, rowVersion: employee.rowVersion })
-            }
-          );
-          showToast("Mitarbeiter reaktiviert · Anmeldung und Planung sind wieder möglich.");
-          await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
-        } catch (error) {
-          showToast(error.message);
-          reactivate.disabled = false;
-        }
-      });
-      copy.append(title, meta);
-      item.append(copy, reactivate);
-      elements.archivedEmployeeList.append(item);
-    });
-    if (archivedEmployees.length === 0) {
-      const empty = document.createElement("li");
-      empty.className = "admin-list__empty";
-      empty.textContent = "Keine archivierten Mitarbeiter.";
-      elements.archivedEmployeeList.append(empty);
-    }
+    renderEmployeeList();
 
     renderCustomerList();
     renderCustomerOverview();
@@ -7933,9 +8015,12 @@ import {
         };
     const periodStart = dateFromIso(visibleWeek.weekStart);
     const periodEnd = dateFromIso(visibleWeek.weekEnd);
+    // Der Zeitraum ohne das Jahr am Anfang: es steht am Ende, und zweimal
+    // dieselbe Jahreszahl in einer Zeile liest niemand.
     elements.weekPeriod.textContent = `${
-      periodStart.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
+      periodStart.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })
     } – ${periodEnd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+    elements.weekNumber.textContent = isoWeekLabel(visibleWeek.weekStart);
     // Ueber den erfassten Arbeitstagen stand fest "Diese Woche", auch wenn
     // gerade eine frueher liegende Woche geblaettert war. Wer den Kopf der
     // Ansicht nicht mitlas, hielt fremde Zahlen fuer die eigenen dieser Woche.
@@ -8020,15 +8105,49 @@ import {
         approvedAbsence ? " day-pill--absent" : ""
       }`;
       item.type = "button";
-      item.setAttribute("aria-label", `${dayName}, ${date.getDate()}.`);
+      // Der Tag traegt seine Zahlen selbst, wie im Entwurf: Wochentag, Datum,
+      // Haken, Kommen, Gehen und die Stunden. Wer den Streifen ueberfliegt,
+      // sieht damit ohne Klick, wo etwas fehlt.
+      const buchungen = workDay?.entries || [];
+      const kommen = buchungen.find((eintrag) => eintrag.entryType === "clock_in");
+      const gehen = [...buchungen].reverse().find((eintrag) => eintrag.entryType === "clock_out");
+      const uhrzeit = (eintrag) => (
+        eintrag ? timeFormatter.format(new Date(eintrag.recordedAt)) : null
+      );
       const name = document.createElement("span");
       const number = document.createElement("strong");
       const status = document.createElement("i");
+      const kommenZeile = document.createElement("span");
+      const gehenZeile = document.createElement("span");
+      const stunden = document.createElement("strong");
+      name.className = "day-pill__weekday";
+      number.className = "day-pill__date";
+      kommenZeile.className = "day-pill__in";
+      gehenZeile.className = "day-pill__out";
+      stunden.className = "day-pill__hours";
       name.textContent = dayName;
-      number.textContent = String(date.getDate());
-      status.textContent = approvedAbsence ? "◆" : workDay?.entries?.length ? "●" : "";
+      number.textContent = `${String(date.getDate()).padStart(2, "0")}.${
+        String(date.getMonth() + 1).padStart(2, "0")}.`;
+      status.textContent = approvedAbsence ? "◆" : buchungen.length ? "✓" : "";
+      status.className = `day-pill__status${
+        approvedAbsence ? " day-pill__status--absent" : buchungen.length ? " day-pill__status--done" : ""
+      }`;
       status.setAttribute("aria-hidden", "true");
-      item.append(name, number, status);
+      kommenZeile.textContent = uhrzeit(kommen) || "–";
+      gehenZeile.textContent = uhrzeit(gehen) || "läuft";
+      // Ein Tag ohne jede Buchung braucht keine zweite Zeile: dort steht ein
+      // Strich, und zwei Striche untereinander sagen nichts mehr dazu.
+      gehenZeile.hidden = !kommen;
+      stunden.textContent = workDay?.workMinutes
+        ? formatMinutes(workDay.workMinutes)
+        : approvedAbsence ? absenceTypeLabel(approvedAbsence.absenceType) : "–";
+      item.setAttribute("aria-label", [
+        `${dayName}, ${number.textContent}`,
+        kommen ? `Kommen ${uhrzeit(kommen)}` : "keine Buchung",
+        gehen ? `Gehen ${uhrzeit(gehen)}` : null,
+        workDay?.workMinutes ? `${formatMinutes(workDay.workMinutes)} Stunden` : null
+      ].filter(Boolean).join(", "));
+      item.append(name, number, status, kommenZeile, gehenZeile, stunden);
       item.addEventListener("click", () => {
         document.querySelector(`#week-day-${workDate}`)?.scrollIntoView({
           behavior: "smooth",
@@ -9396,6 +9515,11 @@ import {
       timeAccountsState = body.timeAccounts;
       elements.timeAccountAdminMessage.textContent = "";
       renderAdminTimeAccounts();
+      // Der Saldo steht auch in der Mitarbeiterliste. Ohne diesen Aufruf stand
+      // dort ein Strich, bis die Liste aus einem anderen Grund neu gezeichnet
+      // wurde - im Browser zuerst am Rechner aufgefallen, am Telefon nicht,
+      // weil dort die Reihenfolge zufaellig anders war.
+      renderEmployeeList();
     } catch (error) {
       if (error.status === 401) showLogin();
       else {
