@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, siebter Schritt: Büro-Dashboard und Baustellenakte.**
+  - Wer plant, sitzt im Büro: sein Dashboard **endet jetzt nach „Heute im
+    Überblick“** — genau da, wo es im Entwurf endet. Arbeitstag, heutiger
+    Einsatz, Übersichtskarten und Stundenzettel stehen bei ihm in der
+    Zeiterfassung; dort sucht er sie ohnehin. **Monteur, Vorarbeiter und
+    Auszubildender behalten ihr Dashboard unverändert** — sie haben keine
+    Kennzahlen und brauchen den Startknopf beim Aufmachen der App.
+  - Die **Baustellenakte** trägt „Baustelle ausgewählt“ über dem Namen, die
+    Reiterleiste ist am Rechner ein Strich statt Pillen, und die Übersicht
+    zeigt die vier Felder des Entwurfs: **Adresse, Vorarbeiter, wer heute vor
+    Ort ist** (als Kürzel-Zeichen, ab dem vierten eine rote Marke mit der
+    Restzahl) **und wann es weitergeht** („Heute, 07:00“ / „Morgen, 07:30“).
+    Alle vier Angaben standen schon in den Daten — sie standen nur nirgends
+    beieinander.
+  - Am Telefon bleiben die Reiter Pillen: dort scrollt die Leiste waagerecht,
+    und eine Pille trifft der Daumen besser als eine Beschriftung.
+- Fassung 0.42.24, Speicher `schaefchen-online-v66`, Migration 076.
+
 - **Neues Design, sechster Schritt: das Dashboard.** Begrüßung mit Namen und
   Winkhand, darunter das volle Datum, rechts der Schnellzugriff. Dann **vier
   Kennzahlen** nebeneinander — laufende Baustellen, Mitarbeiter im Einsatz,

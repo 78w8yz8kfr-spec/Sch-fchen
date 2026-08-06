@@ -7273,3 +7273,126 @@ select:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Die Uebersicht einer Baustelle
+   ---------------------------------------------------------------------------
+
+   Vier Felder nebeneinander, wie im Entwurf: Adresse, Vorarbeiter, wer heute
+   vor Ort ist und wann es weitergeht. Alles vier stand schon in den Daten -
+   es stand nur nirgends beieinander.
+   ------------------------------------------------------------------------ */
+
+.site-overview-cards {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.site-overview-card {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.site-overview-card__label {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.site-overview-card__value {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.site-overview-card__value--leer {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.site-overview-avatars {
+  display: flex;
+  align-items: center;
+}
+
+/* Die Zeichen ueberlappen leicht, wie im Entwurf. */
+.site-overview-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  color: var(--ink);
+  background: #e6e7e6;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.site-overview-avatar + .site-overview-avatar {
+  margin-left: -8px;
+}
+
+.site-overview-avatar--rest {
+  color: #ffffff;
+  background: var(--brand);
+}
+
+@media (min-width: 1080px) {
+  .site-overview-cards {
+    gap: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1080px) {
+  /* Am Rechner sind die Reiter der Baustellenakte eine Reiterleiste, wie im
+     Entwurf: der aktive rot mit rotem Strich darunter, die uebrigen grau. Am
+     Telefon bleiben es Pillen - dort scrollt die Leiste waagerecht, und eine
+     Pille ist mit dem Daumen besser zu treffen als eine Beschriftung. */
+  .workspace-section-nav--site-dashboard {
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .workspace-section-nav--site-dashboard .workspace-section-tab {
+    min-height: 40px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 0 18px;
+    background: transparent;
+    font-weight: 700;
+  }
+
+  .workspace-section-nav--site-dashboard .workspace-section-tab--active {
+    color: var(--brand);
+    background: transparent;
+    border-bottom-color: var(--brand);
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 1080px) {
+  /* Am Rechner ist Platz: die drei Schaltflaechen der Kopfzeile stehen
+     nebeneinander statt untereinander, sonst bleibt der dunkle Block hoch und
+     halb leer. */
+  .site-dashboard__actions {
+    align-items: center;
+    gap: 16px;
+    grid-auto-flow: column;
+  }
+
+  /* Vier Schnellaktionen nebeneinander statt zweimal zwei. */
+  .site-dashboard-shortcuts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

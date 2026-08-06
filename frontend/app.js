@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.23";
+} from "./core/work-time.js?v=0.42.24";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.23";
+} from "./core/sync-queue.js?v=0.42.24";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.23";
+} from "./core/permissions.js?v=0.42.24";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.23";
+} from "./core/state-store.js?v=0.42.24";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -433,6 +433,13 @@ import {
     fieldSiteSubmit: document.querySelector("#field-site-submit"),
     siteChoiceMessage: document.querySelector("#site-choice-message"),
     timesheetSection: document.querySelector("#timesheet-section"),
+    workdayCard: document.querySelector("#workday-card"),
+    todayAssignmentSection: document.querySelector("#today-assignment-section"),
+    weekSection: document.querySelector("#week-section"),
+    siteOverviewAddress: document.querySelector("#site-overview-address"),
+    siteOverviewForeman: document.querySelector("#site-overview-foreman"),
+    siteOverviewToday: document.querySelector("#site-overview-today"),
+    siteOverviewNext: document.querySelector("#site-overview-next"),
     resetDemo: document.querySelector("#reset-demo"),
     bottomNav: document.querySelector(".bottom-nav"),
     navStart: document.querySelector("#nav-start"),
@@ -887,6 +894,17 @@ import {
     elements.siteMasterDataTools,
     elements.siteDashboard
   );
+  // Der eigene Arbeitstag steht hinter der Wochenansicht, nicht davor. Wer im
+  // Buero sitzt, sieht ihn dort - sein Dashboard zeigt den Betrieb. Fuer alle
+  // anderen bleibt er auf dem Dashboard, und die Reihenfolge untereinander
+  // aendert sich dabei nicht, weil die Wochenansicht dort verborgen ist.
+  elements.weekSection.after(
+    elements.workdayCard,
+    elements.todayAssignmentSection,
+    elements.overviewCards,
+    elements.timesheetSection
+  );
+
   // Jeder Eintrag der Seitenleiste hat einen eigenen Bereich. Die Tafeln dafuer
   // liegen im Dokument dort, wo sie fachlich hingehoeren, und ziehen hier an
   // ihren Platz - so wie es die Einsatz- und Baustellenplanung schon macht.
@@ -1166,7 +1184,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.23",
+          "X-Schaefchen-Version": "0.42.24",
           ...options.headers
         }
       });
@@ -1194,7 +1212,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.23" }
+        headers: { "X-Schaefchen-Version": "0.42.24" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1241,7 +1259,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.23 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.24 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3727,6 +3745,77 @@ import {
     ].filter(Boolean).join(", ");
   }
 
+  // Die vier Felder der Uebersicht aus dem Entwurf: wo, wer fuehrt, wer steht
+  // heute dort und wann geht es weiter. Alles vier steht schon in den Daten -
+  // es stand nur nirgends beieinander.
+  function renderSiteOverviewCards(site) {
+    elements.siteOverviewAddress.textContent = siteAddressText(site) || "Keine Adresse hinterlegt";
+
+    const einsaetze = planningAssignments()
+      .filter((assignment) => assignment.constructionSiteId === site.id);
+    const verantwortlich = einsaetze.find((assignment) => assignment.reportResponsible);
+    elements.siteOverviewForeman.textContent = verantwortlich
+      ? verantwortlich.employeeName
+      : "Noch niemand eingeteilt";
+
+    const heute = localDateKey();
+    const heuteVorOrt = einsaetze.filter((assignment) => assignment.workDate === heute);
+    elements.siteOverviewToday.replaceChildren();
+    if (heuteVorOrt.length === 0) {
+      const leer = document.createElement("span");
+      leer.className = "site-overview-card__value site-overview-card__value--leer";
+      leer.textContent = "Heute niemand";
+      elements.siteOverviewToday.append(leer);
+    } else {
+      // Hoechstens drei Zeichen, danach eine rote Marke mit der Restzahl -
+      // vier Namen nebeneinander liest ohnehin niemand.
+      for (const assignment of heuteVorOrt.slice(0, 3)) {
+        const zeichen = document.createElement("span");
+        zeichen.className = "site-overview-avatar";
+        zeichen.title = assignment.employeeName;
+        zeichen.textContent = initialen(assignment.employeeName);
+        elements.siteOverviewToday.append(zeichen);
+      }
+      if (heuteVorOrt.length > 3) {
+        const rest = document.createElement("span");
+        rest.className = "site-overview-avatar site-overview-avatar--rest";
+        rest.textContent = `+${heuteVorOrt.length - 3}`;
+        rest.title = heuteVorOrt.slice(3).map((eintrag) => eintrag.employeeName).join(", ");
+        elements.siteOverviewToday.append(rest);
+      }
+    }
+
+    const naechster = einsaetze
+      .filter((assignment) => assignment.workDate >= heute)
+      .sort((links, rechts) => (
+        links.workDate.localeCompare(rechts.workDate)
+        || String(links.plannedStartTime || "").localeCompare(String(rechts.plannedStartTime || ""))
+      ))[0];
+    elements.siteOverviewNext.textContent = naechster
+      ? `${terminTag(naechster.workDate)}${
+        naechster.plannedStartTime ? `, ${naechster.plannedStartTime.slice(0, 5)}` : ""
+      }`
+      : "Kein Einsatz geplant";
+  }
+
+  function initialen(name) {
+    return String(name || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((teil) => teil[0].toLocaleUpperCase("de-DE"))
+      .join("");
+  }
+
+  // "Heute" und "Morgen" liest sich schneller als ein Datum, das man erst mit
+  // dem Kalender im Kopf abgleichen muss.
+  function terminTag(datum) {
+    const heute = localDateKey();
+    if (datum === heute) return "Heute";
+    if (datum === addIsoDays(heute, 1)) return "Morgen";
+    return shortDate(datum);
+  }
+
   function siteNavigationUrl(site) {
     const destination = siteAddressText(site) || site.name || "";
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
@@ -3845,6 +3934,7 @@ import {
     elements.siteDashboardProject.textContent = site.customerName;
     elements.siteDashboardOrder.textContent = site.shortText || "Noch kein Arbeitsauftrag hinterlegt";
     elements.siteDashboardNavigation.href = siteNavigationUrl(site);
+    renderSiteOverviewCards(site);
     elements.siteDashboardEmployees.replaceChildren();
     if (assignedEmployees.size === 0) {
       const empty = document.createElement("li");
@@ -7442,7 +7532,7 @@ import {
       elements.weekOpenActions,
       elements.nextHolidayCard
     ];
-    elements.overviewCards.hidden = currentDashboardPane !== "start"
+    elements.overviewCards.hidden = currentDashboardPane !== personalPane()
       || karten.every((karte) => karte.hidden);
   }
 
@@ -8350,6 +8440,14 @@ import {
   // allen drei Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten
   // dieselben drei Karten, weil sie im gemeinsamen Verwaltungsbereich liegen
   // und keine eigene Zuordnung hatten.
+  // Wer plant, sitzt im Buero: sein Dashboard zeigt den Betrieb, so wie im
+  // Entwurf. Der eigene Arbeitstag steht bei ihm in der Zeiterfassung - dort
+  // sucht er ihn ohnehin. Monteur, Vorarbeiter und Auszubildender behalten ihn
+  // auf dem Dashboard: sie brauchen den Startknopf beim Aufmachen der App.
+  function personalPane() {
+    return canPlan() ? "week" : "start";
+  }
+
   function isOfficeAdminPane() {
     return currentDashboardPane === "more";
   }
@@ -8372,6 +8470,14 @@ import {
       // Die Uebersichtskarten gehoeren zur Startseite, aber nur, wenn eine von
       // ihnen etwas zu sagen hat - sonst waere dort eine leere Reihe.
       if (element === elements.overviewCards) return;
+      // Arbeitstag, heutiger Einsatz und Stundenzettel gehoeren dorthin, wo
+      // man sie sucht: im Buero in die Zeiterfassung, auf der Baustelle auf
+      // das Dashboard.
+      if ([elements.workdayCard, elements.todayAssignmentSection, elements.timesheetSection]
+        .includes(element)) {
+        element.hidden = pane !== personalPane();
+        return;
+      }
       if (element === elements.apprenticeTodaySection) {
         element.hidden = pane !== "start" || !isApprentice();
         return;
