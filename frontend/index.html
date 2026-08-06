@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.21">
-    <script type="module" src="./app.js?v=0.42.21"></script>
-    <script src="./version.js?v=0.42.21" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.22">
+    <script type="module" src="./app.js?v=0.42.22"></script>
+    <script src="./version.js?v=0.42.22" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.21</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.22</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -1094,6 +1094,11 @@
             </div>
             <p id="admin-intro" class="admin-intro">Baustellen, Einsätze und Mitarbeiter – übersichtlich an einem Ort.</p>
 
+            <!-- Am Telefon fasst die untere Leiste fuenf Eintraege; die uebrigen
+                 Bereiche sind hier zu erreichen. Am Rechner stehen sie in der
+                 Seitenleiste, dann ist diese Liste ueberfluessig. -->
+            <nav id="pane-menu" class="pane-menu" aria-label="Weitere Bereiche" hidden></nav>
+
             <div id="admin-summary" class="admin-summary" aria-label="Verwaltungsübersicht">
               <div><strong id="admin-employee-count">0</strong><span>Mitarbeiter</span></div>
               <div><strong id="admin-customer-count">0</strong><span>Kunden</span></div>
@@ -1201,6 +1206,43 @@
             <section id="site-planning-shell" class="planning-shell-direct" hidden>
               <div id="site-planning-content" class="planning-group">
                 <p class="planning-intro">Baustellen direkt anlegen oder gesammelt aus Excel übernehmen.</p>
+              </div>
+            </section>
+
+            <section id="reports-shell" class="planning-shell-direct" hidden>
+              <div id="reports-content" class="planning-group"></div>
+            </section>
+
+            <section id="employees-shell" class="planning-shell-direct" hidden>
+              <div id="employees-content" class="planning-group"></div>
+            </section>
+
+            <section id="customers-shell" class="planning-shell-direct" hidden>
+              <div id="customers-content" class="planning-group">
+                <div class="entity-toolbar">
+                  <label class="entity-search" for="customer-search-field">
+                    <span>Kunden durchsuchen</span>
+                    <input id="customer-search-field" type="search" maxlength="120" placeholder="Kunde, Nummer oder Ansprechpartner">
+                  </label>
+                  <button id="customer-new" class="button button--primary" type="button">＋ Neuer Kunde</button>
+                </div>
+                <ul id="customer-overview-list" class="admin-list admin-list--table customer-overview-list" aria-label="Kunden"></ul>
+              </div>
+            </section>
+
+            <section id="documents-shell" class="planning-shell-direct" hidden>
+              <div id="documents-content" class="planning-group"></div>
+            </section>
+
+            <section id="inspections-shell" class="planning-shell-direct" hidden>
+              <div id="inspections-content" class="planning-group">
+                <div class="entity-toolbar">
+                  <label class="entity-search" for="inspection-search-field">
+                    <span>Prüfprotokolle durchsuchen</span>
+                    <input id="inspection-search-field" type="search" maxlength="120" placeholder="Baustelle, Verteilung oder Prüfer">
+                  </label>
+                </div>
+                <ul id="inspection-overview-list" class="admin-list admin-list--table inspection-overview-list" aria-label="Prüfprotokolle"></ul>
               </div>
             </section>
 
@@ -2562,29 +2604,53 @@
         </div>
 
         <nav class="bottom-nav" aria-label="Hauptnavigation">
+          <p class="nav-brand" aria-hidden="true">
+            <img src="./assets/mark.svg" alt="" width="26" height="26">
+            <span>Schäfchen</span>
+          </p>
           <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 11 9-7 9 7v9H3v-9Z"/><path d="M9 20v-6h6v6"/></svg>
-            <span>Übersicht</span>
-          </button>
-          <button id="nav-week" class="nav-item" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/></svg>
-            <span>Woche</span>
-          </button>
-          <button id="nav-apprentice" class="nav-item" type="button" hidden>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
-            <span>Azubi-Berichtsheft</span>
-          </button>
-          <button id="nav-assignments" class="nav-item" type="button" hidden>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
-            <span>Einsatzplanung</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+            <span>Dashboard</span>
           </button>
           <button id="nav-sites" class="nav-item" type="button" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
             <span>Baustellen</span>
           </button>
+          <button id="nav-assignments" class="nav-item" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
+            <span>Einsatzplanung</span>
+          </button>
+          <button id="nav-week" class="nav-item" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span>Zeiterfassung</span>
+          </button>
+          <button id="nav-reports" class="nav-item nav-item--desktop" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v4h4"/><path d="M9 13h6m-6 4h4"/></svg>
+            <span>Berichte</span>
+          </button>
+          <button id="nav-inspections" class="nav-item nav-item--desktop" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9V3Z"/><path d="m9 13 2 2 4-4"/></svg>
+            <span>Prüfprotokolle</span>
+          </button>
+          <button id="nav-apprentice" class="nav-item" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
+            <span>Azubi</span>
+          </button>
+          <button id="nav-employees" class="nav-item nav-item--desktop" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 20a5.4 5.4 0 0 0-2-4.2"/></svg>
+            <span>Mitarbeiter</span>
+          </button>
+          <button id="nav-customers" class="nav-item nav-item--desktop" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>
+            <span>Kunden</span>
+          </button>
+          <button id="nav-documents" class="nav-item nav-item--desktop" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h3.5l2 2.5H18a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/></svg>
+            <span>Dokumente</span>
+          </button>
           <button id="nav-more" class="nav-item" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
-            <span>Mehr</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+            <span>Einstellungen</span>
           </button>
         </nav>
       </section>

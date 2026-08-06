@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.21";
+} from "./core/work-time.js?v=0.42.22";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.21";
+} from "./core/sync-queue.js?v=0.42.22";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.21";
+} from "./core/permissions.js?v=0.42.22";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.21";
+} from "./core/state-store.js?v=0.42.22";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -446,6 +446,11 @@ import {
     apprenticeNext: document.querySelector("#apprentice-next"),
     navAssignments: document.querySelector("#nav-assignments"),
     navSites: document.querySelector("#nav-sites"),
+    navReports: document.querySelector("#nav-reports"),
+    navInspections: document.querySelector("#nav-inspections"),
+    navEmployees: document.querySelector("#nav-employees"),
+    navCustomers: document.querySelector("#nav-customers"),
+    navDocuments: document.querySelector("#nav-documents"),
     navMore: document.querySelector("#nav-more"),
     infoCard: document.querySelector(".info-card"),
     adminSection: document.querySelector("#admin-section"),
@@ -485,6 +490,21 @@ import {
     assignmentPlanningContent: document.querySelector("#assignment-planning-content"),
     sitePlanningShell: document.querySelector("#site-planning-shell"),
     sitePlanningContent: document.querySelector("#site-planning-content"),
+    reportsShell: document.querySelector("#reports-shell"),
+    reportsContent: document.querySelector("#reports-content"),
+    employeesShell: document.querySelector("#employees-shell"),
+    employeesContent: document.querySelector("#employees-content"),
+    customersShell: document.querySelector("#customers-shell"),
+    customersContent: document.querySelector("#customers-content"),
+    customerSearchField: document.querySelector("#customer-search-field"),
+    customerNew: document.querySelector("#customer-new"),
+    customerOverviewList: document.querySelector("#customer-overview-list"),
+    documentsShell: document.querySelector("#documents-shell"),
+    documentsContent: document.querySelector("#documents-content"),
+    inspectionsShell: document.querySelector("#inspections-shell"),
+    inspectionSearchField: document.querySelector("#inspection-search-field"),
+    inspectionOverviewList: document.querySelector("#inspection-overview-list"),
+    paneMenu: document.querySelector("#pane-menu"),
     businessStructurePanel: document.querySelector("#business-structure-panel"),
     adminEmployeeCount: document.querySelector("#admin-employee-count"),
     adminCustomerCount: document.querySelector("#admin-customer-count"),
@@ -852,8 +872,19 @@ import {
   elements.sitePlanningContent.append(
     elements.businessStructurePanel,
     elements.siteMasterDataTools,
-    elements.documentManagementPanel,
     elements.siteDashboard
+  );
+  // Jeder Eintrag der Seitenleiste hat einen eigenen Bereich. Die Tafeln dafuer
+  // liegen im Dokument dort, wo sie fachlich hingehoeren, und ziehen hier an
+  // ihren Platz - so wie es die Einsatz- und Baustellenplanung schon macht.
+  elements.reportsContent.append(elements.reportCenter);
+  elements.employeesContent.append(elements.employeePanel);
+  elements.documentsContent.append(elements.documentManagementPanel);
+  elements.customersContent.append(
+    elements.customerPanel,
+    elements.customerManagementPanel,
+    elements.projectPanel,
+    elements.projectManagementPanel
   );
   elements.assignmentForm.querySelector('button[type="submit"]').after(elements.assignmentImportPanel);
   elements.siteForm.querySelector('button[type="submit"]').after(elements.siteImportPanel);
@@ -1116,7 +1147,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.21",
+          "X-Schaefchen-Version": "0.42.22",
           ...options.headers
         }
       });
@@ -1144,7 +1175,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.21" }
+        headers: { "X-Schaefchen-Version": "0.42.22" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1191,7 +1222,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.21 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.22 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1245,12 +1276,25 @@ import {
     // der Zeiterfassung taeglich hat, und fuer den Ausbilder die, die er
     // woechentlich abzeichnet.
     elements.navApprentice.hidden = !(isApprentice() || mayReviewApprentices());
+    // Die Eintraege, die es nur am Rechner gibt. Sie haengen an derselben
+    // Berechtigung wie Baustellen und Einsatzplanung: wer nicht planen darf,
+    // hat dort auch nichts zu suchen.
+    elements.navEmployees.hidden = !planner || isProjectScopedSession();
+    elements.navCustomers.hidden = !planner;
+    elements.navDocuments.hidden = !planner;
+    elements.navReports.hidden = !planner
+      || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
+    elements.navInspections.hidden = !planner || !vdeModuleEnabled();
     elements.bottomNav.classList.toggle("bottom-nav--planner", planner);
     // Ab fuenf Schaltflaechen wird es eng: dann kleinere Schrift und Symbole.
-    // Ein ausbildender Vorarbeiter mit Planungsrolle haette sechs.
-    const sichtbare = [...elements.bottomNav.children].filter((knopf) => !knopf.hidden).length;
+    // Ein ausbildender Vorarbeiter mit Planungsrolle haette sechs. Gezaehlt
+    // wird, was am Telefon zu sehen ist - die Eintraege nur fuer den Rechner
+    // stehen dort nicht in der Leiste.
+    const sichtbare = [...elements.bottomNav.querySelectorAll(".nav-item")].filter(
+      (knopf) => !knopf.hidden && !knopf.classList.contains("nav-item--desktop")
+    ).length;
     elements.bottomNav.classList.toggle("bottom-nav--compact", sichtbare >= 5);
-    document.title = "Start · Schäfchen";
+    document.title = "Dashboard · Schäfchen";
     render();
     showDashboardPane("start", false);
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -3101,6 +3145,130 @@ import {
       .filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
   }
 
+  // Die Kundenliste des eigenen Bereichs. Sie zeigt, was ein Kunde im Betrieb
+  // bedeutet: wer dort ansprechbar ist und wie viel gerade fuer ihn laeuft.
+  //
+  // Die Spalte "Offene Rechnungen" aus dem Entwurf fehlt mit Absicht. Es gibt
+  // in Schaefchen keine Rechnungsstellung - eine Spalte mit erfundenen
+  // Betraegen waere schlimmer als keine.
+  function renderCustomerOverview() {
+    if (!adminState) return;
+    const query = elements.customerSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const kunden = adminState.customers
+      .filter((customer) => customerStatusGroup(customer.status) === "active")
+      .filter((customer) => !query || customerSearchText(customer).includes(query))
+      .sort((links, rechts) => links.displayName.localeCompare(rechts.displayName, "de-DE"));
+
+    elements.customerOverviewList.replaceChildren();
+    if (kunden.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "admin-list__empty";
+      leer.textContent = query ? "Kein Kunde passt zur Suche." : "Noch kein Kunde angelegt.";
+      elements.customerOverviewList.append(leer);
+      return;
+    }
+
+    appendAdminListHead(
+      elements.customerOverviewList,
+      ["Kunde", "Nummer", "Ansprechpartner", "Projekte", "Baustellen"]
+    );
+    kunden.forEach((customer) => {
+      const projekte = adminState.projects.filter(
+        (project) => project.customerId === customer.id
+      );
+      const baustellen = adminState.sites.filter(
+        (site) => site.customerName === customer.displayName
+          && siteStatusGroup(site.status) === "active"
+      );
+      const zeile = document.createElement("li");
+      const name = document.createElement("strong");
+      const knopf = document.createElement("button");
+      name.textContent = customer.displayName;
+      zeile.className = "admin-list__row";
+      knopf.type = "button";
+      knopf.className = "text-button";
+      knopf.textContent = "Bearbeiten";
+      knopf.addEventListener("click", () => openCustomerEditor(customer));
+      zeile.append(
+        name,
+        adminListCells([
+          customer.number,
+          [customer.email, customer.phone].filter(Boolean).join(" · "),
+          `${projekte.length}`,
+          `${baustellen.length} laufend`
+        ]),
+        knopf
+      );
+      elements.customerOverviewList.append(zeile);
+    });
+  }
+
+  // Alle VDE-Pruefungen des Betriebs an einer Stelle. Bisher waren sie nur in
+  // der Akte der einzelnen Baustelle zu finden - wer wissen wollte, was noch
+  // offen ist, musste jede Baustelle einzeln aufmachen.
+  function renderInspectionOverview() {
+    if (!adminState) return;
+    const query = elements.inspectionSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const baustelle = (id) => adminState.sites.find((site) => site.id === id);
+    const pruefungen = (adminState.vdeInspections || [])
+      .map((inspection) => ({ inspection, site: baustelle(inspection.constructionSiteId) }))
+      .filter(({ inspection, site }) => !query || [
+        inspection.name, inspection.number, inspection.inspectorName, site?.name
+      ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query))
+      .sort((links, rechts) => (
+        rechts.inspection.inspectionDate.localeCompare(links.inspection.inspectionDate)
+      ));
+
+    elements.inspectionOverviewList.replaceChildren();
+    if (pruefungen.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "admin-list__empty";
+      leer.textContent = query
+        ? "Kein Prüfprotokoll passt zur Suche."
+        : "Noch kein Prüfprotokoll angelegt.";
+      elements.inspectionOverviewList.append(leer);
+      return;
+    }
+
+    appendAdminListHead(
+      elements.inspectionOverviewList,
+      ["Prüfprotokoll", "Nummer", "Baustelle", "Prüfer", "Datum", "Status"]
+    );
+    pruefungen.forEach(({ inspection, site }) => {
+      const zeile = document.createElement("li");
+      const name = document.createElement("strong");
+      const marke = document.createElement("span");
+      const ziel = document.createElement("a");
+      zeile.className = "admin-list__row";
+      name.textContent = inspection.name;
+      marke.className = `site-status site-status--${
+        inspection.status === "completed" ? "completed" : "active"
+      }`;
+      marke.textContent = vdeInspectionStatusLabel(inspection.status);
+      ziel.className = "text-button";
+      ziel.href = inspection.status === "completed"
+        ? vdePdfUrl(inspection.id, adminState.date)
+        : vdeEditorUrl(inspection.constructionSiteId, inspection.id, adminState.date);
+      ziel.textContent = inspection.status === "completed" ? "PDF" : "Weiter";
+      if (inspection.status === "completed") {
+        ziel.target = "_blank";
+        ziel.rel = "noopener";
+      }
+      zeile.append(
+        name,
+        adminListCells([
+          inspection.number,
+          site?.name,
+          inspection.inspectorName,
+          shortDate(inspection.inspectionDate),
+          marke
+        ]),
+        ziel
+      );
+      elements.inspectionOverviewList.append(zeile);
+    });
+  }
+
   function renderCustomerList() {
     if (!adminState) return;
     const query = elements.customerSearch.value.trim().toLocaleLowerCase("de-DE");
@@ -3218,8 +3386,10 @@ import {
 
   function openCustomerEditor(customer) {
     openedCustomerId = customer.id;
-    elements.siteMasterDataTools.open = true;
-    [elements.customerPanel, elements.projectPanel, elements.siteFormPanel]
+    // Kunde und Projekt haben einen eigenen Bereich; das Baustellenformular
+    // ist dort nicht mehr in Reichweite und wird deshalb auch nicht mehr
+    // zugeklappt.
+    [elements.customerPanel, elements.projectPanel]
       .forEach((panel) => { panel.open = false; });
     elements.projectEditForm.hidden = true;
     elements.projectManagementPanel.hidden = true;
@@ -3244,8 +3414,7 @@ import {
 
   function openProjectEditor(project) {
     openedProjectId = project.id;
-    elements.siteMasterDataTools.open = true;
-    [elements.customerPanel, elements.projectPanel, elements.siteFormPanel]
+    [elements.customerPanel, elements.projectPanel]
       .forEach((panel) => { panel.open = false; });
     elements.customerEditForm.hidden = true;
     elements.customerManagementPanel.hidden = true;
@@ -5100,6 +5269,8 @@ import {
     }
 
     renderCustomerList();
+    renderCustomerOverview();
+    renderInspectionOverview();
     renderProjectList();
     renderSiteList();
     renderDocumentList();
@@ -7858,11 +8029,34 @@ import {
     }
   }
 
+  // Die Bereiche, die es am Telefon nicht in die untere Leiste schaffen,
+  // stehen unter "Einstellungen" als Liste. Sie entsteht aus denselben
+  // Schaltflaechen wie die Leiste - so kann sie nicht auseinanderlaufen, und
+  // ein Eintrag, den die Rolle nicht sehen darf, fehlt hier automatisch.
+  function renderPaneMenu() {
+    const eintraege = [...elements.bottomNav.querySelectorAll(".nav-item--desktop")]
+      .filter((knopf) => !knopf.hidden);
+    elements.paneMenu.replaceChildren();
+    elements.paneMenu.hidden = currentDashboardPane !== "more" || eintraege.length === 0;
+    if (elements.paneMenu.hidden) return;
+    for (const eintrag of eintraege) {
+      const knopf = document.createElement("button");
+      knopf.type = "button";
+      knopf.className = "pane-menu__item";
+      knopf.innerHTML = eintrag.querySelector("svg").outerHTML;
+      const beschriftung = document.createElement("span");
+      beschriftung.textContent = eintrag.querySelector("span").textContent;
+      knopf.append(beschriftung);
+      knopf.addEventListener("click", () => eintrag.click());
+      elements.paneMenu.append(knopf);
+    }
+  }
+
+  // Alle Eintraege der Leiste, nicht nur die alten fuenf: eine feste Liste war
+  // mit jedem neuen Bereich eine Zeile, die man vergessen kann - dann blieb
+  // der aktive Eintrag unmarkiert.
   function activateNavigation(activeButton) {
-    [
-      elements.navStart, elements.navWeek, elements.navApprentice,
-      elements.navAssignments, elements.navSites, elements.navMore
-    ].forEach((button) => {
+    [...elements.bottomNav.querySelectorAll(".nav-item")].forEach((button) => {
       const active = button === activeButton;
       button.classList.toggle("nav-item--active", active);
       if (active) button.setAttribute("aria-current", "page");
@@ -7883,7 +8077,9 @@ import {
     currentDashboardPane = pane;
     if (pane !== "start") closeMobileReportForm();
     if (pane !== "week") closeTimeCorrectionForm();
-    const adminPanes = new Set(["assignments", "sites", "more"]);
+    const adminPanes = new Set([
+      "assignments", "sites", "reports", "employees", "customers", "documents", "inspections", "more"
+    ]);
     elements.dashboardPanes.forEach((element) => {
       if (element === elements.adminSection) {
         element.hidden = !canPlan() || !adminPanes.has(pane);
@@ -7910,15 +8106,26 @@ import {
     if (canPlan()) {
       elements.assignmentPlanningShell.hidden = pane !== "assignments";
       elements.sitePlanningShell.hidden = pane !== "sites";
-      elements.reportCenter.hidden = pane !== "sites"
+      elements.reportsShell.hidden = pane !== "reports";
+      elements.employeesShell.hidden = pane !== "employees";
+      elements.customersShell.hidden = pane !== "customers";
+      elements.documentsShell.hidden = pane !== "documents";
+      elements.inspectionsShell.hidden = pane !== "inspections";
+      elements.reportCenter.hidden = pane !== "reports"
         || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
-      elements.employeePanel.hidden = pane !== "more" || isProjectScopedSession();
-      elements.adminSummary.hidden = pane === "more";
+      elements.employeePanel.hidden = pane !== "employees" || isProjectScopedSession();
+      elements.documentManagementPanel.hidden = pane !== "documents";
+      elements.adminSummary.hidden = pane !== "sites" && pane !== "assignments";
       elements.dispatchSummary.hidden = pane !== "assignments";
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
         sites: ["Baustellen", "Baustellenplanung", "Baustellen anlegen, durchsuchen und direkt bearbeiten."],
-        more: ["Verwaltung", "Mehr", "Mitarbeiter und weitere Einstellungen verwalten."]
+        reports: ["Montage und Tagesberichte", "Berichte", "Offene, zurückgegebene und abgeschlossene Berichte an einer Stelle."],
+        employees: ["Mannschaft", "Mitarbeiter", "Konten anlegen, Rollen vergeben und Stammdaten pflegen."],
+        customers: ["Stammdaten", "Kunden", "Kunden und ihre Aufträge an einer Stelle."],
+        documents: ["Einmal speichern · überall verwenden", "Dokumente", "Pläne, Protokolle und Rechnungen zentral ablegen."],
+        inspections: ["Elektrische Anlagen", "Prüfprotokolle", "Alle VDE-Prüfungen des Betriebs auf einen Blick."],
+        more: ["Verwaltung", "Einstellungen", "Arbeitszeitregeln, Feiertage und Zugang verwalten."]
       }[pane];
       if (copy) {
         [elements.adminEyebrow.textContent, elements.adminTitle.textContent, elements.adminIntro.textContent] = copy;
@@ -7935,21 +8142,32 @@ import {
       apprentice: elements.navApprentice,
       assignments: elements.navAssignments,
       sites: elements.navSites,
+      reports: elements.navReports,
+      employees: elements.navEmployees,
+      customers: elements.navCustomers,
+      documents: elements.navDocuments,
+      inspections: elements.navInspections,
       more: elements.navMore
     }[pane] || elements.navStart;
     activateNavigation(activeButton);
+    renderPaneMenu();
     // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
     renderAccountCard();
     renderOverviewCards();
     renderTopbarUser();
     const title = {
-      week: "Woche",
+      week: "Zeiterfassung",
       apprentice: "Berichtsheft",
+      reports: "Berichte",
+      employees: "Mitarbeiter",
+      customers: "Kunden",
+      documents: "Dokumente",
+      inspections: "Prüfprotokolle",
       site: "Baustelle",
       assignments: "Einsätze",
       sites: "Baustellen",
-      more: "Mehr"
-    }[pane] || "Start";
+      more: "Einstellungen"
+    }[pane] || "Dashboard";
     document.title = `${title} · Schäfchen`;
     window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
   }
@@ -11251,8 +11469,20 @@ import {
   elements.navSites.addEventListener("click", () => {
     showDashboardPane("sites");
   });
+  elements.navReports.addEventListener("click", () => showDashboardPane("reports"));
+  elements.navEmployees.addEventListener("click", () => showDashboardPane("employees"));
+  elements.navCustomers.addEventListener("click", () => showDashboardPane("customers"));
+  elements.navDocuments.addEventListener("click", () => showDashboardPane("documents"));
+  elements.navInspections.addEventListener("click", () => showDashboardPane("inspections"));
   elements.navMore.addEventListener("click", () => {
     showDashboardPane("more");
+  });
+  elements.customerSearchField.addEventListener("input", renderCustomerOverview);
+  elements.inspectionSearchField.addEventListener("input", renderInspectionOverview);
+  elements.customerNew.addEventListener("click", () => {
+    elements.customerPanel.hidden = false;
+    elements.customerPanel.open = true;
+    elements.customerPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   elements.siteDashboardClose.addEventListener("click", () => {
     resetSiteReportForm();

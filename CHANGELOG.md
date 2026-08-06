@@ -4,6 +4,28 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, fünfter Schritt: die Seitenleiste mit allen Bereichen.**
+  Bisher führte die Leiste fünf Einträge, und dahinter lagen drei Bildschirme.
+  Unter „Mehr“ stand alles andere untereinander — Mitarbeiter, Jahreskonten,
+  Feiertage, Zugang. Wer die Mitarbeiterliste wollte, scrollte an drei Tafeln
+  vorbei.
+  - Jeder Eintrag hat jetzt seinen **eigenen Bereich**: Dashboard, Baustellen,
+    Einsatzplanung, Zeiterfassung, Berichte, Prüfprotokolle, Azubi,
+    Mitarbeiter, Kunden, Dokumente, Einstellungen. Die Tafeln sind dieselben,
+    sie sind umgezogen. Oben steht das Zeichen mit der Wortmarke.
+  - **Neu, weil es sie noch nicht gab:** *Kunden* mit Nummer, Ansprechpartner,
+    Projekten und laufenden Baustellen; *Prüfprotokolle* mit allen
+    VDE-Prüfungen des Betriebs — bisher waren die nur in der Akte der
+    einzelnen Baustelle zu finden.
+  - **Nicht enthalten:** die Spalte „Offene Rechnungen“ bei den Kunden (es
+    gibt keine Rechnungsstellung in Schäfchen) und die Einträge *Material* und
+    *Fahrzeuge* (dahinter liegt noch kein Bildschirm). Erfundene Beträge und
+    Einträge, die nichts öffnen, sind schlechter als keine.
+  - **Am Telefon** fasst die untere Leiste weiterhin fünf Einträge. Die
+    übrigen Bereiche stehen unter „Einstellungen“ als Liste — sie entsteht aus
+    denselben Schaltflächen wie die Leiste und kann nicht auseinanderlaufen.
+- Fassung 0.42.22, Speicher `schaefchen-online-v64`, Migration 074.
+
 - **Neues Design, vierter Schritt: die Anmeldeseite.** Am Rechner steht sie
   jetzt zweispaltig da wie im Entwurf: links dunkel mit Name und Anspruch,
   rechts das Formular. **Am Telefon bleibt die einspaltige Karte** — dort ist

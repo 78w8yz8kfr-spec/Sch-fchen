@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.21/);
-assert.match(html, /app\.js\?v=0\.42\.21/);
-assert.match(html, /version\.js\?v=0\.42\.21/);
+assert.match(html, /styles\.css\?v=0\.42\.22/);
+assert.match(html, /app\.js\?v=0\.42\.22/);
+assert.match(html, /version\.js\?v=0\.42\.22/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -719,9 +719,26 @@ assert.match(styles, /\.nav-item--active[\s\S]{0,120}background: var\(--brand\)/
 assert.match(html, /id="topbar-user-name"/);
 assert.match(app, /function renderTopbarUser\(/);
 // Die Beschriftungen folgen dem Entwurf.
-assert.match(html, /<span>Übersicht<\/span>/);
-assert.match(html, /<span>Einsatzplanung<\/span>/);
-assert.match(html, /<span>Azubi-Berichtsheft<\/span>/);
+// Die Seitenleiste fuehrt jeden Bereich des Entwurfs auf, in dessen
+// Reihenfolge. Material und Fahrzeuge fehlen mit Absicht: dahinter liegt noch
+// kein Bildschirm, und ein Eintrag, der nichts oeffnet, ist schlechter als
+// keiner.
+const leisteReihenfolge = [
+  "Dashboard", "Baustellen", "Einsatzplanung", "Zeiterfassung", "Berichte",
+  "Prüfprotokolle", "Azubi", "Mitarbeiter", "Kunden", "Dokumente", "Einstellungen"
+];
+const leiste = html.slice(
+  html.indexOf('<nav class="bottom-nav"'),
+  html.indexOf("</nav>", html.indexOf('<nav class="bottom-nav"'))
+);
+assert.deepEqual(
+  [...leiste.matchAll(/<span>([^<]+)<\/span>/g)].map((treffer) => treffer[1]).slice(1),
+  leisteReihenfolge
+);
+// Zeichen und Wortmarke stehen ueber der Leiste, aber nur am Rechner.
+assert.match(html, /class="nav-brand"/);
+assert.match(styles, /\.bottom-nav > \.nav-brand,\s*\n\.bottom-nav > \.nav-item--desktop \{\s*\n\s*display: none;/);
+assert.match(styles, /\.nav-brand \{[\s\S]{0,260}text-transform: uppercase;/);
 
 // Listen als Tabelle: am Rechner Kopfzeile und Spalten, am Telefon dieselben
 // Angaben gestapelt. Kopfzeile und Datenzeilen lesen dieselbe Spaltenangabe,
@@ -766,6 +783,27 @@ assert.ok(
   html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
   "Die Uebersichtskarten stehen vor dem Wochenbereich"
 );
+
+// Jeder Eintrag der Leiste hat einen eigenen Bereich mit eigener Huelle.
+for (const huelle of [
+  "reports-shell", "employees-shell", "customers-shell", "documents-shell", "inspections-shell"
+]) {
+  assert.match(html, new RegExp(`id="${huelle}"`), `${huelle} fehlt`);
+  assert.match(app, new RegExp(`elements\\.${huelle.replace(/-(.)/g, (_, z) => z.toUpperCase())}\\.hidden = pane !==`));
+}
+assert.match(app, /function renderCustomerOverview\(/);
+assert.match(app, /function renderInspectionOverview\(/);
+assert.match(app, /function renderPaneMenu\(/);
+// Am Telefon fasst die untere Leiste fuenf Eintraege; die uebrigen Bereiche
+// sind unter "Einstellungen" zu erreichen und entstehen aus denselben
+// Schaltflaechen wie die Leiste.
+assert.match(html, /id="pane-menu"/);
+assert.match(app, /querySelectorAll\("\.nav-item--desktop"\)/);
+assert.match(styles, /\.pane-menu \{/);
+assert.match(styles, /@media \(min-width: 1080px\) \{\s*\n\s*\.pane-menu \{\s*\n\s*display: none;/);
+// Der aktive Eintrag wird aus der Leiste selbst bestimmt, nicht aus einer
+// festen Liste - sonst bliebe ein neuer Bereich unmarkiert.
+assert.match(app, /function activateNavigation\([\s\S]{0,220}bottomNav\.querySelectorAll\("\.nav-item"\)/);
 
 // Die Anmeldeseite: am Rechner zweispaltig, links dunkel mit Name und
 // Anspruch, rechts das Formular. Am Telefon bleibt die einspaltige Karte.
@@ -973,16 +1011,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.21"'));
-assert.ok(worker.includes('"./app.js?v=0.42.21"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.21"'));
-assert.ok(worker.includes('"./version.js?v=0.42.21"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.22"'));
+assert.ok(worker.includes('"./app.js?v=0.42.22"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.22"'));
+assert.ok(worker.includes('"./version.js?v=0.42.22"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.21"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.21";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.22"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.22";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1010,7 +1048,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.21$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.22$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1018,11 +1056,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.21"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.21"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.22"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.22"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.21"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.21"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.22"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.22"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1069,8 +1107,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.21/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.21/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.22/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.22/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
