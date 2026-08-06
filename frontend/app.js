@@ -11,7 +11,7 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.26";
+} from "./core/work-time.js?v=0.42.27";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -19,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.26";
+} from "./core/sync-queue.js?v=0.42.27";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.26";
+} from "./core/permissions.js?v=0.42.27";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -37,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.26";
+} from "./core/state-store.js?v=0.42.27";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -516,6 +516,12 @@ import {
     dispatchLicenceWarning: document.querySelector("#dispatch-licence-warning"),
     dispatchLicenceTitle: document.querySelector("#dispatch-licence-title"),
     dispatchLicenceList: document.querySelector("#dispatch-licence-list"),
+    topbarSearch: document.querySelector("#topbar-search"),
+    globalSearch: document.querySelector("#global-search"),
+    globalSearchResults: document.querySelector("#global-search-results"),
+    notificationBell: document.querySelector("#notification-bell"),
+    notificationCount: document.querySelector("#notification-count"),
+    notificationList: document.querySelector("#notification-list"),
     employeeLicences: document.querySelector("#employee-licences"),
     employeeEditLicences: document.querySelector("#employee-edit-licences"),
     employeeDetail: document.querySelector("#employee-detail"),
@@ -1201,7 +1207,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.26",
+          "X-Schaefchen-Version": "0.42.27",
           ...options.headers
         }
       });
@@ -1229,7 +1235,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.26" }
+        headers: { "X-Schaefchen-Version": "0.42.27" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1276,7 +1282,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.26 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.27 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2531,6 +2537,208 @@ import {
     elements.reportReturnSubmit.disabled = false;
     elements.reportReturnDialog.showModal();
     window.setTimeout(() => elements.reportReturnComment.focus(), 100);
+  }
+
+  // ---------------------------------------------------------------------
+  // Suche und Glocke
+  // ---------------------------------------------------------------------
+  //
+  // Beide arbeiten mit dem, was ohnehin geladen ist. Eine eigene Abfrage waere
+  // eine zweite Quelle fuer dieselben Angaben - und eine Suche, die etwas
+  // findet, was der Bildschirm daneben nicht kennt, ist schlimmer als keine.
+
+  function searchMatches(begriff) {
+    const suche = begriff.trim().toLocaleLowerCase("de-DE");
+    if (suche.length < 2 || !adminState) return [];
+    const treffer = [];
+    const passt = (...teile) => teile
+      .filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(suche);
+
+    for (const site of adminState.sites || []) {
+      if (!passt(site.name, site.number, site.customerName, siteAddressText(site))) continue;
+      treffer.push({
+        art: "Baustelle",
+        titel: site.name,
+        unter: [site.customerName, siteAddressText(site)].filter(Boolean).join(" · "),
+        handler: () => {
+          showDashboardPane("sites");
+          openSiteDashboard(site);
+        }
+      });
+    }
+    for (const customer of adminState.customers || []) {
+      if (!passt(customer.displayName, customer.number, customer.email, customer.phone)) continue;
+      treffer.push({
+        art: "Kunde",
+        titel: customer.displayName,
+        unter: [customer.number, customer.email].filter(Boolean).join(" · "),
+        handler: () => {
+          showDashboardPane("customers");
+          elements.customerSearchField.value = customer.displayName;
+          renderCustomerOverview();
+        }
+      });
+    }
+    for (const employee of adminState.employees || []) {
+      const name = `${employee.firstName} ${employee.lastName}`;
+      if (!passt(name, employee.personnelNumber, employee.email, employee.phone)) continue;
+      treffer.push({
+        art: "Mitarbeiter",
+        titel: name,
+        unter: [employee.personnelNumber, employeeRoleLabel(employee.roles)].join(" · "),
+        handler: () => {
+          showDashboardPane("employees");
+          elements.employeePanel.open = true;
+          selectEmployee(employee);
+        }
+      });
+    }
+    for (const report of adminState.siteReports || []) {
+      if (!passt(report.number, report.summary, report.authorName)) continue;
+      treffer.push({
+        art: "Bericht",
+        titel: report.summary || report.number,
+        unter: [reportTypeLabel(report.reportType), reportStatusLabel(report.status)].join(" · "),
+        handler: () => showDashboardPane("reports")
+      });
+    }
+    return treffer.slice(0, 8);
+  }
+
+  function renderSearchResults() {
+    const treffer = searchMatches(elements.globalSearch.value);
+    elements.globalSearchResults.replaceChildren();
+    const offen = treffer.length > 0 || elements.globalSearch.value.trim().length >= 2;
+    elements.globalSearchResults.hidden = !offen;
+    elements.globalSearch.setAttribute("aria-expanded", offen ? "true" : "false");
+    if (!offen) return;
+    if (treffer.length === 0) {
+      const leer = document.createElement("p");
+      leer.className = "topbar-search__empty";
+      leer.textContent = "Nichts gefunden.";
+      elements.globalSearchResults.append(leer);
+      return;
+    }
+    for (const eintrag of treffer) {
+      const knopf = document.createElement("button");
+      const art = document.createElement("small");
+      const titel = document.createElement("strong");
+      const unter = document.createElement("span");
+      knopf.type = "button";
+      knopf.className = "topbar-search__hit";
+      knopf.setAttribute("role", "option");
+      art.textContent = eintrag.art;
+      titel.textContent = eintrag.titel;
+      unter.textContent = eintrag.unter;
+      knopf.append(art, titel, unter);
+      knopf.addEventListener("click", () => {
+        closeSearch();
+        eintrag.handler();
+      });
+      elements.globalSearchResults.append(knopf);
+    }
+  }
+
+  function closeSearch() {
+    elements.globalSearch.value = "";
+    elements.globalSearchResults.hidden = true;
+    elements.globalSearch.setAttribute("aria-expanded", "false");
+  }
+
+  // Die Glocke zaehlt, was jemand tun muss - nicht, was passiert ist. Eine
+  // Meldung, die niemanden zu etwas auffordert, ist eine Ablenkung.
+  function pendingItems() {
+    if (!adminState) return [];
+    const offen = [];
+
+    const berichte = (adminState.siteReports || [])
+      .filter((report) => report.status === "submitted");
+    if (berichte.length) {
+      offen.push({
+        text: `${berichte.length} Bericht${berichte.length === 1 ? "" : "e"} zur Freigabe`,
+        handler: () => showDashboardPane("reports")
+      });
+    }
+
+    // Zusammenhaengende Aenderungen zaehlen einmal, nicht je Buchung -
+    // dieselbe Regel wie in der Pruefliste selbst.
+    const gesehen = new Set();
+    const korrekturen = (adminState.timeCorrections || []).filter((korrektur) => {
+      if (!korrektur.operationId) return true;
+      if (gesehen.has(korrektur.operationId)) return false;
+      gesehen.add(korrektur.operationId);
+      return true;
+    });
+    if (korrekturen.length) {
+      offen.push({
+        text: korrekturen.length === 1
+          ? "1 Zeitkorrektur wartet auf Prüfung"
+          : `${korrekturen.length} Zeitkorrekturen warten auf Prüfung`,
+        handler: () => showDashboardPane("week")
+      });
+    }
+
+    // Buero und Geschaeftsfuehrung pruefen nacheinander; beides ist offen.
+    const abwesenheiten = (adminState.absences || [])
+      .filter((absence) => ["office_review", "management_review"].includes(absence.status));
+    if (abwesenheiten.length) {
+      offen.push({
+        text: abwesenheiten.length === 1
+          ? "1 Abwesenheitsantrag wartet auf Freigabe"
+          : `${abwesenheiten.length} Abwesenheitsanträge warten auf Freigabe`,
+        handler: () => showDashboardPane("week")
+      });
+    }
+
+    const berichtshefte = (apprenticeReviewState || [])
+      .filter((bericht) => bericht.status === "submitted");
+    if (berichtshefte.length) {
+      offen.push({
+        text: `${berichtshefte.length} Berichtsheft-Woche${berichtshefte.length === 1 ? "" : "n"} zum Abzeichnen`,
+        handler: () => showDashboardPane("apprentice")
+      });
+    }
+
+    const pruefungen = (adminState.sites || [])
+      .filter((site) => site.fieldReviewStatus === "pending");
+    if (pruefungen.length) {
+      offen.push({
+        text: `${pruefungen.length} Baustelle${pruefungen.length === 1 ? "" : "n"} vom Monteur zu bestätigen`,
+        handler: () => showDashboardPane("sites")
+      });
+    }
+
+    return offen;
+  }
+
+  function renderNotifications() {
+    const zeigen = Boolean(adminState) && canPlan() && !demoMode;
+    elements.notificationBell.hidden = !zeigen;
+    elements.topbarSearch.hidden = !zeigen;
+    if (!zeigen) return;
+    const offen = pendingItems();
+    elements.notificationCount.textContent = String(offen.length);
+    elements.notificationCount.hidden = offen.length === 0;
+    elements.notificationList.replaceChildren();
+    if (offen.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "notification-bell__empty";
+      leer.textContent = "Nichts offen. Alles abgearbeitet.";
+      elements.notificationList.append(leer);
+      return;
+    }
+    for (const eintrag of offen) {
+      const zeile = document.createElement("li");
+      const knopf = document.createElement("button");
+      knopf.type = "button";
+      knopf.textContent = eintrag.text;
+      knopf.addEventListener("click", () => {
+        elements.notificationBell.open = false;
+        eintrag.handler();
+      });
+      zeile.append(knopf);
+      elements.notificationList.append(zeile);
+    }
   }
 
   // Der Schnellzugriff aus dem Entwurf. Er fuehrt nur zu Dingen, die es
@@ -5835,6 +6043,7 @@ import {
     renderInspectionOverview();
     renderDashboardMetrics();
     renderTodayOverview();
+    renderNotifications();
     renderProjectList();
     renderSiteList();
     renderDocumentList();
@@ -8773,6 +8982,7 @@ import {
     renderDashboardMetrics();
     renderTodayOverview();
     renderQuickAccess();
+    renderNotifications();
     // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
     renderAccountCard();
     renderOverviewCards();
@@ -12106,6 +12316,18 @@ import {
   elements.navInspections.addEventListener("click", () => showDashboardPane("inspections"));
   elements.navMore.addEventListener("click", () => {
     showDashboardPane("more");
+  });
+  elements.globalSearch.addEventListener("input", renderSearchResults);
+  elements.globalSearch.addEventListener("keydown", (ereignis) => {
+    if (ereignis.key === "Escape") closeSearch();
+  });
+  // Ein Klick daneben schliesst die Trefferliste. Ohne das bliebe sie stehen,
+  // bis jemand etwas anderes tippt.
+  document.addEventListener("click", (ereignis) => {
+    if (!elements.topbarSearch.contains(ereignis.target)) {
+      elements.globalSearchResults.hidden = true;
+      elements.globalSearch.setAttribute("aria-expanded", "false");
+    }
   });
   elements.customerSearchField.addEventListener("input", renderCustomerOverview);
   elements.inspectionSearchField.addEventListener("input", renderInspectionOverview);

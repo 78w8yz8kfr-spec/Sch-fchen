@@ -7661,3 +7661,227 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------------------------------------------------------------------------
+   Suche und Glocke in der Kopfzeile
+   ---------------------------------------------------------------------------
+
+   Beide arbeiten mit dem, was ohnehin geladen ist. Am Telefon steht in der
+   Kopfzeile kein Platz dafuer - dort fuehrt der Weg ueber die Bereiche selbst,
+   die jeweils ihr eigenes Suchfeld haben.
+   ------------------------------------------------------------------------ */
+
+.topbar-search {
+  display: none;
+}
+
+.notification-bell {
+  position: relative;
+}
+
+.notification-bell > summary {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  list-style: none;
+  cursor: pointer;
+}
+
+.notification-bell > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notification-bell > summary svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Die Zahl sitzt auf der Glocke, nicht daneben: daneben liest man sie als
+   eigenes Bedienelement. */
+.notification-bell__count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  padding: 0 4px;
+  color: #ffffff;
+  background: var(--brand);
+  font-size: 0.56rem;
+  font-weight: 800;
+}
+
+.notification-bell__panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.notification-bell__title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.notification-bell__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-bell__list button {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 650;
+  text-align: left;
+}
+
+.notification-bell__list button:hover {
+  background: #f2f3f2;
+}
+
+.notification-bell__empty {
+  padding: 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+@media (min-width: 1080px) {
+  .topbar-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: min(420px, 32vw);
+    margin-left: 28px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0 12px;
+    background: #f6f7f6;
+  }
+
+  .topbar-search[hidden] {
+    display: none;
+  }
+
+  .topbar-search > svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+  }
+
+  .topbar-search input {
+    width: 100%;
+    height: 38px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 0.76rem;
+  }
+
+  .topbar-search input:focus {
+    outline: none;
+  }
+
+  .topbar-search__results {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    display: grid;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 6px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .topbar-search__hit {
+    display: grid;
+    gap: 1px;
+    border: 0;
+    border-radius: 11px;
+    padding: 8px 10px;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+  }
+
+  .topbar-search__hit:hover {
+    background: #f2f3f2;
+  }
+
+  .topbar-search__hit small {
+    color: var(--brand);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .topbar-search__hit strong {
+    font-size: 0.78rem;
+  }
+
+  .topbar-search__hit span {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 0.68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-search__empty {
+    margin: 0;
+    padding: 10px;
+    color: var(--muted);
+    font-size: 0.74rem;
+  }
+}
+
+@media (max-width: 1079px) {
+  /* Am Telefon ist in der Kopfzeile kein Platz. Die Bereiche haben jeweils ihr
+     eigenes Suchfeld; eine zweite Suche darueber waere eine Dopplung. */
+  .notification-bell {
+    display: none;
+  }
+}

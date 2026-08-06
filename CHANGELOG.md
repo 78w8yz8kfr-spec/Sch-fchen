@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Suche und Glocke in der Kopfzeile.** Beide standen im Entwurf und fehlten
+  bisher mit Absicht — ein Bedienelement, das nichts tut, ist schlechter als
+  keines. Jetzt tun sie etwas.
+  - Die **Suche** durchsucht Baustellen, Kunden, Mitarbeiter und Berichte und
+    springt in den passenden Bereich. Sie arbeitet mit dem, was ohnehin geladen
+    ist: eine Suche, die etwas findet, was der Bildschirm daneben nicht kennt,
+    wäre schlimmer als keine.
+  - Die **Glocke** zählt, was jemand *tun* muss, nicht was passiert ist:
+    Berichte zur Freigabe, Zeitkorrekturen zur Prüfung, offene
+    Abwesenheitsanträge, Berichtsheft-Wochen zum Abzeichnen und Baustellen, die
+    der Monteur angelegt hat und die das Büro bestätigen muss. Eine Meldung,
+    die niemanden zu etwas auffordert, ist eine Ablenkung.
+  - Beides gilt **nur für die Planung** — ein Monteur hat weder etwas
+    freizugeben noch einen Betrieb zu durchsuchen.
+  - Am Telefon ist in der Kopfzeile kein Platz dafür; dort führt der Weg über
+    die Bereiche selbst, die jeweils ihr eigenes Suchfeld haben.
+- Fassung 0.42.27, Speicher `schaefchen-online-v69`, Migration 080.
+
 - **Führerschein am Mitarbeiter, und die Einsatzplanung warnt.** Auf einer
   Baustelle, auf der niemand mit Führerschein eingeteilt ist, steht am Morgen
   das Fahrzeug in der Halle und die Mannschaft am Betriebshof. Das fiel bisher
