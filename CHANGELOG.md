@@ -4,6 +4,31 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Berichtsheft-Bildschirm nach der Vorlage.** Kopfdaten wie im gedruckten
+  Blatt (Azubi, Lehrjahr, Ausbildungsberuf, Intervall), eine Tagestabelle mit
+  denselben vier Spalten — Tag, Datum, Tätigkeiten, Arbeitszeit —, ein
+  Zeichenzähler an den Bemerkungen, der Stand der Woche („3 von 5 Tagen
+  ausgefüllt“) und die Regeln dort, wo geschrieben wird: als drei Karten unter
+  dem Formular statt in einer Anleitung, die niemand aufschlägt.
+  - Am Handy stehen Tag und Zeit in einer Kopfzeile und das Feld darunter, am
+    Rechner nebeneinander wie eine Tabellenzeile. Dieselben Bausteine.
+  - Das **Lehrjahr** wird auch am Bildschirm aus dem Ausbildungsbeginn
+    gerechnet. Fehlt der Ausbildungsberuf, steht das jetzt dort — vorher fiel
+    es erst der Kammer auf.
+- **Vorschau des Wochenblatts neben dem Formular.** Sie ist etwas anderes als
+  ein Ausdruck: für einen Entwurf erlaubt, dafür mit „VORSCHAU“ quer über dem
+  Blatt, einem entsprechenden Fußtext und dem Wort im Dateinamen. Sie wird im
+  Browser angezeigt statt in den Downloadordner gelegt.
+  - Dabei kam die eigene Sicherheitsrichtlinie in die Quere: `frame-ancestors
+    'none'` verbot das Einrahmen — auch durch die App selbst. Gelockert wird
+    das **nur für diese eine Antwort** und nur auf `'self'`; fremde Seiten
+    können Schäfchen weiterhin nicht einrahmen, und für alle übrigen Antworten
+    bleibt es bei `'none'`.
+  - Am Handy gibt es die Vorschau nicht daneben, sondern über eine
+    Schaltfläche in einem eigenen Fenster — ein eingebettetes A4-Blatt nimmt
+    dort mehr Platz weg, als es hilft.
+- Fassung 0.42.17, Speicher `schaefchen-online-v59`, Migration 069.
+
 - **Schäfchen bekommt eine Desktop-Gestalt.** Gebaut ist die App für die
   Baustelle: eine Spalte, Daumenbedienung, Navigation unten. Am Rechner sitzt
   aber das Büro — Einsatzplanung, Baustellen, Stundenzettel prüfen. Dort galt

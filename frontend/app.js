@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.16";
+} from "./core/work-time.js?v=0.42.17";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.16";
+} from "./core/sync-queue.js?v=0.42.17";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.16";
+} from "./core/permissions.js?v=0.42.17";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.16";
+} from "./core/state-store.js?v=0.42.17";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -199,6 +199,15 @@ import {
     apprenticeWeek: document.querySelector("#apprentice-week"),
     apprenticeReturn: document.querySelector("#apprentice-return"),
     apprenticeLock: document.querySelector("#apprentice-lock"),
+    apprenticeFactName: document.querySelector("#apprentice-fact-name"),
+    apprenticeFactYear: document.querySelector("#apprentice-fact-year"),
+    apprenticeFactOccupation: document.querySelector("#apprentice-fact-occupation"),
+    apprenticeProgress: document.querySelector("#apprentice-progress"),
+    apprenticeRemarkCount: document.querySelector("#apprentice-remark-count"),
+    apprenticePreview: document.querySelector("#apprentice-preview"),
+    apprenticePreviewPanel: document.querySelector("#apprentice-preview-panel"),
+    apprenticePreviewFrame: document.querySelector("#apprentice-preview-frame"),
+    apprenticePreviewState: document.querySelector("#apprentice-preview-state"),
     apprenticeOpen: document.querySelector("#apprentice-open"),
     apprenticeForm: document.querySelector("#apprentice-form"),
     apprenticeDays: document.querySelector("#apprentice-days"),
@@ -865,6 +874,7 @@ import {
   let assignmentsDate = null;
   let apprenticeState = null;
   let apprenticeMissingState = [];
+  let apprenticeProfileState = null;
   let apprenticeReviewState = null;
   let apprenticeGapState = [];
   // Aufgeklappte Zellen der Plantafel, als "mitarbeiter|datum".
@@ -1098,7 +1108,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.16",
+          "X-Schaefchen-Version": "0.42.17",
           ...options.headers
         }
       });
@@ -1126,7 +1136,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.16" }
+        headers: { "X-Schaefchen-Version": "0.42.17" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1173,7 +1183,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.16 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.17 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -7902,6 +7912,7 @@ import {
       );
       apprenticeState = body.reports;
       apprenticeMissingState = body.missingWeeks || [];
+      apprenticeProfileState = body.profile || null;
     } catch (error) {
       if (error.status === 401) return showLogin();
       apprenticeState = apprenticeState || [];
@@ -7982,9 +7993,12 @@ import {
     elements.apprenticePrintBook.hidden = !(apprenticeState || [])
       .some((eintrag) => APPRENTICE_PRINTABLE.includes(eintrag.status));
     elements.apprenticePrintBook.textContent = `Jahr ${selectedWeekStart.slice(0, 4)} drucken`;
+    renderApprenticeFacts();
     renderApprenticeLock(status, bericht);
     renderApprenticeOpenDays();
     renderApprenticeMissing();
+    renderApprenticeRemarkCount();
+    renderApprenticePreview(status, bericht);
 
     renderApprenticeHistory();
   }
@@ -8034,6 +8048,55 @@ import {
     }
   }
 
+  // Die Kopfdaten stehen genauso im gedruckten Blatt. Wer sie am Bildschirm
+  // sieht, merkt sofort, wenn der Ausbildungsberuf im Personalbogen fehlt -
+  // spaeter faellt es erst der Kammer auf.
+  function renderApprenticeFacts() {
+    const person = apprenticeProfileState;
+    const jahr = apprenticeTrainingYear(person?.startedOn, selectedWeekStart);
+    elements.apprenticeFactName.textContent = person?.name || "–";
+    elements.apprenticeFactYear.textContent = jahr ? `${jahr}. Lehrjahr` : "–";
+    elements.apprenticeFactOccupation.textContent = person?.occupation || "– (im Personalbogen ergänzen)";
+  }
+
+  // Dieselbe Rechnung wie im PDF: das Lehrjahr ergibt sich aus dem Beginn.
+  // Von Hand gepflegt waere es spaetestens im zweiten Jahr falsch.
+  function apprenticeTrainingYear(startedOn, weekStart) {
+    if (!startedOn || weekStart < startedOn) return null;
+    const beginn = dateFromIso(startedOn);
+    const woche = dateFromIso(weekStart);
+    return Math.min(4, Math.floor((woche - beginn) / (365.25 * 86_400_000)) + 1);
+  }
+
+  function renderApprenticeRemarkCount() {
+    const laenge = elements.apprenticeWeekRemark.value.length;
+    elements.apprenticeRemarkCount.textContent = `${laenge} / 1000 Zeichen`;
+  }
+
+  // Die Vorschau zeigt beim Schreiben, wie das Blatt wird. Sie traegt quer
+  // darueber "VORSCHAU", solange die Woche nicht eingereicht ist - ein halb
+  // ausgefuellter Nachweis sieht auf Papier sonst fertig aus.
+  function renderApprenticePreview(status, bericht) {
+    const moeglich = Boolean(bericht) && isApprentice();
+    elements.apprenticePreviewPanel.hidden = !moeglich;
+    elements.apprenticePreview.hidden = !moeglich;
+    if (!moeglich) {
+      elements.apprenticePreviewFrame.removeAttribute("src");
+      elements.apprenticePreviewFrame.dataset.week = "";
+      return;
+    }
+    elements.apprenticePreviewState.textContent = APPRENTICE_PRINTABLE.includes(status)
+      ? "Eingereicht"
+      : "Noch nicht eingereicht";
+    // Neu geladen wird nur, wenn sich wirklich etwas geaendert hat: sonst
+    // flackert das Blatt bei jedem Zeichnen.
+    const schluessel = `${selectedWeekStart}|${bericht.rowVersion}`;
+    if (elements.apprenticePreviewFrame.dataset.week === schluessel) return;
+    elements.apprenticePreviewFrame.dataset.week = schluessel;
+    elements.apprenticePreviewFrame.src =
+      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true#toolbar=0`;
+  }
+
   // Warum lassen sich die Felder nicht mehr beschreiben?
   //
   // Nach dem Einreichen sind sie gesperrt - das ist der Sinn der Unterschrift.
@@ -8072,6 +8135,16 @@ import {
       block.classList.toggle("apprentice-day--offen", schreibbar && fehlt);
       if (fehlt) offeneTage.push(block.dataset.dayLabel);
     }
+    // "3 von 5 Tagen ausgefüllt" - der Stand der Woche auf einen Blick.
+    const arbeitstage = bloecke.filter((block) => block.dataset.worked === "true"
+      || block.dataset.absence === "true").length;
+    const erledigt = arbeitstage - offeneTage.length;
+    elements.apprenticeProgress.hidden = arbeitstage === 0;
+    elements.apprenticeProgress.textContent = offeneTage.length === 0
+      ? `Alle ${arbeitstage} Tage ausgefüllt · Woche komplett`
+      : `${erledigt} von ${arbeitstage} Tagen ausgefüllt`;
+    elements.apprenticeProgress.classList.toggle("apprentice-progress--fertig", offeneTage.length === 0);
+
     elements.apprenticeOpen.hidden = !schreibbar || offeneTage.length === 0;
     elements.apprenticeOpen.textContent = elements.apprenticeOpen.hidden
       ? ""
@@ -8142,24 +8215,29 @@ import {
       block.dataset.worked = String(minuten > 0);
       block.dataset.absence = String(Boolean(abwesenheit));
 
-      const kopf = document.createElement("div");
-      kopf.className = "apprentice-day__head";
+      // Vier Zellen wie im gedruckten Blatt: Tag, Datum, Taetigkeiten,
+      // Arbeitszeit. Am Handy stehen sie untereinander, am Rechner
+      // nebeneinander - dieselben Bausteine, eine andere Anordnung.
       const name = document.createElement("strong");
-      name.textContent = dateFromIso(datum).toLocaleDateString("de-DE", {
-        weekday: "long", day: "2-digit", month: "2-digit"
+      name.className = "apprentice-day__weekday";
+      name.textContent = dateFromIso(datum).toLocaleDateString("de-DE", { weekday: "long" });
+      const datumsfeld = document.createElement("span");
+      datumsfeld.className = "apprentice-day__date";
+      datumsfeld.textContent = dateFromIso(datum).toLocaleDateString("de-DE", {
+        day: "2-digit", month: "2-digit", year: "numeric"
       });
       block.dataset.dayLabel = dateFromIso(datum).toLocaleDateString("de-DE", {
         weekday: "short", day: "2-digit", month: "2-digit"
       });
       const zusatz = document.createElement("span");
+      zusatz.className = "apprentice-day__time";
       // Arbeitszeit und Abwesenheit werden nicht getippt: sie stehen bereits in
       // der Zeiterfassung und in den genehmigten Abwesenheiten. Abgeschrieben
       // wuerden sie irgendwann falsch abgeschrieben.
       zusatz.textContent = [
         abwesenheit,
         minuten > 0 ? `${formatMinutes(minuten)} h` : null
-      ].filter(Boolean).join(" · ");
-      kopf.append(name, zusatz);
+      ].filter(Boolean).join(" · ") || "–";
 
       const feld = document.createElement("textarea");
       feld.rows = 2;
@@ -8167,10 +8245,10 @@ import {
       feld.placeholder = "Was hast du heute gemacht? Eine Zeile je Tätigkeit.";
       feld.value = taetigkeiten.join("\n");
       feld.readOnly = !offen;
-      feld.setAttribute("aria-label", `Tätigkeiten am ${name.textContent}`);
+      feld.setAttribute("aria-label", `Tätigkeiten am ${name.textContent}, ${datumsfeld.textContent}`);
       feld.addEventListener("input", renderApprenticeOpenDays);
 
-      block.append(kopf, feld);
+      block.append(name, datumsfeld, feld, zusatz);
       elements.apprenticeDays.append(block);
     }
   }
@@ -10564,6 +10642,16 @@ import {
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
   elements.apprenticeWithdraw.addEventListener("click", () => withdrawApprenticeReport());
+  elements.apprenticeWeekRemark.addEventListener("input", renderApprenticeRemarkCount);
+  // Die Vorschau in einem eigenen Fenster - am Handy gibt es keinen Platz
+  // daneben, und manche wollen sie auch am Rechner gross sehen.
+  elements.apprenticePreview.addEventListener("click", () => {
+    window.open(
+      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true`,
+      "_blank",
+      "noopener"
+    );
+  });
   elements.apprenticePrint.addEventListener("click", () => printApprenticeReport(selectedWeekStart));
   elements.apprenticePrintBook.addEventListener(
     "click", () => printApprenticeYear(selectedWeekStart.slice(0, 4))

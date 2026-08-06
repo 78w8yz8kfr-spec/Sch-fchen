@@ -21,8 +21,20 @@ const SECURITY_HEADERS = Object.freeze({
   "X-Frame-Options": "DENY"
 });
 
-export function securityHeaders() {
-  return SECURITY_HEADERS;
+// sameOriginFrame: erlaubt, dass die App diese Antwort in einem eigenen
+// Rahmen anzeigt - gebraucht fuer die Vorschau des Wochenblatts.
+//
+// Fremde Seiten koennen Schaefchen damit weiterhin nicht einrahmen: 'self'
+// heisst dieselbe Herkunft, nicht "jeder". Der Schutz vor Klickfallen bleibt
+// also bestehen, und er bleibt auch fuer alle uebrigen Antworten auf 'none'.
+export function securityHeaders({ sameOriginFrame = false } = {}) {
+  if (!sameOriginFrame) return SECURITY_HEADERS;
+  return {
+    ...SECURITY_HEADERS,
+    "Content-Security-Policy": SECURITY_HEADERS["Content-Security-Policy"]
+      .replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
+    "X-Frame-Options": "SAMEORIGIN"
+  };
 }
 
 export async function serveStatic(request, response, directory, pathname) {

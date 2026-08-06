@@ -6063,33 +6063,40 @@ select:focus-visible {
   gap: 8px;
 }
 
+/* Vier Zellen wie im gedruckten Blatt: Tag, Datum, Taetigkeiten, Arbeitszeit.
+   Am Handy stehen Tag und Zeit in einer Kopfzeile und das Feld darunter; am
+   Rechner nebeneinander wie eine Tabellenzeile. Dieselben Bausteine. */
 .apprentice-day {
   display: grid;
-  gap: 6px;
+  align-items: baseline;
+  gap: 4px 10px;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-}
-
-.apprentice-day__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 10px;
+  grid-template-areas:
+    "tag datum zeit"
+    "text text text";
+  grid-template-columns: auto auto 1fr;
   font-size: 0.74rem;
 }
 
+.apprentice-day__weekday { grid-area: tag; }
+.apprentice-day__date { grid-area: datum; color: var(--muted); }
+.apprentice-day textarea { grid-area: text; }
+
 /* Arbeitszeit und Abwesenheit stehen fest: sie kommen aus der Zeiterfassung
    und den genehmigten Abwesenheiten, nicht aus der Tastatur. */
-.apprentice-day__head span {
+.apprentice-day__time {
+  grid-area: zeit;
   color: var(--muted);
   font-weight: 700;
+  text-align: right;
 }
 
 .apprentice-day textarea {
   width: 100%;
+  margin-top: 4px;
   border: 1px solid #cfd9d3;
   border-radius: 12px;
   color: var(--ink);
@@ -6260,32 +6267,20 @@ select:focus-visible {
     grid-column: auto;
   }
 
-  /* Berichtsheft: links geschrieben, rechts nachgesehen. Die Tagesfelder
-     stehen zu zweit - ein Feld über 1000 Pixel für "Steckdosen gesetzt" ist
-     kein Gewinn. */
+  /* Berichtsheft: links geschrieben, rechts das Blatt, wie es wird. Genau so
+     arbeitet man am Rechner - schreiben und dabei sehen, was dabei herauskommt.
+     Das Formular bekommt mehr Platz als die Vorschau: geschrieben wird links. */
+  #apprentice-section {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+
   #apprentice-panel {
-    display: grid;
-    align-content: start;
-    column-gap: 26px;
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-column: 1;
   }
 
-  #apprentice-panel > .site-management-panel__heading {
-    grid-row: 1;
-    grid-column: 1 / -1;
-  }
-
-  #apprentice-week { grid-row: 2; grid-column: 1; }
-  #apprentice-return { grid-row: 3; grid-column: 1; }
-  #apprentice-lock { grid-row: 4; grid-column: 1; }
-  #apprentice-open { grid-row: 5; grid-column: 1; }
-  #apprentice-form { grid-row: 6; grid-column: 1; }
-  #apprentice-message { grid-row: 7; grid-column: 1; }
-  #apprentice-missing { grid-row: 2 / 6; grid-column: 2; align-self: start; }
-  #apprentice-history { grid-row: 6 / 8; grid-column: 2; align-self: start; margin-top: 0; }
-
-  .apprentice-days {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  #apprentice-preview-panel {
+    grid-column: 2;
+    align-self: start;
   }
 
   .apprentice-actions {
@@ -6328,5 +6323,139 @@ select:focus-visible {
      halbe Bildschirmbreite lädt niemanden zum Ausfüllen ein. */
   .admin-form {
     max-width: 720px;
+  }
+}
+
+/* Kopfdaten des Auszubildenden - dieselben vier Angaben wie im Kopf des
+   gedruckten Blattes. Wer sie am Bildschirm sieht, merkt sofort, wenn der
+   Ausbildungsberuf im Personalbogen fehlt; sonst faellt es erst der Kammer auf. */
+.apprentice-facts {
+  display: grid;
+  gap: 8px 18px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.apprentice-facts span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.apprentice-facts strong {
+  font-size: 0.78rem;
+}
+
+/* Der Stand der Woche auf einen Blick. */
+.apprentice-progress {
+  margin: 0 0 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.apprentice-progress--fertig {
+  color: var(--brand);
+}
+
+.apprentice-optional {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.apprentice-remark-count {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+/* Die Regeln stehen dort, wo geschrieben wird - nicht in einer Anleitung, die
+   niemand aufschlaegt. */
+.apprentice-notes {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.apprentice-note {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 0.74rem;
+}
+
+.apprentice-note strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.apprentice-note p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.apprentice-note--info { border-color: #b9d3ef; background: #f4f9ff; }
+.apprentice-note--hint { border-color: #f0d9a8; background: #fffaf0; }
+
+/* Die Vorschau des Wochenblatts. */
+.apprentice-preview-frame {
+  width: 100%;
+  height: 640px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.apprentice-preview-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+@media (min-width: 1080px) {
+  /* Am Rechner ist die Tagesliste eine Tabelle: Tag, Datum, Taetigkeiten,
+     Arbeitszeit - genau die Spalten des gedruckten Blattes. */
+  .apprentice-days {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .apprentice-day {
+    align-items: start;
+    grid-template-areas: "tag datum text zeit";
+    grid-template-columns: 96px 104px minmax(0, 1fr) 116px;
+  }
+
+  .apprentice-day textarea {
+    margin-top: 0;
+  }
+
+  .apprentice-facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .apprentice-notes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Die Vorschau steht neben dem Formular, nicht darunter. */
+  #apprentice-preview-panel {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+  }
+}
+
+@media (max-width: 1079px) {
+  /* Auf dem Handy nimmt ein eingebettetes A4-Blatt mehr Platz weg, als es
+     hilft. Dort führt die Schaltfläche "Vorschau PDF" in ein eigenes Fenster. */
+  #apprentice-preview-panel {
+    display: none;
   }
 }

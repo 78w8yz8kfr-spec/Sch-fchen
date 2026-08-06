@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 
 // Der gedruckte Ausbildungsnachweis: eine A4-Seite je Woche.
 //
@@ -336,12 +336,37 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
   );
 }
 
+// Eine Vorschau muss als solche zu erkennen sein.
+//
+// Der Auszubildende soll beim Schreiben sehen, wie das Blatt wird - aber ein
+// halb ausgefuellter Nachweis sieht auf Papier fertig aus. Wer diese Seite
+// ausdruckt oder weiterschickt, soll auf den ersten Blick erkennen, dass sie
+// noch nicht eingereicht ist. Deshalb steht es quer ueber dem Blatt und noch
+// einmal im Fuss, nicht nur in einer Ecke.
+function stampPreview(seiten, fonts) {
+  for (const blatt of seiten) {
+    const text = "VORSCHAU";
+    const groesse = 62;
+    const breite = fonts.bold.widthOfTextAtSize(text, groesse);
+    blatt.drawText(text, {
+      x: (A4[0] - breite * 0.72) / 2,
+      y: A4[1] / 2 - 40,
+      size: groesse,
+      font: fonts.bold,
+      color: rgb(0.86, 0.86, 0.86),
+      rotate: degrees(28)
+    });
+  }
+}
+
 // Die Fusszeile kommt zuletzt: erst wenn alle Wochen gezeichnet sind, steht
 // fest, wie viele Blaetter es geworden sind.
-function stampFooters(seiten, regular) {
+function stampFooters(seiten, regular, vorschau = false) {
   seiten.forEach((blatt, index) => {
     blatt.drawText(
-      "Dieses Berichtsheft wurde digital erstellt und ist ohne Unterschriften ungültig.",
+      vorschau
+        ? "Vorschau · noch nicht eingereicht. Erst nach dem Einreichen gilt dieses Blatt als Nachweis."
+        : "Dieses Berichtsheft wurde digital erstellt und ist ohne Unterschriften ungültig.",
       { x: MARGIN, y: FOOTER_Y, size: 7.5, font: regular, color: MUTED }
     );
     const seitenzahl = `Seite ${index + 1} von ${seiten.length}`;
@@ -363,6 +388,7 @@ async function renderReportBook({
   company,
   companyLogo = null,
   printedAt = new Date(),
+  preview = false,
   title
 }) {
   const document = await PDFDocument.create();
@@ -396,17 +422,19 @@ async function renderReportBook({
   for (const report of reports) {
     drawWeek({ document, seiten, fonts, logoImage, report, apprentice, company });
   }
-  stampFooters(seiten, fonts.regular);
+  if (preview) stampPreview(seiten, fonts);
+  stampFooters(seiten, fonts.regular, preview);
   return Buffer.from(await document.save());
 }
 
 // Eine Woche, ein Blatt.
-export function buildApprenticeReportPdf({ report, apprentice, ...rest }) {
+export function buildApprenticeReportPdf({ report, apprentice, preview = false, ...rest }) {
   return renderReportBook({
     reports: [report],
     apprentice,
+    preview,
     ...rest,
-    title: `Berichtsheft ${weekLabel(report.weekStart)}`
+    title: `Berichtsheft ${weekLabel(report.weekStart)}${preview ? " · Vorschau" : ""}`
   });
 }
 

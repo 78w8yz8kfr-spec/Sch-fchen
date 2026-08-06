@@ -191,7 +191,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.16";
+export const APPLICATION_VERSION = "0.42.17";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -264,7 +264,10 @@ function inlineDocument(response, document) {
   response.end(document.content);
 }
 
-function binaryAttachment(response, { content, fileName, mimeType }) {
+// disposition = "inline": das Blatt wird im Browser angezeigt statt geladen.
+// Nur fuer die Vorschau gedacht - was jemand aufbewahren soll, kommt weiter
+// als Anhang, damit es im Downloadordner landet und nicht nur im Fenster.
+function binaryAttachment(response, { content, fileName, mimeType, disposition = "attachment" }) {
   const fallbackName = fileName
     .normalize("NFKD")
     .replace(/[^A-Za-z0-9._-]+/g, "-")
@@ -275,9 +278,11 @@ function binaryAttachment(response, { content, fileName, mimeType }) {
   response.writeHead(200, {
     "Content-Type": mimeType,
     "Content-Length": content.length,
-    "Content-Disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
+    "Content-Disposition": `${disposition}; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
     "Cache-Control": "no-store",
-    ...securityHeaders()
+    // Nur die eingebettete Vorschau darf in einem Rahmen stehen - und auch
+    // die nur in einem Rahmen derselben Herkunft.
+    ...securityHeaders({ sameOriginFrame: disposition === "inline" })
   });
   response.end(content);
 }
@@ -1930,7 +1935,9 @@ async function apprenticePrintContext(client, context, profile, staticDirectory)
 const apprenticeFileName = (name, teil) =>
   `Berichtsheft-${teil}-${name.replace(/[^A-Za-zÄÖÜäöüß-]+/g, "-")}.pdf`;
 
-async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, staticDirectory) {
+async function buildApprenticePdf(
+  client, context, weekStart, apprenticeUserId, staticDirectory, preview = false
+) {
   const profile = await resolveApprenticeForPrint(client, context, apprenticeUserId);
 
   const result = await client.query(
@@ -1950,7 +1957,11 @@ async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, 
   // Ein Entwurf wird nicht gedruckt. Ein halb ausgefuellter Nachweis auf
   // Papier sieht fertig aus und ist es nicht - im Ordner der Kammer faellt
   // das erst am Ende der Ausbildung auf.
-  if (!PRINTABLE_STATUS.includes(report.status)) {
+  //
+  // Die Vorschau ist etwas anderes als ein Ausdruck: sie zeigt beim Schreiben,
+  // wie das Blatt wird, traegt quer darueber "VORSCHAU" und wird im Browser
+  // angezeigt statt in den Downloadordner gelegt.
+  if (!preview && !PRINTABLE_STATUS.includes(report.status)) {
     throw new InputError(
       "Erst einreichen, dann drucken: ein Entwurf ist noch kein Nachweis.",
       409,
@@ -1964,11 +1975,15 @@ async function buildApprenticePdf(client, context, weekStart, apprenticeUserId, 
     apprentice: {
       ...druck.apprentice,
       trainingYear: trainingYear(profile.startedOn, report.weekStart)
-    }
+    },
+    preview
   });
   return {
     content: pdf,
-    fileName: apprenticeFileName(profile.name, report.weekStart)
+    fileName: apprenticeFileName(
+      profile.name, preview ? `${report.weekStart}-Vorschau` : report.weekStart
+    ),
+    disposition: preview ? "inline" : "attachment"
   };
 }
 
@@ -10274,7 +10289,8 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           pool,
           tokenHash,
           (client, context) => buildApprenticePdf(
-            client, context, weekStart, apprenticeUserId, config.staticDirectory
+            client, context, weekStart, apprenticeUserId, config.staticDirectory,
+            url.searchParams.get("preview") === "true"
           )
         );
         return binaryAttachment(response, { ...datei, mimeType: "application/pdf" });

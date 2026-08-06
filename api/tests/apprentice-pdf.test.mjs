@@ -9,6 +9,7 @@ import {
 import {
   A4_BREITE,
   A4_HOEHE,
+  ausserhalbDesBlattes,
   lesbarerText,
   seitenStroeme,
   zeichenpunkte
@@ -199,6 +200,31 @@ test("Das Lehrjahr wandert im Heft mit", async () => {
   const { seiten } = await seitenStroeme(content);
   assert.match(lesbarerText(seiten[0]), /1\. Lehrjahr/);
   assert.match(lesbarerText(seiten[1]), /2\. Lehrjahr/);
+});
+
+test("Eine Vorschau ist als Vorschau zu erkennen", async () => {
+  // Der Auszubildende soll beim Schreiben sehen, wie das Blatt wird - aber ein
+  // halb ausgefüllter Nachweis sieht auf Papier fertig aus. Wer die Seite
+  // ausdruckt oder weiterschickt, muss auf den ersten Blick erkennen, dass sie
+  // noch nicht eingereicht ist.
+  const vorschau = await buildApprenticeReportPdf({
+    report: bericht(), apprentice: azubi, company: firma, preview: true
+  });
+  const { document, seiten } = await seitenStroeme(vorschau);
+  const text = seiten.map(lesbarerText).join(" ");
+  assert.match(text, /VORSCHAU/);
+  assert.match(text, /noch nicht eingereicht/);
+  assert.match(document.getTitle(), /Vorschau/);
+  // Der Hinweis auf die fehlenden Unterschriften gehört zum fertigen Blatt und
+  // wäre auf einer Vorschau irreführend.
+  assert.doesNotMatch(text, /ohne Unterschriften ungültig/);
+  // Auch die Vorschau bleibt auf dem Blatt.
+  assert.deepEqual(ausserhalbDesBlattes(seiten), []);
+
+  // Ohne die Kennzeichnung steht sie nirgends.
+  const fertig = await blatt();
+  const { seiten: fertigeSeiten } = await seitenStroeme(fertig);
+  assert.doesNotMatch(fertigeSeiten.map(lesbarerText).join(" "), /VORSCHAU/);
 });
 
 test("Ein unlesbares Firmenlogo verhindert den Ausdruck nicht", async () => {

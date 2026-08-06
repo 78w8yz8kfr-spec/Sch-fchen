@@ -122,6 +122,13 @@ Nachweis ohne Unterschriften ungültig ist.
   geschriebene Zeilen abzuschneiden wäre der schlechtere Handel, der Nachweis
   wäre dann unvollständig. Die Seitenzahl am Fuß sagt, wie viele Blätter es
   geworden sind.
+* Eine **Vorschau** (`?preview=true`) ist auch für einen Entwurf erlaubt — sie
+  zeigt beim Schreiben, wie das Blatt wird. Damit sie nicht mit dem fertigen
+  Nachweis verwechselt wird, trägt sie quer über dem Blatt „VORSCHAU“, sagt es
+  im Fuß und im Dateinamen, und sie wird **im Browser angezeigt** statt in den
+  Downloadordner gelegt (`Content-Disposition: inline`). Nur diese Antwort darf
+  von der eigenen Seite eingerahmt werden (`frame-ancestors 'self'`); für alle
+  übrigen bleibt das Einrahmen verboten.
 * Ein **Entwurf wird nicht gedruckt** (409). Auf Papier sieht er fertig aus und
   ist es nicht; im Ordner der Kammer fällt das erst am Ende der Ausbildung auf.
   Gedruckt wird, was eingereicht oder freigegeben ist — also unterschrieben.

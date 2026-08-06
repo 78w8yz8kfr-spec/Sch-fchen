@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.16">
-    <script type="module" src="./app.js?v=0.42.16"></script>
-    <script src="./version.js?v=0.42.16" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.17">
+    <script type="module" src="./app.js?v=0.42.17"></script>
+    <script src="./version.js?v=0.42.17" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.16</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.17</p>
         </div>
       </section>
 
@@ -803,6 +803,13 @@
                 <span id="apprentice-status" class="site-list-summary" aria-live="polite">Entwurf</span>
               </div>
               <p id="apprentice-week" class="apprentice-week">Woche</p>
+              <div class="apprentice-facts" aria-label="Angaben zur Ausbildung">
+                <div><span>Azubi</span><strong id="apprentice-fact-name">–</strong></div>
+                <div><span>Lehrjahr</span><strong id="apprentice-fact-year">–</strong></div>
+                <div><span>Ausbildungsberuf</span><strong id="apprentice-fact-occupation">–</strong></div>
+                <div><span>Berichtsheft-Intervall</span><strong id="apprentice-fact-interval">wöchentlich</strong></div>
+              </div>
+              <p id="apprentice-progress" class="apprentice-progress" aria-live="polite"></p>
               <p id="apprentice-return" class="apprentice-return" hidden></p>
               <p id="apprentice-lock" class="apprentice-lock" aria-live="polite" hidden></p>
               <p id="apprentice-open" class="apprentice-open" aria-live="polite" hidden></p>
@@ -812,19 +819,58 @@
               </div>
               <form id="apprentice-form" class="apprentice-form" novalidate>
                 <div id="apprentice-days" class="apprentice-days"></div>
-                <label for="apprentice-week-remark">Bemerkungen zur Woche</label>
+                <label for="apprentice-week-remark">Bemerkungen zur Woche <span class="apprentice-optional">(optional)</span></label>
                 <textarea id="apprentice-week-remark" rows="2" maxlength="1000"
                   placeholder="Besonderes in dieser Woche"></textarea>
+                <p id="apprentice-remark-count" class="apprentice-remark-count">0 / 1000 Zeichen</p>
                 <div class="apprentice-actions">
                   <button id="apprentice-withdraw" class="button button--secondary" type="button">Wieder bearbeiten</button>
                   <button id="apprentice-save" class="button button--secondary" type="button">Speichern</button>
+                  <button id="apprentice-preview" class="button button--secondary" type="button">Vorschau PDF</button>
                   <button id="apprentice-print" class="button button--secondary" type="button">Woche drucken</button>
                   <button id="apprentice-print-book" class="button button--secondary" type="button">Ganzes Jahr drucken</button>
                   <button id="apprentice-submit" class="button button--primary" type="submit">Einreichen</button>
                 </div>
               </form>
               <p id="apprentice-message" class="form-message" aria-live="polite"></p>
+              <div class="apprentice-notes" aria-label="So funktioniert das Berichtsheft">
+                <article class="apprentice-note">
+                  <strong>Einstellungen (vom Büro)</strong>
+                  <p>Intervall: wöchentlich · Fällig: mit dem Einreichen der Woche ·
+                    Wochentage: Montag bis Freitag, Samstag und Sonntag nur, wenn an
+                    ihnen etwas war.</p>
+                </article>
+                <article class="apprentice-note apprentice-note--info">
+                  <strong>Was der Server verlangt</strong>
+                  <p>Eingereicht wird nur eine vollständige Woche: Jeder Tag mit
+                    Arbeitszeit braucht eine Zeile. Ein Tag mit Urlaub oder Krankheit
+                    ist durch die Abwesenheit erklärt.</p>
+                </article>
+                <article class="apprentice-note apprentice-note--hint">
+                  <strong>Solange nichts unterschrieben ist</strong>
+                  <p>Du kannst jederzeit ergänzen und ändern. Nach dem Einreichen holst
+                    du die Woche mit „Wieder bearbeiten“ zurück — bis dein Ausbilder
+                    unterschrieben hat.</p>
+                </article>
+              </div>
               <ul id="apprentice-history" class="apprentice-history" aria-label="Bisherige Wochenberichte"></ul>
+            </section>
+
+            <!-- Die Vorschau steht nur am Rechner: auf dem Handy nimmt ein
+                 eingebettetes A4-Blatt mehr Platz weg, als es hilft. -->
+            <section id="apprentice-preview-panel" class="week-review-panel apprentice-preview-panel" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Jede Woche = 1 A4-Seite</p>
+                  <h3>Vorschau</h3>
+                </div>
+                <span id="apprentice-preview-state" class="site-list-summary" aria-live="polite"></span>
+              </div>
+              <iframe id="apprentice-preview-frame" class="apprentice-preview-frame"
+                title="Vorschau des Wochenblatts"></iframe>
+              <p class="apprentice-preview-note">Solange die Woche nicht eingereicht ist,
+                steht „Vorschau“ quer über dem Blatt. Herunterladen und drucken lässt
+                sich erst der eingereichte Nachweis.</p>
             </section>
 
             <section id="apprentice-review-panel" class="week-review-panel apprentice-review-panel" aria-labelledby="apprentice-review-title" hidden>

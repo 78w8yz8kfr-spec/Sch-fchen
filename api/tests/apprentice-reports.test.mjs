@@ -237,6 +237,32 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
   assert.equal(entwurfsdruck.status, 409, await entwurfsdruck.clone().text());
   assert.equal((await entwurfsdruck.json()).error.code, "apprentice_report_not_submitted");
 
+  // Die Vorschau ist etwas anderes als ein Ausdruck: sie zeigt beim Schreiben,
+  // wie das Blatt wird, und ist deshalb auch fuer einen Entwurf erlaubt. Damit
+  // sie nicht mit dem fertigen Nachweis verwechselt wird, traegt sie es im
+  // Namen, im Blatt und in der Art, wie sie ausgeliefert wird.
+  const vorschau = await ruf(`/api/v1/apprentice/reports/${woche}/pdf?preview=true`, azubiCookie);
+  assert.equal(vorschau.status, 200, await vorschau.clone().text());
+  assert.match(vorschau.headers.get("content-type"), /application\/pdf/);
+  // "inline": im Browser anzeigen statt in den Downloadordner legen.
+  assert.match(vorschau.headers.get("content-disposition"), /^inline;/);
+  assert.match(vorschau.headers.get("content-disposition"), /Vorschau/);
+  // Eingerahmt werden darf sie nur von der eigenen Seite - fremde Seiten
+  // koennen Schaefchen weiterhin nicht einrahmen.
+  assert.match(vorschau.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  assert.equal(vorschau.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(
+    Buffer.from(await vorschau.arrayBuffer()).subarray(0, 5).toString("ascii"),
+    "%PDF-"
+  );
+
+  // Der Ausdruck bleibt streng: dort gilt weiterhin, dass niemand einrahmt.
+  const strengerDruck = await ruf(`/api/v1/apprentice/reports/${woche}/pdf`, azubiCookie);
+  assert.match(
+    strengerDruck.headers.get("content-security-policy"),
+    /frame-ancestors 'none'/
+  );
+
   // Mit dem Dienstag ist die Woche vollstaendig.
   await ruf(`/api/v1/apprentice/reports/${woche}`, azubiCookie, {
     method: "PUT",
