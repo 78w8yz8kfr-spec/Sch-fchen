@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.30">
-    <script type="module" src="./app.js?v=0.42.30"></script>
-    <script src="./version.js?v=0.42.30" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.31">
+    <script type="module" src="./app.js?v=0.42.31"></script>
+    <script src="./version.js?v=0.42.31" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -138,7 +138,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.30</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.31</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -600,7 +600,20 @@
             <section id="overview-account-card" class="week-focus-card overview-card" aria-labelledby="overview-account-title" hidden>
               <p class="eyebrow">Stand deines Kontos</p>
               <h3 id="overview-account-title">Arbeitskonto</h3>
-              <strong id="overview-account-balance" class="time-account-balance">±00:00</strong>
+              <!-- Stunden und Resturlaub stehen nebeneinander: es sind die
+                   beiden Zahlen, wegen derer man diese Karte ueberhaupt
+                   ansieht. Der Urlaub lag bisher nur im Wochenbereich, einen
+                   Bereichswechsel entfernt. -->
+              <div class="overview-account-values">
+                <div class="overview-account-value">
+                  <strong id="overview-account-balance" class="time-account-balance">±00:00</strong>
+                  <span class="overview-account-value__label">Stunden</span>
+                </div>
+                <div class="overview-account-value">
+                  <strong id="overview-account-vacation" class="time-account-balance">0 Tage</strong>
+                  <span class="overview-account-value__label">Resturlaub</span>
+                </div>
+              </div>
               <p id="overview-account-note" class="overview-card__note"></p>
               <button id="overview-account-link" class="text-button" type="button">Zur Woche</button>
             </section>

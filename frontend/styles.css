@@ -6826,6 +6826,38 @@ select:focus-visible {
   font-size: 1.5rem;
 }
 
+/* Stunden und Resturlaub nebeneinander. Zwei gleich breite Spalten und nicht
+   "so breit wie noetig": sonst wandert die zweite Zahl mit jeder Stelle, die
+   die erste dazugewinnt, und die Karte sieht bei jedem Blick anders aus.
+   minmax(0, 1fr) statt 1fr, damit "Deaktiviert" die Spalte nicht aufblaeht. */
+.overview-account-values {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+.overview-account-value {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.overview-account-value__label {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Der Resturlaub ist eine ruhige Zahl. Er soll die Stunden nicht ueberstrahlen
+   - rot ist hier die Abweichung, nicht der Anspruch. */
+.overview-account-value + .overview-account-value .time-account-balance {
+  color: var(--ink);
+  font-size: 1.18rem;
+}
+
 /* Die Schaltflaeche steht unten links, nicht mittig in der Karte. */
 .overview-card > .text-button {
   justify-self: start;

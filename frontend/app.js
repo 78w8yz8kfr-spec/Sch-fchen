@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.30";
-import { serverIsNewer } from "./core/versions.js?v=0.42.30";
+} from "./core/work-time.js?v=0.42.31";
+import { serverIsNewer } from "./core/versions.js?v=0.42.31";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.30";
+} from "./core/sync-queue.js?v=0.42.31";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.30";
+} from "./core/permissions.js?v=0.42.31";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.30";
+} from "./core/state-store.js?v=0.42.31";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -288,6 +288,7 @@ import {
     overviewCards: document.querySelector("#overview-cards"),
     overviewAccountCard: document.querySelector("#overview-account-card"),
     overviewAccountBalance: document.querySelector("#overview-account-balance"),
+    overviewAccountVacation: document.querySelector("#overview-account-vacation"),
     overviewAccountNote: document.querySelector("#overview-account-note"),
     overviewAccountLink: document.querySelector("#overview-account-link"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
@@ -1234,7 +1235,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.30",
+          "X-Schaefchen-Version": "0.42.31",
           ...options.headers
         }
       });
@@ -1264,7 +1265,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.30" }
+        headers: { "X-Schaefchen-Version": "0.42.31" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1311,7 +1312,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.30 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.31 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2572,7 +2573,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.30";
+  const EIGENE_FASSUNG = "0.42.31";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -8112,23 +8113,38 @@ import {
     });
   }
 
-  // Der Stand des Arbeitskontos in einer Zahl - dieselbe, die im Wochenbereich
-  // ausfuehrlich aufgeschluesselt wird. Auf der Uebersicht will man sie sehen,
-  // ohne den Bereich zu wechseln; wer es genauer wissen will, kommt mit einem
-  // Klick dorthin.
+  // Der Stand des Arbeitskontos in zwei Zahlen - denselben, die im
+  // Wochenbereich ausfuehrlich aufgeschluesselt werden. Auf der Uebersicht
+  // will man sie sehen, ohne den Bereich zu wechseln; wer es genauer wissen
+  // will, kommt mit einem Klick dorthin.
+  //
+  // Der Resturlaub steht neben den Stunden, weil beides dieselbe Frage
+  // beantwortet: was steht mir noch zu. Ihn im Wochenbereich zu verstecken
+  // hiess, fuer eine Zahl den Bereich zu wechseln.
+  //
+  // Die Karte steht auch dann da, wenn das Stundenkonto deaktiviert ist. Der
+  // Urlaub laeuft davon unabhaengig weiter - der Wochenbereich sagt das schon
+  // ausdruecklich ("Urlaubsstaende bleiben sichtbar"), und die Uebersicht darf
+  // ihm nicht widersprechen.
   function renderOverviewAccount(account) {
-    const zeigen = Boolean(account) && account.enabled;
-    elements.overviewAccountCard.hidden = !zeigen;
-    if (!zeigen) return;
-    elements.overviewAccountBalance.textContent =
-      formatSignedMinutes(account.totals.balanceMinutes);
-    elements.overviewAccountBalance.className = `time-account-balance${
-      account.totals.balanceMinutes > 0
-        ? " time-account-balance--positive"
-        : account.totals.balanceMinutes < 0
-          ? " time-account-balance--negative"
-          : ""
-    }`;
+    elements.overviewAccountCard.hidden = !account;
+    if (!account) return;
+    if (account.enabled) {
+      elements.overviewAccountBalance.textContent =
+        formatSignedMinutes(account.totals.balanceMinutes);
+      elements.overviewAccountBalance.className = `time-account-balance${
+        account.totals.balanceMinutes > 0
+          ? " time-account-balance--positive"
+          : account.totals.balanceMinutes < 0
+            ? " time-account-balance--negative"
+            : ""
+      }`;
+    } else {
+      elements.overviewAccountBalance.textContent = "Deaktiviert";
+      elements.overviewAccountBalance.className = "time-account-balance";
+    }
+    elements.overviewAccountVacation.textContent =
+      formatDayCount(account.vacation.remainingDays);
     elements.overviewAccountNote.textContent =
       `${account.year} · Stand ${shortDate(account.asOfDate)}`;
   }

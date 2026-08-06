@@ -4,7 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
-- **„Baustelle öffnen“ funktioniert wieder von überall.** In der
+- **Der Resturlaub steht jetzt neben den Stunden.** Auf der Übersicht stand
+  bisher nur eine Zahl — der Stand des Arbeitskontos. Der Resturlaub lag im
+  Wochenbereich, einen Bereichswechsel entfernt.
+  - Beide Zahlen beantworten dieselbe Frage: **was steht mir noch zu.** Wer die
+    eine ansieht, will meist auch die andere wissen. Sie stehen jetzt
+    nebeneinander in derselben Karte.
+  - Zwei **gleich breite Spalten**, nicht „so breit wie nötig”: sonst wandert
+    die zweite Zahl mit jeder Stelle, die die erste dazugewinnt, und die Karte
+    sieht bei jedem Blick anders aus.
+  - Die Karte steht ab jetzt **auch bei deaktiviertem Stundenkonto** da — dann
+    mit „Deaktiviert” statt der Stunden. Der Urlaub läuft davon unabhängig
+    weiter; der Wochenbereich sagt das schon ausdrücklich, und die Übersicht
+    hat ihm bisher widersprochen, indem sie die ganze Karte wegließ.
+- Fassung 0.42.31, Speicher `schaefchen-online-v73`, Migration 086.
+
+- **„Baustelle öffnen” funktioniert wieder von überall.** In der
   Berichtszentrale, unter „Fehlende Pflichtberichte“, tat der Knopf nichts
   Sichtbares.
   - Die Akte einer Baustelle liegt im Bereich **Baustellen**. Solange es nur
