@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.17/);
-assert.match(html, /app\.js\?v=0\.42\.17/);
-assert.match(html, /version\.js\?v=0\.42\.17/);
+assert.match(html, /styles\.css\?v=0\.42\.18/);
+assert.match(html, /app\.js\?v=0\.42\.18/);
+assert.match(html, /version\.js\?v=0\.42\.18/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -708,6 +708,20 @@ assert.match(styles, /\.site-status--archived/);
 assert.match(styles, /\.site-edit-form/);
 assert.match(styles, /\.entity-edit-form/);
 assert.match(styles, /\.bottom-nav--planner/);
+
+// Der Rahmen des neuen Entwurfs: dunkle Seitenleiste mit rotem aktivem
+// Eintrag, Name der App darueber, Benutzername und Rolle in der Kopfzeile.
+// Auf dem Telefon bleibt alles, wie es ist - dort ist die helle Leiste unten
+// am Rand richtig und erprobt.
+assert.match(styles, /--sidebar: #1b1b1d/);
+assert.match(styles, /\.dashboard-view > \.bottom-nav \{[^}]*background: var\(--sidebar\)/);
+assert.match(styles, /\.nav-item--active[\s\S]{0,120}background: var\(--brand\)/);
+assert.match(html, /id="topbar-user-name"/);
+assert.match(app, /function renderTopbarUser\(/);
+// Die Beschriftungen folgen dem Entwurf.
+assert.match(html, /<span>Übersicht<\/span>/);
+assert.match(html, /<span>Einsatzplanung<\/span>/);
+assert.match(html, /<span>Azubi-Berichtsheft<\/span>/);
 
 // Desktop: dieselbe Seite, zweite Gestalt. Am Rechner sitzt das Buero, und
 // dort war von 1440 Pixeln Breite die Haelfte genutzt - die Plantafel zeigte
@@ -900,16 +914,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.17"'));
-assert.ok(worker.includes('"./app.js?v=0.42.17"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.17"'));
-assert.ok(worker.includes('"./version.js?v=0.42.17"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.18"'));
+assert.ok(worker.includes('"./app.js?v=0.42.18"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.18"'));
+assert.ok(worker.includes('"./version.js?v=0.42.18"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.17"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.17";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.18"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.18";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -937,7 +951,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.17$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.18$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -945,11 +959,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.17"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.17"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.18"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.18"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.17"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.17"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.18"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.18"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -996,8 +1010,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.17/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.17/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.18/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.18/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

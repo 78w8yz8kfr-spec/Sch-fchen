@@ -10,7 +10,7 @@ import {
   formatMinutes,
   formatSignedMinutes,
   localDateKey
-} from "./core/work-time.js?v=0.42.17";
+} from "./core/work-time.js?v=0.42.18";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +18,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.17";
+} from "./core/sync-queue.js?v=0.42.18";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.17";
+} from "./core/permissions.js?v=0.42.18";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +36,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.17";
+} from "./core/state-store.js?v=0.42.18";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -241,6 +241,8 @@ import {
     apprenticeReviewCount: document.querySelector("#apprentice-review-count"),
     apprenticeApproveAll: document.querySelector("#apprentice-approve-all"),
     apprenticeReviewMessage: document.querySelector("#apprentice-review-message"),
+    topbarUserName: document.querySelector("#topbar-user-name"),
+    topbarUserRole: document.querySelector("#topbar-user-role"),
     accountCard: document.querySelector("#account-card"),
     accountName: document.querySelector("#account-name"),
     accountPersonnelNumber: document.querySelector("#account-personnel-number"),
@@ -1108,7 +1110,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.17",
+          "X-Schaefchen-Version": "0.42.18",
           ...options.headers
         }
       });
@@ -1136,7 +1138,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.17" }
+        headers: { "X-Schaefchen-Version": "0.42.18" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1183,7 +1185,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.17 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.18 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -7816,6 +7818,7 @@ import {
     activateNavigation(activeButton);
     // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
     renderAccountCard();
+    renderTopbarUser();
     const title = {
       week: "Woche",
       apprentice: "Berichtsheft",
@@ -10607,6 +10610,18 @@ import {
   // Bedingung stand sie nach jeder Anmeldung auch auf der Startseite: der
   // Bereichswechsel hatte sie richtig verborgen, das spaetere Zeichnen holte
   // sie wieder hervor.
+  // Name und Rolle stehen am Rechner in der Kopfzeile - wie im Entwurf, und
+  // nuetzlich auf einem Geraet, an dem mehrere Leute arbeiten.
+  function renderTopbarUser() {
+    const angemeldet = Boolean(session) && !demoMode;
+    elements.topbarUserName.textContent = angemeldet
+      ? `${session.user.firstName} ${session.user.lastName}`
+      : "";
+    elements.topbarUserRole.textContent = angemeldet
+      ? employeeRoleLabel(session.user.roles)
+      : "";
+  }
+
   function renderAccountCard() {
     elements.accountCard.hidden = demoMode || !session || currentDashboardPane !== "more";
     // Beschriftet wird sie trotzdem: der Bereichswechsel blendet sie ein, ohne

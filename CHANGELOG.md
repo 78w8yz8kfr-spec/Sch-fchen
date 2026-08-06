@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, erster Schritt: der Rahmen.** Nach dem Gesamtentwurf bekommt
+  Schäfchen am Rechner eine **dunkle Seitenleiste** mit rotem aktivem Eintrag
+  und dem Namen der App darüber, dazu **Benutzername und Rolle in der
+  Kopfzeile**. Firmenzeichen und -name bleiben links in der Kopfzeile; der
+  App-Name steht nur noch einmal, in der Leiste.
+  - Die Beschriftungen folgen dem Entwurf: „Übersicht“, „Einsatzplanung“,
+    „Azubi-Berichtsheft“.
+  - Jeder Bildschirm erbt diesen Rahmen — deshalb kommt er zuerst.
+  - **Auf dem Telefon ändert sich nichts** außer den Beschriftungen. Dort ist
+    die helle Leiste unten am Rand richtig und erprobt.
+  - Noch nicht enthalten und bewusst nicht vorgetäuscht: das Suchfeld und die
+    Glocke aus dem Entwurf. Ein Bedienelement, das nichts tut, ist schlechter
+    als keines. Ebenso fehlen die Einträge der Leiste, hinter denen noch kein
+    Bildschirm liegt (Material, Fahrzeuge, Dokumente, Auswertungen).
+- Fassung 0.42.18, Speicher `schaefchen-online-v60`, Migration 070.
+
 - **Der Berichtsheft-Bildschirm nach der Vorlage.** Kopfdaten wie im gedruckten
   Blatt (Azubi, Lehrjahr, Ausbildungsberuf, Intervall), eine Tagestabelle mit
   denselben vier Spalten — Tag, Datum, Tätigkeiten, Arbeitszeit —, ein
