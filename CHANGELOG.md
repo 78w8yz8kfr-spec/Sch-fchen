@@ -4,6 +4,20 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, vierter Schritt: die Anmeldeseite.** Am Rechner steht sie
+  jetzt zweispaltig da wie im Entwurf: links dunkel mit Name und Anspruch,
+  rechts das Formular. **Am Telefon bleibt die einspaltige Karte** — dort ist
+  für eine zweite Spalte kein Platz, und die Karte ist erprobt.
+  - Die dunkle Seite steht im Dokument **hinter** dem Formular und wird nur
+    nach links gesetzt. Wer mit Tastatur oder Vorleser ankommt, landet dadurch
+    zuerst bei der Anmeldung und nicht bei den Werbezeilen.
+  - Der Name der App steht am Rechner nur noch links. Zweimal „Schäfchen“
+    nebeneinander wäre eine Dopplung — dieselbe Überlegung wie bei
+    Seitenleiste und Kopfzeile.
+  - Der Passwortwechsel ist ein eigener Bereich und bleibt mittig; die
+    Ersteinrichtung nutzt dieselbe rechte Spalte wie die Anmeldung.
+- Fassung 0.42.21, Speicher `schaefchen-online-v63`, Migration 073.
+
 - **Neues Design, dritter Schritt: die Übersicht.** Arbeitskonto, offene
   Hinweise und der nächste Feiertag standen im Wochenbereich. Wer morgens die
   App aufmacht, will genau diese drei Angaben sehen, ohne den Bereich zu

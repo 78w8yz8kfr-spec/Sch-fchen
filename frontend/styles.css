@@ -6786,3 +6786,106 @@ select:focus-visible {
     grid-auto-flow: column;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Die Anmeldeseite
+   ---------------------------------------------------------------------------
+
+   Am Rechner zweispaltig wie im Entwurf: links dunkel mit Name und Anspruch,
+   rechts das Formular. Am Telefon bleibt die einspaltige Karte - dort ist fuer
+   eine zweite Spalte kein Platz, und die Karte ist erprobt.
+
+   Die dunkle Seite steht im Dokument hinter dem Formular und wird hier nach
+   links gesetzt. So landet man mit Tastatur oder Vorleser zuerst bei der
+   Anmeldung.
+   ------------------------------------------------------------------------ */
+
+.login-stage {
+  display: none;
+}
+
+@media (min-width: 1080px) {
+  #login-view {
+    align-items: stretch;
+    justify-items: stretch;
+    padding: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  /* Der Name steht links auf der dunklen Seite. Zweimal "Schäfchen"
+     nebeneinander waere eine Dopplung - dieselbe Ueberlegung wie bei
+     Seitenleiste und Kopfzeile. Die Ueberschrift bleibt im Dokument stehen,
+     weil der Bereich seinen Namen von ihr bekommt. */
+  #login-view > .login-card > .brand--large {
+    display: none;
+  }
+
+  #login-view > .login-card {
+    width: min(100%, 430px);
+    border: 0;
+    padding: 32px 0;
+    background: transparent;
+    grid-column: 2;
+    place-self: center;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .login-stage {
+    display: grid;
+    align-content: center;
+    gap: 10px;
+    padding: 56px;
+    color: var(--sidebar-ink);
+    background: var(--sidebar);
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .login-stage img {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 14px;
+    border-radius: 16px;
+  }
+
+  .login-stage__name {
+    color: #ffffff;
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .login-stage__claim {
+    color: var(--brand);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .login-stage__points {
+    display: grid;
+    gap: 9px;
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Ein roter Punkt statt eines Hakens: ein Haken behauptet, etwas sei
+     erledigt - hier steht nur, was die App kann. */
+  .login-stage__points li {
+    display: grid;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--sidebar-muted);
+    font-size: 0.82rem;
+    grid-template-columns: 7px minmax(0, 1fr);
+  }
+
+  .login-stage__points li::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--brand);
+  }
+}

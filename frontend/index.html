@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.20">
-    <script type="module" src="./app.js?v=0.42.20"></script>
-    <script src="./version.js?v=0.42.20" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.21">
+    <script type="module" src="./app.js?v=0.42.21"></script>
+    <script src="./version.js?v=0.42.21" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,8 +130,23 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.20</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.21</p>
         </div>
+
+        <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
+             Dokument aber dahinter: wer mit der Tastatur oder einem Vorleser
+             ankommt, soll zuerst bei der Anmeldung landen und nicht bei den
+             Werbezeilen. -->
+        <aside class="login-stage">
+          <img src="./assets/mark.svg" alt="" width="52" height="52">
+          <p class="login-stage__name">Schäfchen</p>
+          <p class="login-stage__claim">Einfach vor komplex.</p>
+          <ul class="login-stage__points">
+            <li>Zeiten erfassen, ohne Zettel</li>
+            <li>Einsätze und Baustellen an einem Ort</li>
+            <li>Berichtsheft für Auszubildende</li>
+          </ul>
+        </aside>
       </section>
 
       <section id="password-change-view" class="view login-view" aria-labelledby="password-change-title" hidden>
