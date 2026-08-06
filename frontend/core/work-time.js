@@ -33,6 +33,21 @@ export function addIsoMonths(date, months) {
     .slice(0, 10);
 }
 
+// Auf einer Baustelle wird auch nachmittags und nachts gearbeitet. "Guten
+// Morgen" stand bisher zu jeder Uhrzeit auf der Uebersicht; wer um 15 Uhr von
+// der Baustelle kommt, liest daran zuerst, dass die App nicht mitdenkt.
+//
+// Die Grenzen sind bewusst grosszuegig: die Fruehschicht faengt um sechs an
+// und liest dann "Guten Morgen", die Spaetschicht endet nach achtzehn Uhr und
+// liest "Guten Abend".
+export function greetingForHour(date = new Date()) {
+  const stunde = date.getHours();
+  if (stunde < 5) return "Gute Nacht";
+  if (stunde < 11) return "Guten Morgen";
+  if (stunde < 18) return "Guten Tag";
+  return "Guten Abend";
+}
+
 export function durationMinutes(milliseconds) {
   return Math.max(0, Math.floor(milliseconds / 60000));
 }

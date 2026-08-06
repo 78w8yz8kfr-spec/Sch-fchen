@@ -8,9 +8,9 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.19">
-    <script type="module" src="./app.js?v=0.42.19"></script>
-    <script src="./version.js?v=0.42.19" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.42.20">
+    <script type="module" src="./app.js?v=0.42.20"></script>
+    <script src="./version.js?v=0.42.20" defer></script>
   </head>
   <body>
     <main id="app" class="app-shell">
@@ -130,7 +130,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.19</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.20</p>
         </div>
       </section>
 
@@ -501,6 +501,35 @@
             </div>
           </section>
 
+          <div id="overview-cards" class="overview-cards" data-dashboard-pane="start" aria-label="Übersicht" hidden>
+            <section id="overview-account-card" class="week-focus-card overview-card" aria-labelledby="overview-account-title" hidden>
+              <p class="eyebrow">Stand deines Kontos</p>
+              <h3 id="overview-account-title">Arbeitskonto</h3>
+              <strong id="overview-account-balance" class="time-account-balance">±00:00</strong>
+              <p id="overview-account-note" class="overview-card__note"></p>
+              <button id="overview-account-link" class="text-button" type="button">Zur Woche</button>
+            </section>
+
+            <section id="week-open-actions" class="week-focus-card week-open-actions" aria-labelledby="week-open-actions-title" hidden>
+              <p class="eyebrow">Noch zu erledigen</p>
+              <h3 id="week-open-actions-title">Offene Hinweise</h3>
+              <ul id="week-open-actions-list"></ul>
+            </section>
+
+            <section id="next-holiday-card" class="week-focus-card next-holiday-card" aria-labelledby="next-holiday-title" hidden>
+              <p class="eyebrow">Sollzeit im Blick</p>
+              <h3 id="next-holiday-title">Nächster Feiertag</h3>
+              <div id="next-holiday-summary" class="next-holiday-summary"></div>
+              <p id="time-account-holiday-status" class="time-account-status">
+                Feiertagskalender wird geladen …
+              </p>
+              <details class="time-account-months-panel holiday-calendar-details">
+                <summary>Alle Feiertage anzeigen</summary>
+                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
+              </details>
+            </section>
+          </div>
+
           <section id="timesheet-section" class="section" data-dashboard-pane="start" aria-labelledby="timesheet-title">
             <div class="section-heading">
               <div>
@@ -660,25 +689,6 @@
                 </div>
               </div>
               <div id="week-timesheet-list" class="week-timesheet-list" aria-label="Stundenzettel der Woche"></div>
-            </section>
-
-            <section id="week-open-actions" class="week-focus-card week-open-actions" aria-labelledby="week-open-actions-title" hidden>
-              <p class="eyebrow">Noch zu erledigen</p>
-              <h3 id="week-open-actions-title">Offene Hinweise</h3>
-              <ul id="week-open-actions-list"></ul>
-            </section>
-
-            <section id="next-holiday-card" class="week-focus-card next-holiday-card" aria-labelledby="next-holiday-title" hidden>
-              <p class="eyebrow">Sollzeit im Blick</p>
-              <h3 id="next-holiday-title">Nächster Feiertag</h3>
-              <div id="next-holiday-summary" class="next-holiday-summary"></div>
-              <p id="time-account-holiday-status" class="time-account-status">
-                Feiertagskalender wird geladen …
-              </p>
-              <details class="time-account-months-panel holiday-calendar-details">
-                <summary>Alle Feiertage anzeigen</summary>
-                <ul id="time-account-holiday-list" class="holiday-list" aria-label="Berücksichtigte Feiertage"></ul>
-              </details>
             </section>
 
 

@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neues Design, dritter Schritt: die Übersicht.** Arbeitskonto, offene
+  Hinweise und der nächste Feiertag standen im Wochenbereich. Wer morgens die
+  App aufmacht, will genau diese drei Angaben sehen, ohne den Bereich zu
+  wechseln — deshalb stehen sie jetzt auf der Startseite, unter dem Arbeitstag
+  und dem heutigen Einsatz. Am Rechner nebeneinander, am Handy gestapelt.
+  - Sie sind **nicht doppelt**: die Karten sind dieselben, sie sind umgezogen.
+    Nur der Stand des Arbeitskontos steht zweimal da — auf der Übersicht als
+    eine Zahl mit „Zur Woche“ daneben, im Wochenbereich mit den Monatswerten
+    darunter. Eine Zahl ist keine Aufschlüsselung.
+  - Die Reihe steht nur da, wenn wenigstens eine Karte etwas zu sagen hat.
+    Fällt eine weg — kein offener Hinweis, kein Feiertag mehr im Jahr —,
+    teilen sich die übrigen die Breite, statt eine Lücke zu lassen.
+  - **Die Begrüßung folgt jetzt der Uhrzeit.** „Guten Morgen“ stand bisher zu
+    jeder Uhrzeit da; auf einer Baustelle wird auch nachmittags und nachts
+    gearbeitet. Die Grenzen sind großzügig gesetzt: die Frühschicht um sechs
+    liest „Guten Morgen“, die Spätschicht nach achtzehn Uhr „Guten Abend“.
+- Fassung 0.42.20, Speicher `schaefchen-online-v62`, Migration 072.
+
 - **Neues Design, zweiter Schritt: Listen werden am Rechner zu Tabellen.**
   Mitarbeiter und Baustellen standen bisher auch auf 1440 Pixeln so da wie auf
   dem Telefon: Name fett, darunter alle Angaben in einer Zeile mit

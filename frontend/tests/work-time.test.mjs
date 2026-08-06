@@ -11,6 +11,7 @@ import {
   durationMinutes,
   formatMinutes,
   formatSignedMinutes,
+  greetingForHour,
   localDateKey
 } from "../core/work-time.js";
 
@@ -148,4 +149,24 @@ test("Die Fahrzeit übersteigt nie die Arbeitszeit", () => {
   );
   assert.equal(times.travel, times.work);
   assert.ok(times.travel <= times.work);
+});
+
+test("Die Begrüßung folgt der Uhrzeit, nicht dem Wunschdenken", () => {
+  const um = (stunde, minute = 0) => new Date(2026, 7, 4, stunde, minute, 0, 0);
+
+  // Die Fruehschicht faengt um sechs an und soll "Guten Morgen" lesen.
+  assert.equal(greetingForHour(um(6)), "Guten Morgen");
+  assert.equal(greetingForHour(um(10, 59)), "Guten Morgen");
+  // Wer mittags von der Baustelle kommt, liest nicht mehr "Guten Morgen" -
+  // genau das stand hier vorher zu jeder Uhrzeit.
+  assert.equal(greetingForHour(um(11)), "Guten Tag");
+  assert.equal(greetingForHour(um(15)), "Guten Tag");
+  assert.equal(greetingForHour(um(17, 59)), "Guten Tag");
+  // Die Spaetschicht endet nach achtzehn Uhr.
+  assert.equal(greetingForHour(um(18)), "Guten Abend");
+  assert.equal(greetingForHour(um(23, 59)), "Guten Abend");
+  // Nachtschicht: um zwei Uhr morgens ist es weder Morgen noch Abend.
+  assert.equal(greetingForHour(um(0)), "Gute Nacht");
+  assert.equal(greetingForHour(um(4, 59)), "Gute Nacht");
+  assert.equal(greetingForHour(um(5)), "Guten Morgen");
 });

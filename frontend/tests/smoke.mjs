@@ -594,9 +594,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.19/);
-assert.match(html, /app\.js\?v=0\.42\.19/);
-assert.match(html, /version\.js\?v=0\.42\.19/);
+assert.match(html, /styles\.css\?v=0\.42\.20/);
+assert.match(html, /app\.js\?v=0\.42\.20/);
+assert.match(html, /version\.js\?v=0\.42\.20/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -741,6 +741,31 @@ assert.match(styles, /\.admin-list \.admin-list__head \{\s*\n\s*display: none;/)
 assert.match(styles, /\.admin-list__cells > span\[data-leer\] \{\s*\n\s*display: none;/);
 assert.match(styles, /\.admin-list__cells > span\[data-marke\] \{\s*\n\s*display: block;/);
 assert.match(styles, /\.site-status--pending/);
+
+// Die Uebersicht: Arbeitskonto, offene Hinweise und der naechste Feiertag
+// standen im Wochenbereich. Wer morgens die App aufmacht, will genau diese
+// drei Angaben sehen, ohne den Bereich zu wechseln - sie sind umgezogen, nicht
+// verdoppelt. Nur der Stand des Kontos steht zweimal da: hier als eine Zahl,
+// im Wochenbereich mit den Monatswerten darunter.
+assert.match(html, /id="overview-cards"[^>]*data-dashboard-pane="start"/);
+assert.match(html, /id="overview-account-balance"/);
+assert.match(app, /function renderOverviewCards\(/);
+assert.match(app, /function renderOverviewAccount\(/);
+assert.match(styles, /\.overview-cards \{/);
+assert.match(styles, /\.overview-cards \{[\s\S]{0,200}grid-auto-flow: column;/);
+// Die drei Karten stehen genau einmal im Dokument.
+for (const kennung of ["overview-account-card", "week-open-actions", "next-holiday-card"]) {
+  assert.equal(
+    [...html.matchAll(new RegExp(`id="${kennung}"`, "g"))].length,
+    1,
+    `${kennung} darf nur einmal vorkommen`
+  );
+}
+// Und sie stehen auf der Startseite, nicht mehr im Wochenbereich.
+assert.ok(
+  html.indexOf('id="overview-cards"') < html.indexOf('id="week-section"'),
+  "Die Uebersichtskarten stehen vor dem Wochenbereich"
+);
 
 // Desktop: dieselbe Seite, zweite Gestalt. Am Rechner sitzt das Buero, und
 // dort war von 1440 Pixeln Breite die Haelfte genutzt - die Plantafel zeigte
@@ -933,16 +958,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.19"'));
-assert.ok(worker.includes('"./app.js?v=0.42.19"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.19"'));
-assert.ok(worker.includes('"./version.js?v=0.42.19"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.20"'));
+assert.ok(worker.includes('"./app.js?v=0.42.20"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.20"'));
+assert.ok(worker.includes('"./version.js?v=0.42.20"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.19"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.19";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.20"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.20";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -970,7 +995,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.19$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.20$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -978,11 +1003,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.19"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.19"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.20"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.20"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.19"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.19"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.20"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.20"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1029,8 +1054,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.19/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.19/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.20/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.20/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);

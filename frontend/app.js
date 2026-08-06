@@ -9,8 +9,9 @@ import {
   durationMinutes,
   formatMinutes,
   formatSignedMinutes,
+  greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.19";
+} from "./core/work-time.js?v=0.42.20";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -18,14 +19,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.19";
+} from "./core/sync-queue.js?v=0.42.20";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.19";
+} from "./core/permissions.js?v=0.42.20";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -36,7 +37,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.19";
+} from "./core/state-store.js?v=0.42.20";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -282,6 +283,11 @@ import {
     weekNextAssignmentMeta: document.querySelector("#week-next-assignment-meta"),
     weekOpenActions: document.querySelector("#week-open-actions"),
     weekOpenActionsList: document.querySelector("#week-open-actions-list"),
+    overviewCards: document.querySelector("#overview-cards"),
+    overviewAccountCard: document.querySelector("#overview-account-card"),
+    overviewAccountBalance: document.querySelector("#overview-account-balance"),
+    overviewAccountNote: document.querySelector("#overview-account-note"),
+    overviewAccountLink: document.querySelector("#overview-account-link"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
     adminYear: document.querySelector("#admin-year"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
@@ -1110,7 +1116,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.19",
+          "X-Schaefchen-Version": "0.42.20",
           ...options.headers
         }
       });
@@ -1138,7 +1144,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.19" }
+        headers: { "X-Schaefchen-Version": "0.42.20" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1185,7 +1191,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.19 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.20 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -6957,9 +6963,46 @@ import {
     });
   }
 
+  // Der Stand des Arbeitskontos in einer Zahl - dieselbe, die im Wochenbereich
+  // ausfuehrlich aufgeschluesselt wird. Auf der Uebersicht will man sie sehen,
+  // ohne den Bereich zu wechseln; wer es genauer wissen will, kommt mit einem
+  // Klick dorthin.
+  function renderOverviewAccount(account) {
+    const zeigen = Boolean(account) && account.enabled;
+    elements.overviewAccountCard.hidden = !zeigen;
+    if (!zeigen) return;
+    elements.overviewAccountBalance.textContent =
+      formatSignedMinutes(account.totals.balanceMinutes);
+    elements.overviewAccountBalance.className = `time-account-balance${
+      account.totals.balanceMinutes > 0
+        ? " time-account-balance--positive"
+        : account.totals.balanceMinutes < 0
+          ? " time-account-balance--negative"
+          : ""
+    }`;
+    elements.overviewAccountNote.textContent =
+      `${account.year} · Stand ${shortDate(account.asOfDate)}`;
+  }
+
+  // Die Uebersichtskarten stehen nur da, wenn wenigstens eine etwas zu sagen
+  // hat. Eine leere Reihe waere nur eine Luecke ueber dem Stundenzettel.
+  function renderOverviewCards() {
+    const karten = [
+      elements.overviewAccountCard,
+      elements.weekOpenActions,
+      elements.nextHolidayCard
+    ];
+    elements.overviewCards.hidden = currentDashboardPane !== "start"
+      || karten.every((karte) => karte.hidden);
+  }
+
   function renderTimeAccount() {
     elements.timeAccountPanel.hidden = demoMode;
-    if (demoMode) return;
+    if (demoMode) {
+      renderOverviewAccount(null);
+      renderOverviewCards();
+      return;
+    }
     const requestedYear = Number(selectedWeekStart.slice(0, 4));
     const account = timeAccountState?.year === requestedYear ? timeAccountState : null;
     elements.timeAccountMonths.replaceChildren();
@@ -6979,6 +7022,8 @@ import {
       elements.timeAccountHolidayStatus.textContent = navigator.onLine
         ? "Feiertagskalender wird geladen …"
         : "Der Feiertagskalender ist offline gerade nicht verfügbar.";
+      renderOverviewAccount(null);
+      renderOverviewCards();
       return;
     }
     const holidayCalendar = account.holidayCalendar || {
@@ -7061,6 +7106,9 @@ import {
       });
       elements.timeAccountMonths.append(row);
     });
+
+    renderOverviewAccount(account);
+    renderOverviewCards();
   }
 
   const TIME_CORRECTION_POLICY_LABELS = {
@@ -7418,6 +7466,7 @@ import {
       elements.weekOpenActionsList.append(item);
     });
     elements.weekOpenActions.hidden = openActions.length === 0;
+    renderOverviewCards();
 
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
@@ -7843,6 +7892,9 @@ import {
       // Die Berichtsheft-Karte gehoert zur Startseite, aber nur fuer
       // Auszubildende. Ohne diese Ausnahme zeigte der Wechsel auf "Start" sie
       // jedem - der Bereichswechsel kennt die Rolle sonst nicht.
+      // Die Uebersichtskarten gehoeren zur Startseite, aber nur, wenn eine von
+      // ihnen etwas zu sagen hat - sonst waere dort eine leere Reihe.
+      if (element === elements.overviewCards) return;
       if (element === elements.apprenticeTodaySection) {
         element.hidden = pane !== "start" || !isApprentice();
         return;
@@ -7888,6 +7940,7 @@ import {
     activateNavigation(activeButton);
     // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
     renderAccountCard();
+    renderOverviewCards();
     renderTopbarUser();
     const title = {
       week: "Woche",
@@ -8819,7 +8872,7 @@ import {
     elements.dashboardCompany.textContent = session.company.displayName;
     setCompanyMark(elements.dashboardCompanyMark, session.company.displayName, session.company.logoUrl);
     elements.companyNumber.value = session.company.number;
-    elements.dashboardTitle.textContent = `Guten Morgen, ${session.user.firstName}`;
+    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
     if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();
@@ -11157,6 +11210,11 @@ import {
   elements.navWeek.addEventListener("click", () => {
     showDashboardPane("week");
     void Promise.all([refreshWeekData(), refreshAbsenceData()]);
+  });
+  // Derselbe Weg wie ueber die Leiste - die Uebersicht zeigt die Zahl, der
+  // Wochenbereich schluesselt sie auf.
+  elements.overviewAccountLink.addEventListener("click", () => {
+    elements.navWeek.click();
   });
   elements.weekPrevious.addEventListener("click", () => {
     void selectWeek(addIsoDays(selectedWeekStart, -7));
