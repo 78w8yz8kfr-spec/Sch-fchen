@@ -7177,6 +7177,26 @@ select:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Der Platzhalter, solange die Betriebsuebersicht nicht da ist. Er steht dort,
+   wo gleich die Kennzahlen stehen, damit die Seite nicht springt. */
+.dashboard-loading {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin: 0 0 22px;
+}
+
+.dashboard-loading__text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.dashboard-loading > .text-button {
+  min-height: 32px;
+  padding: 0;
+}
+
 .metric-card {
   display: grid;
   align-content: start;

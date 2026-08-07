@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.33";
-import { serverIsNewer } from "./core/versions.js?v=0.42.33";
+} from "./core/work-time.js?v=0.42.34";
+import { serverIsNewer } from "./core/versions.js?v=0.42.34";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.33";
+} from "./core/sync-queue.js?v=0.42.34";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.33";
+} from "./core/permissions.js?v=0.42.34";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.33";
+} from "./core/state-store.js?v=0.42.34";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -559,6 +559,9 @@ import {
     employeeDetailEdit: document.querySelector("#employee-detail-edit"),
     quickAccess: document.querySelector("#quick-access"),
     quickAccessMenu: document.querySelector("#quick-access-menu"),
+    dashboardLoading: document.querySelector("#dashboard-loading"),
+    dashboardLoadingText: document.querySelector("#dashboard-loading-text"),
+    dashboardLoadingRetry: document.querySelector("#dashboard-loading-retry"),
     dashboardMetrics: document.querySelector("#dashboard-metrics"),
     metricSites: document.querySelector("#metric-sites"),
     metricEmployees: document.querySelector("#metric-employees"),
@@ -1009,6 +1012,14 @@ import {
   let deviceCompany = null;
   let companyChangeRequested = false;
   let adminState = null;
+  // Laeuft die Betriebsuebersicht gerade, oder ist sie gescheitert? Ohne diese
+  // Unterscheidung sieht die leere Startseite beim Laden genauso aus wie nach
+  // einem Fehler.
+  let adminOverviewStatus = "idle";
+  // Dauert es laenger als ueblich? Dann sagen wir das auch. "Wird geladen"
+  // stimmt nach einer halben Minute zwar noch, hilft aber niemandem mehr.
+  let adminOverviewDauert = false;
+  let adminOverviewUhr = null;
   let weekState = null;
   let absenceState = [];
   let timeAccountState = null;
@@ -1235,7 +1246,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.33",
+          "X-Schaefchen-Version": "0.42.34",
           ...options.headers
         }
       });
@@ -1265,7 +1276,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.33" }
+        headers: { "X-Schaefchen-Version": "0.42.34" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1312,7 +1323,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.33 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.34 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2584,7 +2595,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.33";
+  const EIGENE_FASSUNG = "0.42.34";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2623,7 +2634,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.42.33". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.42.34". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -2926,9 +2937,36 @@ import {
   // Fuer einen Monteur stehen sie nicht da: er hat mit den Zahlen des ganzen
   // Betriebs nichts zu tun, und sein Dashboard zeigt stattdessen seinen
   // Arbeitstag.
+  // Was ist mit der Betriebsuebersicht?
+  //
+  // Kennzahlen, Tagesuebersicht und Schnellzugriff haengen alle daran. Ist sie
+  // nicht da, stehen alle drei auf "versteckt" - und die Startseite ist
+  // vollstaendig leer. Sie sah dann beim Laden genauso aus wie nach einem
+  // fehlgeschlagenen Laden, und ein Netzfehler wurde nicht einmal gemeldet
+  // (showToast unterbleibt bei error.network). Wer das sieht, wartet - erst
+  // eine Weile, dann laenger.
+  //
+  // Deshalb sagt die Seite jetzt, woran sie ist.
+  function renderDashboardLoading() {
+    const zustaendig = canPlan() && !demoMode;
+    const zeigen = zustaendig
+      && !adminState
+      && currentDashboardPane === "start";
+    elements.dashboardLoading.hidden = !zeigen;
+    if (!zeigen) return;
+    const gescheitert = adminOverviewStatus === "failed";
+    elements.dashboardLoadingText.textContent = gescheitert
+      ? "Die Betriebsübersicht konnte nicht geladen werden."
+      : adminOverviewDauert
+        ? "Die Betriebsübersicht dauert länger als üblich. Der Server läuft vielleicht gerade erst an."
+        : "Betriebsübersicht wird geladen …";
+    elements.dashboardLoadingRetry.hidden = !gescheitert && !adminOverviewDauert;
+  }
+
   function renderDashboardMetrics() {
     const zeigen = Boolean(adminState) && canPlan() && !demoMode;
     elements.dashboardMetrics.hidden = !zeigen || currentDashboardPane !== "start";
+    renderDashboardLoading();
     if (!zeigen) return;
 
     const laufende = adminState.sites.filter(
@@ -6449,16 +6487,33 @@ import {
   async function refreshAdmin(date = elements.assignmentDate.value || localDateKey()) {
     if (!canPlan()) return;
     elements.adminRefresh.disabled = true;
+    adminOverviewStatus = "loading";
+    adminOverviewDauert = false;
+    window.clearTimeout(adminOverviewUhr);
+    adminOverviewUhr = window.setTimeout(() => {
+      if (adminOverviewStatus !== "loading") return;
+      adminOverviewDauert = true;
+      renderDashboardLoading();
+    }, 8000);
+    renderDashboardLoading();
     try {
       const body = await requestJson(`./api/v1/admin/overview?date=${encodeURIComponent(date)}`);
       adminState = body.overview;
+      adminOverviewStatus = "ready";
       elements.assignmentDate.value = adminState.date;
       renderAdmin();
       await refreshTimeCorrectionPolicy();
     } catch (error) {
+      // Auch ein Netzfehler muss sichtbar werden. Er blieb bisher stumm - und
+      // die Startseite, die ohne diese Uebersicht leer ist, sah dann aus, als
+      // laede sie noch. Ohne Ende.
+      adminOverviewStatus = "failed";
+      renderDashboardLoading();
       if (error.status === 401) showLogin();
       else if (!error.network) showToast(error.message);
     } finally {
+      window.clearTimeout(adminOverviewUhr);
+      adminOverviewDauert = false;
       elements.adminRefresh.disabled = false;
     }
   }
@@ -12719,6 +12774,11 @@ import {
     elements.updateBannerReload.disabled = true;
     await verwerfeAbgelegteDateien();
     window.location.reload();
+  });
+
+  elements.dashboardLoadingRetry.addEventListener("click", () => {
+    elements.dashboardLoadingRetry.hidden = true;
+    void refreshAdmin();
   });
 
   elements.globalSearch.addEventListener("input", renderSearchResults);

@@ -4,6 +4,23 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Startseite sagt jetzt, woran sie ist.** Gemeldet als „Start lädt
+  ungewöhnlich lange" — mit einem Bild, auf dem unter der Begrüßung gar nichts
+  stand.
+  - Kennzahlen, Tagesübersicht und Schnellzugriff hängen alle an derselben
+    **Betriebsübersicht**. Ist sie nicht da, stehen alle drei auf „versteckt",
+    und die Startseite ist vollständig leer. Sie sah während des Ladens genauso
+    aus wie nach einem fehlgeschlagenen Laden — und ein **Netzfehler blieb
+    stumm**, weil die Meldung bei Netzfehlern absichtlich unterbleibt. Wer das
+    sieht, wartet: erst eine Weile, dann länger.
+  - Jetzt steht dort, dass geladen wird. Dauert es **länger als acht
+    Sekunden**, steht dort, dass es länger dauert als üblich und der Server
+    vielleicht gerade erst anläuft — „wird geladen" stimmt nach einer halben
+    Minute zwar noch, hilft aber niemandem mehr.
+  - Ist es **gescheitert**, steht das da, mit einem Knopf zum erneuten
+    Versuchen.
+- Fassung 0.42.34, Speicher `schaefchen-online-v76`, Migration 089.
+
 - **Die App merkt jetzt, wenn sie halb alt läuft.** Das Dokument fordert eine
   bestimmte Fassung an — `app.js?v=0.42.33`. Der Dienst-Worker darf im Notfall
   eine ältere Fassung derselben Datei zurückgeben; während einer
