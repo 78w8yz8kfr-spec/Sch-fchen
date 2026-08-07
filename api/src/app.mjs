@@ -200,7 +200,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.42.34";
+export const APPLICATION_VERSION = "0.42.35";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -5724,6 +5724,7 @@ async function getSiteMaterialRecord(client, context, materialId) {
 }
 
 async function createSiteMaterial(client, context, input) {
+  await requireEnabledModule(client, context, "materials");
   const roles = await requirePlanner(client, context);
   await requireConstructionSiteAccess(
     client,
@@ -5745,6 +5746,7 @@ async function createSiteMaterial(client, context, input) {
 }
 
 async function updateSiteMaterial(client, context, materialId, input) {
+  await requireEnabledModule(client, context, "materials");
   const roles = await requirePlanner(client, context);
   await requireScopedEntitySiteAccess(
     client,

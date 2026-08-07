@@ -444,18 +444,11 @@ assert.match(html, /id="employee-edit-phone"/);
 assert.match(html, /id="employee-edit-email"/);
 assert.match(html, /id="customer-form"/);
 assert.match(html, /id="customer-management-panel"/);
-assert.match(html, /id="customer-search"/);
-assert.match(html, /id="customer-status-filter"/);
 assert.match(html, /id="customer-edit-form"/);
 assert.match(html, /id="project-form"/);
 assert.match(html, /id="project-management-panel"/);
-assert.match(html, /id="project-search"/);
-assert.match(html, /id="project-status-filter"/);
 assert.match(html, /id="project-edit-form"/);
 assert.match(html, /id="site-form"/);
-assert.match(html, /id="site-search"/);
-assert.match(html, /id="site-status-filter"/);
-assert.match(html, /id="site-list-summary"/);
 assert.match(html, /id="site-dashboard-edit"/);
 assert.match(html, /id="site-dashboard-status"/);
 assert.match(html, /id="site-edit-form"/);
@@ -594,9 +587,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.34/);
-assert.match(html, /app\.js\?v=0\.42\.34/);
-assert.match(html, /version\.js\?v=0\.42\.34/);
+assert.match(html, /styles\.css\?v=0\.42\.35/);
+assert.match(html, /app\.js\?v=0\.42\.35/);
+assert.match(html, /version\.js\?v=0\.42\.35/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -1106,9 +1099,12 @@ assert.match(app, /window\.SpeechRecognition \|\| window\.webkitSpeechRecognitio
 assert.match(app, /function setCompanyMark/);
 assert.match(app, /session\.company\.logoUrl/);
 assert.match(app, /method: "PATCH"/);
-assert.match(app, /renderSiteList/);
-assert.match(app, /renderCustomerList/);
-assert.match(app, /renderProjectList/);
+// Die sichtbaren Listen fuer Baustellen, Kunden und Projekte. Frueher standen
+// hier renderSiteList, renderCustomerList und renderProjectList - Zwillinge,
+// die nie jemand zu sehen bekam.
+assert.match(app, /function renderBusinessHierarchy\(/);
+assert.match(app, /function renderCustomerOverview\(/);
+assert.match(app, /function renderProjectOverview\(/);
 assert.match(app, /siteStatusGroup/);
 assert.match(app, /rowVersion: customer\.rowVersion/);
 assert.match(app, /rowVersion: project\.rowVersion/);
@@ -1197,16 +1193,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.34"'));
-assert.ok(worker.includes('"./app.js?v=0.42.34"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.34"'));
-assert.ok(worker.includes('"./version.js?v=0.42.34"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.35"'));
+assert.ok(worker.includes('"./app.js?v=0.42.35"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.35"'));
+assert.ok(worker.includes('"./version.js?v=0.42.35"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.34"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.34";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.35"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.35";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1234,7 +1230,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.34$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.35$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1242,11 +1238,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.34"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.34"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.35"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.35"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.34"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.34"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.35"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.35"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1293,8 +1289,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.34/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.34/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.35/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.35/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1409,6 +1405,33 @@ assert.match(app, /Die Betriebsübersicht dauert länger als üblich\./);
 assert.match(app, /adminOverviewStatus = "failed";\s*\n\s*renderDashboardLoading\(\);/);
 assert.match(app, /dashboardLoadingRetry\.addEventListener\("click"/);
 assert.match(styles, /\.dashboard-loading \{/);
+
+// Der Bearbeitungsbogen fuer Projekte war fertig gebaut und die Schnittstelle
+// nahm Aenderungen an - nur rief niemand openProjectEditor auf. Ein Projekt
+// liess sich anlegen und danach nie wieder aendern, auch nicht abschliessen.
+assert.match(html, /id="project-overview-list"/);
+assert.match(app, /function renderProjectOverview\(query\)/);
+assert.match(app, /knopf\.addEventListener\("click", \(\) => openProjectEditor\(project\)\)/);
+assert.match(styles, /#project-overview-list \{\s*--tabellen-spalten:/);
+
+// Nie sichtbare Verwaltungslisten. Sie wurden bei jedem Aktualisieren und bei
+// jedem Tastendruck neu gebaut, ohne dass sie jemand zu sehen bekam - an der
+// laufenden App ueber alle Bereiche nachgemessen.
+for (const tot of ["site-management-panel", "site-list", "customer-list", "project-list"]) {
+  assert.doesNotMatch(
+    html,
+    new RegExp(`id="${tot}"`),
+    `${tot} war nie sichtbar und darf nicht zurueckkommen`
+  );
+}
+assert.doesNotMatch(app, /renderSiteList|renderCustomerList|renderProjectList\b/);
+
+// Jeder abschaltbare Bereich mit eigenem Bildschirm braucht einen Waechter in
+// der Schnittstelle - sonst versteckt die App nur etwas, das der Server weiter
+// bedient. Dass die Waechter greifen, prueft der Integrationstest gegen die
+// laufende Schnittstelle; hier steht nur der Anspruch, damit der naechste
+// Eintrag in MODULBEREICHE nicht ohne ihn dazukommt.
+assert.match(app, /jeden Eintrag hier muss es einen Waechter in der Schnittstelle geben/);
 
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);

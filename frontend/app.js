@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.34";
-import { serverIsNewer } from "./core/versions.js?v=0.42.34";
+} from "./core/work-time.js?v=0.42.35";
+import { serverIsNewer } from "./core/versions.js?v=0.42.35";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.34";
+} from "./core/sync-queue.js?v=0.42.35";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.34";
+} from "./core/permissions.js?v=0.42.35";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.34";
+} from "./core/state-store.js?v=0.42.35";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -510,6 +510,7 @@ import {
     customerSearchField: document.querySelector("#customer-search-field"),
     customerNew: document.querySelector("#customer-new"),
     customerOverviewList: document.querySelector("#customer-overview-list"),
+    projectOverviewList: document.querySelector("#project-overview-list"),
     documentsShell: document.querySelector("#documents-shell"),
     documentsContent: document.querySelector("#documents-content"),
     vehiclesShell: document.querySelector("#vehicles-shell"),
@@ -807,10 +808,6 @@ import {
     customerCity: document.querySelector("#customer-city"),
     customerMessage: document.querySelector("#customer-message"),
     customerManagementPanel: document.querySelector("#customer-management-panel"),
-    customerSearch: document.querySelector("#customer-search"),
-    customerStatusFilter: document.querySelector("#customer-status-filter"),
-    customerListSummary: document.querySelector("#customer-list-summary"),
-    customerList: document.querySelector("#customer-list"),
     customerEditForm: document.querySelector("#customer-edit-form"),
     customerEditNumber: document.querySelector("#customer-edit-number"),
     customerEditType: document.querySelector("#customer-edit-type"),
@@ -836,10 +833,6 @@ import {
     projectManager: document.querySelector("#project-manager"),
     projectMessage: document.querySelector("#project-message"),
     projectManagementPanel: document.querySelector("#project-management-panel"),
-    projectSearch: document.querySelector("#project-search"),
-    projectStatusFilter: document.querySelector("#project-status-filter"),
-    projectListSummary: document.querySelector("#project-list-summary"),
-    projectList: document.querySelector("#project-list"),
     projectEditForm: document.querySelector("#project-edit-form"),
     projectEditNumber: document.querySelector("#project-edit-number"),
     projectEditCustomer: document.querySelector("#project-edit-customer"),
@@ -850,7 +843,6 @@ import {
     projectEditCancel: document.querySelector("#project-edit-cancel"),
     projectEditMessage: document.querySelector("#project-edit-message"),
     siteFormPanel: document.querySelector("#site-form-panel"),
-    siteManagementPanel: document.querySelector("#site-management-panel"),
     siteForm: document.querySelector("#site-form"),
     siteCustomer: document.querySelector("#site-customer"),
     siteNewCustomer: document.querySelector("#site-new-customer"),
@@ -865,10 +857,6 @@ import {
     sitePostalCode: document.querySelector("#site-postal-code"),
     siteCity: document.querySelector("#site-city"),
     siteMessage: document.querySelector("#site-message"),
-    siteSearch: document.querySelector("#site-search"),
-    siteStatusFilter: document.querySelector("#site-status-filter"),
-    siteListSummary: document.querySelector("#site-list-summary"),
-    siteList: document.querySelector("#site-list"),
     documentManagementPanel: document.querySelector("#document-management-panel"),
     documentForm: document.querySelector("#document-form"),
     documentTitle: document.querySelector("#document-title"),
@@ -1246,7 +1234,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.34",
+          "X-Schaefchen-Version": "0.42.35",
           ...options.headers
         }
       });
@@ -1276,7 +1264,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.34" }
+        headers: { "X-Schaefchen-Version": "0.42.35" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1323,7 +1311,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.34 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.35 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2595,7 +2583,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.34";
+  const EIGENE_FASSUNG = "0.42.35";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2634,7 +2622,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.42.34". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.42.35". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -3935,6 +3923,70 @@ import {
       );
       elements.customerOverviewList.append(zeile);
     });
+    renderProjectOverview(query);
+  }
+
+  // Die Projekte des Betriebs, unter den Kunden, zu denen sie gehoeren.
+  //
+  // Bis hierher gab es keinen Weg zu ihnen: der Bearbeitungsbogen war fertig
+  // gebaut, die Schnittstelle nahm Aenderungen an - nur rief niemand
+  // openProjectEditor auf. Ein Projekt liess sich anlegen und danach nie
+  // wieder aendern, auch nicht abschliessen.
+  //
+  // Die Suche der Kundenansicht gilt mit: wer nach einem Kunden sucht, will
+  // dessen Projekte sehen und nicht alle anderen dazu.
+  function renderProjectOverview(query) {
+    const projekte = adminState.projects
+      .filter((project) => (
+        !query
+        || project.name.toLocaleLowerCase("de-DE").includes(query)
+        || (project.number || "").toLocaleLowerCase("de-DE").includes(query)
+        || (project.customerName || "").toLocaleLowerCase("de-DE").includes(query)
+      ))
+      .sort((links, rechts) => (
+        links.customerName.localeCompare(rechts.customerName, "de-DE")
+        || links.name.localeCompare(rechts.name, "de-DE")
+      ));
+
+    elements.projectOverviewList.replaceChildren();
+    if (projekte.length === 0) {
+      const leer = document.createElement("li");
+      leer.className = "admin-list__empty";
+      leer.textContent = query ? "Kein Projekt passt zur Suche." : "Noch kein Projekt angelegt.";
+      elements.projectOverviewList.append(leer);
+      return;
+    }
+
+    appendAdminListHead(
+      elements.projectOverviewList,
+      ["Projekt", "Nummer", "Kunde", "Baustellen", "Status"]
+    );
+    projekte.forEach((project) => {
+      const baustellen = adminState.sites.filter((site) => site.projectId === project.id);
+      const zeile = document.createElement("li");
+      const name = document.createElement("strong");
+      const marke = document.createElement("span");
+      const knopf = document.createElement("button");
+      zeile.className = "admin-list__row";
+      name.textContent = project.name;
+      marke.className = `site-status site-status--${projectStatusGroup(project.status)}`;
+      marke.textContent = projectStatusLabel(project.status);
+      knopf.type = "button";
+      knopf.className = "text-button";
+      knopf.textContent = "Bearbeiten";
+      knopf.addEventListener("click", () => openProjectEditor(project));
+      zeile.append(
+        name,
+        adminListCells([
+          project.number,
+          project.customerName,
+          `${baustellen.length} Baustelle${baustellen.length === 1 ? "" : "n"}`,
+          marke
+        ]),
+        knopf
+      );
+      elements.projectOverviewList.append(zeile);
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -4149,121 +4201,6 @@ import {
     });
   }
 
-  function renderCustomerList() {
-    if (!adminState) return;
-    const query = elements.customerSearch.value.trim().toLocaleLowerCase("de-DE");
-    const statusFilter = elements.customerStatusFilter.value;
-    const customers = adminState.customers.filter((customer) => (
-      (statusFilter === "all" || customerStatusGroup(customer.status) === statusFilter)
-      && (!query || customerSearchText(customer).includes(query))
-    ));
-
-    elements.customerList.replaceChildren();
-    elements.customerListSummary.textContent = `${customers.length} von ${adminState.customers.length} Kunde${adminState.customers.length === 1 ? "" : "n"}`;
-    if (customers.length === 0) {
-      const empty = document.createElement("li");
-      empty.className = "admin-list__empty";
-      empty.textContent = query ? "Kein Kunde passt zur Suche." : "In diesem Status gibt es noch keinen Kunden.";
-      elements.customerList.append(empty);
-      return;
-    }
-
-    customers.forEach((customer) => {
-      const item = document.createElement("li");
-      const content = document.createElement("div");
-      const heading = document.createElement("div");
-      const title = document.createElement("strong");
-      const badge = document.createElement("span");
-      const meta = document.createElement("span");
-      const button = document.createElement("button");
-      const actions = document.createElement("div");
-      const documentsButton = document.createElement("button");
-      const documentCount = documentsForEntity("customer", customer.id).length;
-      const location = [customer.address?.postalCode, customer.address?.city].filter(Boolean).join(" ");
-      title.textContent = customer.displayName;
-      badge.className = `site-status site-status--${customerStatusGroup(customer.status)}`;
-      badge.textContent = customer.status === "archived" ? "Archiviert" : "Aktiv";
-      meta.textContent = [
-        customer.number,
-        `${customer.projectCount} Projekt${customer.projectCount === 1 ? "" : "e"}`,
-        `${documentCount} Dokument${documentCount === 1 ? "" : "e"}`,
-        location,
-        customer.email || customer.phone
-      ].filter(Boolean).join(" · ");
-      heading.append(title, badge);
-      content.append(heading, meta);
-      button.type = "button";
-      button.className = "text-button";
-      button.textContent = "Bearbeiten";
-      button.addEventListener("click", () => openCustomerEditor(customer));
-      documentsButton.type = "button";
-      documentsButton.className = "text-button";
-      documentsButton.textContent = "Dokumente";
-      documentsButton.addEventListener("click", () => focusDocumentsForEntity("customer", customer));
-      actions.className = "list-actions";
-      actions.append(documentsButton, button);
-      item.append(content, actions);
-      elements.customerList.append(item);
-    });
-  }
-
-  function renderProjectList() {
-    if (!adminState) return;
-    const query = elements.projectSearch.value.trim().toLocaleLowerCase("de-DE");
-    const statusFilter = elements.projectStatusFilter.value;
-    const projects = adminState.projects.filter((project) => (
-      (statusFilter === "all" || projectStatusGroup(project.status) === statusFilter)
-      && (!query || projectSearchText(project).includes(query))
-    ));
-
-    elements.projectList.replaceChildren();
-    elements.projectListSummary.textContent = `${projects.length} von ${adminState.projects.length} Projekt${adminState.projects.length === 1 ? "" : "en"}`;
-    if (projects.length === 0) {
-      const empty = document.createElement("li");
-      empty.className = "admin-list__empty";
-      empty.textContent = query ? "Kein Projekt passt zur Suche." : "In diesem Status gibt es noch kein Projekt.";
-      elements.projectList.append(empty);
-      return;
-    }
-
-    projects.forEach((project) => {
-      const item = document.createElement("li");
-      const content = document.createElement("div");
-      const heading = document.createElement("div");
-      const title = document.createElement("strong");
-      const badge = document.createElement("span");
-      const meta = document.createElement("span");
-      const button = document.createElement("button");
-      const actions = document.createElement("div");
-      const documentsButton = document.createElement("button");
-      const documentCount = documentsForEntity("project", project.id).length;
-      title.textContent = project.name;
-      badge.className = `site-status site-status--${projectStatusGroup(project.status)}`;
-      badge.textContent = projectStatusLabel(project.status);
-      meta.textContent = [
-        project.customerName,
-        project.number,
-        project.projectManagerName ? `Projektleitung: ${project.projectManagerName}` : "ohne Projektleitung",
-        `${project.siteCount} Baustelle${project.siteCount === 1 ? "" : "n"}`,
-        `${documentCount} Dokument${documentCount === 1 ? "" : "e"}`
-      ].join(" · ");
-      heading.append(title, badge);
-      content.append(heading, meta);
-      button.type = "button";
-      button.className = "text-button";
-      button.textContent = "Bearbeiten";
-      button.addEventListener("click", () => openProjectEditor(project));
-      documentsButton.type = "button";
-      documentsButton.className = "text-button";
-      documentsButton.textContent = "Dokumente";
-      documentsButton.addEventListener("click", () => focusDocumentsForEntity("project", project));
-      actions.className = "list-actions";
-      actions.append(documentsButton, button);
-      item.append(content, actions);
-      elements.projectList.append(item);
-    });
-  }
-
   function openCustomerEditor(customer) {
     openedCustomerId = customer.id;
     // Kunde und Projekt haben einen eigenen Bereich; das Baustellenformular
@@ -4417,82 +4354,6 @@ import {
       site.address?.postalCode,
       site.address?.city
     ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
-  }
-
-  function renderSiteList() {
-    if (!adminState) return;
-    const query = elements.siteSearch.value.trim().toLocaleLowerCase("de-DE");
-    const statusFilter = elements.siteStatusFilter.value;
-    const sites = adminState.sites.filter((site) => {
-      const statusMatches = statusFilter === "all" || siteStatusGroup(site.status) === statusFilter;
-      return statusMatches && (!query || siteSearchText(site).includes(query));
-    });
-
-    elements.siteList.replaceChildren();
-    elements.siteListSummary.textContent = `${sites.length} von ${adminState.sites.length} Baustelle${adminState.sites.length === 1 ? "" : "n"}`;
-    if (sites.length === 0) {
-      const empty = document.createElement("li");
-      empty.className = "admin-list__empty";
-      empty.textContent = query
-        ? "Keine Baustelle passt zur Suche."
-        : "In diesem Status gibt es noch keine Baustelle.";
-      elements.siteList.append(empty);
-      return;
-    }
-
-    sites.forEach((site) => {
-      const item = document.createElement("li");
-      const content = document.createElement("div");
-      const heading = document.createElement("div");
-      const title = document.createElement("strong");
-      const badge = document.createElement("span");
-      const meta = document.createElement("span");
-      const button = document.createElement("button");
-      const actions = document.createElement("div");
-      title.textContent = site.name;
-      badge.className = `site-status site-status--${siteStatusGroup(site.status)}`;
-      badge.textContent = siteStatusLabel(site.status);
-      meta.textContent = [
-        site.customerName,
-        site.fieldReviewStatus === "pending"
-          ? `Vom Monteur ${site.fieldCreatedByName ? `(${site.fieldCreatedByName}) ` : ""}angelegt · Büroprüfung offen`
-          : null,
-        `${documentsForEntity("construction_site", site.id).length} Dokumente`,
-        `${site.address.street || ""} ${site.address.houseNumber || ""}`.trim(),
-        `${site.address.postalCode || ""} ${site.address.city || ""}`.trim()
-      ].filter(Boolean).join(" · ");
-      heading.append(title, badge);
-      content.append(heading, meta);
-      button.type = "button";
-      button.className = "text-button";
-      button.textContent = "Öffnen";
-      button.addEventListener("click", () => openSiteDashboard(site));
-      actions.className = "site-list-actions";
-      if (site.fieldReviewStatus === "pending") {
-        const confirm = document.createElement("button");
-        confirm.type = "button";
-        confirm.className = "text-button";
-        confirm.textContent = "Bestätigen";
-        confirm.addEventListener("click", async () => {
-          confirm.disabled = true;
-          try {
-            await requestJson(
-              `./api/v1/admin/construction-sites/${encodeURIComponent(site.id)}/confirm`,
-              { method: "POST" }
-            );
-            await refreshAdmin(adminState.date);
-            showToast("Neue Baustelle durch das Büro bestätigt.");
-          } catch (error) {
-            confirm.disabled = false;
-            showToast(error.message);
-          }
-        });
-        actions.append(confirm);
-      }
-      actions.append(button);
-      item.append(content, actions);
-      elements.siteList.append(item);
-    });
   }
 
   // Die Akte einer Baustelle liegt im Bereich "Baustellen". Wer sie von
@@ -6407,14 +6268,11 @@ import {
 
     renderEmployeeList();
 
-    renderCustomerList();
     renderCustomerOverview();
     renderInspectionOverview();
     renderDashboardMetrics();
     renderTodayOverview();
     renderNotifications();
-    renderProjectList();
-    renderSiteList();
     renderDocumentList();
     renderReportCenter();
     renderWorkDayReviews();
@@ -9061,10 +8919,18 @@ import {
   // Abgeschaltete Bereiche werden aus der Oberflaeche genommen. Der Server
   // weist sie ohnehin ab; eine Schaltflaeche, die nur einen Fehler erzeugt,
   // waere schlechter als gar keine.
+  //
+  // "Ohnehin" ist dabei das Entscheidende und nicht selbstverstaendlich: fuer
+  // jeden Eintrag hier muss es einen Waechter in der Schnittstelle geben. Ohne
+  // ihn versteckt die App nur einen Bereich, den der Server weiter bedient -
+  // dann ist der Schalter der Plattformverwaltung eine reine Anzeige.
   const MODULBEREICHE = [
     { key: "absences", knoten: ["#absence-area", "#absence-review-panel"] },
     { key: "documents", knoten: [], reiter: ["tasks", "photos", "documents", "notes"] },
     { key: "materials", knoten: [], reiter: ["materials"] },
+    // Der Baustellenlink ist die einzige Ausnahme, und zwar zu Recht: er wird
+    // aus Daten gebaut, die der Angemeldete ohnehin sehen darf. Es gibt keine
+    // eigene Route, die zu sperren waere.
     { key: "site_qr", knoten: ["#site-dashboard-copy-link"] },
     // Montage- und Tagesberichte sind getrennte Bereiche. Die Berichtsansicht
     // faellt erst weg, wenn beide abgeschaltet sind.
@@ -10855,8 +10721,6 @@ import {
     await refreshAdmin();
   });
 
-  elements.customerSearch.addEventListener("input", renderCustomerList);
-  elements.customerStatusFilter.addEventListener("change", renderCustomerList);
   elements.customerEditCancel.addEventListener("click", () => {
     openedCustomerId = null;
     elements.customerEditForm.hidden = true;
@@ -10927,8 +10791,6 @@ import {
     await refreshAdmin();
   });
 
-  elements.projectSearch.addEventListener("input", renderProjectList);
-  elements.projectStatusFilter.addEventListener("change", renderProjectList);
   elements.projectEditCancel.addEventListener("click", () => {
     openedProjectId = null;
     elements.projectEditForm.hidden = true;
@@ -12858,7 +12720,6 @@ import {
     elements.siteDashboardEdit.hidden = false;
     elements.siteEditMessage.textContent = "";
   });
-  elements.siteSearch.addEventListener("input", renderSiteList);
   elements.hierarchySearch.addEventListener("input", renderBusinessHierarchy);
   elements.hierarchyStatusFilter.addEventListener("change", renderBusinessHierarchy);
   elements.hierarchyNewCustomer.addEventListener("click", () => {
@@ -12875,7 +12736,6 @@ import {
   elements.hierarchyNewSite.addEventListener("click", () => {
     openMasterDataForm(elements.siteFormPanel, elements.siteName);
   });
-  elements.siteStatusFilter.addEventListener("change", renderSiteList);
 
   [
     elements.reportCenterStatus,

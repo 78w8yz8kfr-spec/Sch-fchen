@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Materialschalter sperrt jetzt auch die Schnittstelle.** Material war der
+  einzige abschaltbare Bereich mit eigenem Bildschirm, dessen Routen **nicht am
+  Modul geprüft** wurden. Abgeschaltet verschwand er aus der Oberfläche, blieb
+  über die Schnittstelle aber voll bedienbar — der Schalter der
+  Plattformverwaltung war dort eine reine Anzeige. Alle anderen Bereiche hatten
+  ihren Wächter längst; jetzt auch das Material, beim Anlegen wie beim Ändern.
+- **Projekte lassen sich wieder ändern.** Der Bearbeitungsbogen war fertig
+  gebaut und die Schnittstelle nahm Änderungen an — nur **rief ihn niemand
+  auf**. Ein Projekt ließ sich anlegen und danach nie wieder ändern, auch nicht
+  abschließen. Die Kundenansicht führt jetzt auch die Projekte, mit demselben
+  Weg hinein wie bei den Kunden.
+- **Drei tote Verwaltungslisten entfernt.** Baustellen, Kunden und Projekte
+  hatten je eine zweite Liste, die bei jedem Aktualisieren und bei jedem
+  Tastendruck neu aufgebaut wurde, **ohne dass sie jemals jemand zu sehen
+  bekam** — Reste aus der Zeit vor den heutigen Übersichten. An der laufenden
+  App über alle Bereiche nachgemessen und dann entfernt.
+- Fassung 0.42.35, Speicher `schaefchen-online-v77`, Migration 090.
+
 - **Die Startseite sagt jetzt, woran sie ist.** Gemeldet als „Start lädt
   ungewöhnlich lange" — mit einem Bild, auf dem unter der Begrüßung gar nichts
   stand.

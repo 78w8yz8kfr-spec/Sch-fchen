@@ -4623,6 +4623,67 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
 
   });
 
+  await t.test("Material: der Schalter sperrt auch die Schnittstelle", async () => {
+    // Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
+    // Sonst bliebe er ueber die Schnittstelle bedienbar und der Schalter waere
+    // eine reine Anzeige - genau das war beim Material der Fall, als einzigem
+    // Bereich mit eigenem Bildschirm.
+    const schalteMaterial = async (status) => {
+      const antwort = await fetch(
+        `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/materials`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Cookie: platformCookie },
+          body: JSON.stringify({
+            status,
+            includedInPlan: status !== "inactive",
+            separatelyBilled: false,
+            featureScope: {},
+            reason: `Material im Integrationstest auf ${status} setzen`
+          })
+        }
+      );
+      assert.equal(antwort.status, 200, await antwort.clone().text());
+    };
+
+    const anlegen = () => fetch(`${baseUrl}/api/v1/admin/site-materials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        constructionSiteId: structuredSite.id,
+        itemName: "Kabelkanal 60x40",
+        quantity: 12,
+        unit: "m",
+        status: "planned"
+      })
+    });
+
+    await schalteMaterial("inactive");
+    const gesperrt = await anlegen();
+    assert.equal(gesperrt.status, 409, await gesperrt.clone().text());
+    assert.equal((await gesperrt.json()).error.code, "module_disabled");
+
+    await schalteMaterial("permanent");
+    const erlaubt = await anlegen();
+    assert.equal(erlaubt.status, 201, await erlaubt.clone().text());
+    const eintrag = (await erlaubt.json()).siteMaterial;
+
+    // Auch das Aendern haengt am Schalter, nicht nur das Anlegen.
+    await schalteMaterial("inactive");
+    const aenderungGesperrt = await fetch(
+      `${baseUrl}/api/v1/admin/site-materials/${eintrag.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ status: "available", rowVersion: eintrag.rowVersion })
+      }
+    );
+    assert.equal(aenderungGesperrt.status, 409, await aenderungGesperrt.clone().text());
+    assert.equal((await aenderungGesperrt.json()).error.code, "module_disabled");
+
+    await schalteMaterial("permanent");
+  });
+
   await t.test("Nur die Plattform gibt Bereiche frei", async () => {
     // Frueher konnte die Firma ihre Bereiche selbst abschalten. Das ist
     // entfallen: der Umfang gehoert zum Verkauf, und ein selbst abgeschalteter
