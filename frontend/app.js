@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.35";
-import { serverIsNewer } from "./core/versions.js?v=0.42.35";
+} from "./core/work-time.js?v=0.42.36";
+import { serverIsNewer } from "./core/versions.js?v=0.42.36";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.35";
+} from "./core/sync-queue.js?v=0.42.36";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.35";
+} from "./core/permissions.js?v=0.42.36";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.35";
+} from "./core/state-store.js?v=0.42.36";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -619,6 +619,7 @@ import {
     siteReportDetails: document.querySelector("#site-report-details"),
     siteReportObstructions: document.querySelector("#site-report-obstructions"),
     siteReportOpenItems: document.querySelector("#site-report-open-items"),
+    siteReportWeatherField: document.querySelector("#site-report-weather-field"),
     siteReportWeather: document.querySelector("#site-report-weather"),
     siteReportMaterials: document.querySelector("#site-report-materials"),
     siteReportAgreements: document.querySelector("#site-report-agreements"),
@@ -1234,7 +1235,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.35",
+          "X-Schaefchen-Version": "0.42.36",
           ...options.headers
         }
       });
@@ -1264,7 +1265,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.35" }
+        headers: { "X-Schaefchen-Version": "0.42.36" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1311,7 +1312,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.35 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.36 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2583,7 +2584,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.35";
+  const EIGENE_FASSUNG = "0.42.36";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2622,7 +2623,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.42.35". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.42.36". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -3789,10 +3790,56 @@ import {
     elements.siteReportSubmit.disabled = false;
   }
 
+  // Welche Berichtsarten hat diese Firma?
+  //
+  // Montageberichte und Bautagesberichte sind zwei getrennte Bereiche im
+  // Katalog: ein Betrieb kann den einen fuehren und den anderen nicht. Die
+  // Auswahl hat das bisher nicht gewusst und immer beide angeboten. Wer den
+  // falschen nahm, merkte es erst nach dem Speichern - und hatte Titel,
+  // Leistungen, Stunden und Fotos umsonst eingetragen.
+  const BERICHTSARTEN = [
+    ["montage", "Montageschein", "assembly_reports"],
+    ["daily", "Bautagesbericht", "site_daily_reports"]
+  ];
+
+  function verfuegbareBerichtsarten() {
+    return BERICHTSARTEN.filter(([, , modul]) => moduleEnabled(modul));
+  }
+
+  // Fuellt eine Auswahl mit genau den Arten, die es gibt. Bleibt nur eine
+  // uebrig, gibt es nichts zu waehlen: dann steht sie fest da, statt eine
+  // Entscheidung vorzutaeuschen.
+  // Die Witterung gehoert zum Bautagesbericht, nicht zum Montageschein - der
+  // Server verwirft sie dort. Sichtbar blieb das Feld trotzdem: man konnte es
+  // ausfuellen und der Eintrag verschwand beim Speichern, ohne ein Wort. Die
+  // mobile Karte hat das schon immer richtig gemacht; die Akte jetzt auch.
+  function updateSiteReportTypeFields() {
+    const istTagesbericht = elements.siteReportType.value === "daily";
+    elements.siteReportWeatherField.hidden = !istTagesbericht;
+    elements.siteReportWeather.hidden = !istTagesbericht;
+    if (!istTagesbericht) elements.siteReportWeather.value = "";
+  }
+
+  function fuelleBerichtsarten(select, wunsch = null) {
+    const arten = verfuegbareBerichtsarten();
+    const vorher = wunsch || select.value;
+    select.replaceChildren();
+    arten.forEach(([wert, beschriftung]) => {
+      const option = document.createElement("option");
+      option.value = wert;
+      option.textContent = beschriftung;
+      select.append(option);
+    });
+    select.value = arten.some(([wert]) => wert === vorher) ? vorher : (arten[0]?.[0] || "");
+    select.disabled = arten.length < 2;
+  }
+
   function openSiteReportForm(sourceMode, photoFile = null) {
     resetSiteReportForm();
     reportPhotoFile = photoFile;
     elements.siteReportSourceMode.value = sourceMode;
+    fuelleBerichtsarten(elements.siteReportType);
+    updateSiteReportTypeFields();
     elements.siteReportDate.value = localDateKey();
     renderSiteReportPersonnel();
     renderSiteReportPhotoChoices();
@@ -3804,7 +3851,10 @@ import {
     elements.siteReportForm.hidden = false;
     const draft = readSiteReportDraft(openedSiteId, sourceMode);
     if (draft) {
-      elements.siteReportType.value = draft.reportType || "montage";
+      // Der Entwurf darf keine Art zurueckholen, die es nicht mehr gibt: sonst
+      // steht sie wieder in der Auswahl und scheitert beim Speichern.
+      fuelleBerichtsarten(elements.siteReportType, draft.reportType);
+      updateSiteReportTypeFields();
       elements.siteReportDate.value = draft.workDate || localDateKey();
       renderSiteReportPersonnel();
       elements.siteReportSummary.value = draft.summary || "";
@@ -7473,7 +7523,10 @@ import {
         }
       : null;
     const source = draft || returnedSource;
-    elements.mobileReportType.value = source?.reportType || "daily";
+    // Auch am Feierabend nur die Arten anbieten, die es gibt. Ein Monteur, der
+    // abends auf der Baustelle steht, soll den Bericht abschicken koennen und
+    // nicht erfahren, dass es diese Art hier gar nicht gibt.
+    fuelleBerichtsarten(elements.mobileReportType, source?.reportType || "daily");
     elements.mobileReportSummary.value = source?.summary || "";
     elements.mobileReportDetails.value = source?.workPerformed || "";
     elements.mobileReportObstructions.value = source?.obstructions || "";
@@ -11389,6 +11442,7 @@ import {
     updateMobileReportTypeFields();
     saveMobileReportDraft();
   });
+  elements.siteReportType.addEventListener("change", updateSiteReportTypeFields);
   elements.mobileReportForm.addEventListener("input", (event) => {
     if (event.target.matches("input[data-user-id]")) return;
     updateMobileReportCheck();

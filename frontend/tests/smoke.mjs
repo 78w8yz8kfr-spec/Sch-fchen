@@ -587,9 +587,9 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.35/);
-assert.match(html, /app\.js\?v=0\.42\.35/);
-assert.match(html, /version\.js\?v=0\.42\.35/);
+assert.match(html, /styles\.css\?v=0\.42\.36/);
+assert.match(html, /app\.js\?v=0\.42\.36/);
+assert.match(html, /version\.js\?v=0\.42\.36/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -1193,16 +1193,16 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.35"'));
-assert.ok(worker.includes('"./app.js?v=0.42.35"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.35"'));
-assert.ok(worker.includes('"./version.js?v=0.42.35"'));
+assert.ok(worker.includes('"./styles.css?v=0.42.36"'));
+assert.ok(worker.includes('"./app.js?v=0.42.36"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.42.36"'));
+assert.ok(worker.includes('"./version.js?v=0.42.36"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.35"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.35";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.36"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.36";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1230,7 +1230,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.35$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.42\.36$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1238,11 +1238,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.35"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.35"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.42.36"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.42.36"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.35"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.35"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.42.36"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.42.36"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1289,8 +1289,8 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.35/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.35/);
+assert.match(vdeHtml, /styles\.css\?v=0\.42\.36/);
+assert.match(vdeHtml, /app\.js\?v=0\.42\.36/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1432,6 +1432,24 @@ assert.doesNotMatch(app, /renderSiteList|renderCustomerList|renderProjectList\b/
 // laufende Schnittstelle; hier steht nur der Anspruch, damit der naechste
 // Eintrag in MODULBEREICHE nicht ohne ihn dazukommt.
 assert.match(app, /jeden Eintrag hier muss es einen Waechter in der Schnittstelle geben/);
+
+// Montageberichte und Bautagesberichte sind zwei getrennte Bereiche im
+// Katalog: ein Betrieb kann den einen fuehren und den anderen nicht. Die
+// Auswahl bot bisher immer beide an. Wer den falschen nahm, merkte es erst
+// nach dem Speichern - und hatte Titel, Leistungen, Stunden und Fotos umsonst
+// eingetragen.
+assert.match(app, /const BERICHTSARTEN = \[/);
+assert.match(app, /\["montage", "Montageschein", "assembly_reports"\]/);
+assert.match(app, /\["daily", "Bautagesbericht", "site_daily_reports"\]/);
+assert.match(app, /function verfuegbareBerichtsarten\(\)/);
+assert.match(app, /select\.disabled = arten\.length < 2;/);
+assert.match(app, /fuelleBerichtsarten\(elements\.mobileReportType/);
+// Die Witterung gehoert zum Bautagesbericht. Der Server verwirft sie beim
+// Montageschein - sichtbar blieb das Feld trotzdem, und der Eintrag
+// verschwand beim Speichern ohne ein Wort.
+assert.match(html, /id="site-report-weather-field"/);
+assert.match(app, /function updateSiteReportTypeFields\(\)/);
+assert.match(app, /siteReportType\.addEventListener\("change", updateSiteReportTypeFields\)/);
 
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);

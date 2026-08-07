@@ -4,6 +4,26 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Berichtsarten richten sich nach dem, was die Firma hat.**
+  Montageberichte und Bautagesberichte sind zwei **getrennte Bereiche** im
+  Katalog — ein Betrieb kann den einen führen und den anderen nicht. Die
+  Auswahl im Bericht hat das nie gewusst und immer beide angeboten.
+  - Wer den falschen nahm, merkte es **erst nach dem Speichern**: „Der Bereich
+    Montageberichte ist für diese Firma abgeschaltet." Titel, ausgeführte
+    Leistungen, Stunden je Mitarbeiter und ausgewählte Fotos waren dann umsonst
+    eingetragen. Am schlimmsten trifft es den Monteur, der abends auf der
+    Baustelle steht und den Bericht loswerden will.
+  - Bleibt nur eine Art übrig, **steht sie fest da**, statt eine Entscheidung
+    vorzutäuschen. Das gilt in der Baustellenakte wie auf der Feierabendkarte —
+    und ein wiederhergestellter Entwurf kann keine Art zurückholen, die es
+    nicht mehr gibt.
+  - Dazu ein Zweites: die **Witterung** gehört zum Bautagesbericht, der Server
+    verwirft sie beim Montageschein. Sichtbar blieb das Feld in der
+    Baustellenakte trotzdem — man konnte es ausfüllen, und der Eintrag
+    verschwand beim Speichern, ohne ein Wort. Die Feierabendkarte hat das schon
+    immer richtig gemacht; die Akte jetzt auch.
+- Fassung 0.42.36, Speicher `schaefchen-online-v78`, Migration 091.
+
 - **Der Materialschalter sperrt jetzt auch die Schnittstelle.** Material war der
   einzige abschaltbare Bereich mit eigenem Bildschirm, dessen Routen **nicht am
   Modul geprüft** wurden. Abgeschaltet verschwand er aus der Oberfläche, blieb
