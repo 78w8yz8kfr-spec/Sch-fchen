@@ -1,13 +1,14 @@
 # Projektstatus
 
-Stand: 08.08.2026
-Technischer Stand: V0.43.1
+Stand: 09.08.2026
+Technischer Stand: V0.43.2
 
 ## Abgeschlossen
 
-- mobile Startseite im abgenommenen Baustellenmodus mit eindeutiger Navigation
-  Start, Zeiten und Mehr; der persönliche Arbeitstag erscheint pro Rolle nur
-  an einer Stelle
+- mobile Startseite im abgenommenen Baustellenmodus; Baustellenrollen sehen
+  Start, Zeiten und Mehr, planende Rollen zusätzlich die direkt bedienbaren
+  Bereiche Planung, Doku und Betrieb; der persönliche Arbeitstag erscheint pro
+  Rolle nur an einer Stelle
 - fachlich gruppierte Hauptnavigation mit den Bereichen „Meine Arbeit“,
   „Planung“, „Dokumentation“, „Betrieb“ und „Steuerung“ sowie automatisch
   ausgeblendeten leeren Rollen- und Modulgruppen

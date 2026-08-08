@@ -1659,9 +1659,23 @@ body:has(#vde-app) main {
   }
 
   .bottom-nav {
-    overflow-x: auto;
-    grid-auto-columns: minmax(54px, 1fr);
+    display: flex;
+    overflow-x: hidden;
     scrollbar-width: none;
+  }
+
+  /* Mobil stehen nur echte, antippbare Bereichsschalter in der Leiste. Die
+     Desktop-Ueberschriften duerfen auch bei einem veralteten Zwischenstand
+     der Navigation keinen Platz belegen. */
+  .dashboard-view > .bottom-nav > .nav-group-label,
+  .dashboard-view > .bottom-nav > .nav-brand,
+  .dashboard-view > .bottom-nav > .nav-item--desktop {
+    display: none !important;
+  }
+
+  .dashboard-view > .bottom-nav > .nav-item {
+    min-width: 0;
+    flex: 1 1 0;
   }
 
   .bottom-nav::-webkit-scrollbar {
