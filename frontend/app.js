@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.43.0";
-import { serverIsNewer } from "./core/versions.js?v=0.43.0";
+} from "./core/work-time.js?v=0.43.1";
+import { serverIsNewer } from "./core/versions.js?v=0.43.1";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.43.0";
+} from "./core/sync-queue.js?v=0.43.1";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.43.0";
+} from "./core/permissions.js?v=0.43.1";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.43.0";
+} from "./core/state-store.js?v=0.43.1";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1269,7 +1269,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.43.0",
+          "X-Schaefchen-Version": "0.43.1",
           ...options.headers
         }
       });
@@ -1299,7 +1299,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.43.0" }
+        headers: { "X-Schaefchen-Version": "0.43.1" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1346,7 +1346,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.43.0 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.43.1 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1399,6 +1399,13 @@ import {
     const planner = canPlan();
     elements.navAssignments.hidden = !planner;
     elements.navSites.hidden = !planner;
+    // Die eigene Zeiterfassungsseite brauchen nur planende Rollen. Fuer sie
+    // bleiben "Woche" und "Zeiten" eindeutig getrennt. Baustellenrollen sehen
+    // stattdessen nur "Zeiten" fuer Woche, Eintraege und Arbeitskonto und
+    // starten oder beenden ihren Arbeitstag ausschliesslich auf "Start".
+    elements.navTime.hidden = !planner;
+    elements.navWeek.dataset.kurz = planner ? "Woche" : "Zeiten";
+    elements.navWeek.classList.toggle("nav-week--planner", planner);
     // Das Berichtsheft ist ein eigener Bereich, kein Anhaengsel der
     // Wochenansicht: fuer den Auszubildenden ist es die Arbeit, die er neben
     // der Zeiterfassung taeglich hat, und fuer den Ausbilder die, die er
@@ -2640,7 +2647,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.43.0";
+  const EIGENE_FASSUNG = "0.43.1";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2679,7 +2686,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.43.0". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.43.1". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -9487,13 +9494,12 @@ import {
   // allen drei Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten
   // dieselben drei Karten, weil sie im gemeinsamen Verwaltungsbereich liegen
   // und keine eigene Zuordnung hatten.
-  // Der eigene Arbeitstag hat jetzt einen eindeutigen Bereich. Monteure und
-  // Auszubildende behalten ihn zusaetzlich auf der Uebersicht, weil der erste
-  // logische Schritt beim Oeffnen weiterhin erreichbar bleiben muss. Im Buero
-  // steht er ausschliesslich unter "Zeiterfassung"; "Woche" bleibt die ruhige
-  // Auswertung mit Arbeitskonto und Korrekturen.
+  // Der eigene Arbeitstag hat pro Rolle genau einen Bereich. Baustellenrollen
+  // brauchen den naechsten logischen Schritt direkt auf "Start". Planende
+  // Rollen finden den eigenen Arbeitstag in der getrennten Desktop-
+  // Zeiterfassung. Damit kann dieselbe Karte nicht auf zwei Seiten erscheinen.
   function showsPersonalWorkday(pane) {
-    return pane === "time" || (pane === "start" && !canPlan());
+    return canPlan() ? pane === "time" : pane === "start";
   }
 
   function isOfficeAdminPane() {
@@ -10554,7 +10560,7 @@ import {
     elements.dashboardCompany.textContent = session.company.displayName;
     setCompanyMark(elements.dashboardCompanyMark, session.company.displayName, session.company.logoUrl);
     elements.companyNumber.value = session.company.number;
-    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName}! \u{1F44B}`;
+    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName} \u{1F44B}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
     if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();

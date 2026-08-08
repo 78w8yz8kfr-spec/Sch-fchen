@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.43.0">
-    <link rel="stylesheet" href="./design-system.css?v=0.43.0">
-    <script type="module" src="./app.js?v=0.43.0"></script>
-    <script src="./version.js?v=0.43.0" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.43.1">
+    <link rel="stylesheet" href="./design-system.css?v=0.43.1">
+    <script type="module" src="./app.js?v=0.43.1"></script>
+    <script src="./version.js?v=0.43.1" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.43.0</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.43.1</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -2976,12 +2976,13 @@
             <img src="./assets/mark.svg" alt="" width="26" height="26">
             <span>Schäfchen</span>
           </p>
-          <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page" data-kurz="Übersicht">
+          <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page" data-kurz="Start">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
             <span>Übersicht</span>
           </button>
-          <button id="nav-week" class="nav-item" type="button" data-kurz="Woche">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 0h3m-8 3h3"/></svg>
+          <button id="nav-week" class="nav-item" type="button" data-kurz="Zeiten">
+            <svg class="nav-icon--mobile" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <svg class="nav-icon--desktop" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 0h3m-8 3h3"/></svg>
             <span>Woche</span>
           </button>
           <button id="nav-assignments" class="nav-item" type="button" hidden data-kurz="Planung">

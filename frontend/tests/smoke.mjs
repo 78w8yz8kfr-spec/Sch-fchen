@@ -615,10 +615,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.43\.0/);
-assert.match(html, /design-system\.css\?v=0\.43\.0/);
-assert.match(html, /app\.js\?v=0\.43\.0/);
-assert.match(html, /version\.js\?v=0\.43\.0/);
+assert.match(html, /styles\.css\?v=0\.43\.1/);
+assert.match(html, /design-system\.css\?v=0\.43\.1/);
+assert.match(html, /app\.js\?v=0\.43\.1/);
+assert.match(html, /version\.js\?v=0\.43\.1/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -841,12 +841,17 @@ assert.match(app, /caches\.delete\(name\)/);
 // "Azubi". Unten steht deshalb die kurze Beschriftung; der lange Name bleibt
 // im Dokument, weil ein Vorleser ihn nennt.
 for (const [kennung, kurz] of [
-  ["nav-start", "Übersicht"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
-  ["nav-week", "Woche"], ["nav-time", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
+  ["nav-start", "Start"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
+  ["nav-week", "Zeiten"], ["nav-time", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
 ]) {
   assert.match(html, new RegExp(`id="${kennung}"[^>]*data-kurz="${kurz}"`), `${kennung} ohne kurze Beschriftung`);
 }
 assert.match(styles, /\.bottom-nav > \.nav-item\[data-kurz\]::after \{\s*\n\s*content: attr\(data-kurz\);/);
+assert.match(html, /id="nav-time" class="nav-item"/);
+assert.match(html, /id="nav-week"[\s\S]{0,320}class="nav-icon--mobile"/);
+assert.match(app, /elements\.navTime\.hidden = !planner;/);
+assert.match(app, /elements\.navWeek\.dataset\.kurz = planner \? "Woche" : "Zeiten";/);
+assert.match(app, /elements\.navWeek\.classList\.toggle\("nav-week--planner", planner\);/);
 
 // Der Fuhrpark. Das Modul stand seit Migration 040 im Katalog, dahinter lag
 // nichts; jetzt gibt es die Fahrzeuge samt Bildschirm.
@@ -950,10 +955,10 @@ assert.match(styles, /\.site-overview-avatar--rest \{[\s\S]{0,120}background: va
 // dort scrollt die Leiste waagerecht und eine Pille trifft der Daumen besser.
 assert.match(styles, /\.workspace-section-nav--site-dashboard \.workspace-section-tab--active \{[\s\S]{0,160}border-bottom-color: var\(--brand\);/);
 
-// Wer plant, sieht den eigenen Arbeitstag in der getrennten Zeiterfassung.
-// Monteur, Vorarbeiter und Azubi behalten ihn zusätzlich auf der Übersicht.
+// Der Arbeitstag steht pro Rolle genau einmal: fuer planende Rollen in der
+// Zeiterfassung, fuer Monteur, Vorarbeiter und Azubi auf der Startseite.
 assert.match(app, /function showsPersonalWorkday\(pane\) \{/);
-assert.match(app, /return pane === "time" \|\| \(pane === "start" && !canPlan\(\)\);/);
+assert.match(app, /return canPlan\(\) \? pane === "time" : pane === "start";/);
 assert.match(app, /element\.hidden = !showsPersonalWorkday\(pane\);/);
 assert.match(app, /elements\.overviewCards\.hidden = currentDashboardPane !== "start"/);
 // Der Kopf der Zeiterfassung und die drei vorhandenen Funktionsbereiche stehen
@@ -975,6 +980,10 @@ assert.match(app, /function renderDashboardMetrics\(/);
 assert.match(app, /function renderTodayOverview\(/);
 assert.match(app, /function latestActivity\(/);
 assert.match(app, /function renderQuickAccess\(/);
+assert.match(app, /dashboardTitle\.textContent = `\$\{greetingForHour\(\)\}, \$\{session\.user\.firstName\} \\u\{1F44B\}`;/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.status-card \{[\s\S]*?border-radius: 23px;[\s\S]*?--mobile-status-card-background/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-subtitle \{\s*display: none;/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-badges \.welcome-date \{[\s\S]*?position: absolute;/);
 // Die Kennzahlen gelten nur fuer die Planung: ein Monteur sieht auf seinem
 // Dashboard den Arbeitstag, nicht die Zahlen des ganzen Betriebs.
 assert.match(app, /const zeigen = Boolean\(adminState\) && canPlan\(\) && !demoMode;/);
@@ -1220,17 +1229,17 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.43.0"'));
-assert.ok(worker.includes('"./design-system.css?v=0.43.0"'));
-assert.ok(worker.includes('"./app.js?v=0.43.0"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.43.0"'));
-assert.ok(worker.includes('"./version.js?v=0.43.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.43.1"'));
+assert.ok(worker.includes('"./design-system.css?v=0.43.1"'));
+assert.ok(worker.includes('"./app.js?v=0.43.1"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.43.1"'));
+assert.ok(worker.includes('"./version.js?v=0.43.1"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.43\.0"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.43\.0";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.43\.1"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.43\.1";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1258,7 +1267,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.43\.0$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.43\.1$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1266,11 +1275,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.43.0"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.43.0"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.43.1"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.43.1"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.43.0"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.43.0"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.43.1"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.43.1"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1317,9 +1326,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.43\.0/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.43\.0/);
-assert.match(vdeHtml, /app\.js\?v=0\.43\.0/);
+assert.match(vdeHtml, /styles\.css\?v=0\.43\.1/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.43\.1/);
+assert.match(vdeHtml, /app\.js\?v=0\.43\.1/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1335,7 +1344,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.43\.0/);
+assert.match(platformHtml, /design-system\.css\?v=0\.43\.1/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,
@@ -1401,7 +1410,10 @@ assert.match(app, /document\.addEventListener\("visibilitychange"[\s\S]{0,140}re
 assert.match(app, /setInterval\(\(\) => void refreshModuleAccess\(\), 300000\)/);
 // Der Stand der Bereiche haengt nicht mehr an showDashboard: die Leiste muss
 // sich auch dann neu ausrichten koennen, wenn die Anmeldung laengst vorbei ist.
-assert.match(app, /function applyNavigationAccess\(\)[\s\S]{0,900}navVehicles\.hidden = !planner \|\| !moduleEnabled\("fleet"\)/);
+assert.match(
+  app,
+  /function applyNavigationAccess\(\)[\s\S]*?navVehicles\.hidden = !planner \|\| !moduleEnabled\("fleet"\)[\s\S]*?function setSidebarCollapsed\(/
+);
 assert.match(app, /function showDashboard\(\)[\s\S]{0,240}applyNavigationAccess\(\);/);
 // Wer in einem Bereich steht, der gerade abgeschaltet wurde, darf dort nicht
 // bleiben - der Bildschirm waere noch da, die Schnittstelle schon gesperrt.
