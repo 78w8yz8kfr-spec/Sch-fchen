@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Schäfchen besitzt jetzt ein gemeinsames, referenznahes Designsystem.**
+  Betriebs-App, Plattformverwaltung und VDE-Editor teilen Farben, Typografie,
+  Dichte, Radien, Tabellen, Reiter, Formfelder, Statusmarken und Fokuszustände.
+  Die Desktop-Oberfläche folgt dem kompakten dunklen App-Rahmen der
+  Referenzbilder; mobile Touch-Ziele, Offlinebetrieb und Rollensteuerung bleiben
+  erhalten.
+  - **Woche und Zeiterfassung sind getrennte Bereiche.** Die Woche ergänzt die
+    vorhandenen Detailbuchungen um eine echte Sieben-Tage-Tabelle mit Soll,
+    Ist, Differenz, Einsatz und Status.
+  - Baustellen und Mitarbeiter haben echte Aktiv-/Archiv-Reiter; Mitarbeiter
+    lassen sich nach Name und Rolle filtern. Prüfprotokolle filtern nach
+    Baustelle und Status, Dokumente öffnen das Uploadformular erst bei Bedarf.
+  - Die neue Auswertungsansicht vergleicht die vorhandenen Jahreskonten
+    tabellarisch nach Soll, Ist, Differenz, Überstunden und Saldo. Zeitraum und
+    Mitarbeiter lassen sich filtern; die bestehenden PDF-/Excel-Exporte sind
+    in derselben Ansicht angebunden.
+  - Die Einsatzplanung besitzt echte Wochen-/Monatsreiter sowie Heute-, Druck-
+    und Anlageaktionen. Login, Dashboard, Tabellen und Formulare wurden auf die
+    ruhigere, kompaktere Informationsdichte der Referenz umgestellt.
+- Fassung 0.43.0, Speicher `schaefchen-online-v79`, Migration 092.
+
 - **Die Berichtsarten richten sich nach dem, was die Firma hat.**
   Montageberichte und Bautagesberichte sind zwei **getrennte Bereiche** im
   Katalog — ein Betrieb kann den einen führen und den anderen nicht. Die

@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const stylesheets = ["styles.css", "vde/styles.css", "platform-admin.css"];
+const stylesheets = ["styles.css", "design-system.css", "vde/styles.css", "platform-admin.css"];
 
 // Zerlegt ein Stylesheet grob in Regeln. Verschachtelte Angaben sind in diesem
 // Projekt nicht gebraeuchlich, deshalb genuegt ein flacher Durchlauf, der sich
@@ -46,6 +46,29 @@ function leseRegeln(quelltext) {
   }
   return regeln;
 }
+
+test("Das gemeinsame Designsystem hält die Proportionen der Desktop-Referenz fest", async () => {
+  const css = await readFile(resolve(frontendDirectory, "design-system.css"), "utf8");
+  const regeln = leseRegeln(css);
+  const wurzel = regeln.find((regel) => regel.umgebung === null && regel.selektor === ":root");
+  assert.ok(wurzel, "Dem Designsystem fehlen die globalen Tokens");
+
+  const erwartet = new Map([
+    ["--ui-brand", "#e30613"],
+    ["--ui-sidebar", "#17191d"],
+    ["--ui-sidebar-width", "216px"],
+    ["--ui-sidebar-collapsed-width", "72px"],
+    ["--ui-header-height", "58px"],
+    ["--ui-content-max-width", "1320px"],
+    ["--ui-control-height", "38px"],
+    ["--ui-table-row-height", "44px"]
+  ]);
+  for (const [name, wert] of erwartet) {
+    assert.equal(wurzel.eigenschaften.get(name), wert, `${name} weicht von der Referenz ab`);
+  }
+
+  assert.doesNotMatch(css, /(?:linear|radial)-gradient\(/, "Das zentrale UI braucht keine Verläufe");
+});
 
 test("Keine Anpassung fuer schmale Geraete wird von einer spaeteren Grundregel aufgehoben", async () => {
   const befunde = [];

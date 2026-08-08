@@ -1,10 +1,23 @@
 # Projektstatus
 
-Stand: 01.08.2026
-Technischer Stand: V0.42.0
+Stand: 08.08.2026
+Technischer Stand: V0.43.0
 
 ## Abgeschlossen
 
+- gemeinsames referenznahes Designsystem für Betriebs-App,
+  Plattformverwaltung und VDE-Editor mit zentralen Tokens für Farbe,
+  Typografie, Abstände, Radien, Controls, Tabellen und Status
+- kompakter Desktop-AppShell mit dunkler rollenabhängiger Seitenleiste,
+  rotem Aktivzustand, schmaler Topbar und einklappbarer Navigation
+- getrennte Bereiche für Woche und laufende Zeiterfassung; zusätzliche echte
+  Sieben-Tage-Tabelle mit Einsatz, Soll, Ist, Differenz und Status bei Erhalt
+  aller Detail-, Korrektur- und Exportfunktionen
+- echte Aktiv-/Archiv-Reiter und Filter für Baustellen, Mitarbeiter und
+  Prüfprotokolle sowie kompakte Upload- und Anlageabläufe für Dokumente und
+  Einsatzplanung
+- eigene Auswertungsansicht mit Echt-Daten aus den Jahreskonten, Filtern nach
+  Jahr und Mitarbeiter sowie den bestehenden PDF- und Excel-Exporten
 - Migration 039 trennt Plattformkonten, Plattformrollen, Sitzungen und Audit
   physisch von Firmenbenutzern; der Systemadministrator besitzt keine Firma,
   Mitarbeiterrolle, Einsatz- oder Zeitdaten
