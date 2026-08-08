@@ -9,9 +9,10 @@ const repositoryDirectory = resolve(frontendDirectory, "..");
 
 const readFrontendFile = (path) => readFile(resolve(frontendDirectory, path), "utf8");
 
-const [html, styles, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp, platformHtml, platformStyles, platformApp, workTimeCore] = await Promise.all([
+const [html, styles, designSystem, app, worker, refreshHtml, refreshScript, manifestSource, mark, companyLogo, uiSpecification, siteTemplate, vdeHtml, vdeStyles, vdeApp, platformHtml, platformStyles, platformApp, workTimeCore] = await Promise.all([
   readFrontendFile("index.html"),
   readFrontendFile("styles.css"),
+  readFrontendFile("design-system.css"),
   readFrontendFile("app.js"),
   readFrontendFile("sw.js"),
   readFrontendFile("refresh.html"),
@@ -43,6 +44,33 @@ assert.match(html, /id="week-total-overtime"/);
 assert.match(html, /id="week-previous"/);
 assert.match(html, /id="week-current"/);
 assert.match(html, /id="week-next"/);
+assert.match(html, /id="week-overview-table-body"/);
+assert.match(app, /elements\.weekOverviewTableBody\.append\(tableRow\)/);
+assert.match(html, /id="nav-time"/);
+assert.match(html, /id="time-page-heading"[^>]*data-dashboard-pane="time"/);
+assert.match(html, /id="employee-search-field"/);
+assert.match(html, /id="employee-role-filter"/);
+assert.match(html, /id="inspection-site-filter"/);
+assert.match(html, /id="inspection-status-filter"/);
+assert.match(html, /id="nav-analytics"/);
+assert.match(html, /id="hours-overview-body"/);
+assert.match(html, /id="hours-overview-year"/);
+assert.match(html, /id="hours-overview-employee"/);
+assert.match(app, /function renderHoursOverview\(\)/);
+assert.match(app, /elements\.analyticsExportContent\.append\(elements\.timesheetExportPanel\)/);
+assert.match(app, /elements\.navAnalytics\.hidden = !planner \|\| isProjectScopedSession\(\);/);
+assert.match(app, /elements\.analyticsShell\.hidden = pane !== "analytics" \|\| isProjectScopedSession\(\);/);
+assert.match(html, /id="planning-week-tab"/);
+assert.match(html, /id="planning-month-tab"/);
+assert.match(html, /class="page-tabs report-editor-tabs"/);
+assert.match(html, /href="#site-report-personnel-list">Mitarbeiter/);
+assert.match(html, /id="site-report-finalize-submit"[^>]*>Bericht abschließen</);
+assert.match(designSystem, /--ui-brand: #e30613/);
+assert.match(designSystem, /--ui-sidebar: #17191d/);
+assert.match(designSystem, /--ui-sidebar-width: 216px/);
+assert.match(designSystem, /--ui-header-height: 58px/);
+assert.match(designSystem, /\.week-overview-table/);
+assert.match(designSystem, /\.platform-sidebar/);
 // Der Wochenwechsel nutzt dieselbe Schaltflaeche wie die Plantafel. Vorher war
 // er als kleiner Textknopf ausgefuehrt und mit dem Finger schwer zu treffen.
 assert.match(html, /id="week-previous" class="week-button"/);
@@ -587,9 +615,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.42\.36/);
-assert.match(html, /app\.js\?v=0\.42\.36/);
-assert.match(html, /version\.js\?v=0\.42\.36/);
+assert.match(html, /styles\.css\?v=0\.43\.0/);
+assert.match(html, /design-system\.css\?v=0\.43\.0/);
+assert.match(html, /app\.js\?v=0\.43\.0/);
+assert.match(html, /version\.js\?v=0\.43\.0/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -711,15 +740,13 @@ assert.match(styles, /\.dashboard-view > \.bottom-nav \{[^}]*background: var\(--
 assert.match(styles, /\.nav-item--active[\s\S]{0,120}background: var\(--brand\)/);
 assert.match(html, /id="topbar-user-name"/);
 assert.match(app, /function renderTopbarUser\(/);
-// Die Beschriftungen folgen dem Entwurf.
-// Die Seitenleiste fuehrt jeden Bereich des Entwurfs auf, in dessen
-// Reihenfolge. Material und Fahrzeuge fehlen mit Absicht: dahinter liegt noch
-// kein Bildschirm, und ein Eintrag, der nichts oeffnet, ist schlechter als
-// keiner.
+// Die Beschriftungen folgen dem Entwurf. Woche und Zeiterfassung bleiben
+// getrennt: die erste ist Auswertung und Korrektur, die zweite der laufende
+// Arbeitstag. Ein Eintrag ohne echten Zielbereich wird nicht ergänzt.
 const leisteReihenfolge = [
-  "Dashboard", "Baustellen", "Einsatzplanung", "Zeiterfassung", "Berichte",
-  "Prüfprotokolle", "Azubi", "Mitarbeiter", "Kunden", "Fahrzeuge", "Dokumente",
-  "Einstellungen"
+  "Übersicht", "Woche", "Einsatzplanung", "Zeiterfassung", "Baustellen",
+  "Berichte", "Prüfprotokolle", "Azubi-Berichtsheft", "Mitarbeiter", "Kunden",
+  "Fahrzeuge", "Dokumente", "Auswertungen", "Einstellungen"
 ];
 const leiste = html.slice(
   html.indexOf('<nav class="bottom-nav"'),
@@ -740,8 +767,9 @@ assert.match(styles, /\.nav-brand \{[\s\S]{0,260}text-transform: uppercase;/);
 // waere sie in Zeilen ohne Schaltflaeche null Pixel breit.
 assert.match(app, /function appendAdminListHead\(/);
 assert.match(app, /function adminListCells\(/);
-assert.match(app, /\["Mitarbeiter", "Personalnummer", "Rolle", "Saldo \(Monat\)", "Status"\]/);
-assert.match(app, /appendAdminListHead\(list, \["Baustelle", "Kunde", "Adresse", "Auftrag", "Dokumente", "Status"\]\)/);
+assert.match(app, /\["Name", "E-Mail", "Rolle", "Telefon", "Status"\]/);
+assert.match(app, /appendAdminListHead\(list, \["Name", "Projekt \/ Leistung", "Kunde", "Adresse", "Dokumente", "Status"\]\)/);
+assert.match(app, /\["Nr\.", "Baustelle", "Prüfungsart", "Datum", "Status", "Prüfer"\]/);
 assert.match(styles, /grid-template-columns: var\(--tabellen-spalten/);
 assert.match(styles, /#employee-list \{\s*\n\s*--tabellen-spalten:[^;]*92px;/);
 assert.match(styles, /\.hierarchy-site-table \{\s*\n\s*--tabellen-spalten:[^;]*70px;/);
@@ -813,8 +841,8 @@ assert.match(app, /caches\.delete\(name\)/);
 // "Azubi". Unten steht deshalb die kurze Beschriftung; der lange Name bleibt
 // im Dokument, weil ein Vorleser ihn nennt.
 for (const [kennung, kurz] of [
-  ["nav-start", "Start"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
-  ["nav-week", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
+  ["nav-start", "Übersicht"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
+  ["nav-week", "Woche"], ["nav-time", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
 ]) {
   assert.match(html, new RegExp(`id="${kennung}"[^>]*data-kurz="${kurz}"`), `${kennung} ohne kurze Beschriftung`);
 }
@@ -922,16 +950,15 @@ assert.match(styles, /\.site-overview-avatar--rest \{[\s\S]{0,120}background: va
 // dort scrollt die Leiste waagerecht und eine Pille trifft der Daumen besser.
 assert.match(styles, /\.workspace-section-nav--site-dashboard \.workspace-section-tab--active \{[\s\S]{0,160}border-bottom-color: var\(--brand\);/);
 
-// Wer plant, sitzt im Buero: sein Dashboard endet nach "Heute im Ueberblick",
-// wie im Entwurf. Der eigene Arbeitstag steht bei ihm in der Zeiterfassung.
-// Monteur, Vorarbeiter und Azubi behalten ihn auf dem Dashboard.
-assert.match(app, /function personalPane\(\) \{\s*\n\s*return canPlan\(\) \? "week" : "start";/);
-assert.match(app, /element\.hidden = pane !== personalPane\(\);/);
-assert.match(app, /elements\.overviewCards\.hidden = currentDashboardPane !== personalPane\(\)/);
-// Sie stehen im Dokument hinter der Wochenansicht, damit die Zeiterfassung
-// mit der Woche beginnt - auf dem Dashboard aendert das nichts, weil die
-// Wochenansicht dort verborgen ist.
-assert.match(app, /elements\.weekSection\.after\(\s*\n\s*elements\.workdayCard,/);
+// Wer plant, sieht den eigenen Arbeitstag in der getrennten Zeiterfassung.
+// Monteur, Vorarbeiter und Azubi behalten ihn zusätzlich auf der Übersicht.
+assert.match(app, /function showsPersonalWorkday\(pane\) \{/);
+assert.match(app, /return pane === "time" \|\| \(pane === "start" && !canPlan\(\)\);/);
+assert.match(app, /element\.hidden = !showsPersonalWorkday\(pane\);/);
+assert.match(app, /elements\.overviewCards\.hidden = currentDashboardPane !== "start"/);
+// Der Kopf der Zeiterfassung und die drei vorhandenen Funktionsbereiche stehen
+// als gemeinsamer Block direkt hinter der Woche.
+assert.match(app, /elements\.weekSection\.after\(\s*\n\s*elements\.timePageHeading,\s*\n\s*elements\.workdayCard,/);
 
 // Das Dashboard nach dem Entwurf: Begruessung mit Namen, darunter das volle
 // Datum, rechts der Schnellzugriff. Dann vier Kennzahlen und "Heute im
@@ -1193,16 +1220,17 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.42.36"'));
-assert.ok(worker.includes('"./app.js?v=0.42.36"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.42.36"'));
-assert.ok(worker.includes('"./version.js?v=0.42.36"'));
+assert.ok(worker.includes('"./styles.css?v=0.43.0"'));
+assert.ok(worker.includes('"./design-system.css?v=0.43.0"'));
+assert.ok(worker.includes('"./app.js?v=0.43.0"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.43.0"'));
+assert.ok(worker.includes('"./version.js?v=0.43.0"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.42\.36"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.42\.36";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.43\.0"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.43\.0";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1230,7 +1258,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.42\.36$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.43\.0$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1238,11 +1266,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.42.36"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.42.36"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.43.0"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.43.0"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.42.36"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.42.36"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.43.0"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.43.0"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1289,8 +1317,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.42\.36/);
-assert.match(vdeHtml, /app\.js\?v=0\.42\.36/);
+assert.match(vdeHtml, /styles\.css\?v=0\.43\.0/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.43\.0/);
+assert.match(vdeHtml, /app\.js\?v=0\.43\.0/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1306,6 +1335,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
+assert.match(platformHtml, /design-system\.css\?v=0\.43\.0/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,

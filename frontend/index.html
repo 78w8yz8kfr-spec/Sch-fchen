@@ -8,9 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.42.36">
-    <script type="module" src="./app.js?v=0.42.36"></script>
-    <script src="./version.js?v=0.42.36" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.43.0">
+    <link rel="stylesheet" href="./design-system.css?v=0.43.0">
+    <script type="module" src="./app.js?v=0.43.0"></script>
+    <script src="./version.js?v=0.43.0" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -30,6 +31,11 @@
               <p class="eyebrow">Arbeitsapp</p>
               <h1 id="login-title">Schäfchen</h1>
             </div>
+          </div>
+
+          <div class="login-heading">
+            <h2>Willkommen zurück!</h2>
+            <p>Bitte melde dich an, um fortzufahren.</p>
           </div>
 
           <div class="company-context">
@@ -138,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.42.36</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.43.0</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -148,12 +154,13 @@
         <aside class="login-stage">
           <img src="./assets/mark.svg" alt="" width="52" height="52">
           <p class="login-stage__name">Schäfchen</p>
-          <p class="login-stage__claim">Einfach vor komplex.</p>
+          <p class="login-stage__claim">Die All-in-One Software<br>für Handwerksbetriebe</p>
           <ul class="login-stage__points">
-            <li>Zeiten erfassen, ohne Zettel</li>
-            <li>Einsätze und Baustellen an einem Ort</li>
-            <li>Berichtsheft für Auszubildende</li>
+            <li>Ein System für alle Bereiche</li>
+            <li>Einmal erfassen, überall verfügbar</li>
+            <li>Einfach für Monteure, komplett fürs Büro</li>
           </ul>
+          <p class="login-stage__footer">© 2026 Schäfchen · Alle Rechte vorbehalten</p>
         </aside>
       </section>
 
@@ -182,16 +189,21 @@
 
       <section id="dashboard-view" class="view dashboard-view" aria-labelledby="dashboard-title" hidden>
         <header class="topbar">
-          <div class="brand brand--small">
-            <img src="./assets/mark.svg" alt="" width="40" height="40">
-            <div>
-              <strong>Schäfchen</strong>
-              <span class="company-brand-line">
-                <i id="dashboard-company-mark" class="company-brand-line__mark--logo" aria-hidden="true">
-                  <img src="./assets/company-logos/schaaf-elektro.webp" alt="">
-                </i>
-                <span id="dashboard-company">Schaaf Elektro GmbH</span>
-              </span>
+          <div class="topbar__start">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Navigation einklappen" aria-expanded="true">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+            <div class="brand brand--small">
+              <img src="./assets/mark.svg" alt="" width="40" height="40">
+              <div>
+                <strong>Schäfchen</strong>
+                <span class="company-brand-line">
+                  <i id="dashboard-company-mark" class="company-brand-line__mark--logo" aria-hidden="true">
+                    <img src="./assets/company-logos/schaaf-elektro.webp" alt="">
+                  </i>
+                  <span id="dashboard-company">Schaaf Elektro GmbH</span>
+                </span>
+              </div>
             </div>
           </div>
           <!-- Suche und Glocke aus dem Entwurf. Beide fuehren nur zu Dingen,
@@ -221,6 +233,7 @@
                 <ul id="notification-list" class="notification-bell__list"></ul>
               </div>
             </details>
+            <button id="close-preview" class="avatar-button" type="button" aria-label="Vorschau beenden">D</button>
             <span id="topbar-user" class="topbar-user">
               <strong id="topbar-user-name"></strong>
               <span id="topbar-user-role"></span>
@@ -229,7 +242,6 @@
               <i aria-hidden="true"></i>
               <span>Online</span>
             </span>
-            <button id="close-preview" class="avatar-button" type="button" aria-label="Vorschau beenden">D</button>
           </div>
         </header>
 
@@ -241,9 +253,10 @@
           <div class="welcome-row" data-dashboard-pane="start">
             <div>
               <h1 id="dashboard-title">Guten Morgen</h1>
-              <p id="today-label" class="welcome-date">Heute</p>
+              <p class="welcome-subtitle">Hier ist dein Überblick für heute.</p>
             </div>
             <div class="welcome-badges">
+              <time id="today-label" class="welcome-date">Heute</time>
               <details id="quick-access" class="quick-access" hidden>
                 <summary>Schnellzugriff</summary>
                 <div id="quick-access-menu" class="quick-access__menu"></div>
@@ -251,6 +264,19 @@
               <span id="foreman-badge" class="role-badge" hidden>Vorarbeiter</span>
               <span id="mode-badge" class="preview-badge">Vorschau</span>
             </div>
+          </div>
+
+          <div id="time-page-heading" class="page-heading" data-dashboard-pane="time" hidden>
+            <div>
+              <p class="eyebrow">Persönlicher Arbeitstag</p>
+              <h1>Zeiterfassung</h1>
+            </div>
+            <nav class="page-tabs" aria-label="Bereiche der Zeiterfassung">
+              <a class="page-tab page-tab--active" href="#workday-card">Aktueller Tag</a>
+              <a class="page-tab" href="#timesheet-section">Einträge</a>
+              <button class="page-tab" type="button" data-open-week-target="week-days-section">Korrekturen</button>
+              <button class="page-tab" type="button" data-open-week-target="time-account-panel">Arbeitskonto</button>
+            </nav>
           </div>
 
           <!-- Solange die Betriebsuebersicht nicht da ist, stehen Kennzahlen,
@@ -693,13 +719,12 @@
                 <button id="week-current" class="week-navigation__today" type="button">Heute</button>
               </div>
             </div>
+            <nav class="page-tabs" aria-label="Bereiche der Woche">
+              <a class="page-tab page-tab--active" href="#week-overview-table-card">Übersicht</a>
+              <a class="page-tab" href="#week-days-section">Arbeitszeit</a>
+              <a class="page-tab" href="#time-account-panel">Arbeitskonto</a>
+            </nav>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
-            <div class="week-totals week-totals--primary" aria-label="Persönliche Wochenübersicht">
-              <div><span>Geleistet</span><strong id="week-total-work">00:00</strong></div>
-              <div><span>Sollzeit</span><strong id="week-total-target">00:00</strong></div>
-              <div><span>Differenz</span><strong id="week-total-difference">±00:00</strong></div>
-              <div><span>Zeitkonto</span><strong id="time-account-balance" class="time-account-balance" aria-live="polite">±00:00</strong></div>
-            </div>
             <span id="week-total-break" hidden>00:00</span>
             <span id="week-total-travel" hidden>00:00</span>
             <span id="week-total-overtime" hidden>00:00</span>
@@ -711,6 +736,12 @@
                   <p class="eyebrow">Kompakte Zusammenfassung</p>
                   <h3 id="time-account-title">Arbeitskonto</h3>
                 </div>
+              </div>
+              <div class="week-totals week-totals--primary" aria-label="Persönliche Wochenübersicht">
+                <div><span>Ist-Zeit</span><strong id="week-total-work">00:00</strong></div>
+                <div><span>Soll-Zeit</span><strong id="week-total-target">00:00</strong></div>
+                <div><span>Differenz</span><strong id="week-total-difference">±00:00</strong></div>
+                <div><span>Zeitkonto</span><strong id="time-account-balance" class="time-account-balance" aria-live="polite">±00:00</strong></div>
               </div>
               <p id="time-account-status" class="time-account-status">Wird geladen …</p>
               <details class="time-account-months-panel time-account-details">
@@ -743,6 +774,38 @@
                 </div>
               </details>
               <p id="time-account-message" class="form-message" aria-live="polite"></p>
+            </section>
+
+            <section id="week-overview-table-card" class="week-overview-table-card" aria-labelledby="week-overview-table-title">
+              <div class="week-section-title">
+                <div>
+                  <p class="eyebrow">Tag für Tag</p>
+                  <h3 id="week-overview-table-title">Persönliche Wochenübersicht</h3>
+                </div>
+              </div>
+              <div class="week-overview-table-wrap">
+                <table class="week-overview-table">
+                  <thead>
+                    <tr>
+                      <th>Tag</th>
+                      <th>Datum</th>
+                      <th>Einsatz</th>
+                      <th>Soll-Zeit</th>
+                      <th>Ist-Zeit</th>
+                      <th>Differenz</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="week-overview-table-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section id="week-next-assignment" class="week-focus-card" aria-labelledby="week-next-assignment-title" hidden>
+              <p class="eyebrow">Heute oder als Nächstes</p>
+              <h3 id="week-next-assignment-title">Nächster Einsatz</h3>
+              <strong id="week-next-assignment-name"></strong>
+              <p id="week-next-assignment-meta"></p>
             </section>
 
             <details id="absence-area" class="week-advanced-panel" open>
@@ -801,14 +864,6 @@
               <ul id="absence-list" class="absence-list" aria-label="Eigene Abwesenheitsanträge"></ul>
             </section>
             </details>
-
-            <section id="week-next-assignment" class="week-focus-card" aria-labelledby="week-next-assignment-title" hidden>
-              <p class="eyebrow">Heute oder als Nächstes</p>
-              <h3 id="week-next-assignment-title">Nächster Einsatz</h3>
-              <strong id="week-next-assignment-name"></strong>
-              <p id="week-next-assignment-meta"></p>
-            </section>
-
 
             <section id="week-days-section" class="week-content-section" aria-labelledby="week-days-title">
               <div class="week-section-title">
@@ -926,7 +981,7 @@
             <div class="section-heading week-heading">
               <div>
                 <p class="eyebrow">Ausbildungsnachweis</p>
-                <h2 id="apprentice-section-title">Berichtsheft</h2>
+                <h2 id="apprentice-section-title">Azubi-Berichtsheft</h2>
               </div>
               <div id="apprentice-week-controls" class="week-heading__controls" hidden>
                 <strong id="apprentice-period" class="week-period">Diese Woche</strong>
@@ -937,6 +992,12 @@
                 </div>
               </div>
             </div>
+            <nav class="page-tabs apprentice-tabs" aria-label="Bereiche des Berichtshefts">
+              <a class="page-tab page-tab--active" href="#apprentice-panel">Übersicht</a>
+              <a class="page-tab" href="#apprentice-days">Woche</a>
+              <a class="page-tab" href="#apprentice-history">Verlauf</a>
+              <a class="page-tab" href="#apprentice-preview-panel">Export</a>
+            </nav>
             <section id="apprentice-panel" class="week-review-panel apprentice-panel" aria-labelledby="apprentice-title" hidden>
               <div class="site-management-panel__heading">
                 <div>
@@ -976,26 +1037,29 @@
                 </div>
               </form>
               <p id="apprentice-message" class="form-message" aria-live="polite"></p>
-              <div class="apprentice-notes" aria-label="So funktioniert das Berichtsheft">
-                <article class="apprentice-note">
-                  <strong>Einstellungen (vom Büro)</strong>
-                  <p>Intervall: wöchentlich · Fällig: mit dem Einreichen der Woche ·
-                    Wochentage: Montag bis Freitag, Samstag und Sonntag nur, wenn an
-                    ihnen etwas war.</p>
-                </article>
-                <article class="apprentice-note apprentice-note--info">
-                  <strong>Was der Server verlangt</strong>
-                  <p>Eingereicht wird nur eine vollständige Woche: Jeder Tag mit
-                    Arbeitszeit braucht eine Zeile. Ein Tag mit Urlaub oder Krankheit
-                    ist durch die Abwesenheit erklärt.</p>
-                </article>
-                <article class="apprentice-note apprentice-note--hint">
-                  <strong>Solange nichts unterschrieben ist</strong>
-                  <p>Du kannst jederzeit ergänzen und ändern. Nach dem Einreichen holst
-                    du die Woche mit „Wieder bearbeiten“ zurück — bis dein Ausbilder
-                    unterschrieben hat.</p>
-                </article>
-              </div>
+              <details class="apprentice-guidance">
+                <summary>Hinweise zum Berichtsheft</summary>
+                <div class="apprentice-notes" aria-label="So funktioniert das Berichtsheft">
+                  <article class="apprentice-note">
+                    <strong>Einstellungen (vom Büro)</strong>
+                    <p>Intervall: wöchentlich · Fällig: mit dem Einreichen der Woche ·
+                      Wochentage: Montag bis Freitag, Samstag und Sonntag nur, wenn an
+                      ihnen etwas war.</p>
+                  </article>
+                  <article class="apprentice-note apprentice-note--info">
+                    <strong>Was der Server verlangt</strong>
+                    <p>Eingereicht wird nur eine vollständige Woche: Jeder Tag mit
+                      Arbeitszeit braucht eine Zeile. Ein Tag mit Urlaub oder Krankheit
+                      ist durch die Abwesenheit erklärt.</p>
+                  </article>
+                  <article class="apprentice-note apprentice-note--hint">
+                    <strong>Solange nichts unterschrieben ist</strong>
+                    <p>Du kannst jederzeit ergänzen und ändern. Nach dem Einreichen holst
+                      du die Woche mit „Wieder bearbeiten“ zurück — bis dein Ausbilder
+                      unterschrieben hat.</p>
+                  </article>
+                </div>
+              </details>
               <ul id="apprentice-history" class="apprentice-history" aria-label="Bisherige Wochenberichte"></ul>
             </section>
 
@@ -1206,6 +1270,12 @@
                 <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
               </div>
             </div>
+            <nav id="settings-tabs" class="page-tabs settings-tabs" data-dashboard-pane="more" aria-label="Einstellungsbereiche" hidden>
+              <a class="page-tab page-tab--active" href="#time-account-admin-panel">Arbeitskonten</a>
+              <a class="page-tab" href="#holiday-calendar-admin">Feiertage</a>
+              <a class="page-tab" href="#time-correction-policy-admin">Zeitregeln</a>
+              <a class="page-tab" href="#account-card">Mein Konto</a>
+            </nav>
             <p id="admin-intro" class="admin-intro">Baustellen, Einsätze und Mitarbeiter – übersichtlich an einem Ort.</p>
 
             <!-- Am Telefon fasst die untere Leiste fuenf Eintraege; die uebrigen
@@ -1320,6 +1390,17 @@
             <section id="assignment-planning-shell" class="planning-shell-direct">
               <div id="assignment-planning-content" class="planning-group">
                 <p class="planning-intro">Wochenübersicht, einzelne Zuweisung und Excel-Import an einem Ort.</p>
+                <div class="planning-view-bar">
+                  <nav class="page-tabs planning-view-tabs" aria-label="Zeitraum der Einsatzplanung">
+                    <button id="planning-week-tab" class="page-tab page-tab--active" type="button">Wochenplan</button>
+                    <button id="planning-month-tab" class="page-tab" type="button">Monatsplan</button>
+                  </nav>
+                  <div class="planning-view-actions">
+                    <button id="planning-current" class="button button--secondary" type="button">Heute</button>
+                    <button id="planning-print" class="button button--secondary" type="button">Drucken</button>
+                    <button id="planning-new-assignment" class="button button--primary" type="button">＋ Neuer Einsatz</button>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -1440,18 +1521,86 @@
 
             <section id="inspections-shell" class="planning-shell-direct" hidden>
               <div id="inspections-content" class="planning-group">
-                <div class="entity-toolbar">
+                <nav class="page-tabs inspection-tabs" aria-label="Prüfprotokollstatus">
+                  <button id="inspection-active-tab" class="page-tab page-tab--active" type="button">Meine Protokolle</button>
+                  <button id="inspection-archive-tab" class="page-tab" type="button">Archiv</button>
+                </nav>
+                <div class="entity-toolbar inspection-toolbar">
                   <label class="entity-search" for="inspection-search-field">
                     <span>Prüfprotokolle durchsuchen</span>
                     <input id="inspection-search-field" type="search" maxlength="120" placeholder="Baustelle, Verteilung oder Prüfer">
                   </label>
+                  <label class="entity-search" for="inspection-site-filter">
+                    <span>Baustelle</span>
+                    <select id="inspection-site-filter"><option value="all">Alle Baustellen</option></select>
+                  </label>
+                  <label class="entity-search" for="inspection-status-filter">
+                    <span>Status</span>
+                    <select id="inspection-status-filter">
+                      <option value="draft">Entwurf</option>
+                      <option value="completed">Abgeschlossen</option>
+                      <option value="all">Alle Status</option>
+                    </select>
+                  </label>
+                  <button id="inspection-new" class="button button--primary" type="button">＋ Neues Prüfprotokoll</button>
                 </div>
                 <ul id="inspection-overview-list" class="admin-list admin-list--table inspection-overview-list" aria-label="Prüfprotokolle"></ul>
               </div>
             </section>
 
+            <section id="analytics-shell" class="planning-shell-direct" hidden>
+              <div id="analytics-content" class="planning-group">
+                <nav class="page-tabs analytics-tabs" aria-label="Auswertungsbereiche">
+                  <a class="page-tab page-tab--active" href="#hours-overview-card">Stundenübersicht</a>
+                  <a class="page-tab" href="#timesheet-export-panel">Export</a>
+                </nav>
+                <section id="hours-overview-card" class="hours-overview-card" aria-labelledby="hours-overview-title">
+                  <div class="hours-overview-heading">
+                    <div>
+                      <p class="eyebrow">Arbeitszeiten im Vergleich</p>
+                      <h3 id="hours-overview-title">Stundenübersicht</h3>
+                    </div>
+                    <button id="hours-overview-export" class="button button--primary" type="button">Excel Export</button>
+                  </div>
+                  <div class="hours-overview-toolbar">
+                    <label for="hours-overview-year">
+                      <span>Zeitraum</span>
+                      <select id="hours-overview-year" aria-label="Jahr der Stundenübersicht"></select>
+                    </label>
+                    <label for="hours-overview-employee">
+                      <span>Mitarbeiter</span>
+                      <select id="hours-overview-employee">
+                        <option value="all">Alle Mitarbeiter</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="hours-overview-table-wrap">
+                    <table class="hours-overview-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Mitarbeiter</th>
+                          <th scope="col">Soll-Zeit</th>
+                          <th scope="col">Ist-Zeit</th>
+                          <th scope="col">Differenz</th>
+                          <th scope="col">Überstunden</th>
+                          <th scope="col">Zeitkonto</th>
+                        </tr>
+                      </thead>
+                      <tbody id="hours-overview-body"></tbody>
+                    </table>
+                  </div>
+                  <p id="hours-overview-message" class="form-message" aria-live="polite"></p>
+                </section>
+                <div id="analytics-export-content" class="analytics-export-content"></div>
+              </div>
+            </section>
+
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
               <summary>Kunden, Projekte und Baustellen</summary>
+              <nav class="page-tabs site-list-tabs" aria-label="Baustellenstatus">
+                <button id="site-active-tab" class="page-tab page-tab--active" type="button">Aktive Baustellen</button>
+                <button id="site-archived-tab" class="page-tab" type="button">Archivierte Baustellen</button>
+              </nav>
               <div class="hierarchy-toolbar">
                 <label for="hierarchy-search">
                   <span>Suchen</span>
@@ -1462,6 +1611,7 @@
                   <select id="hierarchy-status-filter">
                     <option value="active">Laufend</option>
                     <option value="completed">Abgeschlossen</option>
+                    <option value="archived">Archiviert</option>
                     <option value="all">Alle</option>
                   </select>
                 </label>
@@ -1613,6 +1763,13 @@
                   <input id="site-report-photo-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
                   <form id="site-report-form" class="site-module-form" novalidate hidden>
                     <input id="site-report-source-mode" type="hidden" value="digital">
+                    <nav class="page-tabs report-editor-tabs" aria-label="Bereiche des Montageberichts">
+                      <a class="page-tab page-tab--active" href="#site-report-type">Übersicht</a>
+                      <a class="page-tab" href="#site-report-personnel-list">Mitarbeiter</a>
+                      <a class="page-tab" href="#site-report-details">Arbeiten</a>
+                      <a class="page-tab" href="#site-report-materials" data-open-report-more>Material</a>
+                      <a class="page-tab" href="#site-report-photo-list">Fotos</a>
+                    </nav>
                     <div class="setup-grid">
                       <div>
                         <label for="site-report-type">Berichtsart</label>
@@ -1691,7 +1848,7 @@
                     </div>
                     <p class="site-module-form__note">Mit dem Abschluss werden beide Unterschriften und eine unveränderliche PDF-Version gespeichert.</p>
                     <div class="site-module-form__actions">
-                      <button id="site-report-finalize-submit" class="button button--primary" type="submit">Unterschreiben &amp; PDF erstellen</button>
+                      <button id="site-report-finalize-submit" class="button button--primary" type="submit">Bericht abschließen</button>
                       <button id="site-report-finalize-cancel" class="text-button" type="button">Abbrechen</button>
                     </div>
                     <p id="site-report-finalize-message" class="form-message" aria-live="polite"></p>
@@ -2006,7 +2163,30 @@
 
             <details id="employee-panel" class="admin-panel">
               <summary>Mitarbeiterverwaltung</summary>
-              <form id="employee-form" class="admin-form" novalidate>
+              <nav class="page-tabs employee-tabs" aria-label="Mitarbeiterstatus">
+                <button id="employee-active-tab" class="page-tab page-tab--active" type="button">Aktive Mitarbeiter</button>
+                <button id="employee-archived-tab" class="page-tab" type="button">Archivierte Mitarbeiter</button>
+              </nav>
+              <div id="employee-toolbar" class="employee-toolbar">
+                <label class="entity-search" for="employee-search-field">
+                  <span>Mitarbeiter durchsuchen</span>
+                  <input id="employee-search-field" type="search" maxlength="120" placeholder="Name, E-Mail oder Personalnummer">
+                </label>
+                <label class="employee-role-filter" for="employee-role-filter">
+                  <span>Rolle</span>
+                  <select id="employee-role-filter">
+                    <option value="all">Alle Rollen</option>
+                    <option value="managing_director">Geschäftsführung</option>
+                    <option value="dispatch_office">Büro / Disposition</option>
+                    <option value="project_manager">Projektleitung</option>
+                    <option value="foreman">Vorarbeiter</option>
+                    <option value="installer">Monteur</option>
+                    <option value="apprentice">Auszubildender</option>
+                  </select>
+                </label>
+                <button id="employee-new" class="button button--primary" type="button">＋ Neuer Mitarbeiter</button>
+              </div>
+              <form id="employee-form" class="admin-form employee-create-form" novalidate hidden>
                 <div class="setup-grid">
                   <div>
                     <label for="employee-first-name">Vorname</label>
@@ -2054,7 +2234,7 @@
               </form>
               <!-- Liste links, ausgewaehlter Mitarbeiter rechts - wie im
                    Entwurf. Am Telefon steht die Spalte unter der Liste. -->
-              <div class="employee-split">
+              <div id="employee-active-content" class="employee-split">
                 <ul id="employee-list" class="admin-list admin-list--table" aria-label="Aktive Mitarbeiter"></ul>
                 <aside id="employee-detail" class="employee-detail" aria-label="Ausgewählter Mitarbeiter" hidden>
                   <p id="employee-detail-name" class="employee-detail__name"></p>
@@ -2374,9 +2554,10 @@
                   <p class="eyebrow">Einmal speichern · überall verwenden</p>
                   <h3 id="document-management-title">Dokumente</h3>
                 </div>
+                <button id="document-new" class="button button--primary" type="button">＋ Hochladen</button>
                 <span id="document-list-summary" class="site-list-summary" aria-live="polite"></span>
               </div>
-              <form id="document-form" class="admin-form document-form" novalidate>
+              <form id="document-form" class="admin-form document-form" novalidate hidden>
                 <div class="document-form__heading">
                   <strong>Neues Dokument</strong>
                   <span>PDF, Bild, Word, Excel oder Text · max. 5 MB</span>
@@ -2795,21 +2976,25 @@
             <img src="./assets/mark.svg" alt="" width="26" height="26">
             <span>Schäfchen</span>
           </p>
-          <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page" data-kurz="Start">
+          <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page" data-kurz="Übersicht">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
-            <span>Dashboard</span>
+            <span>Übersicht</span>
           </button>
-          <button id="nav-sites" class="nav-item" type="button" hidden data-kurz="Baustellen">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
-            <span>Baustellen</span>
+          <button id="nav-week" class="nav-item" type="button" data-kurz="Woche">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 0h3m-8 3h3"/></svg>
+            <span>Woche</span>
           </button>
           <button id="nav-assignments" class="nav-item" type="button" hidden data-kurz="Planung">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
             <span>Einsatzplanung</span>
           </button>
-          <button id="nav-week" class="nav-item" type="button" data-kurz="Zeiten">
+          <button id="nav-time" class="nav-item" type="button" data-kurz="Zeiten">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
             <span>Zeiterfassung</span>
+          </button>
+          <button id="nav-sites" class="nav-item" type="button" hidden data-kurz="Baustellen">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
+            <span>Baustellen</span>
           </button>
           <button id="nav-reports" class="nav-item nav-item--desktop" type="button" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v4h4"/><path d="M9 13h6m-6 4h4"/></svg>
@@ -2821,7 +3006,7 @@
           </button>
           <button id="nav-apprentice" class="nav-item" type="button" hidden data-kurz="Azubi">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
-            <span>Azubi</span>
+            <span>Azubi-Berichtsheft</span>
           </button>
           <button id="nav-employees" class="nav-item nav-item--desktop" type="button" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 20a5.4 5.4 0 0 0-2-4.2"/></svg>
@@ -2838,6 +3023,10 @@
           <button id="nav-documents" class="nav-item nav-item--desktop" type="button" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h3.5l2 2.5H18a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/></svg>
             <span>Dokumente</span>
+          </button>
+          <button id="nav-analytics" class="nav-item nav-item--desktop" type="button" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V10m5 10V4m6 16v-7m5 7V7"/><path d="M3 20h18"/></svg>
+            <span>Auswertungen</span>
           </button>
           <button id="nav-more" class="nav-item" type="button" data-kurz="Mehr">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>

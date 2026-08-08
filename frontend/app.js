@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.42.36";
-import { serverIsNewer } from "./core/versions.js?v=0.42.36";
+} from "./core/work-time.js?v=0.43.0";
+import { serverIsNewer } from "./core/versions.js?v=0.43.0";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.42.36";
+} from "./core/sync-queue.js?v=0.43.0";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.42.36";
+} from "./core/permissions.js?v=0.43.0";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.42.36";
+} from "./core/state-store.js?v=0.43.0";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -114,6 +114,8 @@ import {
     dashboardCompanyMark: document.querySelector("#dashboard-company-mark"),
     dashboardCompany: document.querySelector("#dashboard-company"),
     dashboardTitle: document.querySelector("#dashboard-title"),
+    sidebarToggle: document.querySelector("#sidebar-toggle"),
+    timePageHeading: document.querySelector("#time-page-heading"),
     modeBadge: document.querySelector("#mode-badge"),
     foremanBadge: document.querySelector("#foreman-badge"),
     dashboardPanes: [...document.querySelectorAll("[data-dashboard-pane]")],
@@ -261,6 +263,7 @@ import {
     weekTotalBreak: document.querySelector("#week-total-break"),
     weekTotalTravel: document.querySelector("#week-total-travel"),
     weekTotalOvertime: document.querySelector("#week-total-overtime"),
+    weekOverviewTableBody: document.querySelector("#week-overview-table-body"),
     weekMessage: document.querySelector("#week-message"),
     weekTimesheetList: document.querySelector("#week-timesheet-list"),
     timeAccountPanel: document.querySelector("#time-account-panel"),
@@ -293,6 +296,11 @@ import {
     overviewAccountLink: document.querySelector("#overview-account-link"),
     timeAccountAdminPanel: document.querySelector("#time-account-admin-panel"),
     adminYear: document.querySelector("#admin-year"),
+    hoursOverviewYear: document.querySelector("#hours-overview-year"),
+    hoursOverviewEmployee: document.querySelector("#hours-overview-employee"),
+    hoursOverviewBody: document.querySelector("#hours-overview-body"),
+    hoursOverviewMessage: document.querySelector("#hours-overview-message"),
+    hoursOverviewExport: document.querySelector("#hours-overview-export"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
     timeAccountAdminMessage: document.querySelector("#time-account-admin-message"),
     timeAccountProfileForm: document.querySelector("#time-account-profile-form"),
@@ -447,6 +455,7 @@ import {
     bottomNav: document.querySelector(".bottom-nav"),
     navStart: document.querySelector("#nav-start"),
     navWeek: document.querySelector("#nav-week"),
+    navTime: document.querySelector("#nav-time"),
     navApprentice: document.querySelector("#nav-apprentice"),
     apprenticeSection: document.querySelector("#apprentice-section"),
     apprenticeWeekControls: document.querySelector("#apprentice-week-controls"),
@@ -462,6 +471,7 @@ import {
     navCustomers: document.querySelector("#nav-customers"),
     navVehicles: document.querySelector("#nav-vehicles"),
     navDocuments: document.querySelector("#nav-documents"),
+    navAnalytics: document.querySelector("#nav-analytics"),
     navMore: document.querySelector("#nav-more"),
     infoCard: document.querySelector(".info-card"),
     adminSection: document.querySelector("#admin-section"),
@@ -532,7 +542,14 @@ import {
     vehicleCancel: document.querySelector("#vehicle-cancel"),
     vehicleMessage: document.querySelector("#vehicle-message"),
     inspectionsShell: document.querySelector("#inspections-shell"),
+    analyticsShell: document.querySelector("#analytics-shell"),
+    analyticsExportContent: document.querySelector("#analytics-export-content"),
     inspectionSearchField: document.querySelector("#inspection-search-field"),
+    inspectionSiteFilter: document.querySelector("#inspection-site-filter"),
+    inspectionStatusFilter: document.querySelector("#inspection-status-filter"),
+    inspectionActiveTab: document.querySelector("#inspection-active-tab"),
+    inspectionArchiveTab: document.querySelector("#inspection-archive-tab"),
+    inspectionNew: document.querySelector("#inspection-new"),
     inspectionOverviewList: document.querySelector("#inspection-overview-list"),
     paneMenu: document.querySelector("#pane-menu"),
     dispatchLicenceWarning: document.querySelector("#dispatch-licence-warning"),
@@ -582,6 +599,8 @@ import {
     businessHierarchy: document.querySelector("#business-hierarchy"),
     hierarchySearch: document.querySelector("#hierarchy-search"),
     hierarchyStatusFilter: document.querySelector("#hierarchy-status-filter"),
+    siteActiveTab: document.querySelector("#site-active-tab"),
+    siteArchivedTab: document.querySelector("#site-archived-tab"),
     hierarchyNewCustomer: document.querySelector("#hierarchy-new-customer"),
     hierarchyNewProject: document.querySelector("#hierarchy-new-project"),
     hierarchyNewSite: document.querySelector("#hierarchy-new-site"),
@@ -716,6 +735,11 @@ import {
     adminWeekTitle: document.querySelector("#admin-week-title"),
     adminWeekBoard: document.querySelector("#admin-week-board"),
     planningBoardView: document.querySelector("#planning-board-view"),
+    planningWeekTab: document.querySelector("#planning-week-tab"),
+    planningMonthTab: document.querySelector("#planning-month-tab"),
+    planningCurrent: document.querySelector("#planning-current"),
+    planningPrint: document.querySelector("#planning-print"),
+    planningNewAssignment: document.querySelector("#planning-new-assignment"),
     planningBoardEmployee: document.querySelector("#planning-board-employee"),
     planningBoardTeam: document.querySelector("#planning-board-team"),
     planningBoardSite: document.querySelector("#planning-board-site"),
@@ -775,6 +799,13 @@ import {
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
     employeeList: document.querySelector("#employee-list"),
+    employeeSearchField: document.querySelector("#employee-search-field"),
+    employeeRoleFilter: document.querySelector("#employee-role-filter"),
+    employeeToolbar: document.querySelector("#employee-toolbar"),
+    employeeNew: document.querySelector("#employee-new"),
+    employeeActiveTab: document.querySelector("#employee-active-tab"),
+    employeeArchivedTab: document.querySelector("#employee-archived-tab"),
+    employeeActiveContent: document.querySelector("#employee-active-content"),
     archivedEmployeePanel: document.querySelector("#archived-employee-panel"),
     archivedEmployeeCount: document.querySelector("#archived-employee-count"),
     archivedEmployeeList: document.querySelector("#archived-employee-list"),
@@ -860,6 +891,7 @@ import {
     siteMessage: document.querySelector("#site-message"),
     documentManagementPanel: document.querySelector("#document-management-panel"),
     documentForm: document.querySelector("#document-form"),
+    documentNew: document.querySelector("#document-new"),
     documentTitle: document.querySelector("#document-title"),
     documentCategory: document.querySelector("#document-category"),
     documentCustomer: document.querySelector("#document-customer"),
@@ -936,6 +968,7 @@ import {
   // anderen bleibt er auf dem Dashboard, und die Reihenfolge untereinander
   // aendert sich dabei nicht, weil die Wochenansicht dort verborgen ist.
   elements.weekSection.after(
+    elements.timePageHeading,
     elements.workdayCard,
     elements.todayAssignmentSection,
     elements.overviewCards,
@@ -948,6 +981,7 @@ import {
   elements.reportsContent.append(elements.reportCenter);
   elements.employeesContent.append(elements.employeePanel);
   elements.documentsContent.append(elements.documentManagementPanel);
+  elements.analyticsExportContent.append(elements.timesheetExportPanel);
   elements.customersContent.append(
     elements.customerPanel,
     elements.customerManagementPanel,
@@ -1235,7 +1269,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.42.36",
+          "X-Schaefchen-Version": "0.43.0",
           ...options.headers
         }
       });
@@ -1265,7 +1299,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.42.36" }
+        headers: { "X-Schaefchen-Version": "0.43.0" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1312,7 +1346,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.42.36 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.43.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1376,6 +1410,7 @@ import {
     elements.navEmployees.hidden = !planner || isProjectScopedSession();
     elements.navCustomers.hidden = !planner;
     elements.navDocuments.hidden = !planner;
+    elements.navAnalytics.hidden = !planner || isProjectScopedSession();
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
@@ -1391,12 +1426,33 @@ import {
     elements.bottomNav.classList.toggle("bottom-nav--compact", sichtbare >= 5);
   }
 
+  function setSidebarCollapsed(collapsed, persist = false) {
+    const desktop = window.matchMedia("(min-width: 1080px)").matches;
+    const active = desktop && Boolean(collapsed);
+    elements.dashboardView.classList.toggle("sidebar-collapsed", active);
+    elements.sidebarToggle.setAttribute("aria-expanded", String(!active));
+    elements.sidebarToggle.setAttribute(
+      "aria-label",
+      active ? "Navigation ausklappen" : "Navigation einklappen"
+    );
+    if (persist) {
+      window.localStorage.setItem("schaefchen-sidebar-collapsed", active ? "1" : "0");
+    }
+  }
+
+  function restoreSidebarPreference() {
+    setSidebarCollapsed(
+      window.localStorage.getItem("schaefchen-sidebar-collapsed") === "1"
+    );
+  }
+
   function showDashboard() {
     elements.loginView.hidden = true;
     elements.passwordChangeView.hidden = true;
     elements.dashboardView.hidden = false;
     applyNavigationAccess();
-    document.title = "Dashboard · Schäfchen";
+    restoreSidebarPreference();
+    document.title = "Übersicht · Schäfchen";
     render();
     showDashboardPane("start", false);
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -2584,7 +2640,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.42.36";
+  const EIGENE_FASSUNG = "0.43.0";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2623,7 +2679,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.42.36". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.43.0". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -4191,12 +4247,33 @@ import {
   function renderInspectionOverview() {
     if (!adminState) return;
     const query = elements.inspectionSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const selectedSiteId = elements.inspectionSiteFilter.value || "all";
+    const selectedStatus = elements.inspectionStatusFilter.value || "draft";
+    populatePlanningFilter(
+      elements.inspectionSiteFilter,
+      adminState.sites,
+      "Alle Baustellen",
+      (site) => site.name
+    );
+    if (selectedSiteId === "all" || adminState.sites.some((site) => site.id === selectedSiteId)) {
+      elements.inspectionSiteFilter.value = selectedSiteId;
+    }
+    elements.inspectionActiveTab.classList.toggle("page-tab--active", selectedStatus === "draft");
+    elements.inspectionArchiveTab.classList.toggle("page-tab--active", selectedStatus === "completed");
+    elements.inspectionNew.disabled = !adminState.sites.some(
+      (site) => siteStatusGroup(site.status) === "active"
+    );
     const baustelle = (id) => adminState.sites.find((site) => site.id === id);
     const pruefungen = (adminState.vdeInspections || [])
       .map((inspection) => ({ inspection, site: baustelle(inspection.constructionSiteId) }))
-      .filter(({ inspection, site }) => !query || [
-        inspection.name, inspection.number, inspection.inspectorName, site?.name
-      ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query))
+      .filter(({ inspection, site }) => (
+        (selectedStatus === "all" || inspection.status === selectedStatus)
+        && (elements.inspectionSiteFilter.value === "all"
+          || inspection.constructionSiteId === elements.inspectionSiteFilter.value)
+        && (!query || [
+          inspection.name, inspection.number, inspection.inspectorName, site?.name
+        ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query))
+      ))
       .sort((links, rechts) => (
         rechts.inspection.inspectionDate.localeCompare(links.inspection.inspectionDate)
       ));
@@ -4214,7 +4291,7 @@ import {
 
     appendAdminListHead(
       elements.inspectionOverviewList,
-      ["Prüfprotokoll", "Nummer", "Baustelle", "Prüfer", "Datum", "Status"]
+      ["Nr.", "Baustelle", "Prüfungsart", "Datum", "Status", "Prüfer"]
     );
     pruefungen.forEach(({ inspection, site }) => {
       const zeile = document.createElement("li");
@@ -4222,7 +4299,7 @@ import {
       const marke = document.createElement("span");
       const ziel = document.createElement("a");
       zeile.className = "admin-list__row";
-      name.textContent = inspection.name;
+      name.textContent = inspection.number;
       marke.className = `site-status site-status--${
         inspection.status === "completed" ? "completed" : "active"
       }`;
@@ -4239,11 +4316,11 @@ import {
       zeile.append(
         name,
         adminListCells([
-          inspection.number,
           site?.name,
-          inspection.inspectorName,
+          inspection.name,
           shortDate(inspection.inspectionDate),
-          marke
+          marke,
+          inspection.inspectorName
         ]),
         ziel
       );
@@ -4512,10 +4589,13 @@ import {
   function openDocumentUploadForSite() {
     const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
     if (!site) return;
+    showDashboardPane("documents");
     elements.documentSearch.value = "";
     setDocumentTargets({ customerId: site.customerId, projectId: site.projectId, constructionSiteId: site.id });
     renderDocumentList();
     elements.documentManagementPanel.open = true;
+    elements.documentForm.hidden = false;
+    elements.documentNew.textContent = "Formular schließen";
     elements.documentManagementPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     elements.documentTitle.focus({ preventScroll: true });
   }
@@ -4628,6 +4708,14 @@ import {
   }
 
   function renderBusinessHierarchy() {
+    elements.siteActiveTab.classList.toggle(
+      "page-tab--active",
+      elements.hierarchyStatusFilter.value === "active"
+    );
+    elements.siteArchivedTab.classList.toggle(
+      "page-tab--active",
+      elements.hierarchyStatusFilter.value === "archived"
+    );
     elements.businessHierarchy.replaceChildren();
     const query = elements.hierarchySearch.value.trim().toLocaleLowerCase("de-DE");
     const statusFilter = elements.hierarchyStatusFilter.value;
@@ -4663,7 +4751,7 @@ import {
     const list = document.createElement("ul");
     list.className = "admin-list admin-list--table hierarchy-site-table";
     list.id = "hierarchy-site-table";
-    appendAdminListHead(list, ["Baustelle", "Kunde", "Adresse", "Auftrag", "Dokumente", "Status"]);
+    appendAdminListHead(list, ["Name", "Projekt / Leistung", "Kunde", "Adresse", "Dokumente", "Status"]);
     sites.forEach((site) => {
       const item = document.createElement("li");
       const title = document.createElement("strong");
@@ -4689,9 +4777,9 @@ import {
       item.append(
         title,
         adminListCells([
+          site.shortText,
           site.customerName,
           address,
-          site.shortText,
           `${documents} Dokument${documents === 1 ? "" : "e"}`,
           badge
         ]),
@@ -5147,6 +5235,8 @@ import {
 
   function renderAdminWeek() {
     const view = elements.planningBoardView.value;
+    elements.planningWeekTab.classList.toggle("page-tab--active", view === "week");
+    elements.planningMonthTab.classList.toggle("page-tab--active", view === "month");
     const filters = planningFilters();
     const allAssignments = planningAssignments();
     elements.adminWeekBoard.replaceChildren();
@@ -5772,24 +5862,38 @@ import {
     });
   }
 
-  // Die Mitarbeiterliste mit der Spalte daneben. Sie steht in einer eigenen
-  // Funktion, weil der Saldo erst mit den Jahreskonten eintrifft: bis dahin
-  // stand in der Spalte ein Strich, und niemand zeichnete sie noch einmal.
+  // Die Mitarbeiterliste zeigt die Angaben, nach denen das Büro tatsächlich
+  // sucht. Personalnummer und Arbeitskonto bleiben in der rechten Detailakte;
+  // E-Mail und Telefon müssen dagegen schon beim Überfliegen erreichbar sein.
   function renderEmployeeList() {
     if (!adminState) return;
     const projectScoped = Boolean(adminState.projectScopeRestricted);
+    const search = elements.employeeSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const roleFilter = elements.employeeRoleFilter.value;
+    const activeEmployees = adminState.employees.filter((employee) => {
+      const matchesRole = roleFilter === "all" || employee.roles.includes(roleFilter);
+      const searchText = [
+        employee.firstName,
+        employee.lastName,
+        employee.personnelNumber,
+        employee.email,
+        employee.phone
+      ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
+      return matchesRole && (!search || searchText.includes(search));
+    });
     elements.employeeList.replaceChildren();
-    if (adminState.employees.length > 0) {
+    if (activeEmployees.length > 0) {
       appendAdminListHead(
         elements.employeeList,
-        ["Mitarbeiter", "Personalnummer", "Rolle", "Saldo (Monat)", "Status"]
+        ["Name", "E-Mail", "Rolle", "Telefon", "Status"]
       );
     }
     elements.archivedEmployeeList.replaceChildren();
     const archivedEmployees = adminState.archivedEmployees || [];
     elements.archivedEmployeeCount.textContent = String(archivedEmployees.length);
-    elements.archivedEmployeePanel.hidden = projectScoped;
-    adminState.employees.forEach((employee) => {
+    elements.archivedEmployeePanel.hidden = projectScoped
+      || !elements.employeeArchivedTab.classList.contains("page-tab--active");
+    activeEmployees.forEach((employee) => {
       const roleLabels = {
         admin: "Administrator",
         managing_director: "Geschäftsführer",
@@ -5819,9 +5923,9 @@ import {
       zeile.append(
         name,
         adminListCells([
-          employee.personnelNumber,
+          employee.email,
           employee.roles.map((role) => roleLabels[role] || role).join(", "),
-          employeeBalanceText(employee.id),
+          employee.phone,
           marke
         ])
       );
@@ -5839,6 +5943,14 @@ import {
       zeile.addEventListener("click", () => selectEmployee(employee));
       elements.employeeList.append(zeile);
     });
+    if (activeEmployees.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "admin-list__empty";
+      empty.textContent = adminState.employees.length === 0
+        ? "Noch keine aktiven Mitarbeiter angelegt."
+        : "Kein Mitarbeiter passt zu Suche und Rollenfilter.";
+      elements.employeeList.append(empty);
+    }
     renderEmployeeDetail();
     archivedEmployees.forEach((employee) => {
       const item = document.createElement("li");
@@ -5886,6 +5998,20 @@ import {
       empty.textContent = "Keine archivierten Mitarbeiter.";
       elements.archivedEmployeeList.append(empty);
     }
+  }
+
+  function showArchivedEmployeeView(archived) {
+    const projectScoped = Boolean(adminState?.projectScopeRestricted);
+    elements.employeeActiveTab.classList.toggle("page-tab--active", !archived);
+    elements.employeeArchivedTab.classList.toggle("page-tab--active", archived);
+    elements.employeeActiveContent.hidden = archived;
+    elements.employeeToolbar.hidden = archived;
+    if (archived) {
+      elements.employeeForm.hidden = true;
+      elements.employeeNew.textContent = "＋ Neuer Mitarbeiter";
+    }
+    elements.archivedEmployeePanel.hidden = projectScoped || !archived;
+    elements.archivedEmployeePanel.open = archived && !projectScoped;
   }
 
   // Der Saldo steht im Jahreskonto - dieselbe Zahl, die die Bueroverwaltung
@@ -8247,7 +8373,7 @@ import {
       elements.weekOpenActions,
       elements.nextHolidayCard
     ];
-    elements.overviewCards.hidden = currentDashboardPane !== personalPane()
+    elements.overviewCards.hidden = currentDashboardPane !== "start"
       || karten.every((karte) => karte.hidden);
   }
 
@@ -8537,19 +8663,121 @@ import {
   function renderAdminYearOptions() {
     const current = new Date().getFullYear();
     const years = [current + 1, current, current - 1, current - 2];
-    if (elements.adminYear.options.length !== years.length) {
-      elements.adminYear.replaceChildren(...years.map((year) => {
-        const option = document.createElement("option");
-        option.value = String(year);
-        option.textContent = String(year);
-        return option;
-      }));
+    [elements.adminYear, elements.hoursOverviewYear].forEach((picker) => {
+      if (picker.options.length !== years.length) {
+        picker.replaceChildren(...years.map((year) => {
+          const option = document.createElement("option");
+          option.value = String(year);
+          option.textContent = String(year);
+          return option;
+        }));
+      }
+      picker.value = String(adminYear);
+    });
+  }
+
+  function hoursValueClass(minutes) {
+    if (minutes > 0) return "hours-value hours-value--positive";
+    if (minutes < 0) return "hours-value hours-value--negative";
+    return "hours-value hours-value--neutral";
+  }
+
+  function appendHoursOverviewCell(row, value, className = "") {
+    const cell = document.createElement("td");
+    cell.textContent = value;
+    if (className) cell.className = className;
+    row.append(cell);
+  }
+
+  function renderHoursOverview() {
+    renderAdminYearOptions();
+    const allowed = canPlan() && !isProjectScopedSession();
+    elements.hoursOverviewBody.replaceChildren();
+    if (!allowed) {
+      elements.hoursOverviewMessage.textContent = "";
+      return;
     }
-    elements.adminYear.value = String(adminYear);
+
+    const overview = timeAccountsState?.year === adminYear ? timeAccountsState : null;
+    const previousEmployee = elements.hoursOverviewEmployee.value || "all";
+    elements.hoursOverviewEmployee.replaceChildren(new Option("Alle Mitarbeiter", "all"));
+    (overview?.accounts || []).forEach((account) => {
+      elements.hoursOverviewEmployee.append(
+        new Option(`${account.employeeName} · ${account.personnelNumber}`, account.employeeId)
+      );
+    });
+    elements.hoursOverviewEmployee.value = [...elements.hoursOverviewEmployee.options]
+      .some((option) => option.value === previousEmployee)
+      ? previousEmployee
+      : "all";
+
+    if (!overview) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.className = "hours-overview-empty";
+      cell.textContent = navigator.onLine
+        ? "Stundenübersicht wird geladen …"
+        : "Die Stundenübersicht ist offline gerade nicht verfügbar.";
+      row.append(cell);
+      elements.hoursOverviewBody.append(row);
+      elements.hoursOverviewMessage.textContent = "";
+      return;
+    }
+
+    const selectedEmployee = elements.hoursOverviewEmployee.value;
+    const accounts = overview.accounts.filter((account) => (
+      selectedEmployee === "all" || account.employeeId === selectedEmployee
+    ));
+    if (accounts.length === 0) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.className = "hours-overview-empty";
+      cell.textContent = "Für diese Auswahl sind keine aktiven Mitarbeiter vorhanden.";
+      row.append(cell);
+      elements.hoursOverviewBody.append(row);
+    } else {
+      accounts.forEach((account) => {
+        const row = document.createElement("tr");
+        const employeeCell = document.createElement("td");
+        const employeeName = document.createElement("strong");
+        const employeeMeta = document.createElement("span");
+        employeeCell.className = "hours-overview-employee";
+        employeeName.textContent = account.employeeName;
+        employeeMeta.textContent = account.enabled
+          ? account.personnelNumber
+          : `${account.personnelNumber} · Stundenkonto deaktiviert`;
+        employeeCell.append(employeeName, employeeMeta);
+        row.append(employeeCell);
+
+        if (!account.enabled) {
+          ["–", "–", "–", "–"].forEach((value) => appendHoursOverviewCell(row, value));
+          appendHoursOverviewCell(row, "Deaktiviert", "hours-value hours-value--neutral");
+        } else {
+          const difference = Number(account.totals.yearBalanceChangeMinutes || 0);
+          const balance = Number(account.totals.balanceMinutes || 0);
+          appendHoursOverviewCell(row, `${formatMinutes(account.totals.targetMinutes)} h`);
+          appendHoursOverviewCell(row, `${formatMinutes(account.totals.workedMinutes)} h`);
+          appendHoursOverviewCell(row, `${formatSignedMinutes(difference)} h`, hoursValueClass(difference));
+          appendHoursOverviewCell(
+            row,
+            difference > 0 ? `${formatMinutes(difference)} h` : "–",
+            hoursValueClass(Math.max(0, difference))
+          );
+          appendHoursOverviewCell(row, `${formatSignedMinutes(balance)} h`, hoursValueClass(balance));
+        }
+        elements.hoursOverviewBody.append(row);
+      });
+    }
+    elements.hoursOverviewMessage.textContent = `Stand ${new Intl.DateTimeFormat("de-DE").format(
+      new Date(`${overview.asOfDate}T12:00:00`)
+    )} · genehmigte Abwesenheiten und nachvollziehbare Korrekturen sind im Kontostand berücksichtigt.`;
   }
 
   function renderAdminTimeAccounts() {
     renderAdminYearOptions();
+    renderHoursOverview();
     const visible = canPlan() && !isProjectScopedSession() && isOfficeAdminPane();
     elements.timeAccountAdminPanel.hidden = !visible;
     elements.holidayCalendarAdmin.hidden = !visible;
@@ -8686,6 +8914,7 @@ import {
     elements.timeAccountWeekTravel.textContent = formatMinutes(visibleWeek.totals.travelMinutes || 0);
     elements.timeAccountWeekOvertime.textContent = formatSignedMinutes(visibleWeek.totals.overtimeMinutes || 0);
     elements.weekStrip.replaceChildren();
+    elements.weekOverviewTableBody.replaceChildren();
     elements.weekTimesheetList.replaceChildren();
     renderEmployeeTimesheetExport(visibleWeek);
     renderApprenticePanel();
@@ -8734,6 +8963,64 @@ import {
       const item = document.createElement("button");
       const dayName = shortDayFormatter.format(date).replace(".", "");
       const isToday = workDate === localDateKey(today);
+      const assignmentForDay = selectedIsCurrentWeek
+        && workDate === (assignmentsDate || localDateKey())
+        ? assignments[0]
+        : null;
+      const tableRow = document.createElement("tr");
+      const siteFromEntry = workDay?.entries?.find((entry) => entry.constructionSiteName)
+        ?.constructionSiteName;
+      const actualMinutes = Number(workDay?.workMinutes || 0);
+      const dayTargetMinutes = Number(workDay?.targetWorkMinutes || 0);
+      const dayDifferenceMinutes = actualMinutes - dayTargetMinutes;
+      const weekend = [0, 6].includes(date.getDay());
+      const tableStatus = approvedAbsence
+        ? absenceTypeLabel(approvedAbsence.absenceType)
+        : workDay?.status === "approved"
+          ? "Freigegeben"
+          : workDay?.status === "locked"
+            ? "Abgerechnet"
+            : workDay?.entries?.at(-1)?.entryType === "clock_out"
+              ? "Erfasst"
+              : workDay?.entries?.length
+                ? "In Arbeit"
+                : assignmentForDay
+                  ? "Geplant"
+                  : weekend ? "Frei" : "Offen";
+      const tableStatusKind = approvedAbsence
+        ? "absence"
+        : ["Freigegeben", "Abgerechnet", "Erfasst"].includes(tableStatus)
+          ? "success"
+          : tableStatus === "In Arbeit"
+            ? "active"
+            : tableStatus === "Geplant"
+              ? "planned"
+              : "neutral";
+      const tableValues = [
+        dayName,
+        date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
+        assignmentForDay?.constructionSite?.name || siteFromEntry || "–",
+        dayTargetMinutes ? formatMinutes(dayTargetMinutes) : "–",
+        workDay ? formatMinutes(actualMinutes) : "–",
+        workDay ? formatSignedMinutes(dayDifferenceMinutes) : "–"
+      ];
+      tableValues.forEach((value, index) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        if (index === 0) cell.className = "week-overview-table__day";
+        if (index === 5 && workDay && dayDifferenceMinutes !== 0) {
+          cell.classList.add(dayDifferenceMinutes > 0 ? "is-positive" : "is-negative");
+        }
+        tableRow.append(cell);
+      });
+      const statusCell = document.createElement("td");
+      const statusBadge = document.createElement("span");
+      statusBadge.className = `week-status week-status--${tableStatusKind}`;
+      statusBadge.textContent = tableStatus;
+      statusCell.append(statusBadge);
+      tableRow.append(statusCell);
+      if (isToday) tableRow.classList.add("is-today");
+      elements.weekOverviewTableBody.append(tableRow);
       item.className = `day-pill${isToday ? " day-pill--today" : ""}${
         approvedAbsence ? " day-pill--absent" : ""
       }`;
@@ -9200,12 +9487,13 @@ import {
   // allen drei Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten
   // dieselben drei Karten, weil sie im gemeinsamen Verwaltungsbereich liegen
   // und keine eigene Zuordnung hatten.
-  // Wer plant, sitzt im Buero: sein Dashboard zeigt den Betrieb, so wie im
-  // Entwurf. Der eigene Arbeitstag steht bei ihm in der Zeiterfassung - dort
-  // sucht er ihn ohnehin. Monteur, Vorarbeiter und Auszubildender behalten ihn
-  // auf dem Dashboard: sie brauchen den Startknopf beim Aufmachen der App.
-  function personalPane() {
-    return canPlan() ? "week" : "start";
+  // Der eigene Arbeitstag hat jetzt einen eindeutigen Bereich. Monteure und
+  // Auszubildende behalten ihn zusaetzlich auf der Uebersicht, weil der erste
+  // logische Schritt beim Oeffnen weiterhin erreichbar bleiben muss. Im Buero
+  // steht er ausschliesslich unter "Zeiterfassung"; "Woche" bleibt die ruhige
+  // Auswertung mit Arbeitskonto und Korrekturen.
+  function showsPersonalWorkday(pane) {
+    return pane === "time" || (pane === "start" && !canPlan());
   }
 
   function isOfficeAdminPane() {
@@ -9218,7 +9506,7 @@ import {
     if (pane !== "week") closeTimeCorrectionForm();
     const adminPanes = new Set([
       "assignments", "sites", "reports", "employees", "customers", "vehicles",
-      "documents", "inspections", "more"
+      "documents", "inspections", "analytics", "more"
     ]);
     elements.dashboardPanes.forEach((element) => {
       if (element === elements.adminSection) {
@@ -9236,7 +9524,7 @@ import {
       // das Dashboard.
       if ([elements.workdayCard, elements.todayAssignmentSection, elements.timesheetSection]
         .includes(element)) {
-        element.hidden = pane !== personalPane();
+        element.hidden = !showsPersonalWorkday(pane);
         return;
       }
       if (element === elements.apprenticeTodaySection) {
@@ -9260,21 +9548,29 @@ import {
       elements.vehiclesShell.hidden = pane !== "vehicles";
       elements.documentsShell.hidden = pane !== "documents";
       elements.inspectionsShell.hidden = pane !== "inspections";
+      elements.analyticsShell.hidden = pane !== "analytics" || isProjectScopedSession();
       elements.reportCenter.hidden = pane !== "reports"
         || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
       elements.employeePanel.hidden = pane !== "employees" || isProjectScopedSession();
+      if (pane === "employees" && !elements.employeePanel.hidden) {
+        elements.employeePanel.open = true;
+      }
       elements.documentManagementPanel.hidden = pane !== "documents";
-      elements.adminSummary.hidden = pane !== "sites" && pane !== "assignments";
+      if (pane === "documents" && !elements.documentManagementPanel.hidden) {
+        elements.documentManagementPanel.open = true;
+      }
+      elements.adminSummary.hidden = true;
       elements.dispatchSummary.hidden = pane !== "assignments";
       const copy = {
         assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
-        sites: ["Baustellen", "Baustellenplanung", "Baustellen anlegen, durchsuchen und direkt bearbeiten."],
+        sites: ["Baustellenverwaltung", "Baustellen", "Aktive und archivierte Baustellen durchsuchen und bearbeiten."],
         reports: ["Montage und Tagesberichte", "Berichte", "Offene, zurückgegebene und abgeschlossene Berichte an einer Stelle."],
         employees: ["Mannschaft", "Mitarbeiter", "Konten anlegen, Rollen vergeben und Stammdaten pflegen."],
         customers: ["Stammdaten", "Kunden", "Kunden und ihre Aufträge an einer Stelle."],
         vehicles: ["Fuhrpark", "Fahrzeuge", "Transporter, Anhänger und Maschinen mit Fahrer und Terminen."],
         documents: ["Einmal speichern · überall verwenden", "Dokumente", "Pläne, Protokolle und Rechnungen zentral ablegen."],
         inspections: ["Elektrische Anlagen", "Prüfprotokolle", "Alle VDE-Prüfungen des Betriebs auf einen Blick."],
+        analytics: ["Arbeitszeiten und Nachweise", "Auswertungen", "Soll, Ist und Zeitkonten vergleichen oder als Nachweis exportieren."],
         more: ["Verwaltung", "Einstellungen", "Arbeitszeitregeln, Feiertage und Zugang verwalten."]
       }[pane];
       if (copy) {
@@ -9288,6 +9584,7 @@ import {
     }
 
     const activeButton = {
+      time: elements.navTime,
       week: elements.navWeek,
       apprentice: elements.navApprentice,
       assignments: elements.navAssignments,
@@ -9298,6 +9595,7 @@ import {
       vehicles: elements.navVehicles,
       documents: elements.navDocuments,
       inspections: elements.navInspections,
+      analytics: elements.navAnalytics,
       more: elements.navMore
     }[pane] || elements.navStart;
     activateNavigation(activeButton);
@@ -9311,7 +9609,8 @@ import {
     renderOverviewCards();
     renderTopbarUser();
     const title = {
-      week: "Zeiterfassung",
+      week: "Woche",
+      time: "Zeiterfassung",
       apprentice: "Berichtsheft",
       reports: "Berichte",
       employees: "Mitarbeiter",
@@ -9319,11 +9618,12 @@ import {
       vehicles: "Fahrzeuge",
       documents: "Dokumente",
       inspections: "Prüfprotokolle",
+      analytics: "Auswertungen",
       site: "Baustelle",
       assignments: "Einsätze",
       sites: "Baustellen",
       more: "Einstellungen"
-    }[pane] || "Dashboard";
+    }[pane] || "Übersicht";
     document.title = `${title} · Schäfchen`;
     window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
   }
@@ -10170,9 +10470,12 @@ import {
     } catch (error) {
       if (error.status === 401) showLogin();
       else {
-        elements.timeAccountAdminMessage.textContent = error.network
+        const message = error.network
           ? "Die Jahreskonten konnten gerade nicht aktualisiert werden."
           : error.message;
+        elements.timeAccountAdminMessage.textContent = message;
+        renderHoursOverview();
+        elements.hoursOverviewMessage.textContent = message;
       }
     }
   }
@@ -10251,7 +10554,7 @@ import {
     elements.dashboardCompany.textContent = session.company.displayName;
     setCompanyMark(elements.dashboardCompanyMark, session.company.displayName, session.company.logoUrl);
     elements.companyNumber.value = session.company.number;
-    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName} \u{1F44B}`;
+    elements.dashboardTitle.textContent = `${greetingForHour()}, ${session.user.firstName}! \u{1F44B}`;
     elements.closePreview.textContent = (session.user.firstName[0] || "A").toUpperCase();
     if (!elements.assignmentDate.value) elements.assignmentDate.value = localDateKey();
     showDashboard();
@@ -10410,8 +10713,29 @@ import {
     );
     if (!saved) return;
     elements.employeeForm.reset();
+    elements.employeeForm.hidden = true;
+    elements.employeeNew.textContent = "＋ Neuer Mitarbeiter";
     fillLicenceField(elements.employeeLicences, []);
     await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
+  });
+
+  elements.employeeSearchField.addEventListener("input", renderEmployeeList);
+  elements.employeeRoleFilter.addEventListener("change", renderEmployeeList);
+  elements.employeeActiveTab.addEventListener("click", () => {
+    showArchivedEmployeeView(false);
+  });
+  elements.employeeArchivedTab.addEventListener("click", () => {
+    showArchivedEmployeeView(true);
+  });
+  elements.employeeNew.addEventListener("click", () => {
+    showArchivedEmployeeView(false);
+    const opening = elements.employeeForm.hidden;
+    elements.employeeForm.hidden = !opening;
+    elements.employeeNew.textContent = opening ? "Formular schließen" : "＋ Neuer Mitarbeiter";
+    if (opening) {
+      elements.employeeFirstName.focus({ preventScroll: true });
+      elements.employeeForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   });
 
   elements.employeeEditForm.addEventListener("submit", async (event) => {
@@ -10638,7 +10962,28 @@ import {
     const chosen = Number(elements.adminYear.value);
     if (!Number.isInteger(chosen) || chosen === adminYear) return;
     adminYear = chosen;
+    renderAdminTimeAccounts();
     await refreshAdminTimeAccounts();
+  });
+
+  elements.hoursOverviewYear.addEventListener("change", async () => {
+    const chosen = Number(elements.hoursOverviewYear.value);
+    if (!Number.isInteger(chosen) || chosen === adminYear) return;
+    adminYear = chosen;
+    renderAdminTimeAccounts();
+    await refreshAdminTimeAccounts();
+  });
+
+  elements.hoursOverviewEmployee.addEventListener("change", renderHoursOverview);
+  elements.hoursOverviewExport.addEventListener("click", () => {
+    renderTimesheetExport();
+    const employeeId = elements.hoursOverviewEmployee.value;
+    if (employeeId !== "all" && [...elements.timesheetExportEmployee.options]
+      .some((option) => option.value === employeeId)) {
+      elements.timesheetExportEmployee.value = employeeId;
+    }
+    elements.timesheetExportPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    elements.timesheetExportFrom.focus({ preventScroll: true });
   });
 
   elements.holidayCalendarForm.addEventListener("submit", async (event) => {
@@ -10974,6 +11319,15 @@ import {
 
   elements.documentSearch.addEventListener("input", renderDocumentList);
   elements.documentStatusFilter.addEventListener("change", renderDocumentList);
+  elements.documentNew.addEventListener("click", () => {
+    const opening = elements.documentForm.hidden;
+    elements.documentForm.hidden = !opening;
+    elements.documentNew.textContent = opening ? "Formular schließen" : "＋ Hochladen";
+    if (opening) {
+      elements.documentTitle.focus({ preventScroll: true });
+      elements.documentForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
   elements.documentFileChoose.addEventListener("click", () => elements.documentFile.click());
   elements.documentFile.addEventListener("change", () => {
     documentFile = elements.documentFile.files?.[0] || null;
@@ -11036,6 +11390,8 @@ import {
       documentFile = null;
       elements.documentFile.value = "";
       elements.documentForm.reset();
+      elements.documentForm.hidden = true;
+      elements.documentNew.textContent = "＋ Hochladen";
       elements.documentFileName.textContent = "Noch keine Datei gewählt";
       elements.documentSearch.value = "";
       elements.documentStatusFilter.value = "active";
@@ -11942,6 +12298,23 @@ import {
     elements.planningBoardProjectManager,
     elements.planningBoardStatus
   ].forEach((control) => control.addEventListener("change", renderAdminWeek));
+  elements.planningWeekTab.addEventListener("click", () => {
+    elements.planningBoardView.value = "week";
+    renderAdminWeek();
+  });
+  elements.planningMonthTab.addEventListener("click", () => {
+    elements.planningBoardView.value = "month";
+    renderAdminWeek();
+  });
+  elements.planningCurrent.addEventListener("click", () => {
+    void refreshAdmin(localDateKey());
+  });
+  elements.planningPrint.addEventListener("click", () => window.print());
+  elements.planningNewAssignment.addEventListener("click", () => {
+    elements.assignmentPanel.open = true;
+    elements.assignmentPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => elements.assignmentEmployee.focus({ preventScroll: true }), 250);
+  });
   elements.adminWeekPrevious.addEventListener("click", () => {
     const date = adminState?.date || localDateKey();
     void refreshAdmin(elements.planningBoardView.value === "month"
@@ -12587,9 +12960,39 @@ import {
   elements.navStart.addEventListener("click", () => {
     showDashboardPane("start");
   });
+  elements.navTime.addEventListener("click", () => {
+    showDashboardPane("time");
+    void refreshLiveData();
+  });
   elements.navWeek.addEventListener("click", () => {
     showDashboardPane("week");
     void Promise.all([refreshWeekData(), refreshAbsenceData()]);
+  });
+  elements.sidebarToggle.addEventListener("click", () => {
+    setSidebarCollapsed(
+      !elements.dashboardView.classList.contains("sidebar-collapsed"),
+      true
+    );
+  });
+  document.querySelectorAll("[data-open-week-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetId = button.dataset.openWeekTarget;
+      elements.navWeek.click();
+      window.setTimeout(() => {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    });
+  });
+  document.querySelectorAll("a.page-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tab.closest(".page-tabs")?.querySelectorAll(".page-tab").forEach((candidate) => {
+        candidate.classList.toggle("page-tab--active", candidate === tab);
+      });
+      if (tab.hasAttribute("data-open-report-more")) {
+        const more = tab.closest("form")?.querySelector(".mobile-report-more");
+        if (more) more.open = true;
+      }
+    });
   });
   // Derselbe Weg wie ueber die Leiste - die Uebersicht zeigt die Zahl, der
   // Wochenbereich schluesselt sie auf.
@@ -12635,6 +13038,10 @@ import {
   elements.navEmployees.addEventListener("click", () => showDashboardPane("employees"));
   elements.navCustomers.addEventListener("click", () => showDashboardPane("customers"));
   elements.navDocuments.addEventListener("click", () => showDashboardPane("documents"));
+  elements.navAnalytics.addEventListener("click", () => {
+    showDashboardPane("analytics");
+    void refreshAdminTimeAccounts();
+  });
   elements.navVehicles.addEventListener("click", () => {
     showDashboardPane("vehicles");
     void refreshVehicles();
@@ -12711,6 +13118,32 @@ import {
   });
   elements.customerSearchField.addEventListener("input", renderCustomerOverview);
   elements.inspectionSearchField.addEventListener("input", renderInspectionOverview);
+  elements.inspectionSiteFilter.addEventListener("change", renderInspectionOverview);
+  elements.inspectionStatusFilter.addEventListener("change", renderInspectionOverview);
+  elements.inspectionActiveTab.addEventListener("click", () => {
+    elements.inspectionStatusFilter.value = "draft";
+    renderInspectionOverview();
+  });
+  elements.inspectionArchiveTab.addEventListener("click", () => {
+    elements.inspectionStatusFilter.value = "completed";
+    renderInspectionOverview();
+  });
+  elements.inspectionNew.addEventListener("click", () => {
+    const siteId = elements.inspectionSiteFilter.value;
+    const site = adminState?.sites.find((item) => item.id === siteId);
+    if (!site || siteStatusGroup(site.status) !== "active") {
+      elements.inspectionSiteFilter.focus();
+      try {
+        elements.inspectionSiteFilter.showPicker?.();
+      } catch {
+        // Einige Browser erlauben showPicker nur bei unmittelbar sichtbaren
+        // Selects. Der Fokus und der Hinweis bleiben dann der sichere Fallback.
+      }
+      showToast("Bitte zuerst die Baustelle für das neue Prüfprotokoll wählen.");
+      return;
+    }
+    window.location.assign(vdeEditorUrl(site.id, null, adminState?.date));
+  });
   elements.customerNew.addEventListener("click", () => {
     elements.customerPanel.hidden = false;
     elements.customerPanel.open = true;
@@ -12776,6 +13209,14 @@ import {
   });
   elements.hierarchySearch.addEventListener("input", renderBusinessHierarchy);
   elements.hierarchyStatusFilter.addEventListener("change", renderBusinessHierarchy);
+  elements.siteActiveTab.addEventListener("click", () => {
+    elements.hierarchyStatusFilter.value = "active";
+    renderBusinessHierarchy();
+  });
+  elements.siteArchivedTab.addEventListener("click", () => {
+    elements.hierarchyStatusFilter.value = "archived";
+    renderBusinessHierarchy();
+  });
   elements.hierarchyNewCustomer.addEventListener("click", () => {
     openMasterDataForm(
       elements.customerPanel,

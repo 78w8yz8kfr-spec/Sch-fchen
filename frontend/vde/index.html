@@ -7,7 +7,8 @@
     <meta name="robots" content="noindex,nofollow">
     <title>VDE-Prüfung · Schäfchen</title>
     <link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="./styles.css?v=0.42.36">
+    <link rel="stylesheet" href="./styles.css?v=0.43.0">
+    <link rel="stylesheet" href="../design-system.css?v=0.43.0">
   </head>
   <body>
     <header class="app-header">
@@ -112,9 +113,18 @@
               <span id="inspection-status" class="status-chip">Entwurf</span>
             </div>
 
+            <nav class="editor-tabs" aria-label="Abschnitte des Prüfprotokolls">
+              <a class="editor-tab editor-tab--active" href="#vde-overview-section">Übersicht</a>
+              <a class="editor-tab" href="#vde-visual-section">Besichtigen</a>
+              <a class="editor-tab" href="#vde-incoming-section">Einspeisung</a>
+              <a class="editor-tab" href="#vde-distribution-section">UV / FI / Stromkreise</a>
+              <a class="editor-tab" href="#vde-equipment-section">Messwerte &amp; Ergebnis</a>
+              <a class="editor-tab" href="#signature-section">Unterschrift</a>
+            </nav>
+
             <form id="inspection-form" novalidate>
               <fieldset id="inspection-fields">
-                <section class="form-section" aria-labelledby="basis-title">
+                <section id="vde-overview-section" class="form-section" aria-labelledby="basis-title">
                   <div class="form-section__heading">
                     <div>
                       <span>01</span>
@@ -157,7 +167,7 @@
                   </div>
                 </section>
 
-                <section class="form-section" aria-labelledby="visual-title">
+                <section id="vde-visual-section" class="form-section" aria-labelledby="visual-title">
                   <div class="form-section__heading">
                     <div>
                       <span>02</span>
@@ -167,7 +177,7 @@
                   <div id="visual-checks" class="visual-checks"></div>
                 </section>
 
-                <section class="form-section" aria-labelledby="incoming-title">
+                <section id="vde-incoming-section" class="form-section" aria-labelledby="incoming-title">
                   <div class="form-section__heading">
                     <div>
                       <span>03</span>
@@ -206,7 +216,7 @@
                   </div>
                 </section>
 
-                <section class="form-section" aria-labelledby="distribution-title">
+                <section id="vde-distribution-section" class="form-section" aria-labelledby="distribution-title">
                   <div class="form-section__heading">
                     <div>
                       <span>04</span>
@@ -222,7 +232,7 @@
                   <div id="distribution-list" class="distribution-list"></div>
                 </section>
 
-                <section class="form-section" aria-labelledby="equipment-title">
+                <section id="vde-equipment-section" class="form-section" aria-labelledby="equipment-title">
                   <div class="form-section__heading">
                     <div>
                       <span>05</span>
@@ -314,6 +324,6 @@
       <li class="inspection-list__empty">Noch keine VDE-Prüfung für diese Baustelle.</li>
     </template>
 
-    <script src="./app.js?v=0.42.36" defer></script>
+    <script src="./app.js?v=0.43.0" defer></script>
   </body>
 </html>

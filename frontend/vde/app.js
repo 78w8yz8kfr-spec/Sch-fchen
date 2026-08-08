@@ -419,7 +419,7 @@
           // Plattform ein Pflichtupdate setzt: der Server kann eine fehlende
           // Fassung nicht von einer zu alten unterscheiden. Das VDE-Modul waere
           // dann als einziges vollstaendig ausgefallen.
-          "X-Schaefchen-Version": "0.42.36",
+          "X-Schaefchen-Version": "0.43.0",
           ...(options.body ? { "Content-Type": "application/json" } : {}),
           ...options.headers
         }
@@ -2218,6 +2218,13 @@
   };
   elements.signaturePad.addEventListener("pointerup", finishSignature);
   elements.signaturePad.addEventListener("pointercancel", finishSignature);
+  document.querySelectorAll(".editor-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".editor-tab").forEach((candidate) => {
+        candidate.classList.toggle("editor-tab--active", candidate === tab);
+      });
+    });
+  });
   window.addEventListener("pagehide", persistLocalDraft);
 
   clearSignature();
