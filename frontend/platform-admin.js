@@ -934,11 +934,25 @@
     session = null; elements.shell.hidden = true; elements.auth.hidden = false;
   }
 
+  // Plattformrollen sehen nur die Funktionen, die sie wirklich bedienen
+  // duerfen. Bleibt dadurch eine fachliche Gruppe ohne Eintrag, verschwindet
+  // auch ihre Ueberschrift statt als leeres Kapitel stehen zu bleiben.
+  function updateNavigationGroups() {
+    elements.navigation.querySelectorAll("[data-platform-group-label]").forEach((label) => {
+      const group = label.dataset.platformGroupLabel;
+      const hasVisibleEntry = [...elements.navigation.querySelectorAll(
+        `[data-platform-group="${group}"]`
+      )].some((button) => !button.hidden);
+      label.hidden = !hasVisibleEntry;
+    });
+  }
+
   async function enterPlatform(nextSession) {
     session = nextSession; elements.auth.hidden = true; elements.shell.hidden = false;
     elements.userName.textContent = `${session.platformUser.firstName} ${session.platformUser.lastName}`;
     elements.userRoles.textContent = session.platformUser.roles.join(", ");
     elements.navigation.querySelectorAll("[data-platform-view]").forEach((button) => { button.hidden = !can(permissionByView[button.dataset.platformView]); });
+    updateNavigationGroups();
     await restoreSupportMode();
     const firstView = can("dashboard.read") ? "overview" : Object.keys(viewTitles).find((view) => can(permissionByView[view]));
     await selectView(firstView || "overview");

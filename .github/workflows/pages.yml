@@ -20,8 +20,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
-  cancel-in-progress: false
+  # Prüfungen und Veröffentlichungen dürfen sich nicht gegenseitig blockieren.
+  group: pwa-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -45,11 +46,11 @@ jobs:
 
   deploy:
     name: GitHub Pages veröffentlichen
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
     environment:
-      name: github-pages
+      name: pages-production
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Repository laden

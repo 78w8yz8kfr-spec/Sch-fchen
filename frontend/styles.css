@@ -1881,6 +1881,22 @@ select:focus-visible {
   gap: 6px;
 }
 
+.week-subarea {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  grid-column: 1 / -1;
+}
+
+.week-subarea[hidden] {
+  display: none;
+}
+
+.week-subarea > * {
+  min-width: 0;
+  margin-top: 0;
+}
+
 .week-review-panel {
   margin-top: 20px;
   padding: 17px;
@@ -5393,6 +5409,12 @@ select:focus-visible {
   backdrop-filter: blur(18px);
 }
 
+/* Die fachlichen Gruppen gehoeren zur Desktop-Seitenleiste. In der mobilen
+   Leiste bleiben ausschliesslich die kurzen, direkt antippbaren Ziele. */
+.nav-group-label {
+  display: none;
+}
+
 /* Zeichen und Wortmarke gehoeren zur Seitenleiste am Rechner. Am Telefon
    steht die Leiste unten am Rand - dort ist dafuer kein Platz, und der Name
    steht ohnehin schon in der Kopfzeile. Dasselbe gilt fuer die Eintraege, die
@@ -6587,6 +6609,21 @@ select:focus-visible {
     background: var(--sidebar);
   }
 
+  .dashboard-view > .bottom-nav > .nav-group-label {
+    display: block;
+    margin: 12px 11px 3px;
+    color: rgba(255, 255, 255, 0.46);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    line-height: 1.25;
+    text-transform: uppercase;
+  }
+
+  .dashboard-view > .bottom-nav > .nav-brand + .nav-item + .nav-group-label {
+    margin-top: 16px;
+  }
+
   .dashboard-view > .bottom-nav .nav-item {
     min-height: 40px;
     border-radius: 10px;
@@ -6996,15 +7033,6 @@ select:focus-visible {
   background: #fafafa;
 }
 
-/* Trennt zwei Tabellen im selben Bereich - Kunden und ihre Projekte. Ohne die
-   Zwischenzeile liefen sie ineinander und man haette zwei Kopfzeilen ohne
-   erkennbaren Grund untereinander. */
-.entity-subheading {
-  margin: 22px 0 0;
-  padding: 0 12px;
-  font-size: 0.9rem;
-}
-
 .entity-search {
   display: grid;
   gap: 5px;
@@ -7049,14 +7077,7 @@ select:focus-visible {
   }
 
   #customer-overview-list {
-    --tabellen-spalten: minmax(0, 1.4fr) minmax(0, 0.7fr) minmax(0, 1.6fr) minmax(0, 0.5fr) minmax(0, 0.7fr) 92px;
-  }
-
-  /* Die Spaltenbreiten haengen an der Kennung, nicht an der Klasse. Ohne
-     eigene Angabe faellt die Liste auf eine Spalte zurueck und stapelt sich
-     am Rechner, statt eine Tabelle zu sein. */
-  #project-overview-list {
-    --tabellen-spalten: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.7fr) minmax(0, 0.6fr) 92px;
+    --tabellen-spalten: minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 1.8fr) minmax(0, 0.8fr) 92px;
   }
 
   #inspection-overview-list {
@@ -7068,8 +7089,27 @@ select:focus-visible {
    dort waere diese Liste eine Dopplung. */
 .pane-menu {
   display: grid;
+  gap: 16px;
+  margin: 0 0 20px;
+}
+
+.pane-menu__group {
+  display: grid;
+  gap: 7px;
+}
+
+.pane-menu__heading {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pane-menu__grid {
+  display: grid;
   gap: 8px;
-  margin: 0 0 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
