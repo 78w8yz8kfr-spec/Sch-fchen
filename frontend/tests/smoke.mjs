@@ -628,10 +628,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.43\.1/);
-assert.match(html, /design-system\.css\?v=0\.43\.1/);
-assert.match(html, /app\.js\?v=0\.43\.1/);
-assert.match(html, /version\.js\?v=0\.43\.1/);
+assert.match(html, /styles\.css\?v=0\.43\.2/);
+assert.match(html, /design-system\.css\?v=0\.43\.2/);
+assert.match(html, /app\.js\?v=0\.43\.2/);
+assert.match(html, /version\.js\?v=0\.43\.2/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -758,8 +758,9 @@ assert.match(app, /function renderTopbarUser\(/);
 // Arbeitstag. Ein Eintrag ohne echten Zielbereich wird nicht ergänzt.
 const leisteReihenfolge = [
   "Übersicht", "Zeiterfassung", "Meine Woche", "Azubi-Berichtsheft",
-  "Einsatzplanung", "Baustellen", "Berichtszentrale", "Dokumentablage",
-  "Prüfprotokolle", "Kunden", "Mitarbeiter", "Fahrzeuge",
+  "Planung", "Einsatzplanung", "Baustellen", "Dokumentation",
+  "Berichtszentrale", "Dokumentablage", "Prüfprotokolle", "Betrieb",
+  "Kunden", "Mitarbeiter", "Fahrzeuge",
   "Arbeitszeit-Auswertung", "Einstellungen"
 ];
 const leiste = html.slice(
@@ -850,22 +851,31 @@ assert.match(styles, /body\.hat-fassungshinweis \{/);
 // eingerichteten App wieder dieselben aus dem Speicher.
 assert.match(app, /caches\.delete\(name\)/);
 
-// Am Telefon zeigt eine Baustellenrolle nur Start, Zeiten und Mehr; planende
-// Rollen erhalten die zusaetzlichen Verwaltungsziele. Die kurzen Namen halten
-// die Leiste in beiden Faellen lesbar, die langen bleiben fuer Desktop und
-// Vorleser im Dokument.
+// Am Telefon zeigt eine Baustellenrolle Start, Zeiten und Mehr. Planende Rollen
+// erhalten Planung, Dokumentation und Betrieb als echte Gruppenschalter -
+// keine unbedienbaren Gruppenueberschriften zwischen den Knoepfen.
 for (const [kennung, kurz] of [
-  ["nav-start", "Start"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
-  ["nav-week", "Zeiten"], ["nav-time", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
+  ["nav-start", "Start"], ["nav-week", "Zeiten"],
+  ["nav-mobile-planning", "Planung"],
+  ["nav-mobile-documentation", "Doku"],
+  ["nav-mobile-business", "Betrieb"], ["nav-more", "Mehr"]
 ]) {
   assert.match(html, new RegExp(`id="${kennung}"[^>]*data-kurz="${kurz}"`), `${kennung} ohne kurze Beschriftung`);
 }
 assert.match(styles, /\.bottom-nav > \.nav-item\[data-kurz\]::after \{\s*\n\s*content: attr\(data-kurz\);/);
-assert.match(html, /id="nav-time" class="nav-item"/);
+assert.match(html, /id="nav-time" class="nav-item nav-item--desktop"/);
+for (const kennung of ["nav-assignments", "nav-sites", "nav-apprentice"]) {
+  assert.match(html, new RegExp(`id="${kennung}" class="nav-item nav-item--desktop"`));
+}
 assert.match(html, /id="nav-week"[\s\S]{0,360}class="nav-icon--mobile"/);
 assert.match(app, /elements\.navTime\.hidden = !planner;/);
-assert.match(app, /elements\.navWeek\.dataset\.kurz = planner \? "Woche" : "Zeiten";/);
-assert.match(app, /elements\.navWeek\.classList\.toggle\("nav-week--planner", planner\);/);
+assert.match(app, /elements\.navWeek\.dataset\.kurz = "Zeiten";/);
+assert.match(app, /function openNavigationGroup\(group\)/);
+for (const gruppe of ["planning", "documentation", "business"]) {
+  assert.match(app, new RegExp(`openNavigationGroup\\("${gruppe}"\\)`));
+}
+assert.match(designSystem, /@media \(max-width: 1079px\)[\s\S]*?\.dashboard-view > \.bottom-nav > \.nav-group-label,[\s\S]*?display: none !important;/);
+assert.match(designSystem, /\.dashboard-view > \.bottom-nav > \.nav-item \{\s*\n\s*min-width: 0;\s*\n\s*flex: 1 1 0;/);
 
 // Am Rechner ist die Navigation nach Aufgabe statt nach Entstehungszeit
 // sortiert. Verborgene Modul- oder Rollenpunkte lassen ihre Gruppenueberschrift
@@ -1044,16 +1054,18 @@ for (const huelle of [
 assert.match(app, /function renderCustomerOverview\(/);
 assert.match(app, /function renderInspectionOverview\(/);
 assert.match(app, /function renderPaneMenu\(/);
-// Am Telefon entstehen die weiteren Ziele aus derselben Navigation, werden
-// unter "Mehr" aber ebenfalls nach Dokumentation, Betrieb und Steuerung
-// gruppiert.
+// Am Telefon entstehen die Ziele eines Bereichs aus derselben Navigation. So
+// oeffnen Planung, Dokumentation und Betrieb jeweils ihre echten Unterziele;
+// „Mehr“ sammelt Meine Arbeit und Steuerung.
 assert.match(html, /id="pane-menu"/);
 assert.match(app, /querySelectorAll\("\.nav-item--desktop"\)/);
 assert.match(app, /const gruppennamen = \{/);
+assert.match(app, /planning: "Planung"/);
 assert.match(app, /documentation: "Dokumentation"/);
 assert.match(app, /business: "Betrieb"/);
 assert.match(styles, /\.pane-menu \{/);
 assert.match(styles, /\.pane-menu__group \{/);
+assert.match(styles, /\.pane-menu__item--active \{/);
 assert.match(styles, /@media \(min-width: 1080px\) \{\s*\n\s*\.pane-menu \{\s*\n\s*display: none;/);
 // Auch die Einstellungen und Auswertungen sind echte Unterbereiche. Anklicken
 // markiert nicht nur einen Anker, sondern blendet die anderen Inhalte aus.
@@ -1274,17 +1286,17 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.43.1"'));
-assert.ok(worker.includes('"./design-system.css?v=0.43.1"'));
-assert.ok(worker.includes('"./app.js?v=0.43.1"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.43.1"'));
-assert.ok(worker.includes('"./version.js?v=0.43.1"'));
+assert.ok(worker.includes('"./styles.css?v=0.43.2"'));
+assert.ok(worker.includes('"./design-system.css?v=0.43.2"'));
+assert.ok(worker.includes('"./app.js?v=0.43.2"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.43.2"'));
+assert.ok(worker.includes('"./version.js?v=0.43.2"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.43\.1"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.43\.1";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.43\.2"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.43\.2";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1312,7 +1324,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.43\.1$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.43\.2$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1320,11 +1332,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.43.1"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.43.1"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.43.2"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.43.2"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.43.1"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.43.1"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.43.2"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.43.2"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1371,9 +1383,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.43\.1/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.43\.1/);
-assert.match(vdeHtml, /app\.js\?v=0\.43\.1/);
+assert.match(vdeHtml, /styles\.css\?v=0\.43\.2/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.43\.2/);
+assert.match(vdeHtml, /app\.js\?v=0\.43\.2/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1389,7 +1401,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.43\.1/);
+assert.match(platformHtml, /design-system\.css\?v=0\.43\.2/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,

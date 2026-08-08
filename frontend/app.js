@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.43.1";
-import { serverIsNewer } from "./core/versions.js?v=0.43.1";
+} from "./core/work-time.js?v=0.43.2";
+import { serverIsNewer } from "./core/versions.js?v=0.43.2";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.43.1";
+} from "./core/sync-queue.js?v=0.43.2";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.43.1";
+} from "./core/permissions.js?v=0.43.2";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,7 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.43.1";
+} from "./core/state-store.js?v=0.43.2";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -466,6 +466,9 @@ import {
     navWeek: document.querySelector("#nav-week"),
     navTime: document.querySelector("#nav-time"),
     navApprentice: document.querySelector("#nav-apprentice"),
+    navMobilePlanning: document.querySelector("#nav-mobile-planning"),
+    navMobileDocumentation: document.querySelector("#nav-mobile-documentation"),
+    navMobileBusiness: document.querySelector("#nav-mobile-business"),
     apprenticeSection: document.querySelector("#apprentice-section"),
     apprenticeWeekControls: document.querySelector("#apprentice-week-controls"),
     apprenticePeriod: document.querySelector("#apprentice-period"),
@@ -1303,7 +1306,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.43.1",
+          "X-Schaefchen-Version": "0.43.2",
           ...options.headers
         }
       });
@@ -1333,7 +1336,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.43.1" }
+        headers: { "X-Schaefchen-Version": "0.43.2" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1380,7 +1383,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.43.1 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.43.2 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1449,8 +1452,10 @@ import {
     // und Korrekturen. Nur planende Rollen brauchen zusaetzlich die getrennte
     // persoenliche Zeiterfassungsseite.
     elements.navTime.hidden = !planner;
-    elements.navWeek.dataset.kurz = planner ? "Woche" : "Zeiten";
-    elements.navWeek.classList.toggle("nav-week--planner", planner);
+    // Mobil bleibt der persoenliche Bereich immer „Zeiten“. Planende Rollen
+    // bekommen ihre Verwaltungsbereiche daneben als echte Gruppenschalter;
+    // die Woche muss deshalb nicht mehr zu „Woche“ umbeschriftet werden.
+    elements.navWeek.dataset.kurz = "Zeiten";
     // Das Berichtsheft ist ein eigener Bereich, kein Anhaengsel der
     // Wochenansicht: fuer den Auszubildenden ist es die Arbeit, die er neben
     // der Zeiterfassung taeglich hat, und fuer den Ausbilder die, die er
@@ -1467,12 +1472,16 @@ import {
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
     elements.navInspections.hidden = !planner || !vdeModuleEnabled();
+    const hasVisibleDesktopEntry = (group) => [...elements.bottomNav.querySelectorAll(
+      `.nav-item--desktop[data-nav-group="${group}"]`
+    )].some((button) => !button.hidden);
+    elements.navMobilePlanning.hidden = !hasVisibleDesktopEntry("planning");
+    elements.navMobileDocumentation.hidden = !hasVisibleDesktopEntry("documentation");
+    elements.navMobileBusiness.hidden = !hasVisibleDesktopEntry("business");
     updateNavigationGroups();
-    elements.bottomNav.classList.toggle("bottom-nav--planner", planner);
-    // Ab fuenf Schaltflaechen wird es eng: dann kleinere Schrift und Symbole.
-    // Ein ausbildender Vorarbeiter mit Planungsrolle haette sechs. Gezaehlt
-    // wird, was am Telefon zu sehen ist - die Eintraege nur fuer den Rechner
-    // stehen dort nicht in der Leiste.
+    // Ab fuenf Schaltflaechen werden Schrift und Symbole etwas kompakter.
+    // Gezaehlt wird ausschliesslich die echte mobile Bereichsleiste; die
+    // einzelnen Desktopziele und Gruppenueberschriften nehmen dort nie Platz.
     const sichtbare = [...elements.bottomNav.querySelectorAll(".nav-item")].filter(
       (knopf) => !knopf.hidden && !knopf.classList.contains("nav-item--desktop")
     ).length;
@@ -2693,7 +2702,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.43.1";
+  const EIGENE_FASSUNG = "0.43.2";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2732,7 +2741,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.43.1". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.43.2". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -9426,18 +9435,32 @@ import {
     }
   }
 
-  // Die Bereiche, die es am Telefon nicht in die untere Leiste schaffen,
-  // stehen unter "Mehr" in denselben fachlichen Gruppen wie am Rechner. Die
-  // Eintraege entstehen weiterhin aus der echten Navigation, damit Rolle und
-  // Modulfreigabe nie zwischen zwei Listen auseinanderlaufen.
+  // Die mobile Leiste waehlt fachliche Bereiche, diese Liste die Ziele darin.
+  // Sie entsteht aus der echten Desktopnavigation, damit Rolle und
+  // Modulfreigabe nie zwischen zwei getrennten Listen auseinanderlaufen.
   function renderPaneMenu() {
+    const paneGroup = {
+      assignments: "planning",
+      sites: "planning",
+      reports: "documentation",
+      documents: "documentation",
+      inspections: "documentation",
+      customers: "business",
+      employees: "business",
+      vehicles: "business"
+    }[currentDashboardPane];
+    const selectedGroups = currentDashboardPane === "more"
+      ? new Set(["work", "control"])
+      : new Set(paneGroup ? [paneGroup] : []);
     const eintraege = [...elements.bottomNav.querySelectorAll(".nav-item--desktop")]
-      .filter((knopf) => !knopf.hidden);
+      .filter((knopf) => !knopf.hidden && selectedGroups.has(knopf.dataset.navGroup));
     elements.paneMenu.replaceChildren();
-    elements.paneMenu.hidden = currentDashboardPane !== "more" || eintraege.length === 0;
+    elements.paneMenu.hidden = eintraege.length === 0;
     if (elements.paneMenu.hidden) return;
 
     const gruppennamen = {
+      work: "Meine Arbeit",
+      planning: "Planung",
       documentation: "Dokumentation",
       business: "Betrieb",
       control: "Steuerung"
@@ -9462,6 +9485,9 @@ import {
         const knopf = document.createElement("button");
         knopf.type = "button";
         knopf.className = "pane-menu__item";
+        const active = eintrag.id === `nav-${currentDashboardPane}`;
+        knopf.classList.toggle("pane-menu__item--active", active);
+        knopf.setAttribute("aria-pressed", String(active));
         knopf.innerHTML = eintrag.querySelector("svg").outerHTML;
         const beschriftung = document.createElement("span");
         beschriftung.textContent = eintrag.querySelector("span").textContent;
@@ -9474,12 +9500,19 @@ import {
     }
   }
 
+  function openNavigationGroup(group) {
+    const firstVisibleEntry = [...elements.bottomNav.querySelectorAll(
+      `.nav-item--desktop[data-nav-group="${group}"]`
+    )].find((button) => !button.hidden);
+    firstVisibleEntry?.click();
+  }
+
   // Alle Eintraege der Leiste, nicht nur die alten fuenf: eine feste Liste war
   // mit jedem neuen Bereich eine Zeile, die man vergessen kann - dann blieb
   // der aktive Eintrag unmarkiert.
-  function activateNavigation(activeButton) {
+  function activateNavigation(activeButton, mobileActiveButton = null) {
     [...elements.bottomNav.querySelectorAll(".nav-item")].forEach((button) => {
-      const active = button === activeButton;
+      const active = button === activeButton || button === mobileActiveButton;
       button.classList.toggle("nav-item--active", active);
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
@@ -9650,7 +9683,20 @@ import {
       analytics: elements.navAnalytics,
       more: elements.navMore
     }[pane] || elements.navStart;
-    activateNavigation(activeButton);
+    const mobileActiveButton = {
+      time: elements.navWeek,
+      apprentice: elements.navWeek,
+      assignments: elements.navMobilePlanning,
+      sites: elements.navMobilePlanning,
+      reports: elements.navMobileDocumentation,
+      documents: elements.navMobileDocumentation,
+      inspections: elements.navMobileDocumentation,
+      customers: elements.navMobileBusiness,
+      employees: elements.navMobileBusiness,
+      vehicles: elements.navMobileBusiness,
+      analytics: elements.navMore
+    }[pane] || null;
+    activateNavigation(activeButton, mobileActiveButton);
     renderPaneMenu();
     renderDashboardMetrics();
     renderTodayOverview();
@@ -13026,6 +13072,15 @@ import {
   elements.navWeek.addEventListener("click", () => {
     showDashboardPane("week");
     void Promise.all([refreshWeekData(), refreshAbsenceData()]);
+  });
+  elements.navMobilePlanning.addEventListener("click", () => {
+    openNavigationGroup("planning");
+  });
+  elements.navMobileDocumentation.addEventListener("click", () => {
+    openNavigationGroup("documentation");
+  });
+  elements.navMobileBusiness.addEventListener("click", () => {
+    openNavigationGroup("business");
   });
   elements.sidebarToggle.addEventListener("click", () => {
     setSidebarCollapsed(

@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die untere Leiste ist auf dem Telefon wieder vollständig bedienbar.** Die
+  neuen fachlichen Bereiche bleiben erhalten, erscheinen aber nicht mehr als
+  lose Desktop-Überschriften zwischen den Schaltflächen.
+  - Baustellenrollen sehen weiterhin „Start“, „Zeiten“ und „Mehr“. Planende
+    Rollen erhalten zusätzlich „Planung“, „Doku“ und „Betrieb“ als gleich
+    breite, antippbare Bereichsschalter mit Symbolen.
+  - Planung öffnet Einsatzplanung und Baustellen, Dokumentation öffnet Berichte,
+    Dokumentablage und Prüfprotokolle, Betrieb öffnet Kunden, Mitarbeiter und
+    Fahrzeuge. Rollen und freigeschaltete Module bestimmen weiterhin, welche
+    Ziele tatsächlich erscheinen.
+  - Die vorherige Veröffentlichung verwendete für neues HTML und ältere
+    Mobil-CSS dieselbe Fassungs- und Cachekennung. Dadurch konnte die
+    installierte App beide Stände mischen. Eine neue Fassung und ein neuer
+    App-Shell-Speicher verhindern diesen Zwischenstand zuverlässig.
+- Fassung 0.43.2, Speicher `schaefchen-online-v81`, Migration 094.
+
 - **Die mobile Startseite behält den abgenommenen Baustellenmodus.** Monteur,
   Vorarbeiter und Auszubildende sehen den Arbeitstag nur auf „Start“ und
   erreichen Woche, Einträge, Korrekturen und Arbeitskonto gesammelt über

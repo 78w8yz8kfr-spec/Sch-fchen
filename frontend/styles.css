@@ -7140,9 +7140,21 @@ select:focus-visible {
   stroke-linejoin: round;
 }
 
+.pane-menu__item--active {
+  border-color: rgba(227, 6, 19, 0.32);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
 @media (min-width: 1080px) {
   .pane-menu {
     display: none;
+  }
+
+  /* Diese drei Schalter vertreten mobil ganze Bereiche. Am Rechner stehen
+     dort bereits alle einzelnen Ziele in der Seitenleiste. */
+  .dashboard-view > .bottom-nav > .nav-item--mobile {
+    display: none !important;
   }
 }
 
