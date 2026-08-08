@@ -1,10 +1,13 @@
 # Projektstatus
 
 Stand: 08.08.2026
-Technischer Stand: V0.43.0
+Technischer Stand: V0.43.1
 
 ## Abgeschlossen
 
+- mobile Startseite wieder im abgenommenen Baustellenmodus mit dunkler
+  Arbeitskarte, großer Begrüßung und der klaren Navigation Start, Zeiten, Mehr;
+  keine doppelte Zeiterfassung zwischen Übersicht und eigenem Zeitbereich
 - gemeinsames referenznahes Designsystem für Betriebs-App,
   Plattformverwaltung und VDE-Editor mit zentralen Tokens für Farbe,
   Typografie, Abstände, Radien, Controls, Tabellen und Status

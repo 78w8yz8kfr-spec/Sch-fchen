@@ -368,6 +368,10 @@ textarea {
   gap: 8px;
 }
 
+.nav-icon--mobile {
+  display: none;
+}
+
 .page-heading {
   display: flex;
   min-width: 0;
@@ -1663,6 +1667,22 @@ body:has(#vde-app) main {
     display: none;
   }
 
+  .bottom-nav .nav-icon--mobile {
+    display: block;
+  }
+
+  .bottom-nav .nav-icon--desktop {
+    display: none;
+  }
+
+  .bottom-nav .nav-week--planner .nav-icon--mobile {
+    display: none;
+  }
+
+  .bottom-nav .nav-week--planner .nav-icon--desktop {
+    display: block;
+  }
+
   .platform-sidebar {
     width: 232px;
   }
@@ -1684,15 +1704,109 @@ body:has(#vde-app) main {
   }
 }
 
+/* Der Baustellenmodus bleibt bewusst gross, kontrastreich und auf den
+   naechsten Schritt konzentriert. Das kompakte Desktop-Design darf diese
+   Hierarchie auf dem Telefon nicht ueberschreiben. */
+@media (max-width: 759px) {
+  .dashboard-view > .topbar .connection-state {
+    order: -1;
+  }
+
+  .avatar-button {
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--ui-brand-soft);
+  }
+
+  .welcome-row {
+    position: relative;
+    min-height: 92px;
+    align-items: flex-start;
+    margin-bottom: 22px;
+    padding-bottom: 25px;
+  }
+
+  .welcome-subtitle {
+    display: none;
+  }
+
+  .welcome-badges {
+    padding-top: 13px;
+  }
+
+  .welcome-badges .role-badge,
+  .welcome-badges .preview-badge {
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .welcome-badges .welcome-date {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .status-card {
+    padding: 20px;
+    border: 0;
+    border-radius: 23px;
+    color: #fff;
+    background: var(--mobile-status-card-background, #111);
+    box-shadow: 0 18px 42px rgba(17, 17, 17, 0.24);
+  }
+
+  .status-card .card-label,
+  .status-since,
+  .status-timer span,
+  .action-hint {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .status-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    color: #ff4a54;
+    background: rgba(255, 255, 255, 0.11);
+  }
+
+  .status-timer strong {
+    color: #ff5a63;
+  }
+
+  .button--action {
+    min-height: 52px;
+    margin-top: 20px;
+    border-radius: 15px;
+  }
+
+  .button--action-secondary {
+    min-height: 48px;
+    border-color: rgba(255, 255, 255, 0.32);
+    border-radius: 15px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
 @media (max-width: 620px) {
   .login-heading {
     margin-top: 18px;
   }
 
-  .welcome-row h1,
   .section-heading h2,
   .page-heading h1 {
     font-size: 1.28rem;
+  }
+
+  .welcome-row h1 {
+    font-size: clamp(1.65rem, 7vw, 2.2rem);
+    letter-spacing: -0.04em;
   }
 
   .report-center__filters {

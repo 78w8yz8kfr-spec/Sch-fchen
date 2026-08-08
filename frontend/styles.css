@@ -13,6 +13,9 @@
   --accent-dark: #000000;
   --warning: #9c1119;
   --shadow: 0 24px 70px rgba(17, 17, 17, 0.13);
+  --mobile-status-card-background:
+    radial-gradient(circle at 100% 0%, rgba(227, 6, 19, 0.34), transparent 48%),
+    #111111;
   /* Die dunkle Seitenleiste des neuen Entwurfs. Sie gilt nur am Rechner: auf
      dem Telefon bleibt die helle Leiste unten, die sich bewaehrt hat. */
   --sidebar: #1b1b1d;
@@ -677,9 +680,7 @@ select:focus-visible {
   padding: 20px;
   border-radius: 23px;
   color: #fff;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(227, 6, 19, 0.34), transparent 48%),
-    #111111;
+  background: var(--mobile-status-card-background);
   box-shadow: 0 18px 42px rgba(17, 17, 17, 0.24);
 }
 

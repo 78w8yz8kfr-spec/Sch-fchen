@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die mobile Startseite folgt wieder dem abgenommenen Baustellenmodus.**
+  Der Desktop-Rahmen aus V0.43.0 bleibt erhalten, greift aber nicht mehr in die
+  mobile Hierarchie des persönlichen Arbeitstags ein.
+  - Monteur, Vorarbeiter und Auszubildende sehen unten wieder **Start · Zeiten ·
+    Mehr**. „Start“ enthält den laufenden Arbeitstag und den heutigen Einsatz;
+    „Zeiten“ führt zur Woche mit Einträgen, Korrekturen und Arbeitskonto.
+  - Der persönliche Arbeitstag steht pro Rolle nur noch an **einer** Stelle:
+    bei Baustellenrollen auf „Start“, bei planenden Rollen in der getrennten
+    Desktop-Zeiterfassung. Der in V0.43.0 ergänzte doppelte Mobilzugang entfällt.
+  - Die dunkle Arbeitskarte, die große zweizeilige Begrüßung, das Datum unter
+    dem Namen sowie die Reihenfolge **Online · Profil** sind auf schmalen
+    Bildschirmen wiederhergestellt. Das kompakte weiße Karten- und Tabellendesign
+    bleibt auf dem Desktop unverändert.
+- Fassung 0.43.1, Speicher `schaefchen-online-v80`, Migration 093.
+
 - **Schäfchen besitzt jetzt ein gemeinsames, referenznahes Designsystem.**
   Betriebs-App, Plattformverwaltung und VDE-Editor teilen Farben, Typografie,
   Dichte, Radien, Tabellen, Reiter, Formfelder, Statusmarken und Fokuszustände.
