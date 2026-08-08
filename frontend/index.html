@@ -274,8 +274,8 @@
             <nav class="page-tabs" aria-label="Bereiche der Zeiterfassung">
               <a class="page-tab page-tab--active" href="#workday-card">Aktueller Tag</a>
               <a class="page-tab" href="#timesheet-section">Einträge</a>
-              <button class="page-tab" type="button" data-open-week-target="week-days-section">Korrekturen</button>
-              <button class="page-tab" type="button" data-open-week-target="time-account-panel">Arbeitskonto</button>
+              <button class="page-tab" type="button" data-open-week-view="requests">Korrekturen</button>
+              <button class="page-tab" type="button" data-open-week-view="account">Arbeitskonto</button>
             </nav>
           </div>
 
@@ -720,15 +720,25 @@
               </div>
             </div>
             <nav class="page-tabs" aria-label="Bereiche der Woche">
-              <a class="page-tab page-tab--active" href="#week-overview-table-card">Übersicht</a>
-              <a class="page-tab" href="#week-days-section">Arbeitszeit</a>
-              <a class="page-tab" href="#time-account-panel">Arbeitskonto</a>
+              <button class="page-tab page-tab--active" type="button" data-week-view-button="overview" aria-pressed="true">Überblick</button>
+              <button class="page-tab" type="button" data-week-view-button="days" aria-pressed="false">Arbeitstage</button>
+              <button class="page-tab" type="button" data-week-view-button="account" aria-pressed="false">Arbeitskonto</button>
+              <button class="page-tab" type="button" data-week-view-button="requests" aria-pressed="false">Anträge &amp; Prüfung</button>
             </nav>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
             <span id="week-total-break" hidden>00:00</span>
             <span id="week-total-travel" hidden>00:00</span>
             <span id="week-total-overtime" hidden>00:00</span>
             <p id="week-message" class="form-message week-message" aria-live="polite"></p>
+
+            <!-- Die umfangreiche Woche wird in echte Unterbereiche zerlegt.
+                 Bestehende Karten werden beim Start hier einsortiert, damit
+                 alle Funktionen erhalten bleiben, aber nie alles zugleich
+                 im Blick steht. -->
+            <div id="week-overview-subarea" class="week-subarea week-subarea--overview" data-week-subarea="overview"></div>
+            <div id="week-days-subarea" class="week-subarea" data-week-subarea="days" hidden></div>
+            <div id="week-account-subarea" class="week-subarea" data-week-subarea="account" hidden></div>
+            <div id="week-requests-subarea" class="week-subarea week-subarea--requests" data-week-subarea="requests" hidden></div>
 
             <section id="time-account-panel" class="week-review-panel time-account-panel" aria-labelledby="time-account-title">
               <div class="site-management-panel__heading">
@@ -1270,18 +1280,18 @@
                 <button id="admin-refresh" class="text-button" type="button">Aktualisieren</button>
               </div>
             </div>
+            <!-- Auf dem Telefon stehen die nicht in die untere Leiste
+                 passenden Ziele hier zuerst und fachlich gruppiert. Am
+                 Rechner sind dieselben Ziele bereits in der Seitenleiste. -->
+            <nav id="pane-menu" class="pane-menu" aria-label="Weitere Bereiche" hidden></nav>
+
             <nav id="settings-tabs" class="page-tabs settings-tabs" data-dashboard-pane="more" aria-label="Einstellungsbereiche" hidden>
-              <a class="page-tab page-tab--active" href="#time-account-admin-panel">Arbeitskonten</a>
-              <a class="page-tab" href="#holiday-calendar-admin">Feiertage</a>
-              <a class="page-tab" href="#time-correction-policy-admin">Zeitregeln</a>
-              <a class="page-tab" href="#account-card">Mein Konto</a>
+              <button class="page-tab page-tab--active" type="button" data-settings-view="time-accounts" aria-pressed="true">Arbeitskonten</button>
+              <button class="page-tab" type="button" data-settings-view="holidays" aria-pressed="false">Feiertage</button>
+              <button class="page-tab" type="button" data-settings-view="time-rules" aria-pressed="false">Zeitregeln</button>
+              <button class="page-tab" type="button" data-settings-view="account" aria-pressed="false">Mein Konto</button>
             </nav>
             <p id="admin-intro" class="admin-intro">Baustellen, Einsätze und Mitarbeiter – übersichtlich an einem Ort.</p>
-
-            <!-- Am Telefon fasst die untere Leiste fuenf Eintraege; die uebrigen
-                 Bereiche sind hier zu erreichen. Am Rechner stehen sie in der
-                 Seitenleiste, dann ist diese Liste ueberfluessig. -->
-            <nav id="pane-menu" class="pane-menu" aria-label="Weitere Bereiche" hidden></nav>
 
             <div id="admin-summary" class="admin-summary" aria-label="Verwaltungsübersicht">
               <div><strong id="admin-employee-count">0</strong><span>Mitarbeiter</span></div>
@@ -1428,14 +1438,6 @@
                   <button id="customer-new" class="button button--primary" type="button">＋ Neuer Kunde</button>
                 </div>
                 <ul id="customer-overview-list" class="admin-list admin-list--table customer-overview-list" aria-label="Kunden"></ul>
-
-                <!-- Die Projekte gehoeren zu den Kunden, und hier ist der
-                     einzige Ort, an dem man an sie herankommt: der
-                     Bearbeitungsbogen war gebaut, aber es gab keinen Weg
-                     dorthin. Ein Projekt liess sich anlegen und danach nie
-                     wieder aendern. -->
-                <h3 class="entity-subheading">Projekte</h3>
-                <ul id="project-overview-list" class="admin-list admin-list--table customer-overview-list" aria-label="Projekte"></ul>
               </div>
             </section>
 
@@ -1551,8 +1553,8 @@
             <section id="analytics-shell" class="planning-shell-direct" hidden>
               <div id="analytics-content" class="planning-group">
                 <nav class="page-tabs analytics-tabs" aria-label="Auswertungsbereiche">
-                  <a class="page-tab page-tab--active" href="#hours-overview-card">Stundenübersicht</a>
-                  <a class="page-tab" href="#timesheet-export-panel">Export</a>
+                  <button class="page-tab page-tab--active" type="button" data-analytics-view="hours" aria-pressed="true">Stundenübersicht</button>
+                  <button class="page-tab" type="button" data-analytics-view="export" aria-pressed="false">Export</button>
                 </nav>
                 <section id="hours-overview-card" class="hours-overview-card" aria-labelledby="hours-overview-title">
                   <div class="hours-overview-heading">
@@ -1596,7 +1598,7 @@
             </section>
 
             <details id="business-structure-panel" class="admin-panel business-structure-panel" open>
-              <summary>Kunden, Projekte und Baustellen</summary>
+              <summary hidden>Baustellenübersicht</summary>
               <nav class="page-tabs site-list-tabs" aria-label="Baustellenstatus">
                 <button id="site-active-tab" class="page-tab page-tab--active" type="button">Aktive Baustellen</button>
                 <button id="site-archived-tab" class="page-tab" type="button">Archivierte Baustellen</button>
@@ -2162,7 +2164,7 @@
             </section>
 
             <details id="employee-panel" class="admin-panel">
-              <summary>Mitarbeiterverwaltung</summary>
+              <summary hidden>Mitarbeiterverwaltung</summary>
               <nav class="page-tabs employee-tabs" aria-label="Mitarbeiterstatus">
                 <button id="employee-active-tab" class="page-tab page-tab--active" type="button">Aktive Mitarbeiter</button>
                 <button id="employee-archived-tab" class="page-tab" type="button">Archivierte Mitarbeiter</button>
@@ -2548,11 +2550,11 @@
             </details>
 
             <details id="document-management-panel" class="admin-panel site-management-panel document-management-panel">
-              <summary>Zentrale Dokumentablage</summary>
+              <summary hidden>Zentrale Dokumentablage</summary>
               <div class="site-management-panel__heading">
                 <div>
                   <p class="eyebrow">Einmal speichern · überall verwenden</p>
-                  <h3 id="document-management-title">Dokumente</h3>
+                  <h3 id="document-management-title">Alle Dokumente</h3>
                 </div>
                 <button id="document-new" class="button button--primary" type="button">＋ Hochladen</button>
                 <span id="document-list-summary" class="site-list-summary" aria-live="polite"></span>
@@ -2976,60 +2978,69 @@
             <img src="./assets/mark.svg" alt="" width="26" height="26">
             <span>Schäfchen</span>
           </p>
-          <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page" data-kurz="Start">
+          <button id="nav-start" class="nav-item nav-item--active" type="button" aria-current="page" data-kurz="Start" data-nav-group="overview">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
             <span>Übersicht</span>
           </button>
-          <button id="nav-week" class="nav-item" type="button" data-kurz="Zeiten">
-            <svg class="nav-icon--mobile" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            <svg class="nav-icon--desktop" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 0h3m-8 3h3"/></svg>
-            <span>Woche</span>
-          </button>
-          <button id="nav-assignments" class="nav-item" type="button" hidden data-kurz="Planung">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
-            <span>Einsatzplanung</span>
-          </button>
-          <button id="nav-time" class="nav-item" type="button" data-kurz="Zeiten">
+          <p class="nav-group-label" data-nav-group-label="work">Meine Arbeit</p>
+          <button id="nav-time" class="nav-item" type="button" data-kurz="Zeiten" data-nav-group="work">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
             <span>Zeiterfassung</span>
           </button>
-          <button id="nav-sites" class="nav-item" type="button" hidden data-kurz="Baustellen">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
-            <span>Baustellen</span>
+          <button id="nav-week" class="nav-item" type="button" data-kurz="Zeiten" data-nav-group="work">
+            <svg class="nav-icon--mobile" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <svg class="nav-icon--desktop" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 0h3m-8 3h3"/></svg>
+            <span>Meine Woche</span>
           </button>
-          <button id="nav-reports" class="nav-item nav-item--desktop" type="button" hidden>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v4h4"/><path d="M9 13h6m-6 4h4"/></svg>
-            <span>Berichte</span>
-          </button>
-          <button id="nav-inspections" class="nav-item nav-item--desktop" type="button" hidden>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9V3Z"/><path d="m9 13 2 2 4-4"/></svg>
-            <span>Prüfprotokolle</span>
-          </button>
-          <button id="nav-apprentice" class="nav-item" type="button" hidden data-kurz="Azubi">
+          <button id="nav-apprentice" class="nav-item" type="button" hidden data-kurz="Azubi" data-nav-group="work">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
             <span>Azubi-Berichtsheft</span>
           </button>
-          <button id="nav-employees" class="nav-item nav-item--desktop" type="button" hidden>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 20a5.4 5.4 0 0 0-2-4.2"/></svg>
-            <span>Mitarbeiter</span>
+
+          <p class="nav-group-label" data-nav-group-label="planning">Planung</p>
+          <button id="nav-assignments" class="nav-item" type="button" hidden data-kurz="Planung" data-nav-group="planning">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M8 11h8m-8 4h5"/></svg>
+            <span>Einsatzplanung</span>
           </button>
-          <button id="nav-customers" class="nav-item nav-item--desktop" type="button" hidden>
+          <button id="nav-sites" class="nav-item" type="button" hidden data-kurz="Baustellen" data-nav-group="planning">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
+            <span>Baustellen</span>
+          </button>
+
+          <p class="nav-group-label" data-nav-group-label="documentation">Dokumentation</p>
+          <button id="nav-reports" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="documentation">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v4h4"/><path d="M9 13h6m-6 4h4"/></svg>
+            <span>Berichtszentrale</span>
+          </button>
+          <button id="nav-documents" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="documentation">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h3.5l2 2.5H18a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/></svg>
+            <span>Dokumentablage</span>
+          </button>
+          <button id="nav-inspections" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="documentation">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9V3Z"/><path d="m9 13 2 2 4-4"/></svg>
+            <span>Prüfprotokolle</span>
+          </button>
+
+          <p class="nav-group-label" data-nav-group-label="business">Betrieb</p>
+          <button id="nav-customers" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>
             <span>Kunden</span>
           </button>
-          <button id="nav-vehicles" class="nav-item nav-item--desktop" type="button" hidden>
+          <button id="nav-employees" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="business">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 20a5.4 5.4 0 0 0-2-4.2"/></svg>
+            <span>Mitarbeiter</span>
+          </button>
+          <button id="nav-vehicles" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 16v-4l2-5h11l3 5h2v4"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/><path d="M9.5 16.5h5"/></svg>
             <span>Fahrzeuge</span>
           </button>
-          <button id="nav-documents" class="nav-item nav-item--desktop" type="button" hidden>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h3.5l2 2.5H18a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/></svg>
-            <span>Dokumente</span>
-          </button>
-          <button id="nav-analytics" class="nav-item nav-item--desktop" type="button" hidden>
+
+          <p class="nav-group-label" data-nav-group-label="control">Steuerung</p>
+          <button id="nav-analytics" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="control">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V10m5 10V4m6 16v-7m5 7V7"/><path d="M3 20h18"/></svg>
-            <span>Auswertungen</span>
+            <span>Arbeitszeit-Auswertung</span>
           </button>
-          <button id="nav-more" class="nav-item" type="button" data-kurz="Mehr">
+          <button id="nav-more" class="nav-item" type="button" data-kurz="Mehr" data-nav-group="control">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
             <span>Einstellungen</span>
           </button>

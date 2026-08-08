@@ -4,19 +4,34 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
-- **Die mobile Startseite folgt wieder dem abgenommenen Baustellenmodus.**
-  Der Desktop-Rahmen aus V0.43.0 bleibt erhalten, greift aber nicht mehr in die
-  mobile Hierarchie des persönlichen Arbeitstags ein.
-  - Monteur, Vorarbeiter und Auszubildende sehen unten wieder **Start · Zeiten ·
-    Mehr**. „Start“ enthält den laufenden Arbeitstag und den heutigen Einsatz;
-    „Zeiten“ führt zur Woche mit Einträgen, Korrekturen und Arbeitskonto.
-  - Der persönliche Arbeitstag steht pro Rolle nur noch an **einer** Stelle:
-    bei Baustellenrollen auf „Start“, bei planenden Rollen in der getrennten
-    Desktop-Zeiterfassung. Der in V0.43.0 ergänzte doppelte Mobilzugang entfällt.
-  - Die dunkle Arbeitskarte, die große zweizeilige Begrüßung, das Datum unter
-    dem Namen sowie die Reihenfolge **Online · Profil** sind auf schmalen
-    Bildschirmen wiederhergestellt. Das kompakte weiße Karten- und Tabellendesign
-    bleibt auf dem Desktop unverändert.
+- **Die mobile Startseite behält den abgenommenen Baustellenmodus.** Monteur,
+  Vorarbeiter und Auszubildende sehen den Arbeitstag nur auf „Start“ und
+  erreichen Woche, Einträge, Korrekturen und Arbeitskonto gesammelt über
+  „Zeiten“. Die zusätzliche persönliche Zeiterfassungsseite erscheint nur für
+  planende Rollen. Dunkle Arbeitskarte, große Begrüßung und die Reihenfolge
+  „Online · Profil“ bleiben auf schmalen Bildschirmen erhalten.
+- **Bereiche und Unterbereiche folgen jetzt einer eindeutigen fachlichen
+  Ordnung.** Die Desktop-Navigation ist in „Meine Arbeit“, „Planung“,
+  „Dokumentation“, „Betrieb“ und „Steuerung“ gegliedert; leere Rollen- oder
+  Modulgruppen verschwinden vollständig. Auf dem Telefon verwendet „Mehr“
+  dieselbe Gruppierung.
+  - Die Woche zeigt mit „Überblick“, „Arbeitstage“, „Arbeitskonto“ sowie
+    „Anträge & Prüfung“ immer nur den gewählten Unterbereich. Zeitkorrekturen
+    und Abwesenheitsfreigaben öffnen direkt den passenden Reiter.
+  - Einstellungen und Arbeitszeit-Auswertung besitzen echte umschaltbare
+    Unterbereiche statt mehrerer langer Karten untereinander.
+  - Auch die getrennte Plattformverwaltung ist nicht mehr flach: Firmen,
+    Benutzer, Tarife und Module stehen unter „Mandanten“, operative
+    Systemfunktionen unter „Betrieb“ und Datenschutz, Audit sowie globale
+    Einstellungen unter „Kontrolle“. Berechtigungsbedingt leere Gruppen werden
+    ausgeblendet.
+  - Die sichtbare zweite Projektliste wurde aus Kunden und Baustellen entfernt.
+    Bestehende Projektverknüpfungen, Datenbankbeziehungen, Formulare und APIs
+    bleiben für Altbestände erhalten; die normale Bedienung arbeitet nur mit
+    Kunde und Baustelle.
+  - Doppelte Überschriften in eigenständigen Mitarbeiter-, Baustellen- und
+    Dokumentseiten entfallen; globale Dokumentationsbereiche sind eindeutig
+    von den gleichnamigen Inhalten einer einzelnen Baustelle benannt.
 - Fassung 0.43.1, Speicher `schaefchen-online-v80`, Migration 093.
 
 - **Schäfchen besitzt jetzt ein gemeinsames, referenznahes Designsystem.**

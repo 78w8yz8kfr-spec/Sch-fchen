@@ -263,6 +263,14 @@ import {
     weekTotalBreak: document.querySelector("#week-total-break"),
     weekTotalTravel: document.querySelector("#week-total-travel"),
     weekTotalOvertime: document.querySelector("#week-total-overtime"),
+    weekViewButtons: [...document.querySelectorAll("[data-week-view-button]")],
+    weekSubareas: [...document.querySelectorAll("[data-week-subarea]")],
+    weekOverviewSubarea: document.querySelector("#week-overview-subarea"),
+    weekDaysSubarea: document.querySelector("#week-days-subarea"),
+    weekAccountSubarea: document.querySelector("#week-account-subarea"),
+    weekRequestsSubarea: document.querySelector("#week-requests-subarea"),
+    weekOverviewTableCard: document.querySelector("#week-overview-table-card"),
+    weekDaysSection: document.querySelector("#week-days-section"),
     weekOverviewTableBody: document.querySelector("#week-overview-table-body"),
     weekMessage: document.querySelector("#week-message"),
     weekTimesheetList: document.querySelector("#week-timesheet-list"),
@@ -339,6 +347,7 @@ import {
     holidayClosureSubmit: document.querySelector("#holiday-closure-submit"),
     holidayClosureList: document.querySelector("#holiday-closure-list"),
     holidayCalendarMessage: document.querySelector("#holiday-calendar-message"),
+    absenceArea: document.querySelector("#absence-area"),
     absencePanel: document.querySelector("#absence-panel"),
     absenceForm: document.querySelector("#absence-form"),
     absenceType: document.querySelector("#absence-type"),
@@ -478,6 +487,8 @@ import {
     adminEyebrow: document.querySelector("#admin-eyebrow"),
     adminTitle: document.querySelector("#admin-title"),
     adminIntro: document.querySelector("#admin-intro"),
+    settingsTabs: document.querySelector("#settings-tabs"),
+    settingsViewButtons: [...document.querySelectorAll("[data-settings-view]")],
     adminSummary: document.querySelector("#admin-summary"),
     dispatchSummary: document.querySelector("#dispatch-summary"),
     dispatchSummaryDate: document.querySelector("#dispatch-summary-date"),
@@ -520,7 +531,6 @@ import {
     customerSearchField: document.querySelector("#customer-search-field"),
     customerNew: document.querySelector("#customer-new"),
     customerOverviewList: document.querySelector("#customer-overview-list"),
-    projectOverviewList: document.querySelector("#project-overview-list"),
     documentsShell: document.querySelector("#documents-shell"),
     documentsContent: document.querySelector("#documents-content"),
     vehiclesShell: document.querySelector("#vehicles-shell"),
@@ -543,6 +553,8 @@ import {
     vehicleMessage: document.querySelector("#vehicle-message"),
     inspectionsShell: document.querySelector("#inspections-shell"),
     analyticsShell: document.querySelector("#analytics-shell"),
+    analyticsViewButtons: [...document.querySelectorAll("[data-analytics-view]")],
+    hoursOverviewCard: document.querySelector("#hours-overview-card"),
     analyticsExportContent: document.querySelector("#analytics-export-content"),
     inspectionSearchField: document.querySelector("#inspection-search-field"),
     inspectionSiteFilter: document.querySelector("#inspection-site-filter"),
@@ -975,6 +987,25 @@ import {
     elements.timesheetSection
   );
 
+  // Die Woche war fachlich vollstaendig, aber als eine lange Sammelseite kaum
+  // noch zu ueberblicken. Dieselben Karten leben jetzt in vier eindeutigen
+  // Unterbereichen; sie werden nur umsortiert, nicht kopiert.
+  elements.weekOverviewSubarea.append(
+    elements.weekOverviewTableCard,
+    elements.weekNextAssignment
+  );
+  elements.weekDaysSubarea.append(
+    elements.weekDaysSection,
+    elements.employeeTimesheetExportPanel
+  );
+  elements.weekAccountSubarea.append(elements.timeAccountPanel);
+  elements.weekRequestsSubarea.append(
+    elements.absenceArea,
+    elements.workDayReviewPanel,
+    elements.timeCorrectionReviewPanel,
+    elements.absenceReviewPanel
+  );
+
   // Jeder Eintrag der Seitenleiste hat einen eigenen Bereich. Die Tafeln dafuer
   // liegen im Dokument dort, wo sie fachlich hingehoeren, und ziehen hier an
   // ihren Platz - so wie es die Einsatz- und Baustellenplanung schon macht.
@@ -1013,6 +1044,9 @@ import {
   // diesem Geraet benutzte Firma. Beide zusammen fuellen das Anmeldeformular.
   let loginSetup = null;
   let currentDashboardPane = "start";
+  let currentWeekSubarea = "overview";
+  let currentSettingsSubarea = "time-accounts";
+  let currentAnalyticsSubarea = "hours";
   // Zu welchem Tag gehoeren die geladenen Einsaetze? Die Schnittstelle liefert
   // sie je Tag und traegt das Datum nicht in den einzelnen Einsatz ein.
   let assignmentsDate = null;
@@ -1395,14 +1429,25 @@ import {
   // die Plattformverwaltung schaltet einen Bereich frei oder ab. Deshalb steht
   // das hier fuer sich und nicht mehr mitten in showDashboard: es muss auch
   // dann laufen, wenn die Anmeldung laengst vorbei ist.
+  function updateNavigationGroups() {
+    const labels = elements.bottomNav.querySelectorAll("[data-nav-group-label]");
+    labels.forEach((label) => {
+      const group = label.dataset.navGroupLabel;
+      const hasVisibleEntry = [...elements.bottomNav.querySelectorAll(
+        `.nav-item[data-nav-group="${group}"]`
+      )].some((button) => !button.hidden);
+      label.hidden = !hasVisibleEntry;
+    });
+  }
+
   function applyNavigationAccess() {
     const planner = canPlan();
     elements.navAssignments.hidden = !planner;
     elements.navSites.hidden = !planner;
-    // Die eigene Zeiterfassungsseite brauchen nur planende Rollen. Fuer sie
-    // bleiben "Woche" und "Zeiten" eindeutig getrennt. Baustellenrollen sehen
-    // stattdessen nur "Zeiten" fuer Woche, Eintraege und Arbeitskonto und
-    // starten oder beenden ihren Arbeitstag ausschliesslich auf "Start".
+    // Auf der Baustelle ist der Arbeitstag bereits der erste Schritt auf
+    // „Start“. Dort fuehrt „Zeiten“ in die Woche mit Eintraegen, Arbeitskonto
+    // und Korrekturen. Nur planende Rollen brauchen zusaetzlich die getrennte
+    // persoenliche Zeiterfassungsseite.
     elements.navTime.hidden = !planner;
     elements.navWeek.dataset.kurz = planner ? "Woche" : "Zeiten";
     elements.navWeek.classList.toggle("nav-week--planner", planner);
@@ -1422,6 +1467,7 @@ import {
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
     elements.navInspections.hidden = !planner || !vdeModuleEnabled();
+    updateNavigationGroups();
     elements.bottomNav.classList.toggle("bottom-nav--planner", planner);
     // Ab fuenf Schaltflaechen wird es eng: dann kleinere Schrift und Symbole.
     // Ein ausbildender Vorarbeiter mit Planungsrolle haette sechs. Gezaehlt
@@ -2866,7 +2912,10 @@ import {
         text: korrekturen.length === 1
           ? "1 Zeitkorrektur wartet auf Prüfung"
           : `${korrekturen.length} Zeitkorrekturen warten auf Prüfung`,
-        handler: () => showDashboardPane("week")
+        handler: () => {
+          currentWeekSubarea = "requests";
+          showDashboardPane("week");
+        }
       });
     }
 
@@ -2878,7 +2927,10 @@ import {
         text: abwesenheiten.length === 1
           ? "1 Abwesenheitsantrag wartet auf Freigabe"
           : `${abwesenheiten.length} Abwesenheitsanträge warten auf Freigabe`,
-        handler: () => showDashboardPane("week")
+        handler: () => {
+          currentWeekSubarea = "requests";
+          showDashboardPane("week");
+        }
       });
     }
 
@@ -3951,17 +4003,6 @@ import {
     elements.siteReportSummary.focus({ preventScroll: true });
   }
 
-  function projectStatusLabel(status) {
-    return {
-      planned: "Geplant",
-      active: "Aktiv",
-      on_hold: "Pausiert",
-      completed: "Abgeschlossen",
-      archived: "Archiviert",
-      cancelled: "Storniert"
-    }[status] || status;
-  }
-
   function customerSearchText(customer) {
     return [
       customer.number,
@@ -3973,11 +4014,6 @@ import {
       customer.address?.postalCode,
       customer.address?.city
     ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
-  }
-
-  function projectSearchText(project) {
-    return [project.number, project.name, project.shortText, project.customerName]
-      .filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
   }
 
   // Die Kundenliste des eigenen Bereichs. Sie zeigt, was ein Kunde im Betrieb
@@ -4005,12 +4041,9 @@ import {
 
     appendAdminListHead(
       elements.customerOverviewList,
-      ["Kunde", "Nummer", "Ansprechpartner", "Projekte", "Baustellen"]
+      ["Kunde", "Nummer", "Ansprechpartner", "Baustellen"]
     );
     kunden.forEach((customer) => {
-      const projekte = adminState.projects.filter(
-        (project) => project.customerId === customer.id
-      );
       const baustellen = adminState.sites.filter(
         (site) => site.customerName === customer.displayName
           && siteStatusGroup(site.status) === "active"
@@ -4029,76 +4062,11 @@ import {
         adminListCells([
           customer.number,
           [customer.email, customer.phone].filter(Boolean).join(" · "),
-          `${projekte.length}`,
           `${baustellen.length} laufend`
         ]),
         knopf
       );
       elements.customerOverviewList.append(zeile);
-    });
-    renderProjectOverview(query);
-  }
-
-  // Die Projekte des Betriebs, unter den Kunden, zu denen sie gehoeren.
-  //
-  // Bis hierher gab es keinen Weg zu ihnen: der Bearbeitungsbogen war fertig
-  // gebaut, die Schnittstelle nahm Aenderungen an - nur rief niemand
-  // openProjectEditor auf. Ein Projekt liess sich anlegen und danach nie
-  // wieder aendern, auch nicht abschliessen.
-  //
-  // Die Suche der Kundenansicht gilt mit: wer nach einem Kunden sucht, will
-  // dessen Projekte sehen und nicht alle anderen dazu.
-  function renderProjectOverview(query) {
-    const projekte = adminState.projects
-      .filter((project) => (
-        !query
-        || project.name.toLocaleLowerCase("de-DE").includes(query)
-        || (project.number || "").toLocaleLowerCase("de-DE").includes(query)
-        || (project.customerName || "").toLocaleLowerCase("de-DE").includes(query)
-      ))
-      .sort((links, rechts) => (
-        links.customerName.localeCompare(rechts.customerName, "de-DE")
-        || links.name.localeCompare(rechts.name, "de-DE")
-      ));
-
-    elements.projectOverviewList.replaceChildren();
-    if (projekte.length === 0) {
-      const leer = document.createElement("li");
-      leer.className = "admin-list__empty";
-      leer.textContent = query ? "Kein Projekt passt zur Suche." : "Noch kein Projekt angelegt.";
-      elements.projectOverviewList.append(leer);
-      return;
-    }
-
-    appendAdminListHead(
-      elements.projectOverviewList,
-      ["Projekt", "Nummer", "Kunde", "Baustellen", "Status"]
-    );
-    projekte.forEach((project) => {
-      const baustellen = adminState.sites.filter((site) => site.projectId === project.id);
-      const zeile = document.createElement("li");
-      const name = document.createElement("strong");
-      const marke = document.createElement("span");
-      const knopf = document.createElement("button");
-      zeile.className = "admin-list__row";
-      name.textContent = project.name;
-      marke.className = `site-status site-status--${projectStatusGroup(project.status)}`;
-      marke.textContent = projectStatusLabel(project.status);
-      knopf.type = "button";
-      knopf.className = "text-button";
-      knopf.textContent = "Bearbeiten";
-      knopf.addEventListener("click", () => openProjectEditor(project));
-      zeile.append(
-        name,
-        adminListCells([
-          project.number,
-          project.customerName,
-          `${baustellen.length} Baustelle${baustellen.length === 1 ? "" : "n"}`,
-          marke
-        ]),
-        knopf
-      );
-      elements.projectOverviewList.append(zeile);
     });
   }
 
@@ -4758,7 +4726,7 @@ import {
     const list = document.createElement("ul");
     list.className = "admin-list admin-list--table hierarchy-site-table";
     list.id = "hierarchy-site-table";
-    appendAdminListHead(list, ["Name", "Projekt / Leistung", "Kunde", "Adresse", "Dokumente", "Status"]);
+    appendAdminListHead(list, ["Baustelle", "Aufgabe", "Kunde", "Adresse", "Dokumente", "Status"]);
     sites.forEach((site) => {
       const item = document.createElement("li");
       const title = document.createElement("strong");
@@ -8510,7 +8478,9 @@ import {
     // Die Oberfläche bildet genau das ab, damit niemand auf eine Schaltfläche
     // trifft, die der Server anschließend verweigert.
     const canManage = Boolean(adminState?.canCreateManagementRoles);
-    elements.timeCorrectionPolicyAdmin.hidden = !canPlan() || !isOfficeAdminPane();
+    elements.timeCorrectionPolicyAdmin.hidden = !canPlan()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "time-rules";
     elements.timeCorrectionPolicyForm.hidden = !canManage;
     if (!timeCorrectionPolicyState) {
       elements.timeCorrectionPolicyState.textContent = navigator.onLine
@@ -8786,8 +8756,10 @@ import {
     renderAdminYearOptions();
     renderHoursOverview();
     const visible = canPlan() && !isProjectScopedSession() && isOfficeAdminPane();
-    elements.timeAccountAdminPanel.hidden = !visible;
-    elements.holidayCalendarAdmin.hidden = !visible;
+    elements.timeAccountAdminPanel.hidden = !visible
+      || currentSettingsSubarea !== "time-accounts";
+    elements.holidayCalendarAdmin.hidden = !visible
+      || currentSettingsSubarea !== "holidays";
     if (!visible) return;
     const requestedYear = adminYear;
     const overview = timeAccountsState?.year === requestedYear ? timeAccountsState : null;
@@ -9455,25 +9427,50 @@ import {
   }
 
   // Die Bereiche, die es am Telefon nicht in die untere Leiste schaffen,
-  // stehen unter "Einstellungen" als Liste. Sie entsteht aus denselben
-  // Schaltflaechen wie die Leiste - so kann sie nicht auseinanderlaufen, und
-  // ein Eintrag, den die Rolle nicht sehen darf, fehlt hier automatisch.
+  // stehen unter "Mehr" in denselben fachlichen Gruppen wie am Rechner. Die
+  // Eintraege entstehen weiterhin aus der echten Navigation, damit Rolle und
+  // Modulfreigabe nie zwischen zwei Listen auseinanderlaufen.
   function renderPaneMenu() {
     const eintraege = [...elements.bottomNav.querySelectorAll(".nav-item--desktop")]
       .filter((knopf) => !knopf.hidden);
     elements.paneMenu.replaceChildren();
     elements.paneMenu.hidden = currentDashboardPane !== "more" || eintraege.length === 0;
     if (elements.paneMenu.hidden) return;
+
+    const gruppennamen = {
+      documentation: "Dokumentation",
+      business: "Betrieb",
+      control: "Steuerung"
+    };
+    const gruppen = new Map();
     for (const eintrag of eintraege) {
-      const knopf = document.createElement("button");
-      knopf.type = "button";
-      knopf.className = "pane-menu__item";
-      knopf.innerHTML = eintrag.querySelector("svg").outerHTML;
-      const beschriftung = document.createElement("span");
-      beschriftung.textContent = eintrag.querySelector("span").textContent;
-      knopf.append(beschriftung);
-      knopf.addEventListener("click", () => eintrag.click());
-      elements.paneMenu.append(knopf);
+      const gruppe = eintrag.dataset.navGroup || "other";
+      if (!gruppen.has(gruppe)) gruppen.set(gruppe, []);
+      gruppen.get(gruppe).push(eintrag);
+    }
+
+    for (const [gruppe, gruppeneintraege] of gruppen) {
+      const bereich = document.createElement("section");
+      const ueberschrift = document.createElement("p");
+      const raster = document.createElement("div");
+      bereich.className = "pane-menu__group";
+      ueberschrift.className = "pane-menu__heading";
+      ueberschrift.textContent = gruppennamen[gruppe] || "Weitere Bereiche";
+      raster.className = "pane-menu__grid";
+
+      for (const eintrag of gruppeneintraege) {
+        const knopf = document.createElement("button");
+        knopf.type = "button";
+        knopf.className = "pane-menu__item";
+        knopf.innerHTML = eintrag.querySelector("svg").outerHTML;
+        const beschriftung = document.createElement("span");
+        beschriftung.textContent = eintrag.querySelector("span").textContent;
+        knopf.append(beschriftung);
+        knopf.addEventListener("click", () => eintrag.click());
+        raster.append(knopf);
+      }
+      bereich.append(ueberschrift, raster);
+      elements.paneMenu.append(bereich);
     }
   }
 
@@ -9489,6 +9486,55 @@ import {
     });
   }
 
+  function showWeekSubarea(requested) {
+    const allowed = new Set(["overview", "days", "account", "requests"]);
+    currentWeekSubarea = allowed.has(requested) ? requested : "overview";
+    elements.weekViewButtons.forEach((button) => {
+      const active = button.dataset.weekViewButton === currentWeekSubarea;
+      button.classList.toggle("page-tab--active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    elements.weekSubareas.forEach((subarea) => {
+      subarea.hidden = subarea.dataset.weekSubarea !== currentWeekSubarea;
+    });
+  }
+
+  function showAnalyticsSubarea(requested) {
+    currentAnalyticsSubarea = requested === "export" ? "export" : "hours";
+    elements.analyticsViewButtons.forEach((button) => {
+      const active = button.dataset.analyticsView === currentAnalyticsSubarea;
+      button.classList.toggle("page-tab--active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    elements.hoursOverviewCard.hidden = currentAnalyticsSubarea !== "hours";
+    elements.analyticsExportContent.hidden = currentAnalyticsSubarea !== "export";
+  }
+
+  function showSettingsSubarea(requested) {
+    const allowed = new Set(["time-accounts", "holidays", "time-rules", "account"]);
+    const accountOnly = !canPlan() || isProjectScopedSession();
+    currentSettingsSubarea = accountOnly
+      ? "account"
+      : allowed.has(requested) ? requested : "time-accounts";
+    // Projektbeschraenkte Konten besitzen keine Firmen-Einstellungen. Eine
+    // einzelne, nicht waehlerische Reiterleiste waere dort nur visuelles
+    // Rauschen; der Kontobereich steht direkt unter der Ueberschrift.
+    elements.settingsTabs.hidden = accountOnly;
+    if (accountOnly) {
+      elements.adminIntro.textContent = "Deine Zugangsdaten und Rolle im Überblick.";
+    }
+    elements.settingsViewButtons.forEach((button) => {
+      const active = button.dataset.settingsView === currentSettingsSubarea;
+      button.classList.toggle("page-tab--active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    renderAdminTimeAccounts();
+    renderTimeCorrectionPolicy();
+    renderAccountCard();
+    elements.infoCard.hidden = currentDashboardPane !== "more"
+      || (!demoMode && canPlan() && currentSettingsSubarea !== "account");
+  }
+
   // Die Bueroverwaltung - Jahreskonten, Feiertagskalender und die Regel fuer
   // Zeitkorrekturen - gehoert unter "Mehr". Ohne diese Pruefung stand sie in
   // allen drei Verwaltungsansichten: Einsaetze, Baustellen und Mehr zeigten
@@ -9496,8 +9542,8 @@ import {
   // und keine eigene Zuordnung hatten.
   // Der eigene Arbeitstag hat pro Rolle genau einen Bereich. Baustellenrollen
   // brauchen den naechsten logischen Schritt direkt auf "Start". Planende
-  // Rollen finden den eigenen Arbeitstag in der getrennten Desktop-
-  // Zeiterfassung. Damit kann dieselbe Karte nicht auf zwei Seiten erscheinen.
+  // Rollen finden ihn in der getrennten Zeiterfassung. Damit erscheint
+  // dieselbe Funktion niemals zugleich auf Start und einer zweiten Seite.
   function showsPersonalWorkday(pane) {
     return canPlan() ? pane === "time" : pane === "start";
   }
@@ -9568,16 +9614,16 @@ import {
       elements.adminSummary.hidden = true;
       elements.dispatchSummary.hidden = pane !== "assignments";
       const copy = {
-        assignments: ["Wochen- und Personaleinsatz", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
-        sites: ["Baustellenverwaltung", "Baustellen", "Aktive und archivierte Baustellen durchsuchen und bearbeiten."],
-        reports: ["Montage und Tagesberichte", "Berichte", "Offene, zurückgegebene und abgeschlossene Berichte an einer Stelle."],
-        employees: ["Mannschaft", "Mitarbeiter", "Konten anlegen, Rollen vergeben und Stammdaten pflegen."],
-        customers: ["Stammdaten", "Kunden", "Kunden und ihre Aufträge an einer Stelle."],
-        vehicles: ["Fuhrpark", "Fahrzeuge", "Transporter, Anhänger und Maschinen mit Fahrer und Terminen."],
-        documents: ["Einmal speichern · überall verwenden", "Dokumente", "Pläne, Protokolle und Rechnungen zentral ablegen."],
-        inspections: ["Elektrische Anlagen", "Prüfprotokolle", "Alle VDE-Prüfungen des Betriebs auf einen Blick."],
-        analytics: ["Arbeitszeiten und Nachweise", "Auswertungen", "Soll, Ist und Zeitkonten vergleichen oder als Nachweis exportieren."],
-        more: ["Verwaltung", "Einstellungen", "Arbeitszeitregeln, Feiertage und Zugang verwalten."]
+        assignments: ["Planung", "Einsatzplanung", "Einsätze manuell oder aus Excel planen."],
+        sites: ["Planung", "Baustellen", "Aktive und archivierte Baustellen durchsuchen und bearbeiten."],
+        reports: ["Dokumentation", "Berichte", "Offene, zurückgegebene und abgeschlossene Berichte an einer Stelle."],
+        documents: ["Dokumentation", "Dokumentablage", "Pläne, Protokolle und Rechnungen zentral ablegen."],
+        inspections: ["Dokumentation", "Prüfprotokolle", "Alle VDE-Prüfungen des Betriebs auf einen Blick."],
+        customers: ["Betrieb", "Kunden", "Kundenstammdaten und zugehörige Baustellen an einer Stelle."],
+        employees: ["Betrieb", "Mitarbeiter", "Konten anlegen, Rollen vergeben und Stammdaten pflegen."],
+        vehicles: ["Betrieb", "Fahrzeuge", "Transporter, Anhänger und Maschinen mit Fahrer und Terminen."],
+        analytics: ["Steuerung", "Arbeitszeit-Auswertung", "Soll, Ist und Zeitkonten vergleichen oder als Nachweis exportieren."],
+        more: ["Steuerung", "Einstellungen", "Immer nur den gewählten Einstellungsbereich bearbeiten."]
       }[pane];
       if (copy) {
         [elements.adminEyebrow.textContent, elements.adminTitle.textContent, elements.adminIntro.textContent] = copy;
@@ -9612,6 +9658,9 @@ import {
     renderNotifications();
     // Die Konto-Karte haengt am Bereich, nicht am Zeichnen der Startseite.
     renderAccountCard();
+    if (pane === "week") showWeekSubarea(currentWeekSubarea);
+    if (pane === "analytics") showAnalyticsSubarea(currentAnalyticsSubarea);
+    if (pane === "more") showSettingsSubarea(currentSettingsSubarea);
     renderOverviewCards();
     renderTopbarUser();
     const title = {
@@ -9622,9 +9671,9 @@ import {
       employees: "Mitarbeiter",
       customers: "Kunden",
       vehicles: "Fahrzeuge",
-      documents: "Dokumente",
+      documents: "Dokumentablage",
       inspections: "Prüfprotokolle",
-      analytics: "Auswertungen",
+      analytics: "Arbeitszeit-Auswertung",
       site: "Baustelle",
       assignments: "Einsätze",
       sites: "Baustellen",
@@ -10988,6 +11037,7 @@ import {
       .some((option) => option.value === employeeId)) {
       elements.timesheetExportEmployee.value = employeeId;
     }
+    showAnalyticsSubarea("export");
     elements.timesheetExportPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     elements.timesheetExportFrom.focus({ preventScroll: true });
   });
@@ -12505,7 +12555,10 @@ import {
   }
 
   function renderAccountCard() {
-    elements.accountCard.hidden = demoMode || !session || currentDashboardPane !== "more";
+    elements.accountCard.hidden = demoMode
+      || !session
+      || currentDashboardPane !== "more"
+      || (canPlan() && currentSettingsSubarea !== "account");
     // Beschriftet wird sie trotzdem: der Bereichswechsel blendet sie ein, ohne
     // sie zu fuellen - sonst stuenden dort vier Striche.
     if (demoMode || !session) return;
@@ -12980,14 +13033,20 @@ import {
       true
     );
   });
-  document.querySelectorAll("[data-open-week-target]").forEach((button) => {
+  document.querySelectorAll("[data-open-week-view]").forEach((button) => {
     button.addEventListener("click", () => {
-      const targetId = button.dataset.openWeekTarget;
+      currentWeekSubarea = button.dataset.openWeekView;
       elements.navWeek.click();
-      window.setTimeout(() => {
-        document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 0);
     });
+  });
+  elements.weekViewButtons.forEach((button) => {
+    button.addEventListener("click", () => showWeekSubarea(button.dataset.weekViewButton));
+  });
+  elements.settingsViewButtons.forEach((button) => {
+    button.addEventListener("click", () => showSettingsSubarea(button.dataset.settingsView));
+  });
+  elements.analyticsViewButtons.forEach((button) => {
+    button.addEventListener("click", () => showAnalyticsSubarea(button.dataset.analyticsView));
   });
   document.querySelectorAll("a.page-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -13003,6 +13062,7 @@ import {
   // Derselbe Weg wie ueber die Leiste - die Uebersicht zeigt die Zahl, der
   // Wochenbereich schluesselt sie auf.
   elements.overviewAccountLink.addEventListener("click", () => {
+    currentWeekSubarea = "account";
     elements.navWeek.click();
   });
   elements.weekPrevious.addEventListener("click", () => {

@@ -1,13 +1,13 @@
 -- Fassung 0.43.1 als Produktionsstand eintragen.
 --
--- Diese Korrektur stellt auf schmalen Bildschirmen den abgenommenen
--- Baustellenmodus wieder her: Start, Zeiten und Mehr; der laufende Arbeitstag
--- erscheint pro Rolle nur einmal. Das kompakte Desktop-Design aus V0.43.0 und
--- alle Zeit-, Einsatz- und Berichtsdaten bleiben unveraendert.
+-- Diese Fassung ordnet die vorhandene Betriebsoberflaeche neu: fachliche
+-- Navigationsgruppen, echte Unterbereiche fuer Woche, Einstellungen und
+-- Arbeitszeit-Auswertung sowie eine normale Kunden-/Baustellenbedienung ohne
+-- sichtbare zweite Projektebene. Datenmodell, Mandantengrenzen, Rollen,
+-- Module und historische Projektverknuepfungen bleiben unveraendert.
 --
--- Zu dieser Fassung gehoeren der neue App-Shell-Speicher
--- (schaefchen-online-v80) und zusammenpassende Fassungsangaben an Server,
--- Frontends und Dienst-Worker.
+-- Zu dieser Fassung gehoeren der neue Speichername des Dienst-Workers
+-- (schaefchen-online-v80) und neue Fassungsangaben an allen App-Dateien.
 
 BEGIN;
 
@@ -16,7 +16,7 @@ INSERT INTO application_versions (
     known_issues, database_migrations, rollout_percent, mandatory_update
 ) VALUES (
     '0.43.1', 'superseded', CURRENT_TIMESTAMP,
-    'Mobiler Baustellenmodus wie abgenommen; keine doppelte Zeiterfassung.',
+    'Fachlich gruppierte Navigation und echte, uebersichtliche Unterbereiche.',
     '[]'::JSONB,
     '["093"]'::JSONB, 100, FALSE
 )

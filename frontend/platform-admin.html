@@ -52,19 +52,24 @@
         </div>
         <nav id="platform-navigation" class="platform-navigation" aria-label="Plattformverwaltung">
           <button data-platform-view="overview" class="is-active">Übersicht</button>
-          <button data-platform-view="companies">Firmen</button>
-          <button data-platform-view="accounts">Benutzer</button>
-          <button data-platform-view="plans">Lizenzen und Tarife</button>
-          <button data-platform-view="modules">Module</button>
-          <button data-platform-view="support">Support</button>
-          <button data-platform-view="health">Systemstatus</button>
-          <button data-platform-view="errors">Fehler</button>
-          <button data-platform-view="versions">Versionen</button>
-          <button data-platform-view="announcements">Mitteilungen</button>
-          <button data-platform-view="backups">Backups</button>
-          <button data-platform-view="privacy">Datenschutz</button>
-          <button data-platform-view="audit">Audit-Log</button>
-          <button data-platform-view="settings">Einstellungen</button>
+          <p class="platform-navigation__group" data-platform-group-label="tenants">Mandanten</p>
+          <button data-platform-view="companies" data-platform-group="tenants">Firmen</button>
+          <button data-platform-view="accounts" data-platform-group="tenants">Benutzer</button>
+          <button data-platform-view="plans" data-platform-group="tenants">Lizenzen und Tarife</button>
+          <button data-platform-view="modules" data-platform-group="tenants">Module</button>
+
+          <p class="platform-navigation__group" data-platform-group-label="operations">Betrieb</p>
+          <button data-platform-view="support" data-platform-group="operations">Support</button>
+          <button data-platform-view="health" data-platform-group="operations">Systemstatus</button>
+          <button data-platform-view="errors" data-platform-group="operations">Fehler</button>
+          <button data-platform-view="versions" data-platform-group="operations">Versionen</button>
+          <button data-platform-view="announcements" data-platform-group="operations">Mitteilungen</button>
+          <button data-platform-view="backups" data-platform-group="operations">Backups</button>
+
+          <p class="platform-navigation__group" data-platform-group-label="governance">Kontrolle</p>
+          <button data-platform-view="privacy" data-platform-group="governance">Datenschutz</button>
+          <button data-platform-view="audit" data-platform-group="governance">Audit-Log</button>
+          <button data-platform-view="settings" data-platform-group="governance">Einstellungen</button>
         </nav>
         <div class="platform-sidebar__account">
           <strong id="platform-user-name">Administrator</strong>

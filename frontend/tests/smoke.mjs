@@ -46,6 +46,15 @@ assert.match(html, /id="week-current"/);
 assert.match(html, /id="week-next"/);
 assert.match(html, /id="week-overview-table-body"/);
 assert.match(app, /elements\.weekOverviewTableBody\.append\(tableRow\)/);
+// Die Woche ist keine lange Sammelseite mehr. Jeder Reiter schaltet genau
+// einen Container, waehrend die vorhandenen Fachkarten nur umsortiert werden.
+for (const bereich of ["overview", "days", "account", "requests"]) {
+  assert.match(html, new RegExp(`data-week-view-button="${bereich}"`));
+  assert.match(html, new RegExp(`data-week-subarea="${bereich}"`));
+}
+assert.match(app, /function showWeekSubarea\(requested\)/);
+assert.match(app, /elements\.weekOverviewSubarea\.append\([\s\S]{0,120}elements\.weekNextAssignment/);
+assert.match(app, /elements\.weekRequestsSubarea\.append\([\s\S]{0,180}elements\.absenceReviewPanel/);
 assert.match(html, /id="nav-time"/);
 assert.match(html, /id="time-page-heading"[^>]*data-dashboard-pane="time"/);
 assert.match(html, /id="employee-search-field"/);
@@ -58,6 +67,10 @@ assert.match(html, /id="hours-overview-year"/);
 assert.match(html, /id="hours-overview-employee"/);
 assert.match(app, /function renderHoursOverview\(\)/);
 assert.match(app, /elements\.analyticsExportContent\.append\(elements\.timesheetExportPanel\)/);
+assert.match(app, /function showAnalyticsSubarea\(requested\)/);
+assert.match(html, /data-analytics-view="hours"/);
+assert.match(html, /data-analytics-view="export"/);
+assert.match(app, /elements\.settingsTabs\.hidden = accountOnly/);
 assert.match(app, /elements\.navAnalytics\.hidden = !planner \|\| isProjectScopedSession\(\);/);
 assert.match(app, /elements\.analyticsShell\.hidden = pane !== "analytics" \|\| isProjectScopedSession\(\);/);
 assert.match(html, /id="planning-week-tab"/);
@@ -269,7 +282,7 @@ assert.ok(
 // Karten - Jahreskonten, Feiertagskalender und die Regel fuer Zeitkorrekturen.
 assert.match(app, /function isOfficeAdminPane\(\)/);
 assert.match(app, /const visible = canPlan\(\) && !isProjectScopedSession\(\) && isOfficeAdminPane\(\);/);
-assert.match(app, /elements\.timeCorrectionPolicyAdmin\.hidden = !canPlan\(\) \|\| !isOfficeAdminPane\(\);/);
+assert.match(app, /elements\.timeCorrectionPolicyAdmin\.hidden = !canPlan\(\)[\s\S]{0,120}currentSettingsSubarea !== "time-rules";/);
 
 // Alle Zellen einer Zeile der Plantafel liegen in derselben Rasterzeile: die
 // hoechste bestimmt die Hoehe aller. Ein Mitarbeiter mit vier Einsaetzen an
@@ -636,9 +649,9 @@ assert.match(html, /id="timesheet-export-form"/);
 assert.match(html, /id="employee-timesheet-export-pdf-submit"/);
 assert.match(html, /id="timesheet-export-pdf-submit"/);
 assert.match(html, /Stundenzettel exportieren/);
-// Der Aufklapper zeigt die Struktur aus Kunde, Projekt und Baustelle. Er hiess
-// "Baustellen" wie der Abschnitt darueber und wie die Navigation darunter.
-assert.match(html, /<summary>Kunden, Projekte und Baustellen<\/summary>/);
+// Die technische Projektebene bleibt fuer bestehende Verknuepfungen erhalten,
+// wird in der normalen Bedienung aber nicht als zweite Auftragswelt gezeigt.
+assert.match(html, /<summary hidden>Baustellenübersicht<\/summary>/);
 assert.match(html, /id="site-customer"/);
 assert.match(html, /id="project-panel" class="admin-panel" hidden/);
 assert.match(html, /id="mobile-report-card"/);
@@ -744,9 +757,10 @@ assert.match(app, /function renderTopbarUser\(/);
 // getrennt: die erste ist Auswertung und Korrektur, die zweite der laufende
 // Arbeitstag. Ein Eintrag ohne echten Zielbereich wird nicht ergänzt.
 const leisteReihenfolge = [
-  "Übersicht", "Woche", "Einsatzplanung", "Zeiterfassung", "Baustellen",
-  "Berichte", "Prüfprotokolle", "Azubi-Berichtsheft", "Mitarbeiter", "Kunden",
-  "Fahrzeuge", "Dokumente", "Auswertungen", "Einstellungen"
+  "Übersicht", "Zeiterfassung", "Meine Woche", "Azubi-Berichtsheft",
+  "Einsatzplanung", "Baustellen", "Berichtszentrale", "Dokumentablage",
+  "Prüfprotokolle", "Kunden", "Mitarbeiter", "Fahrzeuge",
+  "Arbeitszeit-Auswertung", "Einstellungen"
 ];
 const leiste = html.slice(
   html.indexOf('<nav class="bottom-nav"'),
@@ -768,7 +782,7 @@ assert.match(styles, /\.nav-brand \{[\s\S]{0,260}text-transform: uppercase;/);
 assert.match(app, /function appendAdminListHead\(/);
 assert.match(app, /function adminListCells\(/);
 assert.match(app, /\["Name", "E-Mail", "Rolle", "Telefon", "Status"\]/);
-assert.match(app, /appendAdminListHead\(list, \["Name", "Projekt \/ Leistung", "Kunde", "Adresse", "Dokumente", "Status"\]\)/);
+assert.match(app, /appendAdminListHead\(list, \["Baustelle", "Aufgabe", "Kunde", "Adresse", "Dokumente", "Status"\]\)/);
 assert.match(app, /\["Nr\.", "Baustelle", "Prüfungsart", "Datum", "Status", "Prüfer"\]/);
 assert.match(styles, /grid-template-columns: var\(--tabellen-spalten/);
 assert.match(styles, /#employee-list \{\s*\n\s*--tabellen-spalten:[^;]*92px;/);
@@ -836,10 +850,10 @@ assert.match(styles, /body\.hat-fassungshinweis \{/);
 // eingerichteten App wieder dieselben aus dem Speicher.
 assert.match(app, /caches\.delete\(name\)/);
 
-// Am Telefon traegt die Leiste bis zu sechs Eintraege. Mit den langen Namen aus
-// der Seitenleiste passt das nicht: "Einsatzplanung" ist dreimal so breit wie
-// "Azubi". Unten steht deshalb die kurze Beschriftung; der lange Name bleibt
-// im Dokument, weil ein Vorleser ihn nennt.
+// Am Telefon zeigt eine Baustellenrolle nur Start, Zeiten und Mehr; planende
+// Rollen erhalten die zusaetzlichen Verwaltungsziele. Die kurzen Namen halten
+// die Leiste in beiden Faellen lesbar, die langen bleiben fuer Desktop und
+// Vorleser im Dokument.
 for (const [kennung, kurz] of [
   ["nav-start", "Start"], ["nav-sites", "Baustellen"], ["nav-assignments", "Planung"],
   ["nav-week", "Zeiten"], ["nav-time", "Zeiten"], ["nav-apprentice", "Azubi"], ["nav-more", "Mehr"]
@@ -848,10 +862,31 @@ for (const [kennung, kurz] of [
 }
 assert.match(styles, /\.bottom-nav > \.nav-item\[data-kurz\]::after \{\s*\n\s*content: attr\(data-kurz\);/);
 assert.match(html, /id="nav-time" class="nav-item"/);
-assert.match(html, /id="nav-week"[\s\S]{0,320}class="nav-icon--mobile"/);
+assert.match(html, /id="nav-week"[\s\S]{0,360}class="nav-icon--mobile"/);
 assert.match(app, /elements\.navTime\.hidden = !planner;/);
 assert.match(app, /elements\.navWeek\.dataset\.kurz = planner \? "Woche" : "Zeiten";/);
 assert.match(app, /elements\.navWeek\.classList\.toggle\("nav-week--planner", planner\);/);
+
+// Am Rechner ist die Navigation nach Aufgabe statt nach Entstehungszeit
+// sortiert. Verborgene Modul- oder Rollenpunkte lassen ihre Gruppenueberschrift
+// nicht alleine stehen.
+for (const gruppe of ["work", "planning", "documentation", "business", "control"]) {
+  assert.match(html, new RegExp(`data-nav-group-label="${gruppe}"`));
+}
+assert.match(app, /function updateNavigationGroups\(\)/);
+const erwarteteNavigation = [
+  "nav-start", "nav-time", "nav-week", "nav-apprentice", "nav-assignments",
+  "nav-sites", "nav-reports", "nav-documents", "nav-inspections",
+  "nav-customers", "nav-employees", "nav-vehicles", "nav-analytics", "nav-more"
+];
+for (let index = 1; index < erwarteteNavigation.length; index += 1) {
+  assert.ok(
+    html.indexOf(`id="${erwarteteNavigation[index - 1]}"`)
+      < html.indexOf(`id="${erwarteteNavigation[index]}"`),
+    `${erwarteteNavigation[index]} steht in der falschen Navigationsgruppe`
+  );
+}
+assert.match(styles, /\.nav-group-label \{/);
 
 // Der Fuhrpark. Das Modul stand seit Migration 040 im Katalog, dahinter lag
 // nichts; jetzt gibt es die Fahrzeuge samt Bildschirm.
@@ -961,6 +996,10 @@ assert.match(app, /function showsPersonalWorkday\(pane\) \{/);
 assert.match(app, /return canPlan\(\) \? pane === "time" : pane === "start";/);
 assert.match(app, /element\.hidden = !showsPersonalWorkday\(pane\);/);
 assert.match(app, /elements\.overviewCards\.hidden = currentDashboardPane !== "start"/);
+assert.match(app, /dashboardTitle\.textContent = `\$\{greetingForHour\(\)\}, \$\{session\.user\.firstName\} \\u\{1F44B\}`;/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.status-card \{[\s\S]*?border-radius: 23px;[\s\S]*?--mobile-status-card-background/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-subtitle \{\s*display: none;/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-badges \.welcome-date \{[\s\S]*?position: absolute;/);
 // Der Kopf der Zeiterfassung und die drei vorhandenen Funktionsbereiche stehen
 // als gemeinsamer Block direkt hinter der Woche.
 assert.match(app, /elements\.weekSection\.after\(\s*\n\s*elements\.timePageHeading,\s*\n\s*elements\.workdayCard,/);
@@ -980,10 +1019,6 @@ assert.match(app, /function renderDashboardMetrics\(/);
 assert.match(app, /function renderTodayOverview\(/);
 assert.match(app, /function latestActivity\(/);
 assert.match(app, /function renderQuickAccess\(/);
-assert.match(app, /dashboardTitle\.textContent = `\$\{greetingForHour\(\)\}, \$\{session\.user\.firstName\} \\u\{1F44B\}`;/);
-assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.status-card \{[\s\S]*?border-radius: 23px;[\s\S]*?--mobile-status-card-background/);
-assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-subtitle \{\s*display: none;/);
-assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-badges \.welcome-date \{[\s\S]*?position: absolute;/);
 // Die Kennzahlen gelten nur fuer die Planung: ein Monteur sieht auf seinem
 // Dashboard den Arbeitstag, nicht die Zahlen des ganzen Betriebs.
 assert.match(app, /const zeigen = Boolean\(adminState\) && canPlan\(\) && !demoMode;/);
@@ -1009,13 +1044,23 @@ for (const huelle of [
 assert.match(app, /function renderCustomerOverview\(/);
 assert.match(app, /function renderInspectionOverview\(/);
 assert.match(app, /function renderPaneMenu\(/);
-// Am Telefon fasst die untere Leiste fuenf Eintraege; die uebrigen Bereiche
-// sind unter "Einstellungen" zu erreichen und entstehen aus denselben
-// Schaltflaechen wie die Leiste.
+// Am Telefon entstehen die weiteren Ziele aus derselben Navigation, werden
+// unter "Mehr" aber ebenfalls nach Dokumentation, Betrieb und Steuerung
+// gruppiert.
 assert.match(html, /id="pane-menu"/);
 assert.match(app, /querySelectorAll\("\.nav-item--desktop"\)/);
+assert.match(app, /const gruppennamen = \{/);
+assert.match(app, /documentation: "Dokumentation"/);
+assert.match(app, /business: "Betrieb"/);
 assert.match(styles, /\.pane-menu \{/);
+assert.match(styles, /\.pane-menu__group \{/);
 assert.match(styles, /@media \(min-width: 1080px\) \{\s*\n\s*\.pane-menu \{\s*\n\s*display: none;/);
+// Auch die Einstellungen und Auswertungen sind echte Unterbereiche. Anklicken
+// markiert nicht nur einen Anker, sondern blendet die anderen Inhalte aus.
+for (const bereich of ["time-accounts", "holidays", "time-rules", "account"]) {
+  assert.match(html, new RegExp(`data-settings-view="${bereich}"`));
+}
+assert.match(app, /function showSettingsSubarea\(requested\)/);
 // Der aktive Eintrag wird aus der Leiste selbst bestimmt, nicht aus einer
 // festen Liste - sonst bliebe ein neuer Bereich unmarkiert.
 assert.match(app, /function activateNavigation\([\s\S]{0,220}bottomNav\.querySelectorAll\("\.nav-item"\)/);
@@ -1135,12 +1180,12 @@ assert.match(app, /window\.SpeechRecognition \|\| window\.webkitSpeechRecognitio
 assert.match(app, /function setCompanyMark/);
 assert.match(app, /session\.company\.logoUrl/);
 assert.match(app, /method: "PATCH"/);
-// Die sichtbaren Listen fuer Baustellen, Kunden und Projekte. Frueher standen
-// hier renderSiteList, renderCustomerList und renderProjectList - Zwillinge,
-// die nie jemand zu sehen bekam.
+// Die sichtbaren Listen fuer Baustellen und Kunden. Die technische
+// Projektverknuepfung bleibt bearbeitbar, bildet aber keine zweite sichtbare
+// Auftragsliste mehr.
 assert.match(app, /function renderBusinessHierarchy\(/);
 assert.match(app, /function renderCustomerOverview\(/);
-assert.match(app, /function renderProjectOverview\(/);
+assert.match(app, /function openProjectEditor\(project\)/);
 assert.match(app, /siteStatusGroup/);
 assert.match(app, /rowVersion: customer\.rowVersion/);
 assert.match(app, /rowVersion: project\.rowVersion/);
@@ -1350,6 +1395,13 @@ assert.equal(
   14,
   "Die Plattformverwaltung besitzt genau ihre vierzehn getrennten Hauptbereiche"
 );
+for (const gruppe of ["tenants", "operations", "governance"]) {
+  assert.match(platformHtml, new RegExp(`data-platform-group-label="${gruppe}"`));
+  assert.match(platformHtml, new RegExp(`data-platform-group="${gruppe}"`));
+}
+assert.match(platformApp, /function updateNavigationGroups\(\)/);
+assert.match(platformApp, /label\.hidden = !hasVisibleEntry/);
+assert.match(platformStyles, /\.platform-navigation__group \{/);
 assert.match(platformHtml, /data-platform-view="overview"/);
 assert.match(platformHtml, /data-platform-view="settings"/);
 assert.doesNotMatch(platformHtml, />Woche</);
@@ -1448,13 +1500,14 @@ assert.match(app, /adminOverviewStatus = "failed";\s*\n\s*renderDashboardLoading
 assert.match(app, /dashboardLoadingRetry\.addEventListener\("click"/);
 assert.match(styles, /\.dashboard-loading \{/);
 
-// Der Bearbeitungsbogen fuer Projekte war fertig gebaut und die Schnittstelle
-// nahm Aenderungen an - nur rief niemand openProjectEditor auf. Ein Projekt
-// liess sich anlegen und danach nie wieder aendern, auch nicht abschliessen.
-assert.match(html, /id="project-overview-list"/);
-assert.match(app, /function renderProjectOverview\(query\)/);
-assert.match(app, /knopf\.addEventListener\("click", \(\) => openProjectEditor\(project\)\)/);
-assert.match(styles, /#project-overview-list \{\s*--tabellen-spalten:/);
+// Kunden und Baustellen fuehren nicht noch einmal eine sichtbare Projektliste.
+// Formulare und Schnittstellen fuer vorhandene technische Verknuepfungen
+// bleiben bestehen, damit keine Daten oder Altvertraege verloren gehen.
+assert.doesNotMatch(html, /id="project-overview-list"/);
+assert.doesNotMatch(app, /function renderProjectOverview\(/);
+assert.match(html, /id="project-form"/);
+assert.match(html, /id="project-edit-form"/);
+assert.match(app, /function openProjectEditor\(project\)/);
 
 // Nie sichtbare Verwaltungslisten. Sie wurden bei jedem Aktualisieren und bei
 // jedem Tastendruck neu gebaut, ohne dass sie jemand zu sehen bekam - an der

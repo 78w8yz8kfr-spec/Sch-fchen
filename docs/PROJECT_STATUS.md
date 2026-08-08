@@ -5,9 +5,20 @@ Technischer Stand: V0.43.1
 
 ## Abgeschlossen
 
-- mobile Startseite wieder im abgenommenen Baustellenmodus mit dunkler
-  Arbeitskarte, großer Begrüßung und der klaren Navigation Start, Zeiten, Mehr;
-  keine doppelte Zeiterfassung zwischen Übersicht und eigenem Zeitbereich
+- mobile Startseite im abgenommenen Baustellenmodus mit eindeutiger Navigation
+  Start, Zeiten und Mehr; der persönliche Arbeitstag erscheint pro Rolle nur
+  an einer Stelle
+- fachlich gruppierte Hauptnavigation mit den Bereichen „Meine Arbeit“,
+  „Planung“, „Dokumentation“, „Betrieb“ und „Steuerung“ sowie automatisch
+  ausgeblendeten leeren Rollen- und Modulgruppen
+- echte Unterbereiche für Woche, Einstellungen und Arbeitszeit-Auswertung;
+  umfangreiche Formulare und Prüfstrecken stehen nicht mehr gleichzeitig auf
+  einer langen Sammelseite
+- getrennt gruppierte Plattformverwaltung mit „Mandanten“, „Betrieb“ und
+  „Kontrolle“ sowie automatisch ausgeblendeten leeren Berechtigungsgruppen
+- normale Kunden- und Baustellenbedienung ohne sichtbare zweite Projektebene;
+  technische Projektverknüpfungen und historische Daten bleiben unverändert
+  erhalten
 - gemeinsames referenznahes Designsystem für Betriebs-App,
   Plattformverwaltung und VDE-Editor mit zentralen Tokens für Farbe,
   Typografie, Abstände, Radien, Controls, Tabellen und Status

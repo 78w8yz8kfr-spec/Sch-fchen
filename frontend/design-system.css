@@ -346,6 +346,10 @@ textarea {
   stroke-width: 1.8;
 }
 
+.nav-icon--mobile {
+  display: none;
+}
+
 .topbar {
   border-color: var(--ui-border);
   box-shadow: none;
@@ -366,10 +370,6 @@ textarea {
 
 .topbar__actions {
   gap: 8px;
-}
-
-.nav-icon--mobile {
-  display: none;
 }
 
 .page-heading {
@@ -1512,7 +1512,8 @@ body:has(#vde-app) main {
   }
 
   .dashboard-view.sidebar-collapsed > .bottom-nav > .nav-brand span,
-  .dashboard-view.sidebar-collapsed > .bottom-nav .nav-item span {
+  .dashboard-view.sidebar-collapsed > .bottom-nav .nav-item span,
+  .dashboard-view.sidebar-collapsed > .bottom-nav > .nav-group-label {
     display: none;
   }
 
@@ -1551,25 +1552,29 @@ body:has(#vde-app) main {
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 
-  #week-section > #time-account-panel {
-    grid-column: span 3;
+  #week-section > .week-subarea {
+    grid-column: 1 / -1;
   }
 
-  #week-section > #week-overview-table-card {
+  #week-overview-subarea {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  #week-overview-subarea > #week-overview-table-card {
     grid-column: span 9;
   }
 
-  #week-section > #week-next-assignment {
+  #week-overview-subarea > #week-next-assignment {
     grid-column: span 3;
   }
 
-  #week-section:not(:has(#week-next-assignment:not([hidden]))) > #week-overview-table-card {
-    grid-column: 4 / -1;
+  #week-overview-subarea:not(:has(#week-next-assignment:not([hidden]))) > #week-overview-table-card {
+    grid-column: 1 / -1;
   }
 
-  #week-section > #absence-area,
-  #week-section > #week-days-section {
-    grid-column: 1 / -1;
+  #week-requests-subarea {
+    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dashboard-metrics {
@@ -1621,12 +1626,8 @@ body:has(#vde-app) main {
 }
 
 @media (min-width: 1440px) {
-  #week-section > #week-overview-table-card {
-    grid-column: span 7;
-  }
-
-  #week-section > #week-next-assignment {
-    grid-column: span 2;
+  #week-overview-subarea > #week-overview-table-card {
+    grid-column: span 9;
   }
 }
 
@@ -1704,9 +1705,9 @@ body:has(#vde-app) main {
   }
 }
 
-/* Der Baustellenmodus bleibt bewusst gross, kontrastreich und auf den
-   naechsten Schritt konzentriert. Das kompakte Desktop-Design darf diese
-   Hierarchie auf dem Telefon nicht ueberschreiben. */
+/* Der Baustellenmodus bleibt auf dem Telefon gross, kontrastreich und auf den
+   naechsten Schritt konzentriert. Das kompakte Desktop-Design darf die
+   persoenliche Startseite dort nicht in eine zweite Buerotabelle verwandeln. */
 @media (max-width: 759px) {
   .dashboard-view > .topbar .connection-state {
     order: -1;
