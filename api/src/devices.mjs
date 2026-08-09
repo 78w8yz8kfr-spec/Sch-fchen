@@ -884,6 +884,13 @@ async function listDevices(client, context, url, administrator = false) {
             AND supervisor.user_id=$2 AND supervisor.status IN ('planned','active')
             AND supervisor.valid_from <= CURRENT_DATE
             AND (supervisor.valid_until IS NULL OR supervisor.valid_until >= CURRENT_DATE)
+        ) OR EXISTS (
+          SELECT 1 FROM site_assignments AS site_assignment
+          WHERE site_assignment.company_id=device.company_id
+            AND site_assignment.construction_site_id=device.assigned_construction_site_id
+            AND site_assignment.user_id=$2
+            AND site_assignment.status IN ('released','completed')
+            AND site_assignment.work_date BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1
         ))`
       : "(fixed_assignment.user_id = $2 OR custody.user_id = $2)");
   }
