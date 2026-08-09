@@ -43,6 +43,15 @@ laufender Ausbildungszeitraum oder ein aktueller Wochenbericht die weiterhin
 bestehende Ausbildung belegt. Einen fehlenden Ausbilder rät sie aus
 Datenschutzgründen nicht.
 
+Eine Rollenreparatur muss auch eine bereits geöffnete App erreichen. Seit
+Fassung 0.44.7 übernimmt Schäfchen deshalb beim Zurückkehren die vollständige
+serverseitige Sitzung mit Rollen, Ausbilderstatus und Modulen; vorher wurde aus
+derselben Antwort nur die Modulliste übernommen. Migration 103 sichert den
+gemeldeten Bestandsfall zusätzlich ab: Für die Schaaf Elektro GmbH bleibt das
+Modul dauerhaft freigegeben, und Piets Rolle wird nur dann wiederhergestellt,
+wenn ein vorhandener Wochenbericht oder eine historische Azubi-Zuweisung die
+Ausbildung belegt.
+
 ## Ablauf
 
 ```

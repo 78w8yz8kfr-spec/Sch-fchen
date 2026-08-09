@@ -29,6 +29,23 @@ export function sessionRoles(session) {
   return session?.user?.roles || [];
 }
 
+// Rollen, Ausbilderstatus und Modulfreigaben entscheiden gemeinsam, welche
+// Bereiche eine laufende Sitzung sehen darf. Die Signatur macht Änderungen
+// unabhängig von der Reihenfolge der Serverantwort erkennbar. So kann die App
+// beim Zurückkehren nicht nur neue Module, sondern auch eine reparierte oder
+// bewusst geänderte Mitarbeiterrolle übernehmen.
+export function sessionAccessSignature(session) {
+  const roles = [...sessionRoles(session)].sort();
+  const modules = Object.entries(session?.modules || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, enabled]) => [key, Boolean(enabled)]);
+  return JSON.stringify({
+    roles,
+    isTrainer: Boolean(session?.user?.isTrainer),
+    modules
+  });
+}
+
 export function canPlan(session, { demoMode = false } = {}) {
   return !demoMode && hatEine(sessionRoles(session), PLANNING_ROLES);
 }
