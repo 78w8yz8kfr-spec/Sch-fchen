@@ -42,6 +42,14 @@ FROM companies AS tenant
 JOIN module_catalog AS catalog ON catalog.module_key = 'devices'
 ON CONFLICT (company_id, module_id) DO NOTHING;
 
+-- Das bestehende Fuhrparkmodell besitzt zwar eine weltweit eindeutige
+-- Fahrzeug-ID, mandantensichere Relationen referenzieren aber bewusst immer
+-- Firma und ID gemeinsam. PostgreSQL verlangt dafuer auch auf der Zielseite
+-- einen passenden eindeutigen Schluessel. Der Index ist rueckwaertskompatibel
+-- und durch IF NOT EXISTS auch beim zweiten Migrationslauf idempotent.
+CREATE UNIQUE INDEX IF NOT EXISTS vehicles_company_id_id_unique
+    ON vehicles (company_id, id);
+
 CREATE TABLE IF NOT EXISTS device_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID NOT NULL REFERENCES companies (id) ON DELETE RESTRICT,

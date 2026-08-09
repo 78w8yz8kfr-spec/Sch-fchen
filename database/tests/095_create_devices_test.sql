@@ -17,6 +17,25 @@ DECLARE
     loeschung_geschuetzt BOOLEAN := FALSE;
 BEGIN
     BEGIN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_index AS idx
+            JOIN pg_class AS relation ON relation.oid = idx.indrelid
+            JOIN pg_attribute AS company_column
+              ON company_column.attrelid = relation.oid
+             AND company_column.attname = 'company_id'
+             AND company_column.attnum = ANY(idx.indkey)
+            JOIN pg_attribute AS id_column
+              ON id_column.attrelid = relation.oid
+             AND id_column.attname = 'id'
+             AND id_column.attnum = ANY(idx.indkey)
+            WHERE relation.relname = 'vehicles'
+              AND idx.indisunique
+              AND idx.indpred IS NULL
+        ) THEN
+            RAISE EXCEPTION 'Fahrzeuge besitzen keinen mandantensicheren eindeutigen Schluessel';
+        END IF;
+
         SELECT id INTO firma FROM companies ORDER BY company_number LIMIT 1;
         IF firma IS NULL THEN
             RAISE EXCEPTION 'Für die Geräteabnahme fehlt eine Firma';
