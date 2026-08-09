@@ -1,4 +1,38 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.1";
+let qrScannerLibraryPromise = null;
+
+function loadQrScannerLibrary() {
+  if (!qrScannerLibraryPromise) {
+    qrScannerLibraryPromise = import(QR_SCANNER_MODULE_URL)
+      .then((module) => module.default)
+      .catch((error) => {
+        qrScannerLibraryPromise = null;
+        throw error;
+      });
+  }
+  return qrScannerLibraryPromise;
+}
+
+export function qrScanResultValue(result) {
+  return typeof result === "string" ? result : result?.data || "";
+}
+
+export function cameraScanErrorMessage(error) {
+  const name = String(error?.name || "");
+  const detail = String(error?.message || error || "").toLocaleLowerCase("de-DE");
+  if (["NotAllowedError", "SecurityError"].includes(name)
+      || /permission|not allowed|denied|berechtigung/.test(detail)) {
+    return "Kamerazugriff wurde nicht erlaubt. Bitte in den Browser-Einstellungen die Kamera für Schäfchen freigeben.";
+  }
+  if (name === "NotFoundError" || /camera not found|keine kamera/.test(detail)) {
+    return "Auf diesem Gerät wurde keine verwendbare Kamera gefunden. QR-Foto wählen oder Adresse einfügen.";
+  }
+  if (["NotReadableError", "AbortError"].includes(name) || /could not start video source/.test(detail)) {
+    return "Die Kamera wird bereits von einer anderen App verwendet. Andere Kamera-App schließen und erneut versuchen.";
+  }
+  return "Kamera konnte nicht gestartet werden. QR-Foto wählen oder Adresse einfügen.";
+}
 
 export function normalizeDeviceQrValue(value) {
   let token = String(value || "").trim();
@@ -338,9 +372,8 @@ export function createDeviceModule({
   let editing = null;
   let currentInventory = null;
   let currentInventoryReport = null;
-  let stream = null;
-  let detector = null;
-  let scanFrame = null;
+  let qrScanner = null;
+  let scanResumeTimer = null;
   let scanning = false;
   let lastScanToken = null;
   let deepLinkHandled = false;
@@ -1324,27 +1357,34 @@ export function createDeviceModule({
 
   function stopCamera() {
     scanning = false;
-    if (scanFrame) window.cancelAnimationFrame(scanFrame);
-    scanFrame = null;
-    stream?.getTracks().forEach((track) => track.stop());
-    stream = null;
+    if (scanResumeTimer) window.clearTimeout(scanResumeTimer);
+    scanResumeTimer = null;
+    qrScanner?.destroy();
+    qrScanner = null;
     elements.scanVideo.srcObject = null;
   }
 
-  async function detectionLoop() {
-    if (!scanning || !detector || elements.scanVideo.readyState < 2) {
-      if (scanning) scanFrame = window.requestAnimationFrame(() => void detectionLoop());
-      return;
-    }
-    try {
-      const results = await detector.detect(elements.scanVideo);
-      if (results[0]?.rawValue) {
+  function resumeCamera(delay = 0) {
+    if (scanResumeTimer) window.clearTimeout(scanResumeTimer);
+    scanResumeTimer = window.setTimeout(async () => {
+      scanResumeTimer = null;
+      if (!elements.scanDialog.open || !qrScanner) return;
+      try {
+        scanning = true;
+        await qrScanner.start();
+      } catch (error) {
         scanning = false;
-        await scanValue(results[0].rawValue);
-        return;
+        elements.scanMessage.textContent = cameraScanErrorMessage(error);
       }
-    } catch { /* Das nächste Kamerabild kann wieder lesbar sein. */ }
-    if (scanning) scanFrame = window.requestAnimationFrame(() => void detectionLoop());
+    }, delay);
+  }
+
+  async function handleCameraResult(result) {
+    const rawValue = qrScanResultValue(result);
+    if (!scanning || !rawValue) return;
+    scanning = false;
+    try { await qrScanner?.pause(true); } catch { /* Der Scanwert bleibt verwertbar. */ }
+    await scanValue(rawValue);
   }
 
   async function startCamera() {
@@ -1354,27 +1394,22 @@ export function createDeviceModule({
       elements.scanMessage.textContent = "Dieser Browser kann die Kamera nicht direkt öffnen. QR-Adresse unten einfügen.";
       return;
     }
-    if (!("BarcodeDetector" in window)) {
-      elements.scanMessage.textContent = "Die QR-Erkennung dieses Browsers ist nicht verfügbar. QR-Foto wählen oder Adresse einfügen.";
-      return;
-    }
     try {
-      const formats = await window.BarcodeDetector.getSupportedFormats?.();
-      if (formats && !formats.includes("qr_code")) throw new Error("QR nicht unterstützt");
-      detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+      const QrScanner = await loadQrScannerLibrary();
+      if (!elements.scanDialog.open) return;
+      qrScanner = new QrScanner(elements.scanVideo, (result) => void handleCameraResult(result), {
+        preferredCamera: "environment",
+        maxScansPerSecond: 10,
+        returnDetailedScanResult: true,
+        onDecodeError: () => {}
       });
-      elements.scanVideo.srcObject = stream;
-      await elements.scanVideo.play();
       scanning = true;
+      await qrScanner.start();
+      if (!elements.scanDialog.open) return stopCamera();
       elements.scanMessage.textContent = "QR-Code in den Rahmen halten …";
-      void detectionLoop();
     } catch (error) {
       stopCamera();
-      elements.scanMessage.textContent = error.name === "NotAllowedError"
-        ? "Kamerazugriff wurde nicht erlaubt. Bitte Berechtigung erteilen oder Code einfügen."
-        : "Kamera konnte nicht gestartet werden. QR-Foto wählen oder Adresse einfügen.";
+      elements.scanMessage.textContent = cameraScanErrorMessage(error);
     }
   }
 
@@ -1392,7 +1427,7 @@ export function createDeviceModule({
   async function scanValue(rawValue) {
     let token;
     try { token = normalizeDeviceQrValue(rawValue); }
-    catch (error) { elements.scanMessage.textContent = error.message; scanning = true; void detectionLoop(); return; }
+    catch (error) { elements.scanMessage.textContent = error.message; resumeCamera(900); return; }
     lastScanToken = token;
     if (currentInventory) {
       if (!navigator.onLine) {
@@ -1406,14 +1441,15 @@ export function createDeviceModule({
         elements.scanMessage.textContent = body.scan.device
           ? `${body.scan.device.name}: ${inventoryResultLabel(body.scan.result)}`
           : "Unbekannter QR-Code erfasst.";
-        window.setTimeout(() => { scanning = true; void detectionLoop(); }, 900);
-      } catch (error) { elements.scanMessage.textContent = error.message; }
+        resumeCamera(900);
+      } catch (error) { elements.scanMessage.textContent = error.message; resumeCamera(1200); }
       return;
     }
     if (!navigator.onLine) {
       const cached = readStorage(cacheKey(), {})[token];
       if (!cached) {
         elements.scanMessage.textContent = "Dieser Code ist auf diesem Gerät noch nicht bekannt. Mit Verbindung einmal scannen.";
+        resumeCamera(1500);
         return;
       }
       cacheScan(token, cached);
@@ -1452,23 +1488,37 @@ export function createDeviceModule({
     } catch (error) {
       elements.scanMessage.textContent = error.message;
       if (!elements.scanDialog.open) elements.scanDialog.showModal();
+      resumeCamera(1200);
     }
   }
 
   async function scanImage(file) {
     if (!file) return;
-    if (!("BarcodeDetector" in window)) {
-      elements.scanMessage.textContent = "Die Bilderkennung wird von diesem Browser nicht unterstützt. QR-Adresse bitte einfügen.";
-      return;
-    }
     try {
-      detector ||= new window.BarcodeDetector({ formats: ["qr_code"] });
-      const bitmap = await createImageBitmap(file);
-      const results = await detector.detect(bitmap);
-      bitmap.close();
-      if (!results[0]?.rawValue) throw new Error("Kein QR-Code erkannt.");
-      await scanValue(results[0].rawValue);
-    } catch (error) { elements.scanMessage.textContent = error.message || "Kein QR-Code erkannt."; }
+      scanning = false;
+      try { await qrScanner?.pause(true); } catch { /* Das Foto kann trotzdem gelesen werden. */ }
+      elements.scanMessage.textContent = "QR-Foto wird erkannt …";
+      const QrScanner = await loadQrScannerLibrary();
+      const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
+      const rawValue = qrScanResultValue(result);
+      if (!rawValue) throw new Error("Kein QR-Code erkannt.");
+      await scanValue(rawValue);
+    } catch (error) {
+      elements.scanMessage.textContent = /no qr code/i.test(String(error?.message || error || ""))
+        ? "Auf dem Foto wurde kein QR-Code erkannt."
+        : error?.message || "Kein QR-Code erkannt.";
+      resumeCamera(1200);
+    } finally {
+      elements.scanImage.value = "";
+    }
+  }
+
+  async function scanEnteredValue(rawValue) {
+    if (qrScanner && scanning) {
+      scanning = false;
+      try { await qrScanner.pause(true); } catch { /* Der eingegebene Wert bleibt nutzbar. */ }
+    }
+    await scanValue(rawValue);
   }
 
   async function handleDeepLink() {
@@ -1513,7 +1563,7 @@ export function createDeviceModule({
   elements.scanClose.addEventListener("click", closeScanner);
   elements.scanDialog.addEventListener("cancel", (event) => { event.preventDefault(); closeScanner(); });
   elements.scanDialog.addEventListener("click", (event) => { if (event.target === elements.scanDialog) closeScanner(); });
-  elements.scanForm.addEventListener("submit", (event) => { event.preventDefault(); void scanValue(elements.scanValue.value); });
+  elements.scanForm.addEventListener("submit", (event) => { event.preventDefault(); void scanEnteredValue(elements.scanValue.value); });
   elements.scanImage.addEventListener("change", () => void scanImage(elements.scanImage.files?.[0]));
   elements.search.addEventListener("input", render);
   elements.status.addEventListener("change", render);

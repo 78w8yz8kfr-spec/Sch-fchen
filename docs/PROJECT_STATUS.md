@@ -1,10 +1,14 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.0
+Technischer Stand: V0.44.1
 
 ## Abgeschlossen
 
+- QR-Livekamera und QR-Fotoerkennung mit lokal ausgeliefertem Decoder für
+  Safari auf iPhone/iPad; die native Browsererkennung bleibt der schnelle
+  Pfad, Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt und der
+  PWA-Speicher `schaefchen-online-v83` erzwingt die korrigierte Fassung
 - vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
   automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
   Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  cameraScanErrorMessage,
   deviceStatusLabel,
   normalizeDeviceQrValue,
   offlineDeviceQueueKey,
-  partitionMyDevices
+  partitionMyDevices,
+  qrScanResultValue
 } from "../core/device-management.js";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -15,6 +17,19 @@ test("QR-Adresse und reiner Token werden gleich aufgelöst", () => {
   assert.equal(normalizeDeviceQrValue(token), token);
   assert.equal(normalizeDeviceQrValue(`https://schaefchen.example/?device=${token}`), token);
   assert.throws(() => normalizeDeviceQrValue("M0042"), /gehört nicht/);
+});
+
+test("QR-Scanner verarbeitet native und browserunabhängige Decodergebnisse", () => {
+  assert.equal(qrScanResultValue({ data: `https://schaefchen.example/?device=${token}` }), `https://schaefchen.example/?device=${token}`);
+  assert.equal(qrScanResultValue(token), token);
+  assert.equal(qrScanResultValue(null), "");
+});
+
+test("Kamerafehler erklären Berechtigung, fehlende und belegte Kamera", () => {
+  assert.match(cameraScanErrorMessage({ name: "NotAllowedError" }), /Browser-Einstellungen/);
+  assert.match(cameraScanErrorMessage({ name: "NotFoundError" }), /keine verwendbare Kamera/);
+  assert.match(cameraScanErrorMessage({ name: "NotReadableError" }), /anderen App/);
+  assert.match(cameraScanErrorMessage(new Error("unbekannt")), /QR-Foto/);
 });
 
 test("Meine Geräte trennt Besitz, feste Zuordnung und Fremdbesitz", () => {

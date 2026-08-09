@@ -14,8 +14,11 @@ const CONTENT_TYPES = new Map([
 ]);
 
 const SECURITY_HEADERS = Object.freeze({
-  "Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; manifest-src 'self'; script-src 'self'; style-src 'self'",
-  "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+  "Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; manifest-src 'self'; media-src 'self' blob:; script-src 'self'; style-src 'self'; worker-src 'self' blob:",
+  // Die Kamera bleibt auf Schäfchens eigene Herkunft begrenzt und benötigt
+  // zusätzlich weiterhin die ausdrückliche Freigabe des Benutzers. Fremde
+  // Frames erhalten wegen frame-ancestors 'none' keinen Zugriff.
+  "Permissions-Policy": "camera=(self), geolocation=(), microphone=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY"
