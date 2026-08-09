@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.10";
-import { serverIsNewer } from "./core/versions.js?v=0.44.10";
+} from "./core/work-time.js?v=0.44.11";
+import { serverIsNewer } from "./core/versions.js?v=0.44.11";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.10";
+} from "./core/sync-queue.js?v=0.44.11";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.10";
+} from "./core/permissions.js?v=0.44.11";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,9 +40,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.10";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.10";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
+} from "./core/state-store.js?v=0.44.11";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.11";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -851,6 +851,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     employeeEditRole: document.querySelector("#employee-edit-role"),
     employeeEditApprenticeship: document.querySelector("#employee-edit-apprenticeship"),
     employeeEditTrainer: document.querySelector("#employee-edit-trainer"),
+    employeeEditOccupation: document.querySelector("#employee-edit-occupation"),
+    employeeEditApprenticeshipStart: document.querySelector("#employee-edit-apprenticeship-start"),
+    employeeEditApprenticeshipEnd: document.querySelector("#employee-edit-apprenticeship-end"),
+    employeeEditTrainingYear: document.querySelector("#employee-edit-training-year"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
     employeeEditRemove: document.querySelector("#employee-edit-remove"),
@@ -1332,7 +1336,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.10",
+          "X-Schaefchen-Version": "0.44.11",
           ...options.headers
         }
       });
@@ -1367,7 +1371,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.10`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.11`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1389,7 +1393,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.10" }
+        headers: { "X-Schaefchen-Version": "0.44.11" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1436,7 +1440,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.10 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.11 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2792,7 +2796,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.10";
+  const EIGENE_FASSUNG = "0.44.11";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2831,7 +2835,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.10". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.11". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6213,6 +6217,20 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       || elements.employeeEditRole.value !== "apprentice";
   }
 
+  // Das Lehrjahr wird gerechnet, nicht gepflegt - von Hand gepflegt waere es
+  // spaetestens im zweiten Jahr falsch. Im Personalbogen steht es trotzdem:
+  // wer den Beginn eintraegt, sieht sofort, ob er das richtige Jahr getroffen
+  // hat, und muss dafuer nicht erst ein Blatt drucken.
+  function renderEmployeeTrainingYear() {
+    const beginn = elements.employeeEditApprenticeshipStart.value;
+    const jahr = apprenticeTrainingYear(beginn, localDateKey());
+    elements.employeeEditTrainingYear.textContent = jahr
+      ? `Heute im ${jahr}. Lehrjahr. Das Lehrjahr rechnet sich aus dem Beginn und steht so auf jedem Blatt.`
+      : beginn
+        ? "Der Ausbildungsbeginn liegt in der Zukunft — bis dahin bleibt das Lehrjahr leer."
+        : "Ohne Ausbildungsbeginn bleibt das Lehrjahr auf dem gedruckten Blatt leer.";
+  }
+
   // Die Klassen des deutschen Fuehrerscheins. Dieselbe Liste steht in der
   // Schnittstelle und als Pruefung am Bestand: hier ist sie das, was man
   // ankreuzen kann.
@@ -6290,6 +6308,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
         elements.employeeEditTrainer.append(eintrag);
       }
       elements.employeeEditTrainer.value = employee.trainerUserId || "";
+      elements.employeeEditOccupation.value = employee.apprenticeshipOccupation || "";
+      elements.employeeEditApprenticeshipStart.value = employee.apprenticeshipStartedOn || "";
+      elements.employeeEditApprenticeshipEnd.value = employee.apprenticeshipEndsOn || "";
+      renderEmployeeTrainingYear();
     }
     elements.employeeEditMessage.textContent = "";
     elements.employeeEditForm.hidden = false;
@@ -6801,7 +6823,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.10" }
+        headers: { "X-Schaefchen-Version": "0.44.11" }
       });
       if (response.ok) {
         await cache.put(
@@ -11142,6 +11164,12 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
           trainerUserId: elements.employeeEditRole.value === "apprentice"
             ? elements.employeeEditTrainer.value || null
             : null,
+          // Ausbildungsberuf und Zeitraum stehen im Kopf jedes gedruckten
+          // Wochenblatts. Der Server fasst sie nur bei einem Auszubildenden an;
+          // wer die Rolle wechselt, verliert seine Ausbildungsdaten nicht.
+          apprenticeshipOccupation: elements.employeeEditOccupation.value,
+          apprenticeshipStartedOn: elements.employeeEditApprenticeshipStart.value,
+          apprenticeshipEndsOn: elements.employeeEditApprenticeshipEnd.value,
           drivingLicenceClasses: readLicenceField(elements.employeeEditLicences),
           rowVersion: employee.rowVersion
         })
@@ -12914,6 +12942,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     }
   });
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
+  elements.employeeEditApprenticeshipStart.addEventListener("change", renderEmployeeTrainingYear);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
   elements.apprenticeWithdraw.addEventListener("click", () => withdrawApprenticeReport());
   elements.apprenticeWeekRemark.addEventListener("input", renderApprenticeRemarkCount);

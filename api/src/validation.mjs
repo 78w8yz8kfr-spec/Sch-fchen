@@ -283,8 +283,43 @@ export function validateEmployeeUpdate(body) {
     // Der Ausbilder gehoert an den Mitarbeiter, nicht in eine eigene
     // Verwaltung daneben. Ob jemand ein Berichtsheft fuehrt, sagt seine Rolle.
     trainerUserId: optionalUuid(body.trainerUserId, "Ausbilder"),
+    apprenticeship: apprenticeshipFields(body),
     drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
     rowVersion
+  };
+}
+
+// Ausbildungsberuf und Ausbildungszeitraum.
+//
+// Beides steht im Kopf jedes gedruckten Wochenblatts; ohne sie ist der
+// Nachweis für die Kammer unvollständig. Das Lehrjahr wird daraus gerechnet
+// und nicht gepflegt - von Hand gepflegt wäre es spätestens im zweiten Jahr
+// falsch.
+//
+// `null` heißt „nicht mitgeschickt“ und damit „unverändert lassen“. Eine noch
+// geöffnete ältere App-Fassung kennt diese Felder nicht; würde ein fehlendes
+// Feld als „leeren“ gelesen, nähme eine Änderung an Name oder Telefon dem
+// Auszubildenden nebenbei seinen Ausbildungsberuf. Genau so ist ihm schon
+// einmal die Rolle abhandengekommen.
+function apprenticeshipFields(body) {
+  const gesendet = ["apprenticeshipOccupation", "apprenticeshipStartedOn", "apprenticeshipEndsOn"]
+    .some((feld) => Object.hasOwn(body, feld));
+  if (!gesendet) return null;
+
+  const startedOn = optionalDate(body.apprenticeshipStartedOn, "Ausbildungsbeginn");
+  const endsOn = optionalDate(body.apprenticeshipEndsOn, "Ausbildungsende");
+  if (startedOn && endsOn && endsOn <= startedOn) {
+    throw new InputError("Das Ausbildungsende muss nach dem Ausbildungsbeginn liegen.");
+  }
+  // Ein Ende ohne Beginn ergäbe kein Lehrjahr und keine Suche nach fehlenden
+  // Wochen - der Zeitraum hinge in der Luft.
+  if (endsOn && !startedOn) {
+    throw new InputError("Zum Ausbildungsende fehlt der Ausbildungsbeginn.");
+  }
+  return {
+    occupation: optionalText(body.apprenticeshipOccupation, "Ausbildungsberuf", 150),
+    startedOn,
+    endsOn
   };
 }
 

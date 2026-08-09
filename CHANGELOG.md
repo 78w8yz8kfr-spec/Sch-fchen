@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Ausbildungsberuf und Ausbildungszeitraum lassen sich eintragen.** Im Kopf
+  jedes gedruckten Wochenblatts stand ein Strich, wo die Kammer den
+  Ausbildungsberuf erwartet, und das Lehrjahr blieb leer. Die Spalten liegen
+  seit Migration 056 und 060 in der Datenbank, das Blatt liest sie — nur gab es
+  keinen einzigen Weg, sie zu füllen. Beides steht jetzt im Personalbogen neben
+  dem Ausbilder: Ausbildungsberuf mit den gängigen Elektroberufen zur Auswahl,
+  Ausbildungsbeginn und optionales Ende. Das **Lehrjahr wird daraus gerechnet**
+  und nicht gepflegt — von Hand gepflegt wäre es spätestens im zweiten Jahr
+  falsch; beim Eintragen des Beginns steht sofort daneben, in welchem Lehrjahr
+  der Azubi heute ist. Der Server fasst die Angaben nur bei einem
+  Auszubildenden an und nur, wenn die Oberfläche sie mitgeschickt hat: weder
+  eine ältere App-Fassung noch ein Rollenwechsel nimmt jemandem seinen
+  Ausbildungsberuf.
+- Fassung 0.44.11, Speicher `schaefchen-online-v93`, Migration 107.
+
 - **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
   stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
   des Designsystems (`display: none !important` für alle Desktop-Einträge)

@@ -32,6 +32,33 @@ Ausbilder wird beim Auszubildenden hinterlegt (Verwaltung → Mitarbeiter
 bearbeiten), sichtbar nur, wenn die Firma das Modul hat und die Rolle gewählt
 ist.
 
+## Was zur Ausbildung gepflegt wird
+
+Im selben Formular stehen **Ausbildungsberuf**, **Ausbildungsbeginn** und ein
+optionales **Ausbildungsende**. Sie gehören dorthin und nicht in eine eigene
+Verwaltung daneben: es ist derselbe Personalbogen, in dem schon steht, wer den
+Nachweis unterschreibt.
+
+* Der **Ausbildungsberuf** steht so auf jedem Blatt, wie er hier eingetragen
+  ist — also so, wie er im Ausbildungsvertrag steht. Die gängigen
+  Elektroberufe stehen zur Auswahl, frei eintragen lässt er sich trotzdem: ein
+  Betrieb bildet nicht nur in den sechs Berufen aus, die eine Liste kennt.
+* Das **Lehrjahr** wird aus dem Beginn gerechnet und ist deshalb **kein Feld**.
+  Von Hand gepflegt wäre es spätestens im zweiten Jahr falsch. Beim Eintragen
+  des Beginns steht daneben, in welchem Lehrjahr der Azubi heute ist — wer sich
+  vertippt, sieht es sofort und nicht erst am gedruckten Blatt.
+* Der **Beginn** begrenzt zusätzlich die Suche nach fehlenden Wochen: weiter
+  zurück als bis dahin hat niemand etwas versäumt.
+* Ein **Ende ohne Beginn** wird abgewiesen — der Zeitraum hinge in der Luft —,
+  ebenso ein Ende vor dem Beginn.
+
+Der Server fasst diese drei Angaben nur an, wenn die Oberfläche sie
+mitgeschickt hat **und** der Mensch Auszubildender ist. Eine noch geöffnete
+ältere App-Fassung kennt die Felder nicht; würde ein fehlendes Feld als
+„leeren“ gelesen, nähme eine Änderung an Name oder Telefon dem Auszubildenden
+nebenbei seinen Ausbildungsberuf. Ein **Rollenwechsel löscht sie nicht**: sie
+gehören zur Geschichte dieses Menschen, und Historie wird erhalten.
+
 Das Bearbeitungsformular wählt diese Rolle ausdrücklich vor. Eine Änderung an
 Name, Telefon, Führerschein oder Ausbilder darf den Azubi nicht nebenbei zum
 Monteur machen und ihm damit das Berichtsheft nehmen. Zusätzlich verlangt der

@@ -40,6 +40,7 @@ import {
 } from "./apprentice-pdf.mjs";
 import {
   APPRENTICE_MODULE_KEY,
+  APPRENTICE_ROLE_KEY,
   apprenticeReportDto,
   listApprenticeGaps,
   listApprenticeReportsForPrint,
@@ -201,7 +202,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.10";
+export const APPLICATION_VERSION = "0.44.11";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1729,6 +1730,11 @@ function employeeDto(row) {
     archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : null,
     archivedReason: row.archived_reason || null,
     trainerUserId: row.trainer_user_id || null,
+    // Ausbildungsberuf und Zeitraum stehen im Kopf jedes gedruckten
+    // Wochenblatts. Das Lehrjahr wird daraus gerechnet, nicht gepflegt.
+    apprenticeshipOccupation: row.apprenticeship_occupation || null,
+    apprenticeshipStartedOn: row.apprenticeship_started_on || null,
+    apprenticeshipEndsOn: row.apprenticeship_ends_on || null,
     // Die Einsatzplanung warnt, wenn auf einer Baustelle niemand mit
     // Fuehrerschein steht - dafuer muss sie die Klassen kennen.
     drivingLicenceClasses: row.driving_licence_classes || [],
@@ -4470,6 +4476,12 @@ async function adminOverview(client, context, date) {
               account.must_change_password, account.status, account.archived_at,
               account.archived_reason, account.row_version,
               account.trainer_user_id,
+              -- Als Text formatiert, nicht als Zeitstempel: Mitternacht in
+              -- Berlin ist in UTC der Vortag, und der Ausbildungsbeginn
+              -- rutschte sonst je nach Zeitzone des Servers um einen Tag.
+              TO_CHAR(account.apprenticeship_started_on, 'YYYY-MM-DD') AS apprenticeship_started_on,
+              TO_CHAR(account.apprenticeship_ends_on, 'YYYY-MM-DD') AS apprenticeship_ends_on,
+              account.apprenticeship_occupation,
               account.driving_licence_classes,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
@@ -6865,6 +6877,9 @@ async function getEmployeeRecord(client, context, employeeId) {
             account.must_change_password, account.status, account.archived_at,
             account.archived_reason, account.row_version,
             account.trainer_user_id,
+            TO_CHAR(account.apprenticeship_started_on, 'YYYY-MM-DD') AS apprenticeship_started_on,
+            TO_CHAR(account.apprenticeship_ends_on, 'YYYY-MM-DD') AS apprenticeship_ends_on,
+            account.apprenticeship_occupation,
             account.driving_licence_classes,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
@@ -7077,12 +7092,21 @@ async function updateEmployee(client, context, employeeId, input) {
     }
   }
 
+  // Ausbildungsberuf und Zeitraum werden nur angefasst, wenn die Oberflaeche
+  // sie ueberhaupt mitgeschickt hat und der Mensch Auszubildender ist. Ein
+  // Rollenwechsel loescht sie nicht: sie sind Teil seiner Geschichte, und wer
+  // versehentlich die Rolle wechselt, soll nicht auch noch den Ausbildungsberuf
+  // verlieren.
+  const ausbildungPflegen = Boolean(input.apprenticeship) && input.role === APPRENTICE_ROLE_KEY;
   const updated = await client.query(
     `UPDATE users
      SET personnel_number = $3, first_name = $4, last_name = $5,
          email = $6, phone = $7,
          trainer_user_id = $9,
-         driving_licence_classes = $10
+         driving_licence_classes = $10,
+         apprenticeship_occupation = CASE WHEN $11 THEN $12 ELSE apprenticeship_occupation END,
+         apprenticeship_started_on = CASE WHEN $11 THEN $13::DATE ELSE apprenticeship_started_on END,
+         apprenticeship_ends_on = CASE WHEN $11 THEN $14::DATE ELSE apprenticeship_ends_on END
      WHERE company_id = $1 AND id = $2 AND row_version = $8
      RETURNING id`,
     [
@@ -7095,7 +7119,11 @@ async function updateEmployee(client, context, employeeId, input) {
       input.phone,
       input.rowVersion,
       input.trainerUserId,
-      input.drivingLicenceClasses
+      input.drivingLicenceClasses,
+      ausbildungPflegen,
+      input.apprenticeship?.occupation ?? null,
+      input.apprenticeship?.startedOn ?? null,
+      input.apprenticeship?.endsOn ?? null
     ]
   );
   if (updated.rowCount !== 1) {

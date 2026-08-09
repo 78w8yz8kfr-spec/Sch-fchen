@@ -819,6 +819,112 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.deepEqual(updatedEditableEmployee.roles, ["foreman"]);
     assert.ok(updatedEditableEmployee.rowVersion > editableEmployee.rowVersion);
 
+    // Ausbildungsberuf und Ausbildungszeitraum.
+    //
+    // Beides steht im Kopf jedes gedruckten Wochenblatts, und das Lehrjahr
+    // wird aus dem Beginn gerechnet. Bis hierher gab es keinen Weg, die Angaben
+    // ueberhaupt einzutragen: die Spalten lagen seit Migration 056 und 060 in
+    // der Datenbank, und niemand hat je hineingeschrieben. Im Nachweis stand
+    // deshalb ein Strich, wo die Kammer den Ausbildungsberuf erwartet.
+    const azubiAnlegen = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        personnelNumber: `AZUBI-${suffix}`,
+        firstName: "Anton",
+        lastName: "Auszubildend",
+        role: "apprentice",
+        temporaryPassword: "Ausbildung-Start-2026!"
+      })
+    });
+    assert.equal(azubiAnlegen.status, 201, await azubiAnlegen.clone().text());
+    let azubi = (await azubiAnlegen.json()).employee;
+    assert.equal(azubi.apprenticeshipOccupation, null);
+    assert.equal(azubi.apprenticeshipStartedOn, null);
+
+    const azubiSchreiben = async (koerper, erwartet = 200) => {
+      const antwort = await fetch(`${baseUrl}/api/v1/admin/employees/${azubi.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          personnelNumber: azubi.personnelNumber,
+          firstName: azubi.firstName,
+          lastName: azubi.lastName,
+          role: "apprentice",
+          rowVersion: azubi.rowVersion,
+          ...koerper
+        })
+      });
+      assert.equal(antwort.status, erwartet, await antwort.clone().text());
+      if (antwort.status !== 200) return antwort;
+      azubi = (await antwort.json()).employee;
+      return antwort;
+    };
+
+    await azubiSchreiben({
+      apprenticeshipOccupation: "Elektroniker/-in Fachrichtung Energie- und Gebäudetechnik",
+      apprenticeshipStartedOn: "2024-09-01",
+      apprenticeshipEndsOn: "2027-08-31"
+    });
+    assert.equal(
+      azubi.apprenticeshipOccupation,
+      "Elektroniker/-in Fachrichtung Energie- und Gebäudetechnik"
+    );
+    // Als Text aus der Datenbank, nicht als Zeitstempel: sonst rutschte der
+    // Beginn je nach Zeitzone des Servers um einen Tag.
+    assert.equal(azubi.apprenticeshipStartedOn, "2024-09-01");
+    assert.equal(azubi.apprenticeshipEndsOn, "2027-08-31");
+
+    // Eine noch geoeffnete aeltere App-Fassung kennt die Felder nicht und
+    // schickt sie nicht mit. Eine Aenderung an der Telefonnummer darf dem
+    // Auszubildenden seinen Ausbildungsberuf nicht nebenbei nehmen - genau so
+    // ist ihm schon einmal die Rolle abhandengekommen.
+    await azubiSchreiben({ phone: "+49 171 1122334" });
+    assert.equal(azubi.phone, "+49 171 1122334");
+    assert.equal(
+      azubi.apprenticeshipOccupation,
+      "Elektroniker/-in Fachrichtung Energie- und Gebäudetechnik"
+    );
+    assert.equal(azubi.apprenticeshipStartedOn, "2024-09-01");
+
+    // Ein Ende vor dem Beginn ergibt keinen Ausbildungszeitraum, und ein Ende
+    // ohne Beginn haengt in der Luft - beides mit klarer Meldung statt einer
+    // Bedingung aus der Datenbank.
+    await azubiSchreiben({
+      apprenticeshipStartedOn: "2024-09-01",
+      apprenticeshipEndsOn: "2024-08-31"
+    }, 400);
+    await azubiSchreiben({
+      apprenticeshipStartedOn: "",
+      apprenticeshipEndsOn: "2027-08-31"
+    }, 400);
+
+    // Ein Rollenwechsel loescht die Ausbildungsdaten nicht: sie gehoeren zur
+    // Geschichte dieses Menschen, und Historie wird erhalten.
+    const azubiZuMonteur = await fetch(`${baseUrl}/api/v1/admin/employees/${azubi.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        personnelNumber: azubi.personnelNumber,
+        firstName: azubi.firstName,
+        lastName: azubi.lastName,
+        role: "installer",
+        roleChangeConfirmed: true,
+        apprenticeshipOccupation: "",
+        apprenticeshipStartedOn: "",
+        apprenticeshipEndsOn: "",
+        rowVersion: azubi.rowVersion
+      })
+    });
+    assert.equal(azubiZuMonteur.status, 200, await azubiZuMonteur.clone().text());
+    const ehemaligerAzubi = (await azubiZuMonteur.json()).employee;
+    assert.deepEqual(ehemaligerAzubi.roles, ["installer"]);
+    assert.equal(
+      ehemaligerAzubi.apprenticeshipOccupation,
+      "Elektroniker/-in Fachrichtung Energie- und Gebäudetechnik"
+    );
+    assert.equal(ehemaligerAzubi.apprenticeshipStartedOn, "2024-09-01");
+
     const customerResponse = await fetch(`${baseUrl}/api/v1/admin/customers`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: plannerCookie },

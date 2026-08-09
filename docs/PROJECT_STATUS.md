@@ -1,10 +1,13 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.9
+Technischer Stand: V0.44.11
 
 ## Abgeschlossen
 
+- Ausbildungsberuf und Ausbildungszeitraum im Personalbogen; Lehrjahr und
+  Beruf stehen damit im Kopf jedes gedruckten Wochenblatts. Das Lehrjahr wird
+  aus dem Beginn gerechnet und nicht gepflegt
 - sichtbarer Menüpunkt „Azubi“ in der mobilen Bereichsleiste: die Ausnahme für
   das Berichtsheft steht nun hinter der allgemeinen Ausblendregel des
   Designsystems und mit derselben Durchsetzung; notwendiges Update auf
