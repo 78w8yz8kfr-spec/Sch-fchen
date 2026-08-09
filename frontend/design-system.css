@@ -1673,6 +1673,18 @@ body:has(#vde-app) main {
     display: none !important;
   }
 
+  /* Beim Auszubildenden ist das Berichtsheft kein Verwaltungsziel, sondern
+     taegliche Arbeit: der Eintrag gehoert unten in die Hauptleiste. Die
+     Ausnahme steht in styles.css ohne !important und blieb deshalb gegen die
+     Regel darueber wirkungslos - "Azubi" war am Telefon nie zu sehen, und
+     aus der Liste unter "Mehr" nimmt app.js den Eintrag genau deshalb heraus.
+     Der Nachweis war damit auf dem Geraet, auf dem er taeglich geschrieben
+     wird, ueberhaupt nicht erreichbar. Beim Ausbilder bleibt er unter "Mehr":
+     die Klasse setzt app.js nur beim Auszubildenden. */
+  .dashboard-view > .bottom-nav > .nav-item--desktop.nav-item--apprentice-mobile {
+    display: grid !important;
+  }
+
   .dashboard-view > .bottom-nav > .nav-item {
     min-width: 0;
     flex: 1 1 0;

@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
+  stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
+  des Designsystems (`display: none !important` für alle Desktop-Einträge)
+  verdeckt; die Ausnahme für den Auszubildenden stand ohne `!important` in einer
+  früher geladenen Datei und blieb wirkungslos. Weil die App denselben Eintrag
+  aus der Liste unter „Mehr“ herausnimmt, sobald er zur Hauptleiste gehört,
+  führte anschließend überhaupt kein Weg mehr in den Nachweis — auf genau dem
+  Gerät, auf dem er täglich geschrieben wird. Rollen und Modulfreigaben waren
+  dabei stets in Ordnung. Ein Test hält die Ausnahme jetzt fest.
+- **Der Ausbilder erreicht seine Prüfliste am Telefon.** Der übliche Ausbilder
+  ist der Vorarbeiter, und der plant nicht — „Mehr“ liegt bei ihm im
+  Verwaltungsbereich, den er gar nicht sieht. Ein Ausbilder ohne Planungsrolle
+  bekommt den Eintrag deshalb unten in die Hauptleiste; planende Ausbilder
+  behalten den Weg über „Mehr“.
+- **Die PDF-Vorschau des Wochenblatts zeigt wieder das Blatt.** Rahmen und
+  neuer Reiter holt der Browser selbst und kann die Kopfzeile mit der
+  App-Fassung nicht mitgeben; solange ein Pflichtupdate lief, stand dort statt
+  der Vorschau die Meldung über das notwendige Update. Die Fassung darf nun
+  ersatzweise als `appVersion` im Adressteil stehen.
+- Fassung 0.44.9, Speicher `schaefchen-online-v91`, Migration 105.
+
 - **Piets Berichtsheft bleibt nach dem Laden sichtbar.** Die erste
   Bestandsreparatur war zu vorsichtig und verlangte einen alten Wochenbericht
   oder eine frühere Azubi-Rolle. Im gemeldeten Konto fehlen diese historischen

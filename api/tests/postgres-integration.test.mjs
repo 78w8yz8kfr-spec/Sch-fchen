@@ -408,6 +408,26 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       headers: { Cookie: cookie, "X-Schaefchen-Version": APPLICATION_VERSION }
     });
     assert.equal(currentSessionResponse.status, 200);
+    // Ein Blatt, das der Browser selbst holt - der Rahmen mit der Vorschau des
+    // Berichtshefts, ein neuer Reiter mit dem Wochennachweis -, kann keine
+    // Kopfzeile mitgeben. Ohne den Adressteil stand dort die Meldung ueber das
+    // notwendige Update statt des PDFs, obwohl die App aktuell war.
+    // Bewusst ohne den Helfer oben: der setzt die Kopfzeile, und genau die
+    // fehlt hier - wie beim Browser.
+    const frameWithoutHeaderResponse = await globalThis.fetch(`${baseUrl}/api/v1/session`, {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(frameWithoutHeaderResponse.status, 426);
+    const frameWithVersionResponse = await globalThis.fetch(
+      `${baseUrl}/api/v1/session?appVersion=${APPLICATION_VERSION}`,
+      { headers: { Cookie: cookie } }
+    );
+    assert.equal(frameWithVersionResponse.status, 200);
+    const frameWithOldVersionResponse = await globalThis.fetch(
+      `${baseUrl}/api/v1/session?appVersion=0.41.0`,
+      { headers: { Cookie: cookie } }
+    );
+    assert.equal(frameWithOldVersionResponse.status, 426);
     const releaseUpdateResponse = await fetch(
       `${baseUrl}/api/v1/platform/versions/${productionVersion.id}`,
       {

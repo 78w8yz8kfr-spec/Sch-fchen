@@ -201,7 +201,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.8";
+export const APPLICATION_VERSION = "0.44.9";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -10304,7 +10304,16 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
       if (platformRuntime.mandatoryUpdate && platformRuntime.productionVersion
           && !logoutDuringBlock) {
-        const clientVersion = request.headers["x-schaefchen-version"];
+        // Der Kopfzeileneintrag geht nur mit, wenn die App die Anfrage selbst
+        // stellt. Ein Blatt, das der Browser holt - ein Rahmen mit der
+        // Vorschau, ein neuer Reiter mit dem Wochennachweis -, traegt ihn
+        // nicht: dort erschien statt des PDFs die Meldung ueber das
+        // notwendige Update, obwohl die App laengst aktuell war. Deshalb darf
+        // die Fassung auch im Adressteil stehen. Schwaecher wird die Abfrage
+        // dadurch nicht - wer die Zahl frei waehlen will, kann das bei der
+        // Kopfzeile ebenso.
+        const clientVersion = request.headers["x-schaefchen-version"]
+          || url.searchParams.get("appVersion");
         const comparison = compareApplicationVersions(clientVersion, platformRuntime.productionVersion);
         if (comparison === null || comparison < 0) {
           return json(response, 426, {

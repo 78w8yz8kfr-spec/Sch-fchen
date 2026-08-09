@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.8";
-import { serverIsNewer } from "./core/versions.js?v=0.44.8";
+} from "./core/work-time.js?v=0.44.9";
+import { serverIsNewer } from "./core/versions.js?v=0.44.9";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.8";
+} from "./core/sync-queue.js?v=0.44.9";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.8";
+} from "./core/permissions.js?v=0.44.9";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,9 +40,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.8";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.8";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
+} from "./core/state-store.js?v=0.44.9";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.9";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1322,7 +1322,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.8",
+          "X-Schaefchen-Version": "0.44.9",
           ...options.headers
         }
       });
@@ -1353,7 +1353,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.8" }
+        headers: { "X-Schaefchen-Version": "0.44.9" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1400,7 +1400,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.8 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.9 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1479,10 +1479,19 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
     // woechentlich abzeichnet.
     elements.navApprentice.hidden = !(isApprentice() || mayReviewApprentices());
     // Derselbe Navigationspunkt steht beim Azubi auch mobil direkt unten.
-    // Ausbilder finden die Pruefliste weiterhin unter „Mehr“, damit die
-    // mobile Leiste bei planenden Rollen nicht mit Verwaltungszielen
-    // ueberlaeuft.
-    elements.navApprentice.classList.toggle("nav-item--apprentice-mobile", isApprentice());
+    // Planende Ausbilder finden die Pruefliste weiterhin unter „Mehr“, damit
+    // die mobile Leiste bei ihnen nicht mit Verwaltungszielen ueberlaeuft.
+    //
+    // Der uebliche Ausbilder ist aber der Vorarbeiter, und der plant nicht:
+    // fuer ihn liegt „Mehr“ im Verwaltungsbereich, den er gar nicht sieht.
+    // Die Pruefliste war damit am Telefon durch nichts zu erreichen - und
+    // ohne die Unterschrift des Ausbilders ist der Nachweis wertlos. Seine
+    // Leiste hat den Platz; die Sorge um eine ueberlaufende Leiste gilt nur
+    // den planenden Rollen.
+    elements.navApprentice.classList.toggle(
+      "nav-item--apprentice-mobile",
+      isApprentice() || (mayReviewApprentices() && !canPlan())
+    );
     // Die Eintraege, die es nur am Rechner gibt. Sie haengen an derselben
     // Berechtigung wie Baustellen und Einsatzplanung: wer nicht planen darf,
     // hat dort auch nichts zu suchen.
@@ -2730,7 +2739,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.8";
+  const EIGENE_FASSUNG = "0.44.9";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2769,7 +2778,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.8". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.9". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -10039,8 +10048,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
     const schluessel = `${selectedWeekStart}|${bericht.rowVersion}`;
     if (elements.apprenticePreviewFrame.dataset.week === schluessel) return;
     elements.apprenticePreviewFrame.dataset.week = schluessel;
+    // Auch hier holt der Browser das Blatt selbst: die Fassung gehoert in den
+    // Adressteil, sonst zeigte der Rahmen die Meldung ueber das notwendige
+    // Update statt des Wochenblatts.
     elements.apprenticePreviewFrame.src =
-      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true#toolbar=0`;
+      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true&appVersion=0.44.9#toolbar=0`;
   }
 
   // Warum lassen sich die Felder nicht mehr beschreiben?
@@ -12704,8 +12716,12 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.8";
   // Die Vorschau in einem eigenen Fenster - am Handy gibt es keinen Platz
   // daneben, und manche wollen sie auch am Rechner gross sehen.
   elements.apprenticePreview.addEventListener("click", () => {
+    // Die Fassung steht im Adressteil: dieses Blatt holt der Browser, nicht
+    // die App - eine Kopfzeile kann sie ihm nicht mitgeben. Ohne die Angabe
+    // stand im neuen Reiter die Meldung ueber das notwendige Update statt der
+    // Vorschau.
     window.open(
-      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true`,
+      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true&appVersion=0.44.9`,
       "_blank",
       "noopener"
     );

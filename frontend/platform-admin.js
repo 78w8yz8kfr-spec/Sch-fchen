@@ -110,7 +110,7 @@
   async function request(path, options = {}) {
     const headers = {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      "X-Schaefchen-Version": "0.44.8",
+      "X-Schaefchen-Version": "0.44.9",
       ...(supportMode?.id ? { "X-Support-Access-Id": supportMode.id } : {}),
       ...(options.headers || {})
     };

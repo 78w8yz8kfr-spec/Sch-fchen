@@ -187,8 +187,27 @@ assert.ok(bereich > 0 && eigenes > bereich, "Das eigene Heft liegt nicht im Beri
 assert.ok(pruefliste > bereich, "Die Prüfliste liegt nicht im Berichtsheft-Bereich");
 assert.ok(bereich > wocheAnfang, "Der Berichtsheft-Bereich liegt noch in der Wochenansicht");
 assert.match(app, /navApprentice\.hidden = !\(isApprentice\(\) \|\| mayReviewApprentices\(\)\)/);
-assert.match(app, /navApprentice\.classList\.toggle\("nav-item--apprentice-mobile", isApprentice\(\)\)/);
+// Der Azubi hat das Heft mobil unten. Der uebliche Ausbilder ist der
+// Vorarbeiter: er plant nicht, sieht den Verwaltungsbereich mit „Mehr“ also gar
+// nicht - ohne eigenen Eintrag war seine Pruefliste am Telefon durch nichts zu
+// erreichen. Planende Ausbilder behalten den Weg ueber „Mehr“.
+assert.match(
+  app,
+  /classList\.toggle\(\s*"nav-item--apprentice-mobile",\s*isApprentice\(\) \|\| \(mayReviewApprentices\(\) && !canPlan\(\)\)/
+);
 assert.match(styles, /\.nav-item--desktop\.nav-item--apprentice-mobile/);
+// Die Ausnahme muss auch gegen die spaetere !important-Regel des Designsystems
+// stehen, sonst fehlt der Eintrag mobil vollstaendig.
+assert.match(
+  designSystem,
+  /\.nav-item--desktop\.nav-item--apprentice-mobile \{\s*display: grid !important;/
+);
+// Vorschau und neuer Reiter holt der Browser selbst und gibt dabei keine
+// Kopfzeile mit. Ohne die Fassung im Adressteil stand dort die Meldung ueber
+// das notwendige Update statt des Wochenblatts.
+for (const treffer of app.matchAll(/apprentice\/reports\/\$\{[^`]*?pdf\?preview=true[^`]*/g)) {
+  assert.match(treffer[0], /appVersion=0\.44\.9/, "Der Vorschau fehlt die Fassung im Adressteil");
+}
 assert.match(app, /element === elements\.apprenticeSection[\s\S]{0,160}mayReviewApprentices\(\)/);
 // Seine bisherigen Berichte fuehren in ihre Woche zurueck und lassen sich von
 // dort drucken. Vorher war die Liste eine tote Aufzaehlung.
@@ -636,10 +655,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.44\.8/);
-assert.match(html, /design-system\.css\?v=0\.44\.8/);
-assert.match(html, /app\.js\?v=0\.44\.8/);
-assert.match(html, /version\.js\?v=0\.44\.8/);
+assert.match(html, /styles\.css\?v=0\.44\.9/);
+assert.match(html, /design-system\.css\?v=0\.44\.9/);
+assert.match(html, /app\.js\?v=0\.44\.9/);
+assert.match(html, /version\.js\?v=0\.44\.9/);
 assert.match(html, /id="devices-section"[^>]*data-dashboard-pane="devices"/);
 assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
@@ -1318,21 +1337,21 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.8"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.8"'));
-assert.ok(worker.includes('"./app.js?v=0.44.8"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.8"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.8"'));
-assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.8"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.8"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.9"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.9"'));
+assert.ok(worker.includes('"./app.js?v=0.44.9"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.9"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.9"'));
+assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.9"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.9"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.8"'));
+assert.ok(worker.includes('"./version.js?v=0.44.9"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.8"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.8";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.9"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.9";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1367,7 +1386,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.44\.8$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.44\.9$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1375,11 +1394,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.8"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.8"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.9"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.9"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.8"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.8"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.9"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.9"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1426,9 +1445,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.44\.8/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.44\.8/);
-assert.match(vdeHtml, /app\.js\?v=0\.44\.8/);
+assert.match(vdeHtml, /styles\.css\?v=0\.44\.9/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.44\.9/);
+assert.match(vdeHtml, /app\.js\?v=0\.44\.9/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1444,7 +1463,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.44\.8/);
+assert.match(platformHtml, /design-system\.css\?v=0\.44\.9/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,
