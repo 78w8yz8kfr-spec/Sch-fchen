@@ -201,7 +201,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.5";
+export const APPLICATION_VERSION = "0.44.6";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -6944,6 +6944,17 @@ async function updateEmployee(client, context, employeeId, input) {
       "Das Administratorkonto wird aus Sicherheitsgründen nicht über die Mitarbeiterliste geändert.",
       409,
       "admin_account_locked"
+    );
+  }
+  if (
+    currentRoles.has("apprentice")
+    && input.role !== "apprentice"
+    && !input.roleChangeConfirmed
+  ) {
+    throw new InputError(
+      "Die Azubi-Rolle wurde nicht geändert. Bitte Schäfchen neu laden und die Rollenänderung erneut auswählen.",
+      409,
+      "employee_role_change_confirmation_required"
     );
   }
   if (

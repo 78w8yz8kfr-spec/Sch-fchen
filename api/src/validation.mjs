@@ -276,6 +276,10 @@ export function validateEmployeeUpdate(body) {
     email: optionalText(body.email, "E-Mail", 254),
     phone: optionalText(body.phone, "Telefon", 50),
     role,
+    // Nur die neue Oberflaeche sendet diese ausdrueckliche Bestaetigung. Eine
+    // alte, bereits geoeffnete Fassung kann einen Azubi dadurch nicht mehr
+    // unbemerkt zur Monteurrolle zuruecksetzen.
+    roleChangeConfirmed: boolean(body.roleChangeConfirmed, "Bestätigung der Rollenänderung"),
     // Der Ausbilder gehoert an den Mitarbeiter, nicht in eine eigene
     // Verwaltung daneben. Ob jemand ein Berichtsheft fuehrt, sagt seine Rolle.
     trainerUserId: optionalUuid(body.trainerUserId, "Ausbilder"),

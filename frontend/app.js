@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.5";
-import { serverIsNewer } from "./core/versions.js?v=0.44.5";
+} from "./core/work-time.js?v=0.44.6";
+import { serverIsNewer } from "./core/versions.js?v=0.44.6";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,15 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.5";
+} from "./core/sync-queue.js?v=0.44.6";
 import {
   canPlan as canPlanFor,
+  editableEmployeeRole,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.44.5";
+} from "./core/permissions.js?v=0.44.6";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,9 +39,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.5";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.5";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
+} from "./core/state-store.js?v=0.44.6";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.6";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1320,7 +1321,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.5",
+          "X-Schaefchen-Version": "0.44.6",
           ...options.headers
         }
       });
@@ -1351,7 +1352,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.5" }
+        headers: { "X-Schaefchen-Version": "0.44.6" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1398,7 +1399,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.5 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.6 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2728,7 +2729,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.5";
+  const EIGENE_FASSUNG = "0.44.6";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2767,7 +2768,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.5". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.6". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6191,9 +6192,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
     elements.employeeEditPersonnelNumber.value = employee.personnelNumber;
     elements.employeeEditPhone.value = employee.phone || "";
     elements.employeeEditEmail.value = employee.email || "";
-    elements.employeeEditRole.value = employee.roles.find((role) => (
-      ["installer", "foreman", "managing_director", "dispatch_office", "project_manager"].includes(role)
-    )) || "installer";
+    elements.employeeEditRole.value = editableEmployeeRole(employee.roles);
     // Der Ausbilder gehoert nur zu einem Auszubildenden, und nur, wenn die
     // Firma das Berichtsheft hat. Ein Feld fuer einen Bereich, den es nicht
     // gibt, verspricht mehr, als die App halten kann.
@@ -10904,6 +10903,12 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
           phone: elements.employeeEditPhone.value,
           email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,
+          // Eine echte Rollenänderung wird ausdrücklich gekennzeichnet. Alte
+          // App-Fassungen kannten den Azubi in dieser Auswahl nicht und
+          // schickten deshalb unbemerkt "installer"; der Server kann diesen
+          // alten Fehler damit sicher von einer bewussten Änderung trennen.
+          roleChangeConfirmed:
+            editableEmployeeRole(employee.roles) !== elements.employeeEditRole.value,
           // Ohne diese Angabe wuerde jede Namensaenderung den Ausbilder eines
           // Auszubildenden stillschweigend entfernen.
           trainerUserId: elements.employeeEditRole.value === "apprentice"

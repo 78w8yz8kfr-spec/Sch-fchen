@@ -32,6 +32,17 @@ Ausbilder wird beim Auszubildenden hinterlegt (Verwaltung → Mitarbeiter
 bearbeiten), sichtbar nur, wenn die Firma das Modul hat und die Rolle gewählt
 ist.
 
+Das Bearbeitungsformular wählt diese Rolle ausdrücklich vor. Eine Änderung an
+Name, Telefon, Führerschein oder Ausbilder darf den Azubi nicht nebenbei zum
+Monteur machen und ihm damit das Berichtsheft nehmen. Zusätzlich verlangt der
+Server für einen echten Wechsel weg von „Auszubildender“ eine ausdrückliche
+Bestätigung der neuen Oberfläche; eine noch geöffnete ältere App-Fassung kann
+die Rolle dadurch nicht still entfernen. Migration 102 stellt genau die durch
+diesen früheren Formularfehler widerrufenen Rollen wieder her, sofern ein
+laufender Ausbildungszeitraum oder ein aktueller Wochenbericht die weiterhin
+bestehende Ausbildung belegt. Einen fehlenden Ausbilder rät sie aus
+Datenschutzgründen nicht.
+
 ## Ablauf
 
 ```
