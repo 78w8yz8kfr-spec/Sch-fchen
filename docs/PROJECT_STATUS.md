@@ -1,9 +1,25 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.43.2
+Technischer Stand: V0.44.0
 
 ## Abgeschlossen
+
+- vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
+  automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
+  Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und
+  „Meine Geräte“ für festen und aktuellen Besitz
+- eigenständiges Akkuinventar mit QR-Code, Akkusystem, Spannung, Kapazität,
+  Ladezyklen und Kapazitätstest; Gerätesets sowie Fahrzeugstandorte sind im
+  relationalen Modell vorbereitet
+- mandantengetrennte Migration 095 mit 18 RLS-geschützten Gerätetabellen,
+  stabilen UUID-Relationen, unveränderlicher Bewegungs-/Audit-Historie,
+  Defekten, Prüfungen, Fotos, Benachrichtigungen und QR-Inventur
+- konfliktfeste Übergaben über Row-Lock, Gerätestand und idempotente
+  Client-Operation; benutzer- und firmengetrennte Offline-Warteschlange mit
+  eindeutiger serverseitiger Konfliktauflösung
+- Rollenrechte für Monteur, Vorarbeiter und Geräteverwaltung; die getrennte
+  Plattformadministration besitzt keine operativen Geräteendpunkte
 
 - mobile Startseite im abgenommenen Baustellenmodus; Baustellenrollen sehen
   Start, Zeiten und Mehr, planende Rollen zusätzlich die direkt bedienbaren

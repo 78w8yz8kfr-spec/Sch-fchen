@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.43.2";
-import { serverIsNewer } from "./core/versions.js?v=0.43.2";
+} from "./core/work-time.js?v=0.44.0";
+import { serverIsNewer } from "./core/versions.js?v=0.44.0";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.43.2";
+} from "./core/sync-queue.js?v=0.44.0";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.43.2";
+} from "./core/permissions.js?v=0.44.0";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,7 +38,8 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.43.2";
+} from "./core/state-store.js?v=0.44.0";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.0";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -482,6 +483,7 @@ import {
     navEmployees: document.querySelector("#nav-employees"),
     navCustomers: document.querySelector("#nav-customers"),
     navVehicles: document.querySelector("#nav-vehicles"),
+    navDevices: document.querySelector("#nav-devices"),
     navDocuments: document.querySelector("#nav-documents"),
     navAnalytics: document.querySelector("#nav-analytics"),
     navMore: document.querySelector("#nav-more"),
@@ -537,6 +539,7 @@ import {
     documentsShell: document.querySelector("#documents-shell"),
     documentsContent: document.querySelector("#documents-content"),
     vehiclesShell: document.querySelector("#vehicles-shell"),
+    deviceModuleRoot: document.querySelector("#device-module"),
     vehicleSearchField: document.querySelector("#vehicle-search-field"),
     vehicleNew: document.querySelector("#vehicle-new"),
     vehicleList: document.querySelector("#vehicle-list"),
@@ -1128,6 +1131,16 @@ import {
   let state = loadState();
   employeeSiteState = state.siteWorkspace || null;
 
+  const deviceModule = createDeviceModule({
+    root: elements.deviceModuleRoot,
+    requestJson,
+    showToast,
+    createClientId: createClientEntryId,
+    getSession: () => session,
+    navigate: (pane) => showDashboardPane(pane),
+    onNotificationsChanged: () => renderNotifications()
+  });
+
   function createSignaturePad(canvas, clearButton) {
     const context = canvas.getContext("2d");
     let drawing = false;
@@ -1306,7 +1319,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.43.2",
+          "X-Schaefchen-Version": "0.44.0",
           ...options.headers
         }
       });
@@ -1336,7 +1349,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.43.2" }
+        headers: { "X-Schaefchen-Version": "0.44.0" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1383,7 +1396,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.43.2 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.0 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1469,6 +1482,8 @@ import {
     elements.navDocuments.hidden = !planner;
     elements.navAnalytics.hidden = !planner || isProjectScopedSession();
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
+    elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
+    deviceModule.setEnabled(!elements.navDevices.hidden);
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
     elements.navInspections.hidden = !planner || !vdeModuleEnabled();
@@ -1527,6 +1542,7 @@ import {
     elements.setupForm.hidden = true;
     elements.loginForm.hidden = false;
     clearPlannerData();
+    deviceModule.clear();
     configureModeCopy();
     applyLoginCompanyIdentity();
     document.title = "Schäfchen";
@@ -2702,7 +2718,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.43.2";
+  const EIGENE_FASSUNG = "0.44.0";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2741,7 +2757,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.43.2". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.0". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -2895,10 +2911,9 @@ import {
   // Die Glocke zaehlt, was jemand tun muss - nicht, was passiert ist. Eine
   // Meldung, die niemanden zu etwas auffordert, ist eine Ablenkung.
   function pendingItems() {
-    if (!adminState) return [];
     const offen = [];
 
-    const berichte = (adminState.siteReports || [])
+    const berichte = (adminState?.siteReports || [])
       .filter((report) => report.status === "submitted");
     if (berichte.length) {
       offen.push({
@@ -2910,7 +2925,7 @@ import {
     // Zusammenhaengende Aenderungen zaehlen einmal, nicht je Buchung -
     // dieselbe Regel wie in der Pruefliste selbst.
     const gesehen = new Set();
-    const korrekturen = (adminState.timeCorrections || []).filter((korrektur) => {
+    const korrekturen = (adminState?.timeCorrections || []).filter((korrektur) => {
       if (!korrektur.operationId) return true;
       if (gesehen.has(korrektur.operationId)) return false;
       gesehen.add(korrektur.operationId);
@@ -2929,7 +2944,7 @@ import {
     }
 
     // Buero und Geschaeftsfuehrung pruefen nacheinander; beides ist offen.
-    const abwesenheiten = (adminState.absences || [])
+    const abwesenheiten = (adminState?.absences || [])
       .filter((absence) => ["office_review", "management_review"].includes(absence.status));
     if (abwesenheiten.length) {
       offen.push({
@@ -2952,7 +2967,7 @@ import {
       });
     }
 
-    const pruefungen = (adminState.sites || [])
+    const pruefungen = (adminState?.sites || [])
       .filter((site) => site.fieldReviewStatus === "pending");
     if (pruefungen.length) {
       offen.push({
@@ -2961,13 +2976,15 @@ import {
       });
     }
 
+    const geraete = deviceModule.notificationSummary();
+    if (geraete) offen.push(geraete);
     return offen;
   }
 
   function renderNotifications() {
-    const zeigen = Boolean(adminState) && canPlan() && !demoMode;
+    const zeigen = Boolean(session) && !demoMode && (canPlan() || moduleEnabled("devices"));
     elements.notificationBell.hidden = !zeigen;
-    elements.topbarSearch.hidden = !zeigen;
+    elements.topbarSearch.hidden = !(Boolean(adminState) && canPlan() && !demoMode);
     if (!zeigen) return;
     const offen = pendingItems();
     elements.notificationCount.textContent = String(offen.length);
@@ -3504,6 +3521,7 @@ import {
     if (aktuellerKnopf?.hidden) showDashboardPane("start", false);
     render();
     await refreshVehicles();
+    await deviceModule.refresh();
   }
 
   function vdeModuleEnabled() {
@@ -9447,7 +9465,8 @@ import {
       inspections: "documentation",
       customers: "business",
       employees: "business",
-      vehicles: "business"
+      vehicles: "business",
+      devices: "business"
     }[currentDashboardPane];
     const selectedGroups = currentDashboardPane === "more"
       ? new Set(["work", "control"])
@@ -9678,6 +9697,7 @@ import {
       employees: elements.navEmployees,
       customers: elements.navCustomers,
       vehicles: elements.navVehicles,
+      devices: elements.navDevices,
       documents: elements.navDocuments,
       inspections: elements.navInspections,
       analytics: elements.navAnalytics,
@@ -9694,6 +9714,7 @@ import {
       customers: elements.navMobileBusiness,
       employees: elements.navMobileBusiness,
       vehicles: elements.navMobileBusiness,
+      devices: elements.navDevices,
       analytics: elements.navMore
     }[pane] || null;
     activateNavigation(activeButton, mobileActiveButton);
@@ -9717,6 +9738,7 @@ import {
       employees: "Mitarbeiter",
       customers: "Kunden",
       vehicles: "Fahrzeuge",
+      devices: "Maschinen & Geräte",
       documents: "Dokumentablage",
       inspections: "Prüfprotokolle",
       analytics: "Arbeitszeit-Auswertung",
@@ -10641,6 +10663,7 @@ import {
       timeAccountsState = null;
       announcementsState = [];
       employeeSiteState = null;
+      deviceModule.clear();
     }
     session = sessionView;
     cachedUserId = session.user.id;
@@ -10669,9 +10692,11 @@ import {
       refreshAdminTimeAccounts(),
       refreshAdmin(),
       refreshPlatformAnnouncements(),
-      refreshVehicles()
+      refreshVehicles(),
+      deviceModule.refresh()
     ]);
     await maybeOpenDeepLinkedSite();
+    await deviceModule.handleDeepLink();
     await syncPendingEntries();
   }
 
@@ -13166,6 +13191,10 @@ import {
   elements.navVehicles.addEventListener("click", () => {
     showDashboardPane("vehicles");
     void refreshVehicles();
+  });
+  elements.navDevices.addEventListener("click", () => {
+    showDashboardPane("devices");
+    void deviceModule.refresh();
   });
   elements.vehicleSearchField.addEventListener("input", renderVehicleList);
   elements.vehicleNew.addEventListener("click", () => openVehicleEditor(null));

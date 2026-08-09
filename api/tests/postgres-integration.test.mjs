@@ -598,7 +598,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       Object.keys(initialModules).sort(),
       [
         "absences", "apprentice_reports", "assembly_reports", "documents",
-        "fleet", "materials", "site_daily_reports", "site_qr", "vde"
+        "devices", "fleet", "materials", "site_daily_reports", "site_qr", "vde"
       ]
     );
     // Der Standardumfang steht ohne Zutun offen. Das Spezialmodul VDE und das
@@ -4621,6 +4621,613 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     });
     assert.equal(monteurSicht.status, 403, await monteurSicht.clone().text());
 
+  });
+
+  await t.test("Maschinen & Geräte: QR, Übergabe, Akku, Prüfung, Inventur und Mandantentrennung", async () => {
+    const request = async (path, {
+      method = "GET", sessionCookie = cookie, payload
+    } = {}) => {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: {
+          Cookie: sessionCookie,
+          ...(payload === undefined ? {} : { "Content-Type": "application/json" })
+        },
+        body: payload === undefined ? undefined : JSON.stringify(payload)
+      });
+      const body = await response.clone().json().catch(() => null);
+      return { response, body };
+    };
+    const tokenFor = async (deviceId) => {
+      const result = await inspectionPool.query(
+        `SELECT public_token FROM device_qr_tokens
+         WHERE company_id=$1 AND device_id=$2 AND is_active`,
+        [tenantCompany.id, deviceId]
+      );
+      assert.equal(result.rowCount, 1);
+      return result.rows[0].public_token;
+    };
+    const createDevice = async (values) => {
+      const result = await request("/api/v1/admin/devices", {
+        method: "POST",
+        payload: {
+          inventoryNumber: values.inventoryNumber,
+          name: values.name,
+          categoryId: values.categoryId,
+          manufacturer: values.manufacturer || null,
+          model: values.model || null,
+          serialNumber: values.serialNumber || null,
+          locationId: values.locationId || null,
+          constructionSiteId: values.constructionSiteId || null,
+          vehicleId: values.vehicleId || null,
+          fixedOwnerUserId: values.fixedOwnerUserId || null,
+          inspectionRequired: values.inspectionRequired || false,
+          nextInspectionOn: values.nextInspectionOn || null,
+          condition: values.condition || "ok",
+          status: values.status || "available",
+          note: values.note || null,
+          ...(values.battery ? { battery: values.battery } : {})
+        }
+      });
+      assert.equal(result.response.status, 201, await result.response.clone().text());
+      return result.body.device;
+    };
+
+    const dashboard = await request("/api/v1/devices/dashboard", { sessionCookie: employeeCookie });
+    assert.equal(dashboard.response.status, 200, await dashboard.response.clone().text());
+    assert.equal(dashboard.body.dashboard.canManage, false);
+    assert.equal(dashboard.body.dashboard.canInventory, false);
+
+    const contextsResult = await request("/api/v1/devices/contexts");
+    assert.equal(contextsResult.response.status, 200, await contextsResult.response.clone().text());
+    const deviceContext = contextsResult.body.context;
+    const powerTools = deviceContext.categories.find((entry) => entry.baseType === "power_tool");
+    const batteries = deviceContext.categories.find((entry) => entry.baseType === "battery");
+    const storage = deviceContext.locations.find((entry) => entry.type === "warehouse");
+    assert.ok(powerTools);
+    assert.ok(batteries);
+    assert.ok(storage);
+
+    const customCategory = await request("/api/v1/admin/devices/categories", {
+      method: "POST",
+      payload: { key: `hydraulic_${suffix.toLowerCase()}`, name: `Hydraulik ${suffix}`, baseType: "machine" }
+    });
+    assert.equal(customCategory.response.status, 201, await customCategory.response.clone().text());
+    assert.equal(customCategory.body.category.baseType, "machine");
+
+    const extraStorage = await request("/api/v1/admin/devices/locations", {
+      method: "POST",
+      payload: { name: `Nebenlager ${suffix}`, type: "warehouse", note: "Integrationstest" }
+    });
+    assert.equal(extraStorage.response.status, 201, await extraStorage.response.clone().text());
+    assert.equal(extraStorage.body.location.location_type, "warehouse");
+
+    const freeTool = await createDevice({
+      inventoryNumber: `M-${suffix}-01`,
+      name: "Bosch Bohrhammer GBH 18V-26",
+      categoryId: powerTools.id,
+      manufacturer: "Bosch",
+      model: "GBH 18V-26",
+      serialNumber: `BOSCH-${suffix}`
+    });
+    assert.equal(freeTool.currentOwner, null);
+    assert.equal(freeTool.status, "available");
+
+    const qrResponse = await fetch(`${baseUrl}/api/v1/admin/devices/${freeTool.id}/qr`, {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(qrResponse.status, 200, await qrResponse.clone().text());
+    assert.match(qrResponse.headers.get("content-type"), /image\/svg\+xml/);
+    assert.match(await qrResponse.text(), /<svg/);
+
+    const qrSheet = await request("/api/v1/admin/devices/qr-sheet", {
+      method: "POST", payload: { deviceIds: [freeTool.id] }
+    });
+    assert.equal(qrSheet.response.status, 200, await qrSheet.response.clone().text());
+    assert.equal(qrSheet.body.labels.length, 1);
+    assert.match(qrSheet.body.labels[0].svg, /<svg/);
+
+    const profilePhoto = await request(`/api/v1/admin/devices/${freeTool.id}/photo`, {
+      method: "POST",
+      payload: {
+        dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+      }
+    });
+    assert.equal(profilePhoto.response.status, 201, await profilePhoto.response.clone().text());
+    const profilePhotoRead = await fetch(`${baseUrl}/api/v1/devices/${freeTool.id}/photo`, {
+      headers: { Cookie: employeeCookie }
+    });
+    assert.equal(profilePhotoRead.status, 200, await profilePhotoRead.clone().text());
+    assert.equal(profilePhotoRead.headers.get("content-type"), "image/png");
+
+    const freeToken = await tokenFor(freeTool.id);
+    const freeOperation = randomUUID();
+    const freeScan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: freeToken, clientOperationId: freeOperation }
+    });
+    assert.equal(freeScan.response.status, 200, await freeScan.response.clone().text());
+    assert.equal(freeScan.body.scan.outcome, "assigned");
+    assert.equal(freeScan.body.scan.device.currentOwner.id, employee.id);
+
+    const returnOperation = randomUUID();
+    const returnPayload = {
+      action: "return_storage",
+      locationId: storage.id,
+      clientOperationId: returnOperation,
+      expectedRowVersion: freeScan.body.scan.device.rowVersion,
+      offline: true
+    };
+    const returned = await request(`/api/v1/devices/${freeTool.id}/transfers`, {
+      method: "POST", sessionCookie: employeeCookie, payload: returnPayload
+    });
+    assert.equal(returned.response.status, 200, await returned.response.clone().text());
+    assert.equal(returned.body.transfer.device.currentLocation.id, storage.id);
+    assert.equal(returned.body.transfer.idempotent, false);
+    const replay = await request(`/api/v1/devices/${freeTool.id}/transfers`, {
+      method: "POST", sessionCookie: employeeCookie, payload: returnPayload
+    });
+    assert.equal(replay.response.status, 200, await replay.response.clone().text());
+    assert.equal(replay.body.transfer.idempotent, true);
+    assert.equal(replay.body.transfer.transferId, returned.body.transfer.transferId);
+
+    const rescan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: freeToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(rescan.body.scan.outcome, "assigned");
+
+    const rotated = await request(`/api/v1/admin/devices/${freeTool.id}/qr/rotate`, {
+      method: "POST", payload: { reason: "Beschädigtes Etikett im Integrationstest" }
+    });
+    assert.equal(rotated.response.status, 200, await rotated.response.clone().text());
+    const rotatedToken = await tokenFor(freeTool.id);
+    assert.notEqual(rotatedToken, freeToken);
+    const oldQr = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: freeToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(oldQr.response.status, 404);
+    assert.equal(oldQr.body.error.code, "device_qr_unknown");
+    const newQr = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: rotatedToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(newQr.body.scan.outcome, "already_yours");
+
+    const fixedDraft = await createDevice({
+      inventoryNumber: `M-${suffix}-02`,
+      name: "Makita Akkuschrauber",
+      categoryId: powerTools.id,
+      serialNumber: `MAKITA-${suffix}`
+    });
+    const fixedAssignment = await request(`/api/v1/admin/devices/${fixedDraft.id}`, {
+      method: "PATCH",
+      payload: { rowVersion: fixedDraft.rowVersion, fixedOwnerUserId: employee.id }
+    });
+    assert.equal(fixedAssignment.response.status, 200, await fixedAssignment.response.clone().text());
+    const fixedTool = fixedAssignment.body.device;
+    assert.equal(fixedTool.fixedOwner.id, employee.id);
+    assert.equal(fixedTool.currentOwner.id, employee.id);
+    const fixedToken = await tokenFor(fixedTool.id);
+    const foreignScan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: { token: fixedToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(foreignScan.body.scan.outcome, "confirmation_required");
+    assert.equal(foreignScan.body.scan.device.fixedOwner.id, employee.id);
+    assert.equal(foreignScan.body.scan.device.currentOwner.id, employee.id);
+
+    const takeover = await request(`/api/v1/devices/${fixedTool.id}/transfers`, {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: {
+        action: "takeover", clientOperationId: randomUUID(),
+        expectedRowVersion: foreignScan.body.scan.device.rowVersion
+      }
+    });
+    assert.equal(takeover.response.status, 200, await takeover.response.clone().text());
+    assert.equal(takeover.body.transfer.device.fixedOwner.id, employee.id);
+    assert.equal(takeover.body.transfer.device.currentOwner.id, foreman.id);
+
+    const ownerNotifications = await request("/api/v1/devices/notifications", {
+      sessionCookie: employeeCookie
+    });
+    assert.equal(ownerNotifications.response.status, 200, await ownerNotifications.response.clone().text());
+    assert.ok(ownerNotifications.body.notifications.some((entry) => (
+      entry.type === "fixed_device_taken" && entry.device.id === fixedTool.id
+    )));
+
+    const giveBack = await request(`/api/v1/devices/${fixedTool.id}/transfers`, {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: {
+        action: "return_fixed_owner", clientOperationId: randomUUID(),
+        expectedRowVersion: takeover.body.transfer.device.rowVersion
+      }
+    });
+    assert.equal(giveBack.response.status, 200, await giveBack.response.clone().text());
+    assert.equal(giveBack.body.transfer.device.currentOwner.id, employee.id);
+    const fixedHistory = await request(`/api/v1/devices/${fixedTool.id}/history`, {
+      sessionCookie: employeeCookie
+    });
+    assert.equal(fixedHistory.response.status, 200, await fixedHistory.response.clone().text());
+    assert.ok(fixedHistory.body.history.transfers.length >= 2);
+    assert.ok(fixedHistory.body.history.events.some((entry) => entry.action === "device_transferred"));
+    assert.ok(fixedHistory.body.history.events.some((entry) => entry.action === "device_returned"));
+    assert.ok(fixedHistory.body.history.events.some((entry) => entry.action === "device_fixed_owner_changed"));
+    const returnedNotifications = await request("/api/v1/devices/notifications", {
+      sessionCookie: employeeCookie
+    });
+    assert.ok(returnedNotifications.body.notifications.some((entry) => (
+      entry.type === "fixed_device_returned" && entry.device.id === fixedTool.id
+    )));
+
+    const siteTool = await createDevice({
+      inventoryNumber: `M-${suffix}-SITE`,
+      name: "Messgerät auf Vorarbeiterbaustelle",
+      categoryId: powerTools.id,
+      constructionSiteId: structuredSite.id,
+      status: "on_site"
+    });
+    const foremanSiteDevices = await request("/api/v1/devices?scope=all", {
+      sessionCookie: foremanCookie
+    });
+    assert.equal(foremanSiteDevices.response.status, 200, await foremanSiteDevices.response.clone().text());
+    assert.ok(foremanSiteDevices.body.devices.some((entry) => entry.id === siteTool.id));
+
+    const battery = await createDevice({
+      inventoryNumber: `A-${suffix}-01`,
+      name: "Milwaukee M18 5,0 Ah",
+      categoryId: batteries.id,
+      manufacturer: "Milwaukee",
+      serialNumber: `AKKU-${suffix}`,
+      fixedOwnerUserId: employee.id,
+      status: "fixed_assigned",
+      battery: {
+        batterySystem: "M18", voltage: 18, capacityAh: 5,
+        cycleCount: 23, remainingCapacityPercent: 91,
+        compatibleSystem: "Milwaukee M18"
+      }
+    });
+    assert.equal(battery.baseType, "battery");
+    assert.equal(battery.battery.capacityAh, 5);
+    const batteryToken = await tokenFor(battery.id);
+    const batteryForeignScan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: { token: batteryToken, clientOperationId: randomUUID() }
+    });
+    const batteryTakeover = await request(`/api/v1/devices/${battery.id}/transfers`, {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: {
+        action: "takeover", clientOperationId: randomUUID(),
+        expectedRowVersion: batteryForeignScan.body.scan.device.rowVersion
+      }
+    });
+    assert.equal(batteryTakeover.body.transfer.device.currentOwner.id, foreman.id);
+
+    const defect = await request(`/api/v1/devices/${battery.id}/defects`, {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: {
+        description: "Gehäuse gerissen und Kontakte lose",
+        severity: "critical", usable: false
+      }
+    });
+    assert.equal(defect.response.status, 201, await defect.response.clone().text());
+    assert.equal(defect.body.defect.device.status, "locked");
+    assert.equal(defect.body.defect.device.blocked, true);
+    const inspectionCannotHideDefect = await request(`/api/v1/admin/devices/${battery.id}/inspections`, {
+      method: "POST",
+      payload: {
+        inspectionType: "Sicherheitsprüfung nach Reparaturannahme",
+        inspectedOn: new Date().toISOString().slice(0, 10),
+        result: "passed",
+        nextInspectionOn: "2027-08-09"
+      }
+    });
+    assert.equal(
+      inspectionCannotHideDefect.response.status, 201,
+      await inspectionCannotHideDefect.response.clone().text()
+    );
+    assert.equal(inspectionCannotHideDefect.body.inspection.device.status, "locked");
+    const blockedBattery = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: batteryToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(blockedBattery.body.scan.outcome, "blocked");
+    const repairedBattery = await request(`/api/v1/admin/devices/defects/${defect.body.defect.id}/resolve`, {
+      method: "POST",
+      payload: {
+        rowVersion: defect.body.defect.device.openDefect.rowVersion,
+        resolutionNote: "Gehäuse und Kontakte ersetzt, Funktion geprüft"
+      }
+    });
+    assert.equal(repairedBattery.response.status, 200, await repairedBattery.response.clone().text());
+    assert.equal(repairedBattery.body.device.status, "loaned");
+    assert.equal(repairedBattery.body.device.openDefect, null);
+    const targetedBatteryHandover = await request(`/api/v1/devices/${battery.id}/transfers`, {
+      method: "POST", sessionCookie: foremanCookie,
+      payload: {
+        action: "handover",
+        toUserId: employee.id,
+        clientOperationId: randomUUID(),
+        expectedRowVersion: repairedBattery.body.device.rowVersion
+      }
+    });
+    assert.equal(
+      targetedBatteryHandover.response.status, 200,
+      await targetedBatteryHandover.response.clone().text()
+    );
+    assert.equal(targetedBatteryHandover.body.transfer.device.currentOwner.id, employee.id);
+    assert.equal(targetedBatteryHandover.body.transfer.device.status, "fixed_assigned");
+
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const overdueDevice = await createDevice({
+      inventoryNumber: `P-${suffix}-01`,
+      name: "Prüfpflichtige Kabeltrommel",
+      categoryId: powerTools.id,
+      inspectionRequired: true,
+      nextInspectionOn: yesterday
+    });
+    const settings = deviceContext.settings;
+    const lockInspections = await request("/api/v1/admin/devices/settings", {
+      method: "PATCH",
+      payload: {
+        inspectionWarningDays: settings.inspectionWarningDays,
+        longLoanDays: settings.longLoanDays,
+        lockOverdueInspections: true,
+        defaultStorageLocationId: settings.defaultStorageLocationId,
+        rowVersion: settings.rowVersion
+      }
+    });
+    assert.equal(lockInspections.response.status, 200, await lockInspections.response.clone().text());
+    const overdueToken = await tokenFor(overdueDevice.id);
+    const overdueScan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: overdueToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(overdueScan.body.scan.outcome, "blocked");
+    assert.equal(overdueScan.body.scan.device.inspectionState, "overdue");
+    assert.equal(overdueScan.body.scan.device.effectiveStatus, "inspection_due");
+    const overdueDirectTransfer = await request(`/api/v1/devices/${overdueDevice.id}/transfers`, {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: {
+        action: "takeover",
+        clientOperationId: randomUUID(),
+        expectedRowVersion: overdueScan.body.scan.device.rowVersion
+      }
+    });
+    assert.equal(overdueDirectTransfer.response.status, 409);
+    assert.equal(overdueDirectTransfer.body.error.code, "device_blocked");
+
+    const passedInspection = await request(`/api/v1/admin/devices/${overdueDevice.id}/inspections`, {
+      method: "POST",
+      payload: {
+        inspectionType: "DGUV Vorschrift 3",
+        inspectedOn: new Date().toISOString().slice(0, 10),
+        result: "passed",
+        nextInspectionOn: "2027-08-09",
+        intervalDays: 365,
+        note: "Messwerte im zulässigen Bereich"
+      }
+    });
+    assert.equal(passedInspection.response.status, 201, await passedInspection.response.clone().text());
+    assert.equal(passedInspection.body.inspection.device.inspectionState, "ok");
+    assert.equal(passedInspection.body.inspection.device.blocked, false);
+
+    const stockDevice = await createDevice({
+      inventoryNumber: `I-${suffix}-01`,
+      name: "Inventurgerät Hauptlager",
+      categoryId: powerTools.id,
+      locationId: storage.id,
+      status: "in_storage"
+    });
+    await createDevice({
+      inventoryNumber: `I-${suffix}-MISS`,
+      name: "Fehlendes Inventurgerät",
+      categoryId: powerTools.id,
+      locationId: storage.id,
+      status: "in_storage"
+    });
+    const stockToken = await tokenFor(stockDevice.id);
+    const employeeInventory = await request("/api/v1/devices/inventories", {
+      method: "POST", sessionCookie: employeeCookie, payload: { locationId: storage.id }
+    });
+    assert.equal(employeeInventory.response.status, 403);
+    assert.equal(employeeInventory.body.error.code, "device_inventory_forbidden");
+    const inventory = await request("/api/v1/devices/inventories", {
+      method: "POST", sessionCookie: foremanCookie, payload: { locationId: storage.id }
+    });
+    assert.equal(inventory.response.status, 201, await inventory.response.clone().text());
+    const inventoryScan = await request(`/api/v1/devices/inventories/${inventory.body.inventory.id}/scan`, {
+      method: "POST", sessionCookie: foremanCookie, payload: { token: stockToken }
+    });
+    assert.equal(inventoryScan.response.status, 201, await inventoryScan.response.clone().text());
+    assert.equal(inventoryScan.body.scan.result, "found");
+    const inventoryWrongLocation = await request(
+      `/api/v1/devices/inventories/${inventory.body.inventory.id}/scan`, {
+        method: "POST", sessionCookie: foremanCookie, payload: { token: rotatedToken }
+      }
+    );
+    assert.equal(inventoryWrongLocation.response.status, 201, await inventoryWrongLocation.response.clone().text());
+    assert.equal(inventoryWrongLocation.body.scan.result, "wrong_location");
+    const inventoryUnknown = await request(
+      `/api/v1/devices/inventories/${inventory.body.inventory.id}/scan`, {
+        method: "POST", sessionCookie: foremanCookie, payload: { token: randomUUID() }
+      }
+    );
+    assert.equal(inventoryUnknown.response.status, 201, await inventoryUnknown.response.clone().text());
+    assert.equal(inventoryUnknown.body.scan.result, "unknown");
+    const inventoryComplete = await request(`/api/v1/devices/inventories/${inventory.body.inventory.id}/complete`, {
+      method: "POST", sessionCookie: foremanCookie, payload: {}
+    });
+    assert.equal(inventoryComplete.response.status, 200, await inventoryComplete.response.clone().text());
+    assert.ok(inventoryComplete.body.report.counts.found >= 1);
+    assert.ok(inventoryComplete.body.report.counts.missing >= 1);
+    assert.ok(inventoryComplete.body.report.counts.wrong_location >= 1);
+    assert.ok(inventoryComplete.body.report.counts.unknown >= 1);
+
+    const raceDevice = await createDevice({
+      inventoryNumber: `R-${suffix}-01`, name: "Gleichzeitig gescanntes Gerät",
+      categoryId: powerTools.id
+    });
+    const raceToken = await tokenFor(raceDevice.id);
+    const [employeeRace, foremanRace] = await Promise.all([
+      request("/api/v1/devices/scan", {
+        method: "POST", sessionCookie: employeeCookie,
+        payload: { token: raceToken, clientOperationId: randomUUID() }
+      }),
+      request("/api/v1/devices/scan", {
+        method: "POST", sessionCookie: foremanCookie,
+        payload: { token: raceToken, clientOperationId: randomUUID() }
+      })
+    ]);
+    assert.equal(employeeRace.response.status, 200, await employeeRace.response.clone().text());
+    assert.equal(foremanRace.response.status, 200, await foremanRace.response.clone().text());
+    assert.deepEqual(
+      [employeeRace.body.scan.outcome, foremanRace.body.scan.outcome].sort(),
+      ["assigned", "confirmation_required"]
+    );
+    const raceAssignments = await inspectionPool.query(
+      `SELECT COUNT(*)::INTEGER AS count FROM device_assignments
+       WHERE company_id=$1 AND device_id=$2 AND assignment_type='custody' AND ended_at IS NULL`,
+      [tenantCompany.id, raceDevice.id]
+    );
+    assert.equal(raceAssignments.rows[0].count, 1);
+
+    const manipulated = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: randomUUID(), clientOperationId: randomUUID() }
+    });
+    assert.equal(manipulated.response.status, 404);
+    assert.equal(manipulated.body.error.code, "device_qr_unknown");
+
+    const otherCompany = await inspectionPool.query(
+      `INSERT INTO companies (legal_name,display_name)
+       VALUES ($1,$1) RETURNING id,company_number`,
+      [`Geräte-Mandantentrennung ${suffix}`]
+    );
+    const otherPassword = "Anderer-Mandant-2026!";
+    const otherUser = await inspectionPool.query(
+      `INSERT INTO users (
+         company_id,personnel_number,first_name,last_name,password_hash,must_change_password
+       ) VALUES ($1,$2,'Tina','Trennung',$3,FALSE) RETURNING id`,
+      [otherCompany.rows[0].id, `TEN-${suffix}`, await hashPassword(otherPassword)]
+    );
+    await inspectionPool.query(
+      `INSERT INTO user_roles (company_id,user_id,role_id,assigned_by_user_id,reason)
+       SELECT $1,$2,role.id,$2,'Mandantentrennung im Integrationstest'
+       FROM roles AS role WHERE role.company_id=$1 AND role.role_key='admin'`,
+      [otherCompany.rows[0].id, otherUser.rows[0].id]
+    );
+    const otherLogin = await fetch(`${baseUrl}/api/v1/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+      body: JSON.stringify({
+        companyNumber: otherCompany.rows[0].company_number,
+        personnelNumber: `TEN-${suffix}`,
+        password: otherPassword
+      })
+    });
+    assert.equal(otherLogin.status, 201, await otherLogin.clone().text());
+    const otherCookie = otherLogin.headers.get("set-cookie").split(";", 1)[0];
+    const crossTenantScan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: otherCookie,
+      payload: { token: rotatedToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(crossTenantScan.response.status, 404);
+    assert.equal(crossTenantScan.body.error.code, "device_qr_unknown");
+    const crossTenantId = await request(`/api/v1/devices/${freeTool.id}`, {
+      sessionCookie: otherCookie
+    });
+    assert.equal(crossTenantId.response.status, 404);
+    assert.equal(crossTenantId.body.error.code, "device_not_found");
+    const platformOperationalRead = await request("/api/v1/devices/dashboard", {
+      sessionCookie: platformCookie
+    });
+    assert.equal(platformOperationalRead.response.status, 401);
+
+    const historicalEmployeeResult = await request("/api/v1/admin/employees", {
+      method: "POST",
+      payload: {
+        personnelNumber: `GER-${suffix}`, firstName: "Historisch", lastName: "Gerät",
+        role: "installer", temporaryPassword: "Historisches-Geraet-2026!"
+      }
+    });
+    assert.equal(historicalEmployeeResult.response.status, 201, await historicalEmployeeResult.response.clone().text());
+    const historicalEmployee = historicalEmployeeResult.body.employee;
+    const historicalDevice = await createDevice({
+      inventoryNumber: `H-${suffix}-01`, name: "Gerät eines archivierten Mitarbeiters",
+      categoryId: powerTools.id, fixedOwnerUserId: historicalEmployee.id,
+      status: "fixed_assigned"
+    });
+    const archiveHistoricalEmployee = await request(`/api/v1/admin/employees/${historicalEmployee.id}`, {
+      method: "DELETE",
+      payload: {
+        rowVersion: historicalEmployee.rowVersion,
+        reason: "Mitarbeiter mit Gerätehistorie im Integrationstest archivieren"
+      }
+    });
+    assert.equal(archiveHistoricalEmployee.response.status, 200, await archiveHistoricalEmployee.response.clone().text());
+    assert.equal(archiveHistoricalEmployee.body.mode, "archived");
+    const archivedOwnerDevice = await request(`/api/v1/devices/${historicalDevice.id}`);
+    assert.equal(archivedOwnerDevice.response.status, 200, await archivedOwnerDevice.response.clone().text());
+    assert.equal(archivedOwnerDevice.body.device.fixedOwner.status, "archived");
+    assert.equal(archivedOwnerDevice.body.device.fixedOwner.name, "Historisch Gerät");
+
+    const retiredDevice = await createDevice({
+      inventoryNumber: `X-${suffix}-01`, name: "Ausgemustertes Gerät", categoryId: powerTools.id
+    });
+    const retiredToken = await tokenFor(retiredDevice.id);
+    const retire = await request(`/api/v1/admin/devices/${retiredDevice.id}`, {
+      method: "DELETE",
+      payload: { rowVersion: retiredDevice.rowVersion, reason: "Verschleiß im Integrationstest" }
+    });
+    assert.equal(retire.response.status, 200, await retire.response.clone().text());
+    assert.equal(retire.body.device.status, "retired");
+    const retiredScan = await request("/api/v1/devices/scan", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { token: retiredToken, clientOperationId: randomUUID() }
+    });
+    assert.equal(retiredScan.response.status, 200, await retiredScan.response.clone().text());
+    assert.equal(retiredScan.body.scan.outcome, "blocked");
+    assert.equal(retiredScan.body.scan.device.status, "retired");
+    const retiredDefect = await request(`/api/v1/devices/${retiredDevice.id}/defects`, {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: { description: "Darf nicht mehr geändert werden", severity: "low", usable: true }
+    });
+    assert.equal(retiredDefect.response.status, 409);
+    assert.equal(retiredDefect.body.error.code, "device_retired");
+
+    const forbiddenCreate = await request("/api/v1/admin/devices", {
+      method: "POST", sessionCookie: employeeCookie,
+      payload: {
+        inventoryNumber: `NO-${suffix}`, name: "Nicht erlaubt", categoryId: powerTools.id
+      }
+    });
+    assert.equal(forbiddenCreate.response.status, 403);
+    assert.equal(forbiddenCreate.body.error.code, "device_manage_forbidden");
+
+    const setModule = async (status) => {
+      const response = await fetch(
+        `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/devices`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Cookie: platformCookie },
+          body: JSON.stringify({
+            status,
+            includedInPlan: status !== "inactive",
+            separatelyBilled: false,
+            featureScope: {},
+            reason: `Gerätemodul im Integrationstest auf ${status} setzen`
+          })
+        }
+      );
+      assert.equal(response.status, 200, await response.clone().text());
+    };
+    await setModule("inactive");
+    const disabled = await request("/api/v1/devices/dashboard", { sessionCookie: employeeCookie });
+    assert.equal(disabled.response.status, 403);
+    assert.equal(disabled.body.error.code, "devices_module_disabled");
+    await setModule("permanent");
   });
 
   await t.test("Material: der Schalter sperrt auch die Schnittstelle", async () => {

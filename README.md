@@ -34,6 +34,9 @@ Aktuell enthalten:
 - Migration `042_enable_complete_time_editing.sql` für unveränderliche Zeitersatzbuchungen, vollständige Korrekturen und gemeinsame Neuberechnung nach Regelversion 4
 - Migration `043_add_employee_lifecycle.sql` für sichere Löschentscheidung, Archivierung, Reaktivierung und unveränderliche Lebenszyklushistorie
 - Migration `044_finalize_platform_security.sql` für gesperrte Firmenanmeldung, Versionsdurchsetzung, zielgerichtete Mitteilungen und abschließende Plattformrechte
+- Migration `095_create_devices.sql` für Maschinen, Werkzeuge, Messgeräte und
+  Akkus mit sicheren QR-Codes, historisierten Besitzrelationen, Prüfungen,
+  Defekten, Inventur und Offline-idempotenten Übergaben
 - historisierte Wochenplanung und automatische Vorarbeiterübergabe
 - Offline-ID, Dublettenschutz, Zeitkorrekturen und berechneter Stundenzettel
 - Node-API für Personalnummer-Login, Session, Arbeitstag und Offline-Synchronisation
@@ -80,6 +83,9 @@ Aktuell enthalten:
 - automatische Berichtsentwürfe sowie Fotoseiten mit auswählbaren Bildern und Bildunterschriften
 - getrennte Baustellenbereiche mit eigener Suche, mobiler Dokumentfreigabe, Offline-Markierung und QR-Einstieg
 - vollständig integriertes, ausschließlich plattformseitig freischaltbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
+- vollständiger Bereich „Maschinen & Geräte“ mit mobiler QR-Kamera,
+  automatischer Übernahme, Fremdbesitzwarnung, Rückgabe, Akku-Einzelinventar,
+  Gerätehinweisen, Prüf- und Defektsperren sowie Desktop-Inventar
 - mobiler VDE-Editor für geordnete Verteilungen, FI/RCD-Gruppen, Stromkreise, passende Schutzorganparameter und Messwerte einschließlich Zi, Zs, Ik und stromkreisbezogener RCD-Werte
 - kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF mit Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
 
@@ -170,6 +176,8 @@ Berechnungs- und Rollenregeln der Jahreskonten stehen in
 [`docs/TIME_ACCOUNTS.md`](docs/TIME_ACCOUNTS.md). Die
 Fach-, Rollen-, Import- und Abschlussregeln des VDE-Moduls stehen in
 [`docs/VDE_MODULE.md`](docs/VDE_MODULE.md). Die
+Geräte-, QR-, Rollen-, Offline- und Inventurregeln stehen in
+[`docs/DEVICES_MODULE.md`](docs/DEVICES_MODULE.md). Die
 Sicherheitsgrenze und die Endpunkte der API stehen in
 [`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die Trennung und Bedienung der
 Plattformverwaltung steht in

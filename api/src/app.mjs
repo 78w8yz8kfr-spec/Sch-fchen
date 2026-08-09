@@ -54,6 +54,7 @@ import {
   withdrawOwnApprenticeReport
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
+import { handleDeviceRequest } from "./devices.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -200,7 +201,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.43.2";
+export const APPLICATION_VERSION = "0.44.0";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -10380,6 +10381,30 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           )
         );
         return json(response, 200, { announcement });
+      }
+
+      // Maschinen & Geräte kapselt seine umfangreiche Fachlogik in einem
+      // eigenen Modul. Die Sitzung wird trotzdem hier aufgeloest: company_id
+      // und user_id kommen damit ausschliesslich aus dem HttpOnly-Cookie und
+      // nie aus einem QR-Code oder einem Frontend-Feld.
+      if (
+        url.pathname.startsWith("/api/v1/devices")
+        || url.pathname.startsWith("/api/v1/admin/devices")
+      ) {
+        const handled = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => handleDeviceRequest({
+            request,
+            url,
+            client,
+            context,
+            allowedOrigin: config.allowedOrigin,
+            today: localDate(new Date().toISOString(), config.timeZone)
+          })
+        );
+        if (handled?.document) return inlineDocument(response, handled.document);
+        if (handled) return json(response, handled.status, handled.body);
       }
 
       if (request.method === "GET" && url.pathname === "/api/v1/time-account") {

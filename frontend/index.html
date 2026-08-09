@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.43.2">
-    <link rel="stylesheet" href="./design-system.css?v=0.43.2">
-    <script type="module" src="./app.js?v=0.43.2"></script>
-    <script src="./version.js?v=0.43.2" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.0">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.0">
+    <script type="module" src="./app.js?v=0.44.0"></script>
+    <script src="./version.js?v=0.44.0" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.43.2</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.0</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -1269,6 +1269,11 @@
               <p id="site-choice-message" class="form-message" aria-live="polite"></p>
             </div>
           </dialog>
+
+          <section id="devices-section" class="section devices-section" data-dashboard-pane="devices"
+                   aria-label="Maschinen und Geräte" hidden>
+            <div id="device-module"></div>
+          </section>
 
           <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>
             <div class="section-heading">
@@ -3045,6 +3050,10 @@
           <button id="nav-vehicles" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 16v-4l2-5h11l3 5h2v4"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/><path d="M9.5 16.5h5"/></svg>
             <span>Fahrzeuge</span>
+          </button>
+          <button id="nav-devices" class="nav-item" type="button" hidden data-kurz="Geräte" data-nav-group="business">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
+            <span>Maschinen &amp; Geräte</span>
           </button>
 
           <p class="nav-group-label" data-nav-group-label="control">Steuerung</p>
