@@ -4690,6 +4690,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.ok(chargers);
     assert.ok(storage);
 
+    // Die firmenweite Sicht braucht nur company_id. Ein überzählig gebundener
+    // user_id-Parameter ließ PostgreSQL die leere und die gefüllte
+    // Verwaltungsübersicht mit einem internen Fehler ablehnen.
+    const managerInventory = await request("/api/v1/devices?scope=all");
+    assert.equal(
+      managerInventory.response.status,
+      200,
+      await managerInventory.response.clone().text()
+    );
+    const administrativeInventory = await request("/api/v1/admin/devices");
+    assert.equal(
+      administrativeInventory.response.status,
+      200,
+      await administrativeInventory.response.clone().text()
+    );
+
     const customCategory = await request("/api/v1/admin/devices/categories", {
       method: "POST",
       payload: { key: `hydraulic_${suffix.toLowerCase()}`, name: `Hydraulik ${suffix}`, baseType: "machine" }

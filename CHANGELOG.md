@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Gerätebestand und mobile Set-Anlage funktionieren fehlerfrei.** Die
+  firmenweite Büro-/Admin-Liste bindet nur noch die von PostgreSQL tatsächlich
+  verwendeten Parameter; die Fehlerreferenz beim Laden des Gerätebestands
+  entfällt. Im Anlageformular werden versehentlich leere Zusatzteile entfernt,
+  während unvollständige Teile eine konkrete Meldung wie „Teil 2: Kategorie
+  fehlt“ erhalten statt des unklaren iOS-Hinweises „Feld ausfüllen“.
+- Fassung 0.44.3, Speicher `schaefchen-online-v85`, Migration 099.
+
 - **Geräteanlage, Zuordnung, QR-Etiketten und Sets sind jetzt ein durchgehender
   Bedienablauf.** Die Verwaltungsansicht bleibt sichtbar, wenn einzelne
   Geräte-Endpunkte vorübergehend ausfallen, und zeigt einen gezielten
