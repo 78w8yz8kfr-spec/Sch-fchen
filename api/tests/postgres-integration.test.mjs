@@ -4683,9 +4683,11 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const deviceContext = contextsResult.body.context;
     const powerTools = deviceContext.categories.find((entry) => entry.baseType === "power_tool");
     const batteries = deviceContext.categories.find((entry) => entry.baseType === "battery");
+    const chargers = deviceContext.categories.find((entry) => entry.baseType === "charger");
     const storage = deviceContext.locations.find((entry) => entry.type === "warehouse");
     assert.ok(powerTools);
     assert.ok(batteries);
+    assert.ok(chargers);
     assert.ok(storage);
 
     const customCategory = await request("/api/v1/admin/devices/categories", {
@@ -4712,6 +4714,102 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     });
     assert.equal(freeTool.currentOwner, null);
     assert.equal(freeTool.status, "available");
+
+    const bundleResult = await request("/api/v1/admin/devices/bundles", {
+      method: "POST",
+      payload: {
+        device: {
+          inventoryNumber: `SET-M-${suffix}`,
+          name: "Makita Akkuschrauber im Koffer",
+          categoryId: powerTools.id,
+          manufacturer: "Makita",
+          model: "DDF484",
+          serialNumber: `SET-MAIN-${suffix}`,
+          fixedOwnerUserId: employee.id,
+          currentOwnerUserId: foreman.id,
+          condition: "ok",
+          status: "fixed_assigned",
+          inspectionRequired: false
+        },
+        parts: [{
+          inventoryNumber: `SET-L-${suffix}`,
+          name: "Makita Ladegerät",
+          categoryId: chargers.id,
+          manufacturer: "Makita",
+          serialNumber: `SET-PART-${suffix}`,
+          fixedOwnerUserId: employee.id,
+          condition: "ok",
+          status: "fixed_assigned",
+          inspectionRequired: false
+        }],
+        set: {
+          setNumber: `SET-${suffix}`,
+          name: "Makita Koffer",
+          note: "Gemeinsam inventariertes Geräteset"
+        }
+      }
+    });
+    assert.equal(bundleResult.response.status, 201, await bundleResult.response.clone().text());
+    const createdSet = bundleResult.body.bundle.set;
+    assert.equal(createdSet.items.length, 2);
+    assert.equal(bundleResult.body.bundle.device.set.id, createdSet.id);
+    assert.equal(bundleResult.body.bundle.device.fixedOwner.id, employee.id);
+    assert.equal(bundleResult.body.bundle.device.currentOwner.id, foreman.id);
+    assert.equal(bundleResult.body.bundle.device.status, "loaned");
+    assert.equal(bundleResult.body.bundle.parts[0].set.number, `SET-${suffix}`);
+    const bundleTokens = await inspectionPool.query(
+      `SELECT COUNT(*)::INTEGER AS count FROM device_qr_tokens
+       WHERE company_id=$1 AND device_id=ANY($2::UUID[]) AND is_active`,
+      [tenantCompany.id, createdSet.items.map((item) => item.id)]
+    );
+    assert.equal(bundleTokens.rows[0].count, 2, "Hauptgerät und Teil brauchen je einen QR-Code");
+    const setList = await request("/api/v1/admin/devices/sets");
+    assert.equal(setList.response.status, 200, await setList.response.clone().text());
+    assert.ok(setList.body.sets.some((entry) => entry.id === createdSet.id && entry.itemCount === 2));
+    const addSetItem = await request(`/api/v1/admin/devices/sets/${createdSet.id}/items`, {
+      method: "POST",
+      payload: { rowVersion: createdSet.rowVersion, deviceIds: [freeTool.id] }
+    });
+    assert.equal(addSetItem.response.status, 200, await addSetItem.response.clone().text());
+    assert.equal(addSetItem.body.set.items.length, 3);
+    const removeSetItem = await request(
+      `/api/v1/admin/devices/sets/${createdSet.id}/items/${freeTool.id}`,
+      {
+        method: "DELETE",
+        payload: {
+          rowVersion: addSetItem.body.set.rowVersion,
+          reason: "Nur zur Prüfung der nachträglichen Setzuordnung"
+        }
+      }
+    );
+    assert.equal(removeSetItem.response.status, 200, await removeSetItem.response.clone().text());
+    assert.equal(removeSetItem.body.set.items.length, 2);
+    const bundlePart = removeSetItem.body.set.items.find(
+      (item) => item.id === bundleResult.body.bundle.parts[0].id
+    );
+    const administrativeAssignment = await request(`/api/v1/devices/${bundlePart.id}/transfers`, {
+      method: "POST",
+      payload: {
+        action: "administrative_correction",
+        toUserId: foreman.id,
+        clientOperationId: randomUUID(),
+        expectedRowVersion: bundlePart.rowVersion,
+        note: "Aktuellen Besitzer durch das Büro korrigiert"
+      }
+    });
+    assert.equal(
+      administrativeAssignment.response.status,
+      200,
+      await administrativeAssignment.response.clone().text()
+    );
+    assert.equal(administrativeAssignment.body.transfer.device.fixedOwner.id, employee.id);
+    assert.equal(administrativeAssignment.body.transfer.device.currentOwner.id, foreman.id);
+    assert.equal(administrativeAssignment.body.transfer.device.status, "loaned");
+    const employeeSets = await request("/api/v1/admin/devices/sets", {
+      sessionCookie: employeeCookie
+    });
+    assert.equal(employeeSets.response.status, 403);
+    assert.equal(employeeSets.body.error.code, "device_manage_forbidden");
 
     const qrResponse = await fetch(`${baseUrl}/api/v1/admin/devices/${freeTool.id}/qr`, {
       headers: { Cookie: cookie }

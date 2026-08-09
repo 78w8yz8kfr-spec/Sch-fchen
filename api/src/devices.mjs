@@ -141,6 +141,7 @@ export function validateDeviceInput(body, { partial = false } = {}) {
   assign("constructionSiteId", (value) => optionalId(value, "Baustellen-ID"));
   assign("vehicleId", (value) => optionalId(value, "Fahrzeug-ID"));
   assign("fixedOwnerUserId", (value) => optionalId(value, "Fester Besitzer"));
+  assign("currentOwnerUserId", (value) => optionalId(value, "Aktueller Besitzer"));
   assign("inspectionRequired", (value) => requiredBoolean(value, "Prüfpflicht"));
   assign("lastInspectionOn", (value) => optionalDate(value, "Letzte Prüfung"));
   assign("nextInspectionOn", (value) => optionalDate(value, "Nächste Prüfung"));
@@ -174,6 +175,57 @@ export function validateDeviceInput(body, { partial = false } = {}) {
     }
   }
   return result;
+}
+
+export function validateDeviceSetInput(body, { partial = false } = {}) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new InputError("Die Angaben zum Geräteset sind ungültig.");
+  }
+  rejectServerFields(body);
+  const result = {};
+  if (Object.hasOwn(body, "setNumber")) {
+    result.setNumber = requiredText(body.setNumber, "Setnummer", 40);
+  } else if (!partial) {
+    throw new InputError("Die Setnummer fehlt.");
+  }
+  if (Object.hasOwn(body, "name")) {
+    result.name = requiredText(body.name, "Setbezeichnung", 160);
+  } else if (!partial) {
+    throw new InputError("Die Setbezeichnung fehlt.");
+  }
+  if (Object.hasOwn(body, "note")) result.note = optionalText(body.note, "Setnotiz", 3000);
+  if (Object.hasOwn(body, "rowVersion")) {
+    result.rowVersion = optionalInteger(
+      body.rowVersion, "Zeilenversion", 1, Number.MAX_SAFE_INTEGER
+    );
+  }
+  if (Object.hasOwn(body, "deviceIds")) {
+    if (!Array.isArray(body.deviceIds) || body.deviceIds.length < 1 || body.deviceIds.length > 50) {
+      throw new InputError("Ein Geräteset muss 1 bis 50 inventarisierte Teile enthalten.");
+    }
+    result.deviceIds = [...new Set(body.deviceIds.map((value) => validateId(value, "Geräte-ID")))];
+  }
+  return result;
+}
+
+export function validateDeviceBundleInput(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new InputError("Die Angaben zur Geräteanlage sind ungültig.");
+  }
+  rejectServerFields(body);
+  const device = validateDeviceInput(body.device);
+  const rawParts = body.parts ?? [];
+  if (!Array.isArray(rawParts) || rawParts.length > 25) {
+    throw new InputError("Pro Anlage können höchstens 25 beiliegende Teile erfasst werden.");
+  }
+  const parts = rawParts.map((part) => validateDeviceInput(part));
+  let set = null;
+  if (parts.length) {
+    set = validateDeviceSetInput(body.set);
+  } else if (body.set !== undefined && body.set !== null) {
+    throw new InputError("Ein Geräteset benötigt mindestens ein beiliegendes Teil.");
+  }
+  return { device, parts, set };
 }
 
 export function validateTransferInput(body) {
@@ -308,6 +360,10 @@ const DEVICE_SELECT = `
          latest_defect.status AS open_defect_status,
          latest_defect.row_version AS open_defect_row_version,
          latest_defect.reported_at AS open_defect_reported_at,
+         containing_set.id AS device_set_id,
+         containing_set.set_number AS device_set_number,
+         containing_set.name AS device_set_name,
+         containing_set.item_count AS device_set_item_count,
          EXISTS (
            SELECT 1 FROM device_images AS image
            WHERE image.company_id = device.company_id AND image.device_id = device.id
@@ -354,6 +410,23 @@ const DEVICE_SELECT = `
     ORDER BY defect.reported_at DESC, defect.id DESC
     LIMIT 1
   ) AS latest_defect ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT device_set.id, device_set.set_number, device_set.name,
+           (SELECT COUNT(*)::INTEGER
+            FROM device_set_items AS counted_item
+            WHERE counted_item.company_id = device_set.company_id
+              AND counted_item.device_set_id = device_set.id
+              AND counted_item.removed_at IS NULL) AS item_count
+    FROM device_set_items AS set_item
+    JOIN device_sets AS device_set
+      ON device_set.company_id = set_item.company_id
+     AND device_set.id = set_item.device_set_id
+    WHERE set_item.company_id = device.company_id
+      AND set_item.device_id = device.id
+      AND set_item.removed_at IS NULL
+      AND device_set.status = 'active'
+    LIMIT 1
+  ) AS containing_set ON TRUE
   LEFT JOIN device_settings AS settings ON settings.company_id = device.company_id`;
 
 function datePlusDays(date, days) {
@@ -467,6 +540,12 @@ export function deviceDto(row, userId, today = new Date().toISOString().slice(0,
       status: row.open_defect_status,
       rowVersion: Number(row.open_defect_row_version),
       reportedAt: row.open_defect_reported_at
+    } : null,
+    set: row.device_set_id ? {
+      id: row.device_set_id,
+      number: row.device_set_number,
+      name: row.device_set_name,
+      itemCount: Number(row.device_set_item_count || 0)
     } : null,
     isFixedOwner: fixedIsSelf,
     isCurrentOwner: currentIsSelf,
@@ -691,10 +770,15 @@ async function createDevice(client, context, input) {
   await ensureConstructionSite(client, context, input.constructionSiteId);
   await ensureVehicle(client, context, input.vehicleId);
   if (input.fixedOwnerUserId) await ensureActiveUser(client, context, input.fixedOwnerUserId);
+  if (input.currentOwnerUserId) await ensureActiveUser(client, context, input.currentOwnerUserId);
+  const custodyOwnerUserId = Object.hasOwn(input, "currentOwnerUserId")
+    ? input.currentOwnerUserId
+    : input.fixedOwnerUserId || null;
   const requestedStatus = input.status || "available";
   const status = BLOCKING_STATUSES.has(requestedStatus)
     ? requestedStatus
-    : input.fixedOwnerUserId ? "fixed_assigned"
+    : custodyOwnerUserId
+      ? custodyOwnerUserId === input.fixedOwnerUserId ? "fixed_assigned" : "loaned"
       : input.constructionSiteId ? "on_site"
         : input.locationId || input.vehicleId ? "in_storage" : "available";
   if (status === "retired" && !input.retiredReason) {
@@ -733,7 +817,9 @@ async function createDevice(client, context, input) {
   const deviceId = inserted.rows[0].id;
   if (input.fixedOwnerUserId) {
     await addAssignment(client, context, deviceId, "fixed", input.fixedOwnerUserId, "administration");
-    await addAssignment(client, context, deviceId, "custody", input.fixedOwnerUserId, "administration");
+  }
+  if (custodyOwnerUserId) {
+    await addAssignment(client, context, deviceId, "custody", custodyOwnerUserId, "administration");
   }
   await upsertBattery(client, context, deviceId, input.battery, category.base_type);
   await client.query(
@@ -747,9 +833,286 @@ async function createDevice(client, context, input) {
   await audit(client, context, deviceId, "device_created", null, {
     inventoryNumber: input.inventoryNumber,
     name: input.name,
-    fixedOwnerUserId: input.fixedOwnerUserId || null
+    fixedOwnerUserId: input.fixedOwnerUserId || null,
+    currentOwnerUserId: custodyOwnerUserId
   }, "Gerät angelegt");
   return loadDevice(client, context, deviceId);
+}
+
+function deviceSetDto(row) {
+  return {
+    id: row.id,
+    number: row.set_number,
+    name: row.name,
+    note: row.note,
+    status: row.status,
+    itemCount: Number(row.item_count || 0),
+    rowVersion: Number(row.row_version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+async function lockDeviceSet(client, context, setId, expectedRowVersion = null) {
+  const result = await client.query(
+    `SELECT id,set_number,name,note,status,row_version,created_at,updated_at
+     FROM device_sets WHERE company_id=$1 AND id=$2 FOR UPDATE`,
+    [context.companyId, setId]
+  );
+  if (!result.rowCount) {
+    throw new InputError("Das Geräteset wurde nicht gefunden.", 404, "device_set_not_found");
+  }
+  if (result.rows[0].status !== "active") {
+    throw new InputError("Das Geräteset ist archiviert.", 409, "device_set_archived");
+  }
+  if (expectedRowVersion && Number(result.rows[0].row_version) !== expectedRowVersion) {
+    throw new InputError(
+      "Das Geräteset wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "device_set_changed"
+    );
+  }
+  return result.rows[0];
+}
+
+async function ensureSetDevices(client, context, deviceIds) {
+  if (!deviceIds?.length) {
+    throw new InputError("Ein Geräteset benötigt mindestens einen inventarisierten Gegenstand.");
+  }
+  const devices = await client.query(
+    `SELECT id,status FROM devices
+     WHERE company_id=$1 AND id=ANY($2::UUID[]) FOR UPDATE`,
+    [context.companyId, deviceIds]
+  );
+  if (devices.rowCount !== deviceIds.length) {
+    throw new InputError(
+      "Mindestens ein Set-Teil wurde nicht gefunden.", 404, "device_set_item_not_found"
+    );
+  }
+  if (devices.rows.some((device) => device.status === "retired")) {
+    throw new InputError(
+      "Ausgemusterte Geräte können keinem aktiven Set hinzugefügt werden.",
+      409,
+      "device_set_item_retired"
+    );
+  }
+  const membership = await client.query(
+    `SELECT item.device_id,device_set.set_number,device_set.name
+     FROM device_set_items AS item
+     JOIN device_sets AS device_set
+       ON device_set.company_id=item.company_id AND device_set.id=item.device_set_id
+     WHERE item.company_id=$1 AND item.device_id=ANY($2::UUID[])
+       AND item.removed_at IS NULL`,
+    [context.companyId, deviceIds]
+  );
+  if (membership.rowCount) {
+    const occupied = membership.rows[0];
+    throw new InputError(
+      `Ein ausgewähltes Gerät gehört bereits zu ${occupied.set_number} · ${occupied.name}.`,
+      409,
+      "device_set_item_assigned"
+    );
+  }
+}
+
+async function loadDeviceSet(client, context, setId) {
+  await requireManager(client, context);
+  const result = await client.query(
+    `SELECT device_set.*,
+            COUNT(item.id) FILTER (WHERE item.removed_at IS NULL)::INTEGER AS item_count
+     FROM device_sets AS device_set
+     LEFT JOIN device_set_items AS item
+       ON item.company_id=device_set.company_id AND item.device_set_id=device_set.id
+     WHERE device_set.company_id=$1 AND device_set.id=$2
+     GROUP BY device_set.id`,
+    [context.companyId, setId]
+  );
+  if (!result.rowCount) {
+    throw new InputError("Das Geräteset wurde nicht gefunden.", 404, "device_set_not_found");
+  }
+  const items = await client.query(
+    `${DEVICE_SELECT}
+     WHERE device.company_id=$1 AND EXISTS (
+       SELECT 1 FROM device_set_items AS set_item
+       WHERE set_item.company_id=device.company_id
+         AND set_item.device_id=device.id
+         AND set_item.device_set_id=$2
+         AND set_item.removed_at IS NULL
+     )
+     ORDER BY category.name,device.name,device.inventory_number`,
+    [context.companyId, setId]
+  );
+  return {
+    ...deviceSetDto(result.rows[0]),
+    items: items.rows.map((row) => deviceDto(row, context.userId, context.deviceToday))
+  };
+}
+
+async function listDeviceSets(client, context) {
+  await requireManager(client, context);
+  const result = await client.query(
+    `SELECT device_set.*,
+            COUNT(item.id) FILTER (WHERE item.removed_at IS NULL)::INTEGER AS item_count
+     FROM device_sets AS device_set
+     LEFT JOIN device_set_items AS item
+       ON item.company_id=device_set.company_id AND item.device_set_id=device_set.id
+     WHERE device_set.company_id=$1
+     GROUP BY device_set.id
+     ORDER BY device_set.status='archived',device_set.set_number,device_set.name`,
+    [context.companyId]
+  );
+  return result.rows.map(deviceSetDto);
+}
+
+async function createDeviceSet(client, context, input) {
+  await requireManager(client, context);
+  const deviceIds = input.deviceIds || [];
+  await ensureSetDevices(client, context, deviceIds);
+  let result;
+  try {
+    result = await client.query(
+      `INSERT INTO device_sets (company_id,set_number,name,note)
+       VALUES ($1,$2,$3,$4)
+       RETURNING id`,
+      [context.companyId, input.setNumber, input.name, input.note]
+    );
+    await client.query(
+      `INSERT INTO device_set_items (
+         company_id,device_set_id,device_id,added_by_user_id
+       )
+       SELECT $1,$2,listed.item_id,$4 FROM UNNEST($3::UUID[]) AS listed(item_id)`,
+      [context.companyId, result.rows[0].id, deviceIds, context.userId]
+    );
+  } catch (error) {
+    if (error.code === "23505") {
+      throw new InputError(
+        "Diese Setnummer oder eines der Geräte ist bereits einem Set zugeordnet.",
+        409,
+        "device_set_exists"
+      );
+    }
+    throw error;
+  }
+  for (const deviceId of deviceIds) {
+    await audit(
+      client,
+      context,
+      deviceId,
+      "device_set_added",
+      null,
+      { setId: result.rows[0].id, setNumber: input.setNumber },
+      "Gerät dem Set hinzugefügt"
+    );
+  }
+  return loadDeviceSet(client, context, result.rows[0].id);
+}
+
+async function createDeviceBundle(client, context, input) {
+  await requireManager(client, context);
+  const device = await createDevice(client, context, input.device);
+  const parts = [];
+  for (const part of input.parts) parts.push(await createDevice(client, context, part));
+  const set = parts.length
+    ? await createDeviceSet(client, context, {
+      ...input.set,
+      deviceIds: [device.id, ...parts.map((part) => part.id)]
+    })
+    : null;
+  return {
+    device: set?.items.find((item) => item.id === device.id) || device,
+    parts: set ? set.items.filter((item) => item.id !== device.id) : parts,
+    set
+  };
+}
+
+async function updateDeviceSet(client, context, setId, input) {
+  await requireManager(client, context);
+  const current = await lockDeviceSet(client, context, setId, input.rowVersion);
+  if (!input.rowVersion) {
+    throw new InputError("Für das Geräteset fehlt der aktuelle Stand.");
+  }
+  try {
+    await client.query(
+      `UPDATE device_sets SET set_number=$3,name=$4,note=$5
+       WHERE company_id=$1 AND id=$2`,
+      [
+        context.companyId,
+        setId,
+        input.setNumber ?? current.set_number,
+        input.name ?? current.name,
+        Object.hasOwn(input, "note") ? input.note : current.note
+      ]
+    );
+  } catch (error) {
+    if (error.code === "23505") {
+      throw new InputError("Diese Setnummer gibt es bereits.", 409, "device_set_exists");
+    }
+    throw error;
+  }
+  return loadDeviceSet(client, context, setId);
+}
+
+async function addDeviceSetItems(client, context, setId, input) {
+  await requireManager(client, context);
+  if (!input.rowVersion) throw new InputError("Für das Geräteset fehlt der aktuelle Stand.");
+  await lockDeviceSet(client, context, setId, input.rowVersion);
+  await ensureSetDevices(client, context, input.deviceIds);
+  await client.query(
+    `INSERT INTO device_set_items (company_id,device_set_id,device_id,added_by_user_id)
+     SELECT $1,$2,listed.item_id,$4 FROM UNNEST($3::UUID[]) AS listed(item_id)`,
+    [context.companyId, setId, input.deviceIds, context.userId]
+  );
+  await client.query(
+    `UPDATE device_sets SET updated_at=CURRENT_TIMESTAMP WHERE company_id=$1 AND id=$2`,
+    [context.companyId, setId]
+  );
+  for (const deviceId of input.deviceIds) {
+    await audit(
+      client, context, deviceId, "device_set_added", null, { setId },
+      "Gerät dem Set hinzugefügt"
+    );
+  }
+  return loadDeviceSet(client, context, setId);
+}
+
+async function removeDeviceSetItem(client, context, setId, deviceId, body) {
+  await requireManager(client, context);
+  const rowVersion = optionalInteger(
+    body.rowVersion, "Zeilenversion", 1, Number.MAX_SAFE_INTEGER
+  );
+  if (!rowVersion) throw new InputError("Für das Geräteset fehlt der aktuelle Stand.");
+  await lockDeviceSet(client, context, setId, rowVersion);
+  const reason = requiredText(body.reason, "Grund", 1000, 3);
+  const count = await client.query(
+    `SELECT COUNT(*)::INTEGER AS count FROM device_set_items
+     WHERE company_id=$1 AND device_set_id=$2 AND removed_at IS NULL`,
+    [context.companyId, setId]
+  );
+  if (count.rows[0].count <= 1) {
+    throw new InputError(
+      "Das letzte Teil kann nicht entfernt werden. Das Set muss mindestens einen Gegenstand enthalten.",
+      409,
+      "device_set_last_item"
+    );
+  }
+  const result = await client.query(
+    `UPDATE device_set_items
+     SET removed_at=CURRENT_TIMESTAMP,removed_by_user_id=$4,remove_reason=$5
+     WHERE company_id=$1 AND device_set_id=$2 AND device_id=$3 AND removed_at IS NULL
+     RETURNING id`,
+    [context.companyId, setId, deviceId, context.userId, reason]
+  );
+  if (!result.rowCount) {
+    throw new InputError("Das Gerät gehört nicht zu diesem Set.", 404, "device_set_item_not_found");
+  }
+  await client.query(
+    `UPDATE device_sets SET updated_at=CURRENT_TIMESTAMP WHERE company_id=$1 AND id=$2`,
+    [context.companyId, setId]
+  );
+  await audit(
+    client, context, deviceId, "device_set_removed", { setId }, null, reason
+  );
+  return loadDeviceSet(client, context, setId);
 }
 
 async function updateFixedOwner(client, context, deviceId, userId, reason) {
@@ -770,6 +1133,13 @@ async function updateFixedOwner(client, context, deviceId, userId, reason) {
 
 async function updateDevice(client, context, deviceId, input) {
   await requireManager(client, context);
+  if (Object.hasOwn(input, "currentOwnerUserId")) {
+    throw new InputError(
+      "Den aktuellen Besitzer bitte über eine protokollierte Geräteübergabe ändern.",
+      409,
+      "device_custody_requires_transfer"
+    );
+  }
   const locked = await lockDevice(client, context, deviceId);
   if (!input.rowVersion || Number(locked.row_version) !== input.rowVersion) {
     throw new InputError(
@@ -1089,6 +1459,9 @@ async function transferDevice(client, context, deviceId, input, internalAction =
   const fixed = await activeAssignment(client, context, deviceId, "fixed");
   const custody = await activeAssignment(client, context, deviceId, "custody");
   const action = internalAction || input.action;
+  if (locked.status === "retired") {
+    throw new InputError("Das Gerät ist ausgemustert und darf nicht mehr zugeordnet werden.", 409, "device_retired");
+  }
   if ((BLOCKING_STATUSES.has(locked.status) || locked.inspection_blocked)
       && action !== "administrative_correction") {
     throw new InputError("Das Gerät ist gesperrt und darf nicht übernommen werden.", 409, "device_blocked");
@@ -1154,7 +1527,9 @@ async function transferDevice(client, context, deviceId, input, internalAction =
   if (targetUserId) {
     await addAssignment(
       client, context, deviceId, "custody", targetUserId,
-      input.offline ? "offline_sync" : action === "handover" ? "handover" : "qr_scan",
+      input.offline ? "offline_sync"
+        : action === "administrative_correction" ? "administration"
+          : action === "handover" ? "handover" : "qr_scan",
       input.clientOperationId
     );
   }
@@ -1203,7 +1578,7 @@ async function transferDevice(client, context, deviceId, input, internalAction =
     { userId: custody?.user_id || null, locationId: locked.current_location_id },
     { userId: targetUserId, locationId: targetLocation?.id || null },
     input.note || action,
-    input.offline ? "offline_sync" : "qr_scan",
+    input.offline ? "offline_sync" : action === "administrative_correction" ? "api" : "qr_scan",
     transfer.rows[0].id
   );
   if (fixed?.user_id && targetUserId && targetUserId !== fixed.user_id) {
@@ -1927,6 +2302,25 @@ export async function handleDeviceRequest({ request, url, client, context, allow
     const device = await createDevice(client, context, validateDeviceInput(await readJson(request)));
     return { status: 201, body: { device } };
   }
+  if (request.method === "POST" && path === "/api/v1/admin/devices/bundles") {
+    const bundle = await createDeviceBundle(
+      client,
+      context,
+      validateDeviceBundleInput(await readJson(request, 250_000))
+    );
+    return { status: 201, body: { bundle } };
+  }
+  if (request.method === "GET" && path === "/api/v1/admin/devices/sets") {
+    return { status: 200, body: { sets: await listDeviceSets(client, context) } };
+  }
+  if (request.method === "POST" && path === "/api/v1/admin/devices/sets") {
+    const set = await createDeviceSet(
+      client,
+      context,
+      validateDeviceSetInput(await readJson(request))
+    );
+    return { status: 201, body: { set } };
+  }
   if (request.method === "POST" && path === "/api/v1/admin/devices/categories") {
     return { status: 201, body: { category: await createCategory(client, context, await readJson(request)) } };
   }
@@ -1968,6 +2362,40 @@ export async function handleDeviceRequest({ request, url, client, context, allow
   if (request.method === "GET" && inventoryMatch) {
     return { status: 200, body: { report: await inventoryReport(
       client, context, validateId(inventoryMatch[1], "Inventur-ID")
+    ) } };
+  }
+
+  const adminSetItemMatch = /^\/api\/v1\/admin\/devices\/sets\/([^/]+)\/items\/([^/]+)$/.exec(path);
+  if (request.method === "DELETE" && adminSetItemMatch) {
+    return { status: 200, body: { set: await removeDeviceSetItem(
+      client,
+      context,
+      validateId(adminSetItemMatch[1], "Set-ID"),
+      validateId(adminSetItemMatch[2], "Geräte-ID"),
+      await readJson(request)
+    ) } };
+  }
+  const adminSetItemsMatch = /^\/api\/v1\/admin\/devices\/sets\/([^/]+)\/items$/.exec(path);
+  if (request.method === "POST" && adminSetItemsMatch) {
+    return { status: 200, body: { set: await addDeviceSetItems(
+      client,
+      context,
+      validateId(adminSetItemsMatch[1], "Set-ID"),
+      validateDeviceSetInput(await readJson(request), { partial: true })
+    ) } };
+  }
+  const adminSetMatch = /^\/api\/v1\/admin\/devices\/sets\/([^/]+)$/.exec(path);
+  if (request.method === "GET" && adminSetMatch) {
+    return { status: 200, body: { set: await loadDeviceSet(
+      client, context, validateId(adminSetMatch[1], "Set-ID")
+    ) } };
+  }
+  if (request.method === "PATCH" && adminSetMatch) {
+    return { status: 200, body: { set: await updateDeviceSet(
+      client,
+      context,
+      validateId(adminSetMatch[1], "Set-ID"),
+      validateDeviceSetInput(await readJson(request), { partial: true })
     ) } };
   }
 

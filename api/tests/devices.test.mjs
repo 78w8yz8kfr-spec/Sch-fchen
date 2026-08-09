@@ -4,7 +4,9 @@ import {
   DEVICE_MODULE_KEY,
   deviceDto,
   normalizeDeviceQrToken,
+  validateDeviceBundleInput,
   validateDeviceInput,
+  validateDeviceSetInput,
   validateTransferInput
 } from "../src/devices.mjs";
 
@@ -14,6 +16,8 @@ const ids = {
   employee: "33333333-3333-4333-8333-333333333333",
   device: "44444444-4444-4444-8444-444444444444"
 };
+
+const partId = "55555555-5555-4555-8555-555555555555";
 
 test("das Gerätemodul besitzt einen stabilen Katalogschlüssel", () => {
   assert.equal(DEVICE_MODULE_KEY, "devices");
@@ -78,6 +82,40 @@ test("Akkus werden als eigenständige Geräte validiert", () => {
     inventoryNumber: "A", name: "Akku", categoryId: ids.category,
     battery: { batterySystem: "M18", remainingCapacityPercent: 101 }
   }), /Restkapazität/);
+});
+
+test("Gerätesets und beiliegende Teile werden gemeinsam validiert", () => {
+  assert.deepEqual(validateDeviceSetInput({
+    setNumber: " SET-12 ",
+    name: " Makita Koffer ",
+    deviceIds: [ids.device, partId, ids.device]
+  }), {
+    setNumber: "SET-12",
+    name: "Makita Koffer",
+    deviceIds: [ids.device, partId]
+  });
+  const bundle = validateDeviceBundleInput({
+    device: {
+      inventoryNumber: "M-12",
+      name: "Makita Akkuschrauber",
+      categoryId: ids.category
+    },
+    parts: [{
+      inventoryNumber: "A-12",
+      name: "Makita Akku",
+      categoryId: ids.category
+    }],
+    set: { setNumber: "SET-12", name: "Makita Koffer" }
+  });
+  assert.equal(bundle.parts.length, 1);
+  assert.equal(bundle.set.setNumber, "SET-12");
+  assert.throws(() => validateDeviceBundleInput({
+    device: { inventoryNumber: "M-13", name: "Gerät", categoryId: ids.category },
+    parts: [{ inventoryNumber: "A-13", name: "Akku", categoryId: ids.category }]
+  }), /Geräteset/);
+  assert.throws(() => validateDeviceSetInput({
+    setNumber: "SET-X", name: "Fremd", deviceIds: [ids.device], companyId: ids.employee
+  }), /ausschließlich vom Server/);
 });
 
 test("Übergaben benötigen Aktion, Offline-ID und stabile Relationen", () => {
@@ -148,6 +186,7 @@ function row(overrides = {}) {
     measured_remaining_capacity_percent: null,
     compatible_system: null,
     open_defect_id: null,
+    device_set_id: null,
     inspection_warning_days: 30,
     lock_overdue_inspections: false,
     created_at: "2026-08-09T06:00:00Z",
@@ -191,6 +230,21 @@ test("DTO bietet dem aktuellen Besitzer die schnellen Rückgabeaktionen", () => 
   assert.ok(device.actions.includes("return"));
   assert.ok(device.actions.includes("handover"));
   assert.ok(device.actions.includes("report_defect"));
+});
+
+test("DTO zeigt die Setzugehörigkeit ohne Teile zu duplizieren", () => {
+  const device = deviceDto(row({
+    device_set_id: partId,
+    device_set_number: "SET-12",
+    device_set_name: "Makita Koffer",
+    device_set_item_count: 5
+  }), ids.employee, "2026-08-09");
+  assert.deepEqual(device.set, {
+    id: partId,
+    number: "SET-12",
+    name: "Makita Koffer",
+    itemCount: 5
+  });
 });
 
 test("ausgemusterte Geräte bieten keine fachlichen Folgeaktionen", () => {

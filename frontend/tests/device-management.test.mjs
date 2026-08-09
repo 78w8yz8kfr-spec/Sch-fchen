@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canManageDevicesFromSession,
   cameraScanErrorMessage,
   deviceStatusLabel,
   normalizeDeviceQrValue,
@@ -58,4 +59,10 @@ test("Gerätestatus erhält verständliche deutsche Bezeichnungen", () => {
   assert.equal(deviceStatusLabel("available"), "Verfügbar");
   assert.equal(deviceStatusLabel("inspection_due"), "Prüfung fällig");
   assert.equal(deviceStatusLabel("retired"), "Ausgemustert");
+});
+
+test("Verwaltungsaktionen bleiben anhand der Sitzung sichtbar, wenn Kennzahlen ausfallen", () => {
+  assert.equal(canManageDevicesFromSession({ user: { roles: ["managing_director"] } }), true);
+  assert.equal(canManageDevicesFromSession({ user: { roles: ["office"] } }), true);
+  assert.equal(canManageDevicesFromSession({ user: { roles: ["foreman"] } }), false);
 });

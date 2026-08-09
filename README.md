@@ -85,7 +85,8 @@ Aktuell enthalten:
 - vollständig integriertes, ausschließlich plattformseitig freischaltbares VDE-Prüfmodul ohne doppelte Kunden- oder Baustellenstammdaten
 - vollständiger Bereich „Maschinen & Geräte“ mit mobiler QR-Kamera,
   automatischer Übernahme, Fremdbesitzwarnung, Rückgabe, Akku-Einzelinventar,
-  Gerätehinweisen, Prüf- und Defektsperren sowie Desktop-Inventar
+  Gerätehinweisen, Prüf- und Defektsperren, Desktop-Inventar sowie bedienbaren
+  Gerätesets, deren beiliegende Teile jeweils einen eigenen QR-Code behalten
 - mobiler VDE-Editor für geordnete Verteilungen, FI/RCD-Gruppen, Stromkreise, passende Schutzorganparameter und Messwerte einschließlich Zi, Zs, Ik und stromkreisbezogener RCD-Werte
 - kontrollierter V15-Bestandsimport sowie unterschriebene, unveränderliche VDE-Abschluss-PDF mit Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
 
