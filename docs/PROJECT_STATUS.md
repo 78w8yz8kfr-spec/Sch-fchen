@@ -1,9 +1,22 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.8
+Technischer Stand: V0.44.9
 
 ## Abgeschlossen
+
+- sichtbarer Menüpunkt „Azubi“ in der mobilen Bereichsleiste: die Ausnahme für
+  das Berichtsheft steht nun hinter der allgemeinen Ausblendregel des
+  Designsystems und mit derselben Durchsetzung; notwendiges Update auf
+  PWA-Speicher `schaefchen-online-v91`
+- mobiler Zugang zur Prüfliste für Ausbilder ohne Planungsrolle, deren „Mehr“
+  im nicht sichtbaren Verwaltungsbereich liegt
+- Dateien, die der Browser selbst holt, kommen auch während eines
+  Pflichtupdates an: Vorschau des Wochenblatts, fertige Berichte, Dokumente,
+  Baustellenfotos und VDE-Protokolle tragen die App-Fassung als `appVersion`
+  im Adressteil
+- Dokumente holt die App selbst, statt der Adresse zu folgen; die Ansicht
+  bleibt in der App, offline gesicherte Dokumente behalten ihren Schlüssel
 
 - eindeutige, mandantengebundene Zuordnung des gemeldeten Piet-Kontos zur
   Azubi-Rolle auch ohne unvollständig übernommene historische Berichte oder

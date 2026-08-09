@@ -1,28 +1,28 @@
-const CACHE_NAME = "schaefchen-online-v91";
+const CACHE_NAME = "schaefchen-online-v92";
 const DOCUMENT_CACHE_VERSION = "v42";
 const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=0.44.9",
-  "./design-system.css?v=0.44.9",
-  "./app.js?v=0.44.9",
-  "./core/work-time.js?v=0.44.9",
-  "./core/sync-queue.js?v=0.44.9",
-  "./core/permissions.js?v=0.44.9",
-  "./core/state-store.js?v=0.44.9",
-  "./core/versions.js?v=0.44.9",
-  "./core/device-management.js?v=0.44.9",
-  "./core/apprentice-view.js?v=0.44.9",
-  "./vendor/qr-scanner.min.js?v=0.44.9",
+  "./styles.css?v=0.44.10",
+  "./design-system.css?v=0.44.10",
+  "./app.js?v=0.44.10",
+  "./core/work-time.js?v=0.44.10",
+  "./core/sync-queue.js?v=0.44.10",
+  "./core/permissions.js?v=0.44.10",
+  "./core/state-store.js?v=0.44.10",
+  "./core/versions.js?v=0.44.10",
+  "./core/device-management.js?v=0.44.10",
+  "./core/apprentice-view.js?v=0.44.10",
+  "./vendor/qr-scanner.min.js?v=0.44.10",
   "./vendor/qr-scanner-worker.min.js",
-  "./version.js?v=0.44.9",
+  "./version.js?v=0.44.10",
   "./platform-admin.html",
-  "./platform-admin.css?v=0.44.9",
-  "./platform-admin.js?v=0.44.9",
+  "./platform-admin.css?v=0.44.10",
+  "./platform-admin.js?v=0.44.10",
   "./vde/index.html",
-  "./vde/styles.css?v=0.44.9",
-  "./vde/app.js?v=0.44.9",
+  "./vde/styles.css?v=0.44.10",
+  "./vde/app.js?v=0.44.10",
   "./manifest.webmanifest",
   "./assets/mark.svg",
   "./assets/company-logos/schaaf-elektro.webp",
@@ -65,6 +65,13 @@ self.addEventListener("fetch", (event) => {
       .test(offlineScope || "")
       ? `${DOCUMENT_CACHE_PREFIX}${offlineScope}`
       : null;
+    // Abgelegt ist das Dokument ohne die App-Fassung im Adressteil: die steht
+    // nur an der Anfrage, damit ein Pflichtupdate ein Bild oder ein Blatt
+    // nicht durch seine eigene Meldung ersetzt. Gesucht wird deshalb ohne
+    // sie - sonst waere jedes zuvor gesicherte Dokument nach einer neuen
+    // Fassung offline verschwunden.
+    const cacheUrl = new URL(requestUrl);
+    cacheUrl.searchParams.delete("appVersion");
     event.respondWith(
       fetch(event.request)
         .catch(async () => {
@@ -72,7 +79,7 @@ self.addEventListener("fetch", (event) => {
           if (scopedCacheName) {
             const cacheNames = await caches.keys();
             if (cacheNames.includes(scopedCacheName)) {
-              cachedResponse = await (await caches.open(scopedCacheName)).match(event.request);
+              cachedResponse = await (await caches.open(scopedCacheName)).match(cacheUrl.href);
             }
           }
           return cachedResponse || new Response("Dieses Dokument wurde nicht für die Offline-Ansicht gespeichert.", {

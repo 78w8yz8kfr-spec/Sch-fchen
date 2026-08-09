@@ -4,6 +4,40 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
+  stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
+  des Designsystems (`display: none !important` für alle Desktop-Einträge)
+  verdeckt; die Ausnahme für den Auszubildenden stand ohne `!important` in einer
+  früher geladenen Datei und blieb wirkungslos. Weil die App denselben Eintrag
+  aus der Liste unter „Mehr“ herausnimmt, sobald er zur Hauptleiste gehört,
+  führte anschließend überhaupt kein Weg mehr in den Nachweis — auf genau dem
+  Gerät, auf dem er täglich geschrieben wird. Rollen und Modulfreigaben waren
+  dabei stets in Ordnung. Ein Test hält die Ausnahme jetzt fest.
+- **Der Ausbilder erreicht seine Prüfliste am Telefon.** Der übliche Ausbilder
+  ist der Vorarbeiter, und der plant nicht — „Mehr“ liegt bei ihm im
+  Verwaltungsbereich, den er gar nicht sieht. Ein Ausbilder ohne Planungsrolle
+  bekommt den Eintrag deshalb unten in die Hauptleiste; planende Ausbilder
+  behalten den Weg über „Mehr“.
+- **„PDF“ und „Öffnen“ liefern wieder ein PDF — und die App bleibt offen.**
+  Alles, was der Browser selbst holt, gab die Kopfzeile mit der App-Fassung
+  nicht mit: die Vorschau des Wochenblatts, der fertige Bericht in der
+  Berichtsliste, jedes Dokument der Ablage, die Baustellenfotos und das
+  VDE-Protokoll. Solange ein Pflichtupdate lief, kam dort dessen Meldung als
+  JSON an — 203 Byte, auf dem Telefon abgelegt als
+  „SE-R-2026-00001-2026-07-27.pdf.json“. Die Fassung darf nun ersatzweise als
+  `appVersion` im Adressteil stehen. Dokumente holt die App außerdem selbst,
+  statt der Adresse zu folgen: bisher ersetzte das Blatt die ganze Ansicht,
+  und in einer eingerichteten App gibt es dort kein Zurück — sie musste
+  beendet werden. Bereits offline gesicherte Dokumente behalten ihren
+  Schlüssel und bleiben ohne Netz auffindbar.
+- **Die Integrationsprüfung hängt nicht mehr an der Uhrzeit.** Die Prüfung der
+  eigenen Zeitkorrektur schob eine Buchung stets eine volle Stunde zurück.
+  Zwischen Mitternacht und ein Uhr lag der frühere Zeitpunkt damit im Vortag,
+  der Server wies die Korrektur zu Recht ab — und die Prüfung scheiterte jede
+  Nacht eine Stunde lang an der Uhr statt an der Anwendung. Sie schiebt jetzt
+  höchstens bis zum Anfang des Arbeitstages zurück.
+- Fassung 0.44.10, Speicher `schaefchen-online-v92`, Migration 106.
+
 - **Die Baustellenakte des Vorarbeiters kann jetzt etwas.** Die Akte gab es
   längst, mit sieben Reitern — Übersicht, Aufgaben, Berichte, Fotos, Dokumente,
   Material, Notizen. Angefasst hat sie fast nichts: **nur Fotos und Notizen**

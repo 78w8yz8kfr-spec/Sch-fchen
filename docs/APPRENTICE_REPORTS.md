@@ -134,9 +134,30 @@ Handlung offen ist:
   eingereichten oder freigegebenen Wochen bleibt die Startseite frei. Der
   Status steht weiterhin vollständig im eigenen Berichtsheft-Bereich.
 
-Ausbilder erhalten keinen zusätzlichen Eintrag in einer bereits umfangreichen
-mobilen Verwaltungsleiste. Ihre Prüfliste bleibt über **„Mehr“** erreichbar;
-am Rechner steht der Bereich wie bisher in der Seitenleiste.
+Dieser Eintrag ist mobil der **einzige** Weg in den Nachweis: sobald er zur
+Hauptleiste gehört, nimmt ihn die App aus der Liste unter „Mehr“ heraus — er
+stünde dort sonst zweimal. Damit hängt das ganze Modul an einer einzigen
+CSS-Regel. Genau die ging verloren: das Designsystem blendet mobil alle
+Desktop-Einträge der Leiste mit `display: none !important` aus, und die
+Ausnahme für den Auszubildenden stand ohne `!important` in der früher
+geladenen `styles.css`. Der Menüpunkt war damit am Telefon nie zu sehen, und
+weil er zugleich aus „Mehr“ entfernt war, führte überhaupt kein Weg mehr
+hinein — bei einwandfreier Rolle und freigeschaltetem Modul. Die Ausnahme
+gehört deshalb hinter die Regel, die sie aufhebt, und braucht dieselbe
+Durchsetzung; ein Test in `frontend/tests/styles.test.mjs` hält beides fest.
+
+**Planende** Ausbilder erhalten keinen zusätzlichen Eintrag in einer bereits
+umfangreichen mobilen Verwaltungsleiste. Ihre Prüfliste bleibt über **„Mehr“**
+erreichbar; am Rechner steht der Bereich wie bisher in der Seitenleiste.
+
+Der übliche Ausbilder ist aber der **Vorarbeiter**, und der plant nicht: „Mehr“
+liegt bei ihm im Verwaltungsbereich, den er gar nicht zu sehen bekommt. Seine
+Prüfliste war damit am Telefon durch nichts zu erreichen — und ohne die
+Unterschrift des Ausbilders ist der Nachweis wertlos. Ein Ausbilder ohne
+Planungsrolle bekommt den Eintrag deshalb wie der Auszubildende unten in die
+Hauptleiste; seine Leiste hat den Platz dafür.
+
+Der Wochenwechsel bleibt dabei aus: er gehört zum eigenen Heft.
 
 ## Schnittstelle
 
@@ -180,6 +201,16 @@ Nachweis ohne Unterschriften ungültig ist.
   Downloadordner gelegt (`Content-Disposition: inline`). Nur diese Antwort darf
   von der eigenen Seite eingerahmt werden (`frame-ancestors 'self'`); für alle
   übrigen bleibt das Einrahmen verboten.
+* Dieses eine Blatt holt der **Browser selbst** — als Rahmen oder als neuer
+  Reiter. Die Fassung der App, die sonst in der Kopfzeile
+  `X-Schaefchen-Version` steht, kann er dabei nicht mitgeben; solange ein
+  Pflichtupdate läuft, stand deshalb statt der Vorschau die Meldung über das
+  notwendige Update. Die Fassung darf darum ersatzweise als `appVersion` im
+  Adressteil stehen (`browserFileUrl` in `app.js`). Schwächer wird die Abfrage
+  dadurch nicht: wer die Zahl frei wählen will, kann das bei der Kopfzeile
+  ebenso. Dasselbe gilt außerhalb des Berichtshefts für jedes Dokument, jedes
+  Baustellenfoto und jedes VDE-Protokoll — dort kam die Meldung als
+  „…&#46;pdf.json" im Downloadordner an.
 * Ein **Entwurf wird nicht gedruckt** (409). Auf Papier sieht er fertig aus und
   ist es nicht; im Ordner der Kammer fällt das erst am Ende der Ausbildung auf.
   Gedruckt wird, was eingereicht oder freigegeben ist — also unterschrieben.

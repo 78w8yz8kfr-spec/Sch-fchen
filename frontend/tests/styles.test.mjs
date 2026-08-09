@@ -98,6 +98,47 @@ test("Keine Anpassung fuer schmale Geraete wird von einer spaeteren Grundregel a
   assert.deepEqual([...new Set(befunde)], []);
 });
 
+test("Der Azubi erreicht sein Berichtsheft in der mobilen Leiste", async () => {
+  // Das Designsystem blendet alle Desktop-Eintraege der unteren Leiste mit
+  // `display: none !important` aus. Die Ausnahme fuer den Auszubildenden stand
+  // in styles.css ohne !important und in der frueher geladenen Datei - sie war
+  // damit wirkungslos, und "Azubi" fehlte am Telefon vollstaendig. Weil app.js
+  // genau diesen Eintrag aus der Liste unter "Mehr" herausnimmt, sobald er in
+  // die Hauptleiste gehoert, fuehrte anschliessend kein Weg mehr in den
+  // Nachweis. Die Ausnahme muss deshalb dieselbe Durchsetzung mitbringen wie
+  // die Regel, die sie aufhebt - und hinter ihr stehen.
+  const designSystem = await readFile(resolve(frontendDirectory, "design-system.css"), "utf8");
+  const regeln = leseRegeln(designSystem);
+  const versteckt = regeln.findLast((regel) =>
+    regel.umgebung?.startsWith("media")
+    && regel.selektor.includes(".nav-item--desktop")
+    && !regel.selektor.includes("apprentice")
+    && regel.eigenschaften.get("display")?.startsWith("none"));
+  assert.ok(versteckt, "Die mobile Leiste blendet die Desktop-Eintraege nicht mehr aus");
+
+  const ausnahme = regeln.findLast((regel) =>
+    regel.umgebung?.startsWith("media")
+    && regel.selektor.includes(".nav-item--apprentice-mobile")
+    && regel.eigenschaften.has("display"));
+  assert.ok(ausnahme, "Das Berichtsheft hat in der mobilen Leiste keine Ausnahme");
+  assert.ok(
+    ausnahme.position > versteckt.position,
+    "Die Ausnahme fuer das Berichtsheft muss hinter der allgemeinen Regel stehen"
+  );
+  const durchsetzung = versteckt.eigenschaften.get("display").includes("!important");
+  assert.equal(
+    ausnahme.eigenschaften.get("display").includes("!important"),
+    durchsetzung,
+    "Die Ausnahme braucht dieselbe Durchsetzung wie die Regel, die sie aufhebt"
+  );
+  assert.match(ausnahme.umgebung, /max-width/);
+
+  // Der Eintrag fehlt unter "Mehr", solange er zur Hauptleiste gehoert. Ohne
+  // die Ausnahme oben gaebe es damit ueberhaupt keinen Weg mehr.
+  const app = await readFile(resolve(frontendDirectory, "app.js"), "utf8");
+  assert.match(app, /!knopf\.classList\.contains\("nav-item--apprentice-mobile"\)/);
+});
+
 test("Firmenzeichen und Firmenname stehen im Kopf nebeneinander", async () => {
   // `.company-brand-line` legt display: flex fest, `.brand--small span` weiter
   // unten display: block. Die zweite Regel ist genauer und gewann: das

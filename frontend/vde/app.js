@@ -419,7 +419,7 @@
           // Plattform ein Pflichtupdate setzt: der Server kann eine fehlende
           // Fassung nicht von einer zu alten unterscheiden. Das VDE-Modul waere
           // dann als einziges vollstaendig ausgefallen.
-          "X-Schaefchen-Version": "0.44.9",
+          "X-Schaefchen-Version": "0.44.10",
           ...(options.body ? { "Content-Type": "application/json" } : {}),
           ...options.headers
         }
@@ -1469,8 +1469,14 @@
     elements.editorTitle.textContent =
       currentInspection?.name || "VDE-Prüfprotokoll";
     if (completed) {
+      // Diesem Verweis folgt der Browser selbst und gibt dabei keine Kopfzeile
+      // mit der App-Fassung mit. Waehrend eines Pflichtupdates lag statt des
+      // Protokolls dessen Meldung als JSON im Downloadordner; die Fassung darf
+      // deshalb ersatzweise im Adressteil stehen.
       elements.openPdf.href = apiPath(
-        `/inspections/${encodeURIComponent(currentInspection.id)}/pdf?date=${encodeURIComponent(accessDate)}`
+        `/inspections/${encodeURIComponent(currentInspection.id)}/pdf?date=${
+          encodeURIComponent(accessDate)
+        }&appVersion=0.44.10`
       );
       elements.saveState.textContent = `Unveränderlich abgeschlossen am ${
         new Intl.DateTimeFormat("de-DE", {
