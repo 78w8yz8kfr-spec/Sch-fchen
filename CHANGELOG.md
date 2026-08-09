@@ -4,6 +4,13 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Geräte-QR-Druckbogen spart Papier.** Bis zu 120 ausgewählte Geräte
+  stehen in einem festen Raster aus zehn Spalten und zwölf Reihen auf genau
+  einer A4-Seite. Jeder QR-Code bleibt mit 18 × 18 mm unter der gewünschten
+  Höchstgröße von 2 × 2 cm; Gerätename und Inventarnummer stehen kompakt direkt
+  darunter.
+- Fassung 0.44.5, Speicher `schaefchen-online-v87`, Migration 101.
+
 - **Die mobile Azubi-Ansicht ist wieder ein klarer eigener Bereich.** Azubis
   erreichen das Berichtsheft direkt über „Azubi“ in der unteren Leiste. Auf
   „Start“ erscheint nur dann ein kompakter Hinweis, wenn der heutige Eintrag

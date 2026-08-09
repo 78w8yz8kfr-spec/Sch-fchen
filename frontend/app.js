@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.4";
-import { serverIsNewer } from "./core/versions.js?v=0.44.4";
+} from "./core/work-time.js?v=0.44.5";
+import { serverIsNewer } from "./core/versions.js?v=0.44.5";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.4";
+} from "./core/sync-queue.js?v=0.44.5";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.44.4";
+} from "./core/permissions.js?v=0.44.5";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,9 +38,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.4";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.4";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
+} from "./core/state-store.js?v=0.44.5";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.5";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.5";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1320,7 +1320,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.4",
+          "X-Schaefchen-Version": "0.44.5",
           ...options.headers
         }
       });
@@ -1351,7 +1351,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.4" }
+        headers: { "X-Schaefchen-Version": "0.44.5" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1398,7 +1398,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.4 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.5 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2728,7 +2728,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.4";
+  const EIGENE_FASSUNG = "0.44.5";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2767,7 +2767,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.4". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.5". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft

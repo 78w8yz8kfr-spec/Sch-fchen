@@ -1,6 +1,40 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.4";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.5";
 let qrScannerLibraryPromise = null;
+
+export const DEVICE_QR_SHEET_LAYOUT = Object.freeze({
+  maxLabels: 120,
+  columns: 10,
+  rows: 12,
+  pageWidthMm: 210,
+  pageHeightMm: 297,
+  pageMarginMm: 5,
+  cellWidthMm: 19.8,
+  cellHeightMm: 23.5,
+  gapMm: 0.2,
+  qrSizeMm: 18
+});
+
+export function deviceQrSheetStyles() {
+  const layout = DEVICE_QR_SHEET_LAYOUT;
+  const printableWidth = layout.pageWidthMm - (2 * layout.pageMarginMm);
+  const printableHeight = layout.pageHeightMm - (2 * layout.pageMarginMm);
+  return `
+    @page{size:A4 portrait;margin:${layout.pageMarginMm}mm}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,sans-serif;color:#111}
+    .sheet{display:grid;grid-template-columns:repeat(${layout.columns},${layout.cellWidthMm}mm);grid-auto-rows:${layout.cellHeightMm}mm;gap:${layout.gapMm}mm;width:${printableWidth}mm;align-content:start}
+    .label{display:grid;grid-template-rows:${layout.qrSizeMm}mm 2.2mm 2.2mm;align-items:center;overflow:hidden;border:.15mm solid #aaa;padding:.3mm;text-align:center;break-inside:avoid;page-break-inside:avoid}
+    .label__qr{display:grid;place-items:center;width:${layout.qrSizeMm}mm;height:${layout.qrSizeMm}mm;margin:auto}
+    .label svg{display:block;width:${layout.qrSizeMm}mm;height:${layout.qrSizeMm}mm;max-width:${layout.qrSizeMm}mm;max-height:${layout.qrSizeMm}mm}
+    .label strong,.label span{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:2.2mm}
+    .label strong{font-size:4.5pt}
+    .label span{font-size:4.2pt}
+    @media screen{body{min-width:${layout.pageWidthMm}mm;padding:${layout.pageMarginMm}mm;background:#f4f4f5}.sheet{margin:auto;background:#fff}}
+    @media print{html,body{width:${printableWidth}mm;height:${printableHeight}mm;overflow:hidden}.label{border-color:#000}}
+  `;
+}
 
 function loadQrScannerLibrary() {
   if (!qrScannerLibraryPromise) {
@@ -1917,11 +1951,11 @@ export function createDeviceModule({
         method: "POST", body: JSON.stringify({ deviceIds: [...printSelection] })
       });
       if (!popup) return showToast("Bitte Pop-ups für den Druckbogen erlauben.");
-      popup.document.write("<!doctype html><html lang=\"de\"><head><title>Schäfchen QR-Druckbogen</title><style>body{font:12px system-ui}.sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm}.label{border:1px solid #bbb;border-radius:3mm;padding:4mm;text-align:center;break-inside:avoid}.label svg{width:40mm;height:40mm}.label strong,.label span{display:block}@media print{.label{border:1px solid #000}}</style></head><body><div class=\"sheet\"></div></body></html>");
+      popup.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Schäfchen QR-Druckbogen</title><style>${deviceQrSheetStyles()}</style></head><body><main class="sheet"></main></body></html>`);
       const sheet = popup.document.querySelector(".sheet");
       body.labels.forEach((label) => {
         const article = popup.document.createElement("article"); article.className = "label";
-        const qr = popup.document.createElement("div"); qr.innerHTML = label.svg;
+        const qr = popup.document.createElement("div"); qr.className = "label__qr"; qr.innerHTML = label.svg;
         const strong = popup.document.createElement("strong"); strong.textContent = label.label.split(" · ")[0];
         const number = popup.document.createElement("span"); number.textContent = label.label.split(" · ").slice(1).join(" · ");
         article.append(qr, strong, number); sheet.append(article);
