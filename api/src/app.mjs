@@ -201,7 +201,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.8";
+export const APPLICATION_VERSION = "0.44.9";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -5724,16 +5724,7 @@ async function getSiteMaterialRecord(client, context, materialId) {
   return siteMaterialDto(result.rows[0]);
 }
 
-async function createSiteMaterial(client, context, input) {
-  await requireEnabledModule(client, context, "materials");
-  const roles = await requirePlanner(client, context);
-  await requireConstructionSiteAccess(
-    client,
-    context,
-    input.constructionSiteId,
-    roles
-  );
-  await requireActiveSite(client, context, input.constructionSiteId);
+async function storeSiteMaterial(client, context, input) {
   const result = await client.query(
     `INSERT INTO site_material_entries (
        company_id, construction_site_id, item_name, quantity, unit, status,
@@ -5746,6 +5737,31 @@ async function createSiteMaterial(client, context, input) {
   return getSiteMaterialRecord(client, context, result.rows[0].id);
 }
 
+async function storeSiteMaterialStatus(client, context, materialId, input) {
+  const result = await client.query(
+    `UPDATE site_material_entries
+     SET status = $3, changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2 AND row_version = $5
+     RETURNING id`,
+    [context.companyId, materialId, input.status, context.userId, input.rowVersion]
+  );
+  if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde geändert. Bitte neu laden.", 409, "row_version_conflict");
+  return getSiteMaterialRecord(client, context, materialId);
+}
+
+async function createSiteMaterial(client, context, input) {
+  await requireEnabledModule(client, context, "materials");
+  const roles = await requirePlanner(client, context);
+  await requireConstructionSiteAccess(
+    client,
+    context,
+    input.constructionSiteId,
+    roles
+  );
+  await requireActiveSite(client, context, input.constructionSiteId);
+  return storeSiteMaterial(client, context, input);
+}
+
 async function updateSiteMaterial(client, context, materialId, input) {
   await requireEnabledModule(client, context, "materials");
   const roles = await requirePlanner(client, context);
@@ -5756,15 +5772,47 @@ async function updateSiteMaterial(client, context, materialId, input) {
     materialId,
     roles
   );
-  const result = await client.query(
-    `UPDATE site_material_entries
-     SET status = $3, changed_by_user_id = $4
-     WHERE company_id = $1 AND id = $2 AND row_version = $5
-     RETURNING id`,
-    [context.companyId, materialId, input.status, context.userId, input.rowVersion]
+  return storeSiteMaterialStatus(client, context, materialId, input);
+}
+
+// Material von der Baustelle aus.
+//
+// Bisher konnte nur das Buero Material eintragen. Wer es verbaut, sieht es
+// aber zuerst: der Vorarbeiter weiss abends, was von der Rolle runter ist und
+// was fehlt. Er konnte es nur ansehen und niemandem sagen - ausser per Notiz,
+// wo es keine Menge und keinen Status hat.
+//
+// Der Zugang ist derselbe wie bei Notizen und Fotos: wer an diesem Tag auf der
+// Baustelle eingeteilt ist. Material ist Sache des ganzen Trupps, nicht nur
+// des Vorarbeiters - wer die Kabeltrommel holt, soll es eintragen duerfen.
+async function createMobileSiteMaterial(client, context, input, date) {
+  await requireEnabledModule(client, context, "materials");
+  await requireSiteWorkspaceAccess(client, context, input.constructionSiteId, date);
+  await requireActiveSite(client, context, input.constructionSiteId);
+  return storeSiteMaterial(client, context, input);
+}
+
+async function updateMobileSiteMaterial(
+  client,
+  context,
+  constructionSiteId,
+  materialId,
+  date,
+  input
+) {
+  await requireEnabledModule(client, context, "materials");
+  await requireSiteWorkspaceAccess(client, context, constructionSiteId, date);
+  // Die Baustelle muss zum Eintrag passen. Ohne diese Pruefung koennte man mit
+  // dem Zugang zu einer Baustelle den Eintrag einer anderen aendern.
+  const vorhanden = await client.query(
+    `SELECT 1 FROM site_material_entries
+     WHERE company_id = $1 AND id = $2 AND construction_site_id = $3`,
+    [context.companyId, materialId, constructionSiteId]
   );
-  if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde geändert. Bitte neu laden.", 409, "row_version_conflict");
-  return getSiteMaterialRecord(client, context, materialId);
+  if (vorhanden.rowCount !== 1) {
+    throw new InputError("Der Materialeintrag wurde nicht gefunden.", 404, "site_material_not_found");
+  }
+  return storeSiteMaterialStatus(client, context, materialId, input);
 }
 
 async function getSiteNoteRecord(client, context, noteId) {
@@ -10792,6 +10840,46 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => createMobileSiteNote(client, context, input, date)
         );
         return json(response, result.idempotent ? 200 : 201, { siteNote: result.siteNote });
+      }
+
+      // Material von der Baustelle aus - derselbe Zugang wie bei Notizen und
+      // Fotos: wer an diesem Tag dort eingeteilt ist.
+      const siteMaterialWorkspaceMatch =
+        /^\/api\/v1\/construction-sites\/([^/]+)\/materials$/.exec(url.pathname);
+      if (request.method === "POST" && siteMaterialWorkspaceMatch) {
+        const constructionSiteId = validateId(siteMaterialWorkspaceMatch[1], "Baustellen-ID");
+        const date = validateWorkDate(
+          url.searchParams.get("date") || localDate(new Date().toISOString(), config.timeZone)
+        );
+        const input = validateSiteMaterial({
+          ...await readJson(request),
+          constructionSiteId
+        });
+        const siteMaterial = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => createMobileSiteMaterial(client, context, input, date)
+        );
+        return json(response, 201, { siteMaterial });
+      }
+
+      const siteMaterialWorkspaceItemMatch =
+        /^\/api\/v1\/construction-sites\/([^/]+)\/materials\/([^/]+)$/.exec(url.pathname);
+      if (request.method === "PATCH" && siteMaterialWorkspaceItemMatch) {
+        const constructionSiteId = validateId(siteMaterialWorkspaceItemMatch[1], "Baustellen-ID");
+        const materialId = validateId(siteMaterialWorkspaceItemMatch[2], "Material-ID");
+        const date = validateWorkDate(
+          url.searchParams.get("date") || localDate(new Date().toISOString(), config.timeZone)
+        );
+        const input = validateSiteMaterialUpdate(await readJson(request));
+        const siteMaterial = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => updateMobileSiteMaterial(
+            client, context, constructionSiteId, materialId, date, input
+          )
+        );
+        return json(response, 200, { siteMaterial });
       }
 
       const sitePhotoMatch = /^\/api\/v1\/construction-sites\/([^/]+)\/photos$/.exec(url.pathname);
