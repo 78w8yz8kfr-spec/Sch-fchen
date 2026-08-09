@@ -647,6 +647,12 @@ assert.match(deviceManagement, /import\(QR_SCANNER_MODULE_URL\)/);
 assert.match(deviceManagement, /preferredCamera: "environment"/);
 assert.match(deviceManagement, /QrScanner\.scanImage\(file/);
 assert.doesNotMatch(deviceManagement, /if \(!\("BarcodeDetector" in window\)\)/);
+assert.match(deviceManagement, /Promise\.allSettled/);
+assert.match(deviceManagement, /Gerät & QR anlegen/);
+assert.match(deviceManagement, /Beiliegende Teile \/ Koffer/);
+assert.match(deviceManagement, /admin\/devices\/bundles/);
+assert.match(deviceManagement, /Aktuellen Besitzer zuordnen/);
+assert.match(deviceManagement, /QR-Druckbogen für dieses Set/);
 assert.match(qrScannerVendor, /qr-scanner-worker\.min\.js/);
 assert.match(qrScannerWorker, /export const createWorker/);
 assert.match(styles, /\.device-settings__form/);
@@ -1304,14 +1310,14 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.1"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.1"'));
-assert.ok(worker.includes('"./app.js?v=0.44.1"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.1"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.1"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.1"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.2"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.2"'));
+assert.ok(worker.includes('"./app.js?v=0.44.2"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.2"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.2"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.2"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.1"'));
+assert.ok(worker.includes('"./version.js?v=0.44.2"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
@@ -1353,11 +1359,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.1"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.1"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.2"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.2"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.1"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.1"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.2"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.2"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);

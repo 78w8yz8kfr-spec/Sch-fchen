@@ -8281,11 +8281,52 @@ body.hat-fassungshinweis {
 .device-notifications-panel,
 .device-scanner-card,
 .device-inventory,
-.device-settings {
+.device-settings,
+.device-management-actions,
+.device-load-problem {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 19px;
   background: var(--surface);
+}
+
+.device-management-actions,
+.device-load-problem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px;
+}
+
+.device-management-actions {
+  border-color: rgba(227, 6, 19, 0.2);
+  background: linear-gradient(135deg, #ffffff, var(--brand-soft));
+}
+
+.device-management-actions h2,
+.device-management-actions p,
+.device-load-problem h2,
+.device-load-problem p {
+  margin: 0;
+}
+
+.device-management-actions h2,
+.device-load-problem h2 {
+  font-size: 0.93rem;
+}
+
+.device-management-actions p,
+.device-load-problem p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.device-load-problem {
+  border-color: #dec88e;
+  background: #fff9e9;
 }
 
 .device-group__heading,
@@ -8554,6 +8595,13 @@ body.hat-fassungshinweis {
   margin: 0;
 }
 
+.device-editor-intro {
+  padding-right: 44px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .device-dialog__close {
   position: absolute;
   z-index: 2;
@@ -8573,6 +8621,28 @@ body.hat-fassungshinweis {
 .device-editor-grid {
   display: grid;
   gap: 12px;
+}
+
+.device-editor-section {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 14px;
+  background: #fbfbfb;
+}
+
+.device-editor-section h3,
+.device-editor-section summary {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.device-editor-section summary {
+  cursor: pointer;
 }
 
 .device-dialog label,
@@ -8601,6 +8671,170 @@ body.hat-fassungshinweis {
   border: 1px solid var(--line);
   border-radius: 15px;
   padding: 14px;
+}
+
+.device-included-parts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  border: 1px solid rgba(227, 6, 19, 0.22);
+  border-radius: 15px;
+  padding: 14px;
+  background: linear-gradient(145deg, #ffffff, var(--brand-soft));
+}
+
+.device-included-parts > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.device-included-parts > .button,
+.device-included-parts-enable {
+  width: max-content;
+  max-width: 100%;
+  min-height: 44px;
+  margin-top: 0;
+}
+
+.device-part-list {
+  display: grid;
+  gap: 10px;
+}
+
+.device-part-row {
+  display: grid;
+  gap: 11px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.device-part-row > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.device-part-remove {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-size: 1.15rem;
+}
+
+.device-part-battery,
+.device-set-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.device-created-list,
+.device-set-list,
+.device-set-items {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.device-created-item,
+.device-set-card,
+.device-set-item-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 14px;
+  color: var(--ink);
+  background: #ffffff;
+  text-align: left;
+}
+
+.device-created-item:last-child,
+.device-set-card:last-child,
+.device-set-items article:last-child {
+  border-bottom: 0;
+}
+
+.device-created-item > span:first-child,
+.device-created-item strong,
+.device-created-item small,
+.device-set-card strong,
+.device-set-card span,
+.device-set-item-main strong,
+.device-set-item-main span {
+  display: block;
+  min-width: 0;
+}
+
+.device-created-item small,
+.device-set-card span,
+.device-set-item-main span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.device-created-item > span:last-child {
+  color: var(--brand);
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.device-set-items article {
+  display: grid;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.device-set-item-main {
+  border-bottom: 0;
+}
+
+.device-set-item-remove {
+  min-height: 44px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  padding: 0 12px;
+  color: var(--brand);
+  background: #ffffff;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.device-set-add {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.device-set-add select {
+  min-height: 44px;
+  border: 1px solid #cfd4d1;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #ffffff;
+}
+
+.device-set-add .button {
+  width: auto;
+  min-height: 44px;
+  margin-top: 0;
 }
 
 .device-detail {
@@ -8832,6 +9066,25 @@ body.hat-fassungshinweis {
   .device-module__heading-actions .device-scan-now {
     width: 100%;
     min-height: 54px;
+  }
+
+  .device-management-actions,
+  .device-load-problem {
+    display: grid;
+  }
+
+  .device-management-actions .device-dialog__actions,
+  .device-management-actions .button,
+  .device-load-problem .button,
+  .device-created .device-dialog__actions,
+  .device-created .button {
+    width: 100%;
+  }
+
+  .device-part-battery,
+  .device-set-fields,
+  .device-set-add {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .device-card__main {

@@ -4,6 +4,23 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Geräteanlage, Zuordnung, QR-Etiketten und Sets sind jetzt ein durchgehender
+  Bedienablauf.** Die Verwaltungsansicht bleibt sichtbar, wenn einzelne
+  Geräte-Endpunkte vorübergehend ausfallen, und zeigt einen gezielten
+  Wiederholungsweg statt einer leeren Seite.
+  - Berechtigte Rollen finden „Gerät anlegen“ dauerhaft sichtbar. Das gegliederte
+    Formular erfasst Inventar- und Seriennummer, Kategorie, Hersteller/Modell,
+    festen und aktuellen Besitzer, Standort, Kaufdaten, Prüfung und Foto.
+  - Nach dem Speichern erscheint das sichere QR-Etikett unmittelbar. Bei einem
+    Koffer/Set werden Hauptgerät, Akkus, Ladegeräte und weitere beiliegende
+    Teile transaktional als eigene Gegenstände mit je eigener Historie und
+    eigenem QR-Code angelegt; ein gemeinsamer Druckbogen ist sofort verfügbar.
+  - Vorhandene Geräte lassen sich nachträglich einem Set hinzufügen oder mit
+    Pflichtgrund wieder daraus entfernen. Fester und aktueller Besitzer bleiben
+    getrennte Relationen; administrative Zuordnungen laufen über die
+    protokollierte Übergabelogik.
+- Fassung 0.44.2, Speicher `schaefchen-online-v84`, Migration 098.
+
 - **Die QR-Livekamera funktioniert jetzt auch auf iPhone und iPad.** Safari
   stellt die experimentelle `BarcodeDetector`-Schnittstelle standardmäßig
   nicht bereit. Schäfchen nutzt deshalb einen mitgelieferten lokalen Decoder

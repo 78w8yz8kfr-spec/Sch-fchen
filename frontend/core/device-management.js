@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.1";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.2";
 let qrScannerLibraryPromise = null;
 
 function loadQrScannerLibrary() {
@@ -58,6 +58,15 @@ export function partitionMyDevices(devices, userId) {
   };
 }
 
+const DEVICE_MANAGER_ROLES = new Set([
+  "admin", "managing_director", "dispatch_office", "office", "planner",
+  "executive_assistant"
+]);
+
+export function canManageDevicesFromSession(session) {
+  return (session?.user?.roles || []).some((role) => DEVICE_MANAGER_ROLES.has(role));
+}
+
 export function deviceStatusLabel(status) {
   return ({
     available: "Verfügbar",
@@ -94,6 +103,7 @@ const VIEW_LABELS = new Map([
   ["mine", "Meine Geräte"],
   ["tools", "Maschinen & Werkzeuge"],
   ["batteries", "Akkus"],
+  ["sets", "Sets & Teile"],
   ["loans", "Ausgabe & Rückgabe"],
   ["scanner", "QR-Scanner"],
   ["inspections", "Prüfungen & Wartung"],
@@ -180,41 +190,56 @@ const html = `
         <button class="device-dialog__close device-editor-close" type="button" aria-label="Bearbeitung schließen">×</button>
         <p class="eyebrow">Inventarstammdaten</p>
         <h2 id="device-editor-title">Gerät anlegen</h2>
-        <div class="device-editor-grid">
-          <label>Inventarnummer *<input name="inventoryNumber" maxlength="50" required></label>
-          <label>Bezeichnung *<input name="name" maxlength="180" required></label>
-          <label>Kategorie *<select name="categoryId" required></select></label>
-          <button class="button button--secondary device-category-new" type="button">Kategorie ergänzen</button>
-          <label>Hersteller<input name="manufacturer" maxlength="120"></label>
-          <label>Modell<input name="model" maxlength="120"></label>
-          <label>Seriennummer<input name="serialNumber" maxlength="160"></label>
-          <label>Kaufdatum<input name="purchaseDate" type="date"></label>
-          <label>Kaufpreis brutto (€)<input name="purchasePrice" type="number" min="0" step="0.01"></label>
-          <label>Lieferant<input name="supplier" maxlength="160"></label>
-          <label>Garantie bis<input name="warrantyUntil" type="date"></label>
-          <label>Zustand<select name="condition">
-            <option value="new">Neu</option><option value="ok" selected>OK</option>
-            <option value="worn">Gebraucht</option><option value="damaged">Beschädigt</option>
-            <option value="defective">Defekt</option><option value="unknown">Unbekannt</option>
-          </select></label>
-          <label>Status<select name="status">
-            <option value="available">Verfügbar</option><option value="fixed_assigned">Fest zugeordnet</option>
-            <option value="loaned">Ausgeliehen</option><option value="on_site">Auf Baustelle</option>
-            <option value="in_storage">Im Lager</option><option value="repair">In Reparatur</option>
-            <option value="defective">Defekt</option><option value="locked">Gesperrt</option>
-            <option value="lost">Verloren</option>
-          </select></label>
-          <label>Fester Besitzer<select name="fixedOwnerUserId"><option value="">Niemand</option></select></label>
-          <label>Standort<select name="locationId"><option value="">Kein Standort</option></select></label>
-          <button class="button button--secondary device-location-new" type="button">Standort ergänzen</button>
-          <label>Baustelle<select name="constructionSiteId"><option value="">Keine Baustelle</option></select></label>
-          <label>Fahrzeug<select name="vehicleId"><option value="">Kein Fahrzeug</option></select></label>
-          <label class="device-check"><input name="inspectionRequired" type="checkbox"> Wiederkehrende Prüfung erforderlich</label>
-          <label>Nächster Prüftermin<input name="nextInspectionOn" type="date"></label>
-          <label>Wartungsintervall (Tage)<input name="maintenanceIntervalDays" type="number" min="1" max="3650"></label>
-          <label>Nächste Wartung<input name="nextMaintenanceOn" type="date"></label>
-          <label>Gerätefoto<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"></label>
-        </div>
+        <p class="device-editor-intro">Nach dem Speichern erzeugt Schäfchen automatisch das sichere QR-Etikett. Seriennummer, Besitzer und beiliegende Teile bleiben am jeweiligen Gegenstand nachvollziehbar.</p>
+        <section class="device-editor-section">
+          <h3>1 · Gerät erkennen</h3>
+          <div class="device-editor-grid">
+            <label>Inventarnummer *<input name="inventoryNumber" maxlength="50" required placeholder="z. B. M0042"></label>
+            <label>Bezeichnung *<input name="name" maxlength="180" required placeholder="z. B. Bosch Bohrhammer"></label>
+            <label>Kategorie *<select name="categoryId" required></select></label>
+            <button class="button button--secondary device-category-new" type="button">Kategorie ergänzen</button>
+            <label>Hersteller<input name="manufacturer" maxlength="120"></label>
+            <label>Modell<input name="model" maxlength="120"></label>
+            <label>Seriennummer<input name="serialNumber" maxlength="160" placeholder="Vom Typenschild ablesen"></label>
+            <label>Gerätefoto<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"></label>
+          </div>
+        </section>
+        <details class="device-editor-section" open>
+          <summary>2 · Besitzer & Standort</summary>
+          <div class="device-editor-grid">
+            <label>Fester Besitzer<select name="fixedOwnerUserId"><option value="">Niemand</option></select></label>
+            <label>Aktueller Besitzer<select name="currentOwnerUserId"><option value="">Niemand / verfügbar</option></select></label>
+            <label>Standort<select name="locationId"><option value="">Kein Standort</option></select></label>
+            <button class="button button--secondary device-location-new" type="button">Standort ergänzen</button>
+            <label>Baustelle<select name="constructionSiteId"><option value="">Keine Baustelle</option></select></label>
+            <label>Fahrzeug<select name="vehicleId"><option value="">Kein Fahrzeug</option></select></label>
+            <label>Zustand<select name="condition">
+              <option value="new">Neu</option><option value="ok" selected>OK</option>
+              <option value="worn">Gebraucht</option><option value="damaged">Beschädigt</option>
+              <option value="defective">Defekt</option><option value="unknown">Unbekannt</option>
+            </select></label>
+            <label>Status<select name="status">
+              <option value="available">Verfügbar</option><option value="fixed_assigned">Fest zugeordnet</option>
+              <option value="loaned">Ausgeliehen</option><option value="on_site">Auf Baustelle</option>
+              <option value="in_storage">Im Lager</option><option value="repair">In Reparatur</option>
+              <option value="defective">Defekt</option><option value="locked">Gesperrt</option>
+              <option value="lost">Verloren</option>
+            </select></label>
+          </div>
+        </details>
+        <details class="device-editor-section">
+          <summary>3 · Kauf, Prüfung & Wartung</summary>
+          <div class="device-editor-grid">
+            <label>Kaufdatum<input name="purchaseDate" type="date"></label>
+            <label>Kaufpreis brutto (€)<input name="purchasePrice" type="number" min="0" step="0.01"></label>
+            <label>Lieferant<input name="supplier" maxlength="160"></label>
+            <label>Garantie bis<input name="warrantyUntil" type="date"></label>
+            <label class="device-check"><input name="inspectionRequired" type="checkbox"> Wiederkehrende Prüfung erforderlich</label>
+            <label>Nächster Prüftermin<input name="nextInspectionOn" type="date"></label>
+            <label>Wartungsintervall (Tage)<input name="maintenanceIntervalDays" type="number" min="1" max="3650"></label>
+            <label>Nächste Wartung<input name="nextMaintenanceOn" type="date"></label>
+          </div>
+        </details>
         <fieldset class="device-battery-fields" hidden>
           <legend>Akkuangaben</legend>
           <div class="device-editor-grid">
@@ -227,14 +252,47 @@ const html = `
             <label>Kompatibles System<input name="compatibleSystem" maxlength="160"></label>
           </div>
         </fieldset>
+        <fieldset class="device-included-parts" hidden>
+          <legend>4 · Beiliegende Teile / Koffer</legend>
+          <p>Akku, Ladegerät, Messgerät oder Koffer werden als eigene Gegenstände erfasst. Jedes Teil erhält eine Inventarnummer, optional eine Seriennummer und einen eigenen QR-Code.</p>
+          <div class="device-part-list"></div>
+          <button class="button button--secondary device-part-add" type="button">+ Beiliegendes Teil hinzufügen</button>
+          <div class="device-set-fields" hidden>
+            <label>Setnummer *<input name="setNumber" maxlength="40" placeholder="z. B. SET-12"></label>
+            <label>Setbezeichnung *<input name="setName" maxlength="160" placeholder="z. B. Makita Koffer"></label>
+          </div>
+        </fieldset>
+        <button class="button button--secondary device-included-parts-enable" type="button">+ Gerät hat beiliegende Teile</button>
         <label>Notizen<textarea name="note" maxlength="5000" rows="4"></textarea></label>
         <p class="device-editor-message" role="status"></p>
         <div class="device-dialog__actions">
-          <button class="button button--action device-editor-save" type="submit">Speichern</button>
+          <button class="button button--action device-editor-save" type="submit">Gerät & QR anlegen</button>
           <button class="button button--secondary device-editor-retire" type="button" hidden>Ausmustern</button>
           <button class="button button--secondary device-editor-cancel" type="button">Abbrechen</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog class="device-dialog device-created-dialog" aria-labelledby="device-created-title">
+      <div class="device-dialog__frame device-created">
+        <button class="device-dialog__close device-created-close" type="button" aria-label="Abschluss schließen">×</button>
+        <p class="eyebrow">Inventar angelegt</p>
+        <h2 id="device-created-title">QR-Etiketten sind bereit</h2>
+        <p class="device-created-message"></p>
+        <div class="device-created-list"></div>
+        <div class="device-dialog__actions">
+          <button class="button button--action device-created-print" type="button">Alle QR-Etiketten drucken</button>
+          <button class="button button--secondary device-created-done" type="button">Fertig</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="device-dialog device-set-dialog" aria-labelledby="device-set-title">
+      <div class="device-dialog__frame">
+        <button class="device-dialog__close device-set-close" type="button" aria-label="Set schließen">×</button>
+        <p class="eyebrow">Geräteset</p>
+        <div class="device-set-content"></div>
+      </div>
     </dialog>
 
     <dialog class="device-dialog device-defect-dialog" aria-labelledby="device-defect-title">
@@ -351,6 +409,14 @@ export function createDeviceModule({
     editorCancel: q(".device-editor-cancel"), editorRetire: q(".device-editor-retire"),
     categoryNew: q(".device-category-new"), locationNew: q(".device-location-new"),
     editorMessage: q(".device-editor-message"), batteryFields: q(".device-battery-fields"),
+    includedParts: q(".device-included-parts"), includedPartsEnable: q(".device-included-parts-enable"),
+    partList: q(".device-part-list"), partAdd: q(".device-part-add"),
+    setFields: q(".device-set-fields"),
+    createdDialog: q(".device-created-dialog"), createdClose: q(".device-created-close"),
+    createdDone: q(".device-created-done"), createdPrint: q(".device-created-print"),
+    createdMessage: q(".device-created-message"), createdList: q(".device-created-list"),
+    setDialog: q(".device-set-dialog"), setClose: q(".device-set-close"),
+    setContent: q(".device-set-content"),
     defectDialog: q(".device-defect-dialog"), defectForm: q(".device-defect-form"),
     defectClose: q(".device-defect-close"), defectCancel: q(".device-defect-cancel"),
     defectMessage: q(".device-defect-message"),
@@ -367,7 +433,9 @@ export function createDeviceModule({
   let dashboard = null;
   let context = null;
   let devices = [];
+  let sets = [];
   let notifications = [];
+  let loadProblems = [];
   let selected = null;
   let editing = null;
   let currentInventory = null;
@@ -377,10 +445,15 @@ export function createDeviceModule({
   let scanning = false;
   let lastScanToken = null;
   let deepLinkHandled = false;
+  let createdDevices = [];
   const printSelection = new Set();
 
-  const manager = () => Boolean(dashboard?.canManage);
-  const inventoryAllowed = () => Boolean(dashboard?.canInventory);
+  const manager = () => dashboard
+    ? Boolean(dashboard.canManage)
+    : canManageDevicesFromSession(getSession());
+  const inventoryAllowed = () => dashboard
+    ? Boolean(dashboard.canInventory)
+    : manager() || (getSession()?.user?.roles || []).includes("foreman");
 
   function cacheKey() {
     const session = getSession();
@@ -482,7 +555,7 @@ export function createDeviceModule({
       if (["tools", "batteries", "loans", "history"].includes(key)) {
         return manager() || inventoryAllowed();
       }
-      if (key === "inspections") return manager();
+      if (["sets", "inspections"].includes(key)) return manager();
       return true;
     });
   }
@@ -522,6 +595,7 @@ export function createDeviceModule({
 
   function renderMetrics() {
     elements.metrics.replaceChildren();
+    if (!dashboard) return;
     const mine = dashboard?.mine || {};
     if (!manager()) {
       elements.metrics.append(
@@ -836,6 +910,98 @@ export function createDeviceModule({
     return section;
   }
 
+  function renderLoadProblems() {
+    const section = document.createElement("section");
+    section.className = "device-load-problem";
+    const copy = document.createElement("div");
+    const title = document.createElement("h2");
+    title.textContent = "Noch nicht alles geladen";
+    const note = document.createElement("p");
+    note.textContent = `${loadProblems.map((problem) => problem.area).join(", ")} konnten nicht aktualisiert werden. Bereits geladene Funktionen bleiben erhalten.`;
+    copy.append(title, note);
+    const references = loadProblems.map((problem) => problem.error?.requestId).filter(Boolean);
+    if (references.length) {
+      const reference = document.createElement("small");
+      reference.textContent = `Fehlerreferenz: ${references.join(", ")}`;
+      copy.append(reference);
+    }
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "button button--secondary";
+    retry.textContent = "Erneut laden";
+    retry.addEventListener("click", () => void refresh());
+    section.append(copy, retry);
+    return section;
+  }
+
+  function renderManagementActions() {
+    const section = document.createElement("section");
+    section.className = "device-management-actions";
+    const copy = document.createElement("div");
+    const title = document.createElement("h2");
+    title.textContent = "Inventar verwalten";
+    const note = document.createElement("p");
+    note.textContent = "Gerät mit Seriennummer und Besitzer anlegen, beiliegende Teile erfassen und anschließend QR-Etiketten drucken.";
+    copy.append(title, note);
+    const actions = document.createElement("div");
+    actions.className = "device-dialog__actions";
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "button button--action";
+    add.textContent = "+ Gerät anlegen";
+    add.addEventListener("click", () => openEditor());
+    const setButton = document.createElement("button");
+    setButton.type = "button";
+    setButton.className = "button button--secondary";
+    setButton.textContent = "Sets & beiliegende Teile";
+    setButton.addEventListener("click", () => { activeView = "sets"; render(); });
+    actions.append(add, setButton);
+    section.append(copy, actions);
+    return section;
+  }
+
+  function renderSets() {
+    const section = document.createElement("section");
+    section.className = "device-group";
+    const heading = document.createElement("div");
+    heading.className = "device-group__heading";
+    const copy = document.createElement("div");
+    const title = document.createElement("h2");
+    title.textContent = "Gerätesets & Koffer";
+    const note = document.createElement("p");
+    note.textContent = "Jedes enthaltene Teil bleibt einzeln inventarisiert und besitzt einen eigenen QR-Code.";
+    copy.append(title, note);
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "button button--secondary";
+    add.textContent = "+ Gerät mit Teilen anlegen";
+    add.addEventListener("click", () => { openEditor(); enableIncludedParts(); });
+    heading.append(copy, add);
+    const list = document.createElement("div");
+    list.className = "device-set-list";
+    if (!sets.length) {
+      const empty = document.createElement("p");
+      empty.className = "device-empty";
+      empty.textContent = "Noch kein Set angelegt. Lege ein Gerät an und füge im letzten Schritt Akku, Ladegerät oder Koffer hinzu.";
+      list.append(empty);
+    } else {
+      sets.forEach((set) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "device-set-card";
+        const strong = document.createElement("strong");
+        strong.textContent = `${set.number} · ${set.name}`;
+        const meta = document.createElement("span");
+        meta.textContent = `${set.itemCount} inventarisierte Teile`;
+        button.append(strong, meta);
+        button.addEventListener("click", () => void openSet(set.id));
+        list.append(button);
+      });
+    }
+    section.append(heading, list);
+    return section;
+  }
+
   function render() {
     if (!enabled) return;
     if (!visibleViews().some(([key]) => key === activeView)) activeView = "overview";
@@ -846,9 +1012,11 @@ export function createDeviceModule({
     elements.status.hidden = activeView === "scanner" || activeView === "inventory";
     elements.printSheet.hidden = !manager() || activeView === "scanner" || activeView === "inventory";
     elements.content.replaceChildren();
+    if (loadProblems.length) elements.content.append(renderLoadProblems());
     const userId = getSession()?.user?.id;
     const mine = partitionMyDevices(devices, userId);
     if (activeView === "overview") {
+      if (manager()) elements.content.append(renderManagementActions());
       elements.content.append(renderNotificationsPanel());
       elements.content.append(group(
         manager() ? "Gesamter Gerätebestand" : inventoryAllowed() ? "Geräte meiner Baustellen" : "Bei mir",
@@ -870,6 +1038,8 @@ export function createDeviceModule({
       elements.content.append(group("Maschinen & Werkzeuge", "Inventar ohne Akkus.", devices.filter((device) => device.baseType !== "battery")));
     } else if (activeView === "batteries") {
       elements.content.append(group("Akkus", "Jeder Akku besitzt eine eigene ID, einen eigenen QR-Code und eine eigene Historie.", devices.filter((device) => device.baseType === "battery")));
+    } else if (activeView === "sets") {
+      elements.content.append(renderSets());
     } else if (activeView === "loans") {
       elements.content.append(group("Aktuelle Ausgaben", "Fester und aktueller Besitzer unterscheiden sich.", devices.filter((device) => (
         device.currentOwner && device.currentOwner.id !== device.fixedOwner?.id
@@ -911,29 +1081,33 @@ export function createDeviceModule({
       return;
     }
     elements.message.textContent = "Geräte werden geladen …";
-    try {
-      const [dashboardBody, contextBody, deviceBody, notificationBody] = await Promise.all([
-        requestJson("./api/v1/devices/dashboard"),
-        requestJson("./api/v1/devices/contexts"),
-        requestJson("./api/v1/devices?scope=all"),
-        requestJson("./api/v1/devices/notifications")
-      ]);
-      dashboard = dashboardBody.dashboard;
-      context = contextBody.context;
-      if (dashboard.canManage) {
-        const all = await requestJson("./api/v1/admin/devices");
-        devices = all.devices || [];
-      } else devices = deviceBody.devices || [];
-      notifications = notificationBody.notifications || [];
-      elements.message.textContent = "";
-      fillEditorOptions();
-      render();
-      onNotificationsChanged();
+    const requests = [
+      ["Kennzahlen", requestJson("./api/v1/devices/dashboard")],
+      ["Auswahldaten", requestJson("./api/v1/devices/contexts")],
+      ["Gerätebestand", requestJson("./api/v1/devices?scope=all")],
+      ["Hinweise", requestJson("./api/v1/devices/notifications")],
+      ...(manager() ? [["Gerätesets", requestJson("./api/v1/admin/devices/sets")]] : [])
+    ];
+    const results = await Promise.allSettled(requests.map(([, promise]) => promise));
+    loadProblems = [];
+    results.forEach((result, index) => {
+      const area = requests[index][0];
+      if (result.status === "rejected") {
+        loadProblems.push({ area, error: result.reason });
+        return;
+      }
+      if (area === "Kennzahlen") dashboard = result.value.dashboard;
+      if (area === "Auswahldaten") context = result.value.context;
+      if (area === "Gerätebestand") devices = result.value.devices || [];
+      if (area === "Hinweise") notifications = result.value.notifications || [];
+      if (area === "Gerätesets") sets = result.value.sets || [];
+    });
+    elements.message.textContent = "";
+    fillEditorOptions();
+    render();
+    onNotificationsChanged();
+    if (!loadProblems.some((problem) => problem.area === "Gerätebestand")) {
       await syncQueue();
-    } catch (error) {
-      elements.message.textContent = error.network
-        ? "Der letzte Gerätebestand bleibt sichtbar. Für die Aktualisierung fehlt die Verbindung."
-        : error.message;
     }
   }
 
@@ -951,6 +1125,7 @@ export function createDeviceModule({
     context.categories.filter((category) => category.status === "active")
       .forEach((category) => option(categorySelect, category.id, category.name));
     fillSelect(elements.editor.elements.fixedOwnerUserId, context.employees, "Niemand");
+    fillSelect(elements.editor.elements.currentOwnerUserId, context.employees, "Niemand / verfügbar");
     fillSelect(
       elements.editor.elements.locationId,
       context.locations.filter((location) => location.status === "active"),
@@ -968,11 +1143,149 @@ export function createDeviceModule({
     elements.editor.elements.batterySystem.required = battery;
   }
 
+  function activeCategories() {
+    return (context?.categories || []).filter((category) => category.status === "active");
+  }
+
+  function updatePartBatteryFields(row) {
+    const categoryId = row.querySelector(".device-part-category").value;
+    const category = activeCategories().find((item) => item.id === categoryId);
+    const fields = row.querySelector(".device-part-battery");
+    const system = row.querySelector(".device-part-battery-system");
+    const battery = category?.baseType === "battery";
+    fields.hidden = !battery;
+    system.required = battery;
+  }
+
+  function renumberPartRows() {
+    [...elements.partList.children].forEach((row, index) => {
+      row.querySelector(".device-part-title").textContent = `Teil ${index + 1}`;
+    });
+  }
+
+  function addPartRow(values = {}) {
+    const row = document.createElement("article");
+    row.className = "device-part-row";
+    row.innerHTML = `
+      <header><strong class="device-part-title"></strong><button type="button" class="device-part-remove" aria-label="Beiliegendes Teil entfernen">×</button></header>
+      <div class="device-editor-grid">
+        <label>Inventarnummer *<input class="device-part-inventory" maxlength="50" required></label>
+        <label>Bezeichnung *<input class="device-part-name" maxlength="180" required></label>
+        <label>Kategorie *<select class="device-part-category" required></select></label>
+        <label>Seriennummer<input class="device-part-serial" maxlength="160"></label>
+        <label>Hersteller<input class="device-part-manufacturer" maxlength="120"></label>
+        <label>Modell<input class="device-part-model" maxlength="120"></label>
+        <label class="device-check"><input class="device-part-inspection" type="checkbox"> Eigene Prüfung erforderlich</label>
+      </div>
+      <div class="device-part-battery" hidden>
+        <label>Akkusystem *<input class="device-part-battery-system" maxlength="100" placeholder="z. B. M18"></label>
+        <label>Spannung (V)<input class="device-part-voltage" type="number" min="0.01" step="0.01"></label>
+        <label>Kapazität (Ah)<input class="device-part-capacity" type="number" min="0.01" step="0.01"></label>
+      </div>`;
+    const category = row.querySelector(".device-part-category");
+    option(category, "", "Kategorie wählen");
+    activeCategories().forEach((item) => option(category, item.id, item.name));
+    const number = elements.partList.children.length + 1;
+    const mainNumber = elements.editor.elements.inventoryNumber.value.trim();
+    row.querySelector(".device-part-inventory").value = values.inventoryNumber
+      || (mainNumber ? `${mainNumber}-${String(number).padStart(2, "0")}` : "");
+    row.querySelector(".device-part-name").value = values.name || "";
+    row.querySelector(".device-part-serial").value = values.serialNumber || "";
+    row.querySelector(".device-part-manufacturer").value = values.manufacturer
+      || elements.editor.elements.manufacturer.value;
+    row.querySelector(".device-part-model").value = values.model || "";
+    category.value = values.categoryId || "";
+    category.addEventListener("change", () => updatePartBatteryFields(row));
+    row.querySelector(".device-part-remove").addEventListener("click", () => {
+      row.remove();
+      renumberPartRows();
+      if (!elements.partList.children.length) disableIncludedParts();
+    });
+    elements.partList.append(row);
+    renumberPartRows();
+    updatePartBatteryFields(row);
+  }
+
+  function enableIncludedParts() {
+    if (editing || !context) return;
+    elements.includedParts.hidden = false;
+    elements.includedPartsEnable.hidden = true;
+    elements.setFields.hidden = false;
+    elements.editor.elements.setNumber.required = true;
+    elements.editor.elements.setName.required = true;
+    if (!elements.editor.elements.setNumber.value) {
+      const inventoryNumber = elements.editor.elements.inventoryNumber.value.trim();
+      elements.editor.elements.setNumber.value = inventoryNumber
+        ? `SET-${inventoryNumber}`.slice(0, 40) : "";
+    }
+    if (!elements.editor.elements.setName.value) {
+      const name = elements.editor.elements.name.value.trim();
+      elements.editor.elements.setName.value = name ? `${name} · Set` : "";
+    }
+    if (!elements.partList.children.length) addPartRow();
+  }
+
+  function disableIncludedParts() {
+    elements.partList.replaceChildren();
+    elements.includedParts.hidden = true;
+    elements.includedPartsEnable.hidden = Boolean(editing);
+    elements.setFields.hidden = true;
+    elements.editor.elements.setNumber.required = false;
+    elements.editor.elements.setName.required = false;
+  }
+
+  function partPayload(row, mainPayload) {
+    const numberOrNull = (value) => value === "" ? null : Number(value);
+    const categoryId = row.querySelector(".device-part-category").value;
+    const category = activeCategories().find((item) => item.id === categoryId);
+    return {
+      inventoryNumber: row.querySelector(".device-part-inventory").value,
+      name: row.querySelector(".device-part-name").value,
+      categoryId,
+      manufacturer: row.querySelector(".device-part-manufacturer").value || null,
+      model: row.querySelector(".device-part-model").value || null,
+      serialNumber: row.querySelector(".device-part-serial").value || null,
+      purchaseDate: mainPayload.purchaseDate,
+      purchasePriceCents: null,
+      supplier: mainPayload.supplier,
+      warrantyUntil: mainPayload.warrantyUntil,
+      condition: mainPayload.condition,
+      status: mainPayload.status,
+      fixedOwnerUserId: mainPayload.fixedOwnerUserId,
+      currentOwnerUserId: mainPayload.currentOwnerUserId,
+      locationId: mainPayload.locationId,
+      constructionSiteId: mainPayload.constructionSiteId,
+      vehicleId: mainPayload.vehicleId,
+      inspectionRequired: row.querySelector(".device-part-inspection").checked,
+      nextInspectionOn: null,
+      maintenanceIntervalDays: null,
+      nextMaintenanceOn: null,
+      note: `Bestandteil von ${elements.editor.elements.setName.value.trim()}`,
+      ...(category?.baseType === "battery" ? { battery: {
+        batterySystem: row.querySelector(".device-part-battery-system").value,
+        voltage: numberOrNull(row.querySelector(".device-part-voltage").value),
+        capacityAh: numberOrNull(row.querySelector(".device-part-capacity").value),
+        cycleCount: null,
+        lastCapacityTestOn: null,
+        remainingCapacityPercent: null,
+        compatibleSystem: row.querySelector(".device-part-battery-system").value || null
+      } } : {})
+    };
+  }
+
   function openEditor(device = null) {
+    if (!context) {
+      showToast("Die Gerätestammdaten werden noch geladen. Bitte erneut versuchen.");
+      void refresh();
+      return;
+    }
     editing = device;
     elements.editor.reset();
+    disableIncludedParts();
     fillEditorOptions();
     elements.editorTitle.textContent = device ? "Gerät bearbeiten" : "Gerät anlegen";
+    elements.editor.querySelector(".device-editor-save").textContent = device
+      ? "Änderungen speichern" : "Gerät & QR anlegen";
     elements.editorRetire.hidden = !device || device.status === "retired";
     elements.editorMessage.textContent = "";
     if (device) {
@@ -983,7 +1296,8 @@ export function createDeviceModule({
         purchasePrice: device.purchasePriceCents == null ? "" : (device.purchasePriceCents / 100).toFixed(2),
         supplier: device.supplier, warrantyUntil: device.warrantyUntil, condition: device.condition,
         status: device.status === "retired" ? "available" : device.status,
-        fixedOwnerUserId: device.fixedOwner?.id, locationId: device.currentLocation?.id,
+        fixedOwnerUserId: device.fixedOwner?.id, currentOwnerUserId: device.currentOwner?.id,
+        locationId: device.currentLocation?.id,
         constructionSiteId: device.constructionSite?.id, vehicleId: device.vehicle?.id,
         nextInspectionOn: device.nextInspectionOn,
         maintenanceIntervalDays: device.maintenanceIntervalDays,
@@ -1004,6 +1318,9 @@ export function createDeviceModule({
       elements.editor.elements.status.value = "available";
       elements.editor.elements.condition.value = "ok";
     }
+    elements.editor.elements.currentOwnerUserId.disabled = Boolean(device);
+    elements.editor.elements.currentOwnerUserId.title = device
+      ? "Den aktuellen Besitzer über die Geräteübergabe ändern." : "";
     updateBatteryFields();
     elements.editorDialog.showModal();
   }
@@ -1027,6 +1344,7 @@ export function createDeviceModule({
       condition: form.condition.value,
       status: form.status.value,
       fixedOwnerUserId: form.fixedOwnerUserId.value || null,
+      ...(!editing ? { currentOwnerUserId: form.currentOwnerUserId.value || null } : {}),
       locationId: form.locationId.value || null,
       constructionSiteId: form.constructionSiteId.value || null,
       vehicleId: form.vehicleId.value || null,
@@ -1050,26 +1368,190 @@ export function createDeviceModule({
     save.disabled = true;
     elements.editorMessage.textContent = "Wird gespeichert …";
     try {
+      const partRows = editing ? [] : [...elements.partList.querySelectorAll(".device-part-row")];
+      const parts = partRows.map((row) => partPayload(row, payload));
+      const createBundle = !editing && parts.length > 0;
       const body = await requestJson(
-        editing ? `./api/v1/admin/devices/${encodeURIComponent(editing.id)}` : "./api/v1/admin/devices",
-        { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) }
+        editing
+          ? `./api/v1/admin/devices/${encodeURIComponent(editing.id)}`
+          : createBundle ? "./api/v1/admin/devices/bundles" : "./api/v1/admin/devices",
+        {
+          method: editing ? "PATCH" : "POST",
+          body: JSON.stringify(createBundle ? {
+            device: payload,
+            parts,
+            set: {
+              setNumber: form.setNumber.value,
+              name: form.setName.value,
+              note: `Gemeinsam mit ${payload.inventoryNumber} angelegt`
+            }
+          } : payload)
+        }
       );
-      const saved = body.device;
+      const saved = createBundle ? body.bundle.device : body.device;
       const photo = form.photo.files?.[0];
       if (photo) {
-        await requestJson(`./api/v1/admin/devices/${encodeURIComponent(saved.id)}/photo`, {
-          method: "POST", body: JSON.stringify({ dataUrl: await fileDataUrl(photo) })
-        });
+        try {
+          await requestJson(`./api/v1/admin/devices/${encodeURIComponent(saved.id)}/photo`, {
+            method: "POST", body: JSON.stringify({ dataUrl: await fileDataUrl(photo) })
+          });
+        } catch (error) {
+          showToast(`Gerät gespeichert; Foto konnte nicht übernommen werden: ${error.message}`);
+        }
       }
       elements.editorDialog.close();
-      showToast(editing ? "Gerät aktualisiert." : "Gerät angelegt · QR-Code ist bereit.");
       await refresh();
       const fresh = devices.find((item) => item.id === saved.id) || saved;
-      void openDetail(fresh);
+      if (editing) {
+        showToast("Gerät aktualisiert.");
+        void openDetail(fresh);
+      } else {
+        const added = [fresh, ...(createBundle ? body.bundle.parts : [])].map((item) => (
+          devices.find((candidate) => candidate.id === item.id) || item
+        ));
+        showCreatedDevices(added, body.bundle?.set || null);
+      }
     } catch (error) {
       elements.editorMessage.textContent = error.message;
     } finally {
       save.disabled = false;
+    }
+  }
+
+  function showCreatedDevices(items, set = null) {
+    createdDevices = items;
+    printSelection.clear();
+    items.forEach((item) => printSelection.add(item.id));
+    updatePrintButton();
+    elements.createdMessage.textContent = set
+      ? `${set.number} · ${set.name} enthält ${items.length} einzeln inventarisierte Gegenstände. Jeder QR-Code verweist auf genau einen Datensatz.`
+      : `${items[0].name} wurde angelegt und fest mit seinem QR-Code verknüpft.`;
+    elements.createdList.replaceChildren();
+    items.forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "device-created-item";
+      const copy = document.createElement("span");
+      const strong = document.createElement("strong");
+      strong.textContent = item.name;
+      const meta = document.createElement("small");
+      meta.textContent = [item.inventoryNumber, item.serialNumber && `SN ${item.serialNumber}`]
+        .filter(Boolean).join(" · ");
+      copy.append(strong, meta);
+      const action = document.createElement("span");
+      action.textContent = "QR anzeigen";
+      button.append(copy, action);
+      button.addEventListener("click", () => {
+        elements.createdDialog.close();
+        openQr(item);
+      });
+      elements.createdList.append(button);
+    });
+    elements.createdPrint.textContent = items.length === 1
+      ? "QR-Etikett drucken" : `Alle ${items.length} QR-Etiketten drucken`;
+    showToast(items.length === 1
+      ? "Gerät angelegt · QR-Code ist bereit."
+      : `${items.length} Gegenstände angelegt · QR-Codes sind bereit.`);
+    elements.createdDialog.showModal();
+  }
+
+  function renderSetDetail(set) {
+    elements.setContent.replaceChildren();
+    const title = document.createElement("h2");
+    title.id = "device-set-title";
+    title.textContent = `${set.number} · ${set.name}`;
+    const note = document.createElement("p");
+    note.textContent = set.note || `${set.items.length} einzeln inventarisierte Gegenstände`;
+    const list = document.createElement("div");
+    list.className = "device-set-items";
+    set.items.forEach((item) => {
+      const row = document.createElement("article");
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "device-set-item-main";
+      const strong = document.createElement("strong");
+      strong.textContent = item.name;
+      const meta = document.createElement("span");
+      meta.textContent = [item.inventoryNumber, item.serialNumber && `SN ${item.serialNumber}`]
+        .filter(Boolean).join(" · ");
+      open.append(strong, meta);
+      open.addEventListener("click", () => {
+        elements.setDialog.close();
+        void openDetail(devices.find((device) => device.id === item.id) || item);
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "device-set-item-remove";
+      remove.textContent = "Entfernen";
+      remove.disabled = set.items.length <= 1;
+      remove.addEventListener("click", async () => {
+        const reason = window.prompt("Warum wird das Teil aus dem Set entfernt?");
+        if (!reason || reason.trim().length < 3) return;
+        try {
+          const body = await requestJson(
+            `./api/v1/admin/devices/sets/${encodeURIComponent(set.id)}/items/${encodeURIComponent(item.id)}`,
+            { method: "DELETE", body: JSON.stringify({ rowVersion: set.rowVersion, reason }) }
+          );
+          renderSetDetail(body.set);
+          await refresh();
+        } catch (error) { showToast(error.message); }
+      });
+      row.append(open, remove);
+      list.append(row);
+    });
+    const addForm = document.createElement("form");
+    addForm.className = "device-set-add";
+    const select = document.createElement("select");
+    option(select, "", "Vorhandenes Gerät hinzufügen");
+    devices.filter((device) => device.status !== "retired" && !device.set)
+      .forEach((device) => option(select, device.id, `${device.inventoryNumber} · ${device.name}`));
+    select.required = true;
+    const add = document.createElement("button");
+    add.type = "submit";
+    add.className = "button button--secondary";
+    add.textContent = "Zum Set hinzufügen";
+    addForm.append(select, add);
+    addForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const body = await requestJson(
+          `./api/v1/admin/devices/sets/${encodeURIComponent(set.id)}/items`,
+          {
+            method: "POST",
+            body: JSON.stringify({ rowVersion: set.rowVersion, deviceIds: [select.value] })
+          }
+        );
+        renderSetDetail(body.set);
+        await refresh();
+      } catch (error) { showToast(error.message); }
+    });
+    const actions = document.createElement("div");
+    actions.className = "device-dialog__actions";
+    const print = document.createElement("button");
+    print.type = "button";
+    print.className = "button button--action";
+    print.textContent = "QR-Druckbogen für dieses Set";
+    print.addEventListener("click", () => {
+      printSelection.clear();
+      set.items.forEach((item) => printSelection.add(item.id));
+      updatePrintButton();
+      void printSheet();
+    });
+    actions.append(print);
+    elements.setContent.append(title, note, list, addForm, actions);
+  }
+
+  async function openSet(setId) {
+    elements.setContent.replaceChildren();
+    const waiting = document.createElement("p");
+    waiting.textContent = "Set wird geladen …";
+    elements.setContent.append(waiting);
+    if (!elements.setDialog.open) elements.setDialog.showModal();
+    try {
+      const body = await requestJson(`./api/v1/admin/devices/sets/${encodeURIComponent(setId)}`);
+      renderSetDetail(body.set);
+    } catch (error) {
+      waiting.textContent = error.message;
     }
   }
 
@@ -1112,6 +1594,12 @@ export function createDeviceModule({
       detailRow("Nächste Prüfung", device.nextInspectionOn ? `${formatDate(device.nextInspectionOn)} · ${device.inspectionState === "overdue" ? "überfällig" : device.inspectionState === "due" ? "bald fällig" : "im Plan"}` : "Keine Frist"),
       detailRow("Nächste Wartung", device.nextMaintenanceOn ? formatDate(device.nextMaintenanceOn) : null)
     );
+    if (device.set) {
+      facts.append(detailRow(
+        "Geräteset / beiliegende Teile",
+        `${device.set.number} · ${device.set.name} · ${device.set.itemCount} Teile`
+      ));
+    }
     if (device.battery) {
       facts.append(
         detailRow("Akkusystem", device.battery.batterySystem),
@@ -1145,7 +1633,9 @@ export function createDeviceModule({
     employee.setAttribute("aria-label", "Empfänger auswählen");
     location.setAttribute("aria-label", "Lager oder Standort auswählen");
     site.setAttribute("aria-label", "Baustelle auswählen");
-    if (device.actions.includes("handover")) controls.append(employee);
+    if (device.actions.includes("handover") || (manager() && device.status !== "retired")) {
+      controls.append(employee);
+    }
     if (device.actions.includes("return")) controls.append(location);
     if (device.actions.includes("leave_site")) controls.append(site);
     controls.hidden = !controls.children.length;
@@ -1173,9 +1663,21 @@ export function createDeviceModule({
     if (device.actions.includes("report_defect")) actionButton("Defekt melden", openDefect);
     if (manager()) {
       if (device.status !== "retired") {
+        actionButton("Aktuellen Besitzer zuordnen", () => {
+          if (!employee.value) return showToast("Bitte zuerst einen Mitarbeiter auswählen.");
+          const note = window.prompt("Grund für die administrative Zuordnung:");
+          if (!note || note.trim().length < 3) return;
+          void transfer("administrative_correction", { toUserId: employee.value, note });
+        });
         actionButton("Bearbeiten", () => { elements.detailDialog.close(); openEditor(device); });
       }
       actionButton("QR-Etikett", () => openQr(device));
+      if (device.set) {
+        actionButton("Set & beiliegende Teile", () => {
+          elements.detailDialog.close();
+          void openSet(device.set.id);
+        });
+      }
       if (device.status !== "retired") actionButton("Prüfung erfassen", openInspection);
       if (device.openDefect) actionButton("Reparatur abschließen", async () => {
         const note = window.prompt("Was wurde repariert bzw. geprüft?");
@@ -1536,7 +2038,10 @@ export function createDeviceModule({
   function setEnabled(value) {
     enabled = Boolean(value);
     root.hidden = !enabled;
-    if (enabled) renderSyncState();
+    if (enabled) {
+      renderSyncState();
+      render();
+    }
   }
 
   function unreadCount() {
@@ -1554,7 +2059,8 @@ export function createDeviceModule({
 
   function clear() {
     stopCamera();
-    dashboard = null; context = null; devices = []; notifications = []; selected = null;
+    dashboard = null; context = null; devices = []; sets = []; notifications = [];
+    loadProblems = []; selected = null; createdDevices = [];
     currentInventory = null; currentInventoryReport = null; deepLinkHandled = false;
     renderSyncState();
   }
@@ -1570,6 +2076,13 @@ export function createDeviceModule({
   elements.add.addEventListener("click", () => openEditor());
   elements.printSheet.addEventListener("click", () => void printSheet());
   elements.editor.elements.categoryId.addEventListener("change", updateBatteryFields);
+  elements.editor.elements.fixedOwnerUserId.addEventListener("change", () => {
+    if (!editing && !elements.editor.elements.currentOwnerUserId.value) {
+      elements.editor.elements.currentOwnerUserId.value = elements.editor.elements.fixedOwnerUserId.value;
+    }
+  });
+  elements.includedPartsEnable.addEventListener("click", enableIncludedParts);
+  elements.partAdd.addEventListener("click", () => addPartRow());
   elements.categoryNew.addEventListener("click", async () => {
     const name = window.prompt("Name der neuen Gerätekategorie:");
     if (!name?.trim()) return;
@@ -1620,6 +2133,10 @@ export function createDeviceModule({
   elements.editor.addEventListener("submit", (event) => void saveEditor(event));
   elements.editorClose.addEventListener("click", () => elements.editorDialog.close());
   elements.editorCancel.addEventListener("click", () => elements.editorDialog.close());
+  elements.createdClose.addEventListener("click", () => elements.createdDialog.close());
+  elements.createdDone.addEventListener("click", () => elements.createdDialog.close());
+  elements.createdPrint.addEventListener("click", () => void printSheet());
+  elements.setClose.addEventListener("click", () => elements.setDialog.close());
   elements.editorRetire.addEventListener("click", async () => {
     if (!editing) return;
     const reason = window.prompt("Warum wird das Gerät ausgemustert?");

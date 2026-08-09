@@ -1,6 +1,6 @@
 # Maschinen & Geräte
 
-Stand: Fassung 0.44.1, Migrationen 095 bis 097.
+Stand: Fassung 0.44.2, Migrationen 095 bis 098.
 
 ## Fachlicher Ablauf
 
@@ -8,6 +8,21 @@ Ein Gerät wird einmal angelegt und erhält dabei einen aktiven QR-Token. Ein
 normaler Etikett-Neudruck liest diesen Token erneut; nur „Code ersetzen“
 widerruft ihn und erzeugt die nächste Generation. Es entsteht in beiden Fällen
 kein neuer Gerätestammsatz.
+
+Die Verwaltung führt dabei in einem Ablauf durch Inventarnummer, Bezeichnung,
+Kategorie, Hersteller/Modell, Seriennummer, festen und aktuellen Besitzer,
+Standort sowie optionale Kauf-, Prüf- und Fotodaten. Direkt nach der Anlage
+erscheint das QR-Etikett; der Benutzer muss keine versteckte Folgeaktion
+suchen. Fester und aktueller Besitzer können bereits bei der Erstanlage
+voneinander abweichen.
+
+Hat ein Gerät beiliegende Teile, legt derselbe Vorgang Hauptgerät und Teile
+innerhalb einer Datenbanktransaktion an und verbindet sie mit einem
+`device_set`. Akku, Ladegerät, Messgerät oder Koffer behalten jeweils eigene
+Inventar- und Seriennummer, QR-Token, Besitzerrelation und Historie. Nach dem
+Speichern steht ein gemeinsamer QR-Druckbogen bereit. Vorhandene Gegenstände
+lassen sich später hinzufügen; das Entfernen aus dem Set verlangt einen Grund
+und löscht weder Gegenstand noch Verlauf.
 
 Beim Scan löst die API den Token innerhalb der angemeldeten Firma auf:
 
@@ -31,7 +46,7 @@ sichtbar, während „Aktuell bei“ einen anderen Mitarbeiter nennen kann.
 | Bereich | Tabellen | Zweck |
 | --- | --- | --- |
 | Stamm | `device_categories`, `devices`, `device_battery_profiles` | Kategorien, Gerätedaten und eigenständige Akkuwerte |
-| Orte und Sets | `device_locations`, `device_sets`, `device_set_items` | Lager, Werkstatt, Baustelle, Fahrzeug und vorbereitete Koffer/Set-Struktur |
+| Orte und Sets | `device_locations`, `device_sets`, `device_set_items` | Lager, Werkstatt, Baustelle, Fahrzeug und vollständig bedienbare Koffer-/Set-Struktur |
 | Besitz | `device_assignments`, `device_transfers` | feste Zuordnung, aktueller Besitz und idempotente Übergaben |
 | QR | `device_qr_tokens` | zufällige Token-Generationen und Widerruf |
 | Sicherheit | `device_defects`, `device_inspections`, `device_images` | Defekt, Reparatur, Prüfung, Protokollreferenz und Fotos |
