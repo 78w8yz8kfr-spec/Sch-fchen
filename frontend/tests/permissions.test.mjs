@@ -11,6 +11,7 @@ import {
   isForeman,
   isProjectScopedSession,
   plannableEmployees,
+  sessionAccessSignature,
   sessionRoles
 } from "../core/permissions.js";
 
@@ -22,6 +23,39 @@ test("Ohne Sitzung gilt keine Berechtigung", () => {
   assert.equal(canPlan({}), false);
   assert.equal(canAdministerModules(undefined), false);
   assert.equal(isProjectScopedSession(undefined), false);
+});
+
+test("Laufende Sitzungen erkennen Rollen und Moduländerungen", () => {
+  const current = {
+    user: { roles: ["installer"], isTrainer: false },
+    modules: { devices: true, apprentice_reports: true }
+  };
+  const sameAccessDifferentOrder = {
+    user: { roles: ["installer"], isTrainer: false },
+    modules: { apprentice_reports: true, devices: true }
+  };
+  assert.equal(
+    sessionAccessSignature(current),
+    sessionAccessSignature(sameAccessDifferentOrder)
+  );
+  assert.notEqual(
+    sessionAccessSignature(current),
+    sessionAccessSignature({
+      ...current,
+      user: { roles: ["apprentice", "installer"], isTrainer: false }
+    })
+  );
+  assert.notEqual(
+    sessionAccessSignature(current),
+    sessionAccessSignature({ ...current, modules: { ...current.modules, devices: false } })
+  );
+  assert.notEqual(
+    sessionAccessSignature(current),
+    sessionAccessSignature({
+      ...current,
+      user: { roles: ["installer"], isTrainer: true }
+    })
+  );
 });
 
 test("Alle Planungsrollen duerfen planen", () => {

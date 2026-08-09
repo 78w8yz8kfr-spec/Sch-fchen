@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.6";
-import { serverIsNewer } from "./core/versions.js?v=0.44.6";
+} from "./core/work-time.js?v=0.44.7";
+import { serverIsNewer } from "./core/versions.js?v=0.44.7";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,15 +20,16 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.6";
+} from "./core/sync-queue.js?v=0.44.7";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
+  sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.6";
+} from "./core/permissions.js?v=0.44.7";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -39,9 +40,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.6";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.6";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
+} from "./core/state-store.js?v=0.44.7";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.7";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.7";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1321,7 +1322,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.6",
+          "X-Schaefchen-Version": "0.44.7",
           ...options.headers
         }
       });
@@ -1352,7 +1353,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.6" }
+        headers: { "X-Schaefchen-Version": "0.44.7" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1399,7 +1400,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.6 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.7 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2729,7 +2730,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.6";
+  const EIGENE_FASSUNG = "0.44.7";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2768,7 +2769,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.6". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.7". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -3492,7 +3493,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
     return ausDerSitzung === undefined ? true : Boolean(ausDerSitzung);
   }
 
-  // Den Stand der Bereiche nachholen.
+  // Den Stand der Zugriffe nachholen.
   //
   // Die Liste kam bisher nur beim Anmelden. Schaltet die Plattformverwaltung
   // danach einen Bereich frei, merkt die App davon nichts: der Server laesst
@@ -3502,14 +3503,20 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
   // Praxis "gar nicht". Genau so ist der Fuhrpark gemeldet worden:
   // eingeschaltet, und trotzdem nicht da.
   //
+  // Dasselbe gilt fuer Rollen. Eine Datenbankreparatur hatte Piets Azubi-Rolle
+  // bereits wiederhergestellt; diese Funktion uebernahm aus der frischen
+  // Serverantwort aber nur `modules`. Die laufende iPhone-Sitzung behielt
+  // deshalb `installer` und versteckte das Berichtsheft weiter. Nun wird die
+  // ganze serverseitige Zugriffssicht übernommen.
+  //
   // Gefragt wird beim Zurueckkommen in die App und in ruhigem Abstand. Ein
-  // haeufigeres Nachfragen brauchte es nicht: eine Freigabe ist nichts, was
-  // sekundengenau ankommen muss.
+  // haeufigeres Nachfragen brauchte es nicht: eine Freigabe oder Rollenänderung
+  // ist nichts, was sekundengenau ankommen muss.
   async function refreshModuleAccess() {
     if (demoMode || !session || elements.dashboardView.hidden) return;
-    let neue;
+    let neueSitzung;
     try {
-      neue = (await requestJson("./api/v1/session")).session?.modules;
+      neueSitzung = (await requestJson("./api/v1/session")).session;
     } catch (error) {
       // Offline oder ein Serverfehler: der bekannte Stand bleibt stehen.
       // Bereiche wegzunehmen, nur weil gerade niemand antwortet, waere
@@ -3517,9 +3524,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
       if (error.status === 401) showLogin();
       return;
     }
-    if (!neue) return;
-    if (JSON.stringify(neue) === JSON.stringify(session.modules || {})) return;
-    session = { ...session, modules: neue };
+    if (!neueSitzung) return;
+    if (sessionAccessSignature(neueSitzung) === sessionAccessSignature(session)) return;
+    session = neueSitzung;
     saveState();
     applyNavigationAccess();
     // Wer gerade in einem Bereich steht, der eben abgeschaltet wurde, kann
@@ -3531,8 +3538,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.6";
     const aktuellerKnopf = document.querySelector(`#nav-${currentDashboardPane}`);
     if (aktuellerKnopf?.hidden) showDashboardPane("start", false);
     render();
-    await refreshVehicles();
-    await deviceModule.refresh();
+    renderTopbarUser();
+    await Promise.all([
+      refreshVehicles(),
+      deviceModule.refresh(),
+      refreshApprenticeData(),
+      refreshApprenticeReviews()
+    ]);
   }
 
   function vdeModuleEnabled() {

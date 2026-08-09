@@ -1,9 +1,17 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.6
+Technischer Stand: V0.44.7
 
 ## Abgeschlossen
+
+- vollständige Aktualisierung von Rollen, Ausbilderstatus und Modulen beim
+  Zurückkehren in eine laufende App-Sitzung; eine serverseitig reparierte
+  Azubi-Rolle erscheint dadurch ohne Ab- und erneutes Anmelden in der
+  Navigation
+- gezielte, evidenzgebundene Wiederherstellung von Piets Azubi-Rolle sowie
+  dauerhafte Berichtsheft-Freigabe für den Schaaf-Mandanten; notwendiges
+  Update auf PWA-Speicher `schaefchen-online-v89`
 
 - automatische Wiederherstellung versehentlich durch die Mitarbeiterverwaltung
   entfernter Azubi-Rollen bei belegter laufender Ausbildung; das persönliche

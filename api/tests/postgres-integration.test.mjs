@@ -14,6 +14,18 @@ const enabled = process.env.API_INTEGRATION_TEST === "true";
 const integrationTest = enabled ? test : test.skip;
 const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../frontend");
 
+// Dieser Test bildet den aktuell ausgelieferten App-Client ab. Deshalb sendet
+// jeder seiner Aufrufe die Serverfassung mit, genau wie die PWA. Einzelne
+// Prüfungen können weiterhin bewusst eine ältere Fassung setzen, um das
+// verpflichtende Update zu testen.
+function fetch(input, init = {}) {
+  const headers = new Headers(init.headers);
+  if (!headers.has("X-Schaefchen-Version")) {
+    headers.set("X-Schaefchen-Version", APPLICATION_VERSION);
+  }
+  return globalThis.fetch(input, { ...init, headers });
+}
+
 function nextBusinessDate(date) {
   const value = new Date(`${date}T00:00:00Z`);
   do value.setUTCDate(value.getUTCDate() + 1);

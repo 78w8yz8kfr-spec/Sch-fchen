@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Berichtsheft erscheint nun auch in einer bereits laufenden Sitzung
+  wieder.** Beim Zurückkehren in die App übernimmt Schäfchen nicht mehr nur
+  geänderte Modulfreigaben, sondern auch die aktuelle Rollenliste und den
+  Ausbilderstatus vom Server. Piets belegte Azubi-Rolle und die
+  Berichtsheft-Freigabe der Schaaf Elektro GmbH werden zusätzlich gezielt in
+  der Datenbank abgesichert. Die notwendige Aktualisierung lädt auf noch
+  geöffneten älteren App-Ständen automatisch die korrigierte Fassung.
+- Fassung 0.44.7, Speicher `schaefchen-online-v89`, Migration 103.
+
 - **Das Berichtsheft bleibt einem Auszubildenden sicher erhalten.** Das
   Mitarbeiterformular erkennt die Rolle „Auszubildender“ nun auch bei der
   Vorauswahl und kann sie bei einer Änderung von Name, Telefon oder Ausbilder
