@@ -30,6 +30,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   und in einer eingerichteten App gibt es dort kein Zurück — sie musste
   beendet werden. Bereits offline gesicherte Dokumente behalten ihren
   Schlüssel und bleiben ohne Netz auffindbar.
+- **Die Integrationsprüfung hängt nicht mehr an der Uhrzeit.** Die Prüfung der
+  eigenen Zeitkorrektur schob eine Buchung stets eine volle Stunde zurück.
+  Zwischen Mitternacht und ein Uhr lag der frühere Zeitpunkt damit im Vortag,
+  der Server wies die Korrektur zu Recht ab — und die Prüfung scheiterte jede
+  Nacht eine Stunde lang an der Uhr statt an der Anwendung. Sie schiebt jetzt
+  höchstens bis zum Anfang des Arbeitstages zurück.
 - Fassung 0.44.9, Speicher `schaefchen-online-v91`, Migration 105.
 
 - **Piets Berichtsheft bleibt nach dem Laden sichtbar.** Die erste

@@ -26,6 +26,21 @@ function fetch(input, init = {}) {
   return globalThis.fetch(input, { ...init, headers });
 }
 
+// Wie viel Zeit ist an diesem Arbeitstag in der Zeitzone des Betriebs bereits
+// vergangen? Damit weiss ein Test, wie weit er einen Zeitpunkt zurueckschieben
+// darf, ohne im Vortag zu landen.
+function millisecondsIntoLocalDay(iso, timeZone) {
+  const teile = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date(iso));
+  const wert = (typ) => Number(teile.find((teil) => teil.type === typ).value);
+  return ((wert("hour") * 60 + wert("minute")) * 60 + wert("second")) * 1000;
+}
+
 function nextBusinessDate(date) {
   const value = new Date(`${date}T00:00:00Z`);
   do value.setUTCDate(value.getUTCDate() + 1);
@@ -4421,7 +4436,21 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     };
 
     const correctOwnStart = async ({ ownCookie, ownWorkDate, entry }) => {
-      const shifted = new Date(new Date(entry.recordedAt).valueOf() - 3_600_000).toISOString();
+      // Eine Stunde zurueck - aber nie ueber den Anfang des Arbeitstages
+      // hinaus. Zwischen Mitternacht und ein Uhr lag der fruehere Zeitpunkt
+      // sonst im Vortag, und der Server wies die Korrektur zu Recht ab:
+      // "Zeitpunkt und ausgewaehlter Arbeitstag stimmen nicht ueberein". Der
+      // Test scheiterte dadurch jede Nacht eine Stunde lang - an der Uhr, nicht
+      // an der Anwendung -, und mit ihm die ganze Auslieferung. Genau davor
+      // warnen die Arbeitsregeln: ein Test bringt seine Daten selbst mit und
+      // haengt nicht am Startzeitpunkt.
+      const gebucht = new Date(entry.recordedAt).valueOf();
+      const shifted = new Date(
+        gebucht - Math.max(1000, Math.min(3_600_000, millisecondsIntoLocalDay(
+          entry.recordedAt,
+          config.timeZone
+        ) - 1000))
+      ).toISOString();
       const response = await fetch(`${baseUrl}/api/v1/time-entries/${entry.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Cookie: ownCookie },
