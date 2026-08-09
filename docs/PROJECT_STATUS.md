@@ -1,9 +1,15 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.3
+Technischer Stand: V0.44.4
 
 ## Abgeschlossen
+
+- eigenständiger mobiler Azubi-Bereich in der unteren Hauptnavigation;
+  eingereichte und freigegebene Wochen belegen die Startseite nicht mehr
+- kompakter Berichtsheft-Hinweis nur bei fehlendem heutigem Eintrag oder einer
+  Rückgabe zur Überarbeitung; klare Einzelaktion führt direkt zum nächsten
+  notwendigen Schritt
 
 - PostgreSQL-Parameterbindung der firmenweiten Geräteübersicht korrigiert;
   Büro und Administration laden den Gerätebestand wieder ohne internen Fehler
@@ -22,7 +28,7 @@ Technischer Stand: V0.44.3
 - QR-Livekamera und QR-Fotoerkennung mit lokal ausgeliefertem Decoder für
   Safari auf iPhone/iPad; die native Browsererkennung bleibt der schnelle
   Pfad, Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt und der
-  PWA-Speicher `schaefchen-online-v85` erzwingt die korrigierte Fassung
+  PWA-Speicher `schaefchen-online-v86` erzwingt die korrigierte Fassung
 - vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
   automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
   Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und

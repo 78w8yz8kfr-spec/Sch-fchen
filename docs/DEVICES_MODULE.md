@@ -1,6 +1,6 @@
 # Maschinen & Geräte
 
-Stand: Fassung 0.44.3, Migrationen 095 bis 099.
+Stand: Fassung 0.44.4, Migrationen 095 bis 099.
 
 ## Fachlicher Ablauf
 

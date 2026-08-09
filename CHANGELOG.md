@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die mobile Azubi-Ansicht ist wieder ein klarer eigener Bereich.** Azubis
+  erreichen das Berichtsheft direkt über „Azubi“ in der unteren Leiste. Auf
+  „Start“ erscheint nur dann ein kompakter Hinweis, wenn der heutige Eintrag
+  fehlt oder der Ausbilder eine Woche mit Kommentar zur Überarbeitung
+  zurückgegeben hat. Bereits eingereichte oder freigegebene Wochen erzeugen
+  dort keine große Platzhalterkarte mehr. Mobile Abschlussaktionen sind nach
+  Wichtigkeit geordnet; der nicht sichtbare Export-Reiter wurde entfernt.
+- Fassung 0.44.4, Speicher `schaefchen-online-v86`, Migration 100.
+
 - **Gerätebestand und mobile Set-Anlage funktionieren fehlerfrei.** Die
   firmenweite Büro-/Admin-Liste bindet nur noch die von PostgreSQL tatsächlich
   verwendeten Parameter; die Fehlerreferenz beim Laden des Gerätebestands

@@ -5425,6 +5425,16 @@ select:focus-visible {
   display: none;
 }
 
+/* Beim Auszubildenden ist das Berichtsheft kein Verwaltungsziel, sondern
+   taegliche Arbeit. Derselbe Eintrag aus der Desktop-Seitenleiste darf deshalb
+   mobil direkt in der Hauptleiste stehen; beim Ausbilder bleibt er unter
+   „Mehr“. */
+@media (max-width: 1079px) {
+  .bottom-nav > .nav-item--desktop.nav-item--apprentice-mobile {
+    display: grid;
+  }
+}
+
 .bottom-nav--planner,
 .bottom-nav--compact {
   padding-right: max(5px, calc((100vw - 540px) / 2));
@@ -6098,21 +6108,158 @@ select:focus-visible {
   accent-color: var(--brand);
 }
 
-/* Das Berichtsheft auf der Startseite: solange fuer heute nichts eingetragen
-   ist, faellt die Karte auf - danach ist sie eine ruhige Bestaetigung. */
+/* Auf der Startseite steht kein zweiter Berichtsheft-Bildschirm. Der Azubi hat
+   dafuer mobil einen eigenen Bereich; hier erscheint nur der naechste
+   notwendige Schritt, wenn heute wirklich noch etwas offen ist. */
+.apprentice-today-section {
+  display: grid;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(227, 6, 19, 0.25);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(17, 17, 17, 0.06);
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.apprentice-today-section__icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  align-self: start;
+  border-radius: 14px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.apprentice-today-section__icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.apprentice-today-section__copy {
+  min-width: 0;
+}
+
+.apprentice-today-section__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.apprentice-today-section__heading .eyebrow,
+.apprentice-today-section h2 {
+  margin: 0;
+}
+
+.apprentice-today-section h2 {
+  margin-top: 3px;
+  font-size: 0.96rem;
+}
+
+.apprentice-today-section__state {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
 .apprentice-today-summary {
-  margin: 0 0 12px;
-  font-size: 0.82rem;
+  margin: 4px 0 0;
   color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
-.apprentice-today-section--offen {
-  border-color: var(--brand);
+.apprentice-today-section__action {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 13px;
+  color: #ffffff;
+  background: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 800;
+  grid-column: 2;
 }
 
-.apprentice-today-section--offen .apprentice-today-summary {
-  color: var(--ink);
-  font-weight: 700;
+.apprentice-today-section__action > :last-child {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+@media (min-width: 680px) {
+  .apprentice-today-section {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .apprentice-today-section__action {
+    min-width: 150px;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
+@media (max-width: 1079px) {
+  .apprentice-tab--desktop {
+    display: none;
+  }
+
+  .apprentice-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .apprentice-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Auf dem Telefon gibt es genau eine hervorgehobene Abschlussaktion. Die
+     Hilfsaktionen bleiben darunter paarweise erreichbar, statt sechs gleich
+     wichtige breite Schaltflaechen zu bilden. */
+  .apprentice-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .apprentice-actions #apprentice-submit,
+  .apprentice-actions #apprentice-withdraw,
+  .apprentice-actions #apprentice-print-book {
+    grid-column: 1 / -1;
+  }
+
+  .apprentice-actions #apprentice-submit {
+    grid-row: 1;
+  }
+
+  .apprentice-actions .button {
+    min-width: 0;
+  }
+}
+
+/* Der vollstaendige Nachweis bleibt ein eigener Bildschirm. Die Startseite
+   zeigt nach dem Speichern oder Freigeben keine bestaetigende Platzhalterkarte
+   mehr; die Freigabe steht im Berichtsheft selbst. */
+.apprentice-today-section[hidden] {
+  display: none !important;
 }
 
 /* Eine Sperre, die sich nicht erklaert, ist ein Fehler: nach dem Einreichen

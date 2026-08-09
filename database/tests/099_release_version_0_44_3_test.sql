@@ -17,7 +17,7 @@ BEGIN
     SELECT release_status, database_migrations
       INTO release_state, migrations
     FROM application_versions WHERE version = '0.44.3';
-    IF release_state IS DISTINCT FROM 'production' THEN
+    IF release_state IS NULL OR release_state NOT IN ('production', 'superseded') THEN
         RAISE EXCEPTION 'Die Fassung 0.44.3 fehlt oder besitzt einen ungültigen Status';
     END IF;
     IF NOT migrations @> '["099"]'::JSONB THEN

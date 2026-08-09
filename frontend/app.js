@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.3";
-import { serverIsNewer } from "./core/versions.js?v=0.44.3";
+} from "./core/work-time.js?v=0.44.4";
+import { serverIsNewer } from "./core/versions.js?v=0.44.4";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,14 +20,14 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.3";
+} from "./core/sync-queue.js?v=0.44.4";
 import {
   canPlan as canPlanFor,
   employeeRoleLabel,
   isProjectScopedSession as isProjectScopedSessionFor,
   plannableEmployees,
   sessionRoles
-} from "./core/permissions.js?v=0.44.3";
+} from "./core/permissions.js?v=0.44.4";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -38,8 +38,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.3";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
+} from "./core/state-store.js?v=0.44.4";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.4";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.4";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -233,7 +234,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     apprenticeTodayState: document.querySelector("#apprentice-today-state"),
     apprenticeTodaySummary: document.querySelector("#apprentice-today-summary"),
     apprenticeTodayOpen: document.querySelector("#apprentice-today-open"),
-    apprenticeWeekOpen: document.querySelector("#apprentice-week-open"),
+    apprenticeTodayOpenLabel: document.querySelector("#apprentice-today-open-label"),
     apprenticeTodayDialog: document.querySelector("#apprentice-today-dialog"),
     apprenticeTodayForm: document.querySelector("#apprentice-today-form"),
     apprenticeTodayEyebrow: document.querySelector("#apprentice-today-eyebrow"),
@@ -1319,7 +1320,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.3",
+          "X-Schaefchen-Version": "0.44.4",
           ...options.headers
         }
       });
@@ -1350,7 +1351,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.3" }
+        headers: { "X-Schaefchen-Version": "0.44.4" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1397,7 +1398,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.3 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.4 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1475,6 +1476,11 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     // der Zeiterfassung taeglich hat, und fuer den Ausbilder die, die er
     // woechentlich abzeichnet.
     elements.navApprentice.hidden = !(isApprentice() || mayReviewApprentices());
+    // Derselbe Navigationspunkt steht beim Azubi auch mobil direkt unten.
+    // Ausbilder finden die Pruefliste weiterhin unter „Mehr“, damit die
+    // mobile Leiste bei planenden Rollen nicht mit Verwaltungszielen
+    // ueberlaeuft.
+    elements.navApprentice.classList.toggle("nav-item--apprentice-mobile", isApprentice());
     // Die Eintraege, die es nur am Rechner gibt. Sie haengen an derselben
     // Berechtigung wie Baustellen und Einsatzplanung: wer nicht planen darf,
     // hat dort auch nichts zu suchen.
@@ -1499,7 +1505,10 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     // Gezaehlt wird ausschliesslich die echte mobile Bereichsleiste; die
     // einzelnen Desktopziele und Gruppenueberschriften nehmen dort nie Platz.
     const sichtbare = [...elements.bottomNav.querySelectorAll(".nav-item")].filter(
-      (knopf) => !knopf.hidden && !knopf.classList.contains("nav-item--desktop")
+      (knopf) => !knopf.hidden && (
+        !knopf.classList.contains("nav-item--desktop")
+        || knopf.classList.contains("nav-item--apprentice-mobile")
+      )
     ).length;
     elements.bottomNav.classList.toggle("bottom-nav--compact", sichtbare >= 5);
   }
@@ -2719,7 +2728,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.3";
+  const EIGENE_FASSUNG = "0.44.4";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2758,7 +2767,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.3". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.4". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -9473,7 +9482,9 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
       ? new Set(["work", "control"])
       : new Set(paneGroup ? [paneGroup] : []);
     const eintraege = [...elements.bottomNav.querySelectorAll(".nav-item--desktop")]
-      .filter((knopf) => !knopf.hidden && selectedGroups.has(knopf.dataset.navGroup));
+      .filter((knopf) => !knopf.hidden
+        && !knopf.classList.contains("nav-item--apprentice-mobile")
+        && selectedGroups.has(knopf.dataset.navGroup));
     elements.paneMenu.replaceChildren();
     elements.paneMenu.hidden = eintraege.length === 0;
     if (elements.paneMenu.hidden) return;
@@ -9633,7 +9644,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
         return;
       }
       if (element === elements.apprenticeTodaySection) {
-        element.hidden = pane !== "start" || !isApprentice();
+        renderApprenticeToday();
         return;
       }
       if (element === elements.apprenticeSection) {
@@ -9706,7 +9717,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     }[pane] || elements.navStart;
     const mobileActiveButton = {
       time: elements.navWeek,
-      apprentice: elements.navWeek,
+      apprentice: elements.navApprentice,
       assignments: elements.navMobilePlanning,
       sites: elements.navMobilePlanning,
       reports: elements.navMobileDocumentation,
@@ -9867,7 +9878,7 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     draft: "Entwurf",
     submitted: "Eingereicht",
     approved: "Freigegeben",
-    returned: "Zurückgegeben"
+    returned: "Zur Überarbeitung"
   };
 
   function currentApprenticeReport() {
@@ -10436,21 +10447,29 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
   }
 
   function renderApprenticeToday() {
-    elements.apprenticeTodaySection.hidden = !isApprentice() || currentDashboardPane !== "start";
-    if (!isApprentice()) return;
+    if (!isApprentice()) {
+      elements.apprenticeTodaySection.hidden = true;
+      return;
+    }
     const bericht = apprenticeTodayReport();
     const taetigkeiten = apprenticeTodayEntry()?.activities || [];
-    const offen = apprenticeTodayEditable();
-    elements.apprenticeTodayState.textContent = APPRENTICE_STATUS_LABEL[bericht?.status || "draft"];
-    elements.apprenticeTodaySummary.textContent = taetigkeiten.length
-      ? `Heute: ${taetigkeiten.join(" · ")}`
-      : offen
-        ? "Für heute steht noch nichts im Berichtsheft."
-        : "Diese Woche ist bereits eingereicht.";
-    elements.apprenticeTodaySection.classList.toggle(
-      "apprentice-today-section--offen", offen && taetigkeiten.length === 0
-    );
-    elements.apprenticeTodayOpen.hidden = !offen;
+    const arbeitstagBegonnen = Boolean(lastEvent())
+      || (apprenticeTodayEntry()?.workedMinutes ?? calculatedTimes().work) > 0;
+    const prompt = apprenticeTodayPrompt({
+      apprentice: true,
+      pane: currentDashboardPane,
+      status: bericht?.status || "draft",
+      activities: taetigkeiten,
+      workdayStarted: arbeitstagBegonnen,
+      returnComment: bericht?.returnComment || ""
+    });
+    elements.apprenticeTodaySection.hidden = !prompt.visible;
+    if (!prompt.visible) return;
+
+    elements.apprenticeTodayState.textContent = prompt.state;
+    elements.apprenticeTodaySummary.textContent = prompt.summary;
+    elements.apprenticeTodayOpen.dataset.action = prompt.action;
+    elements.apprenticeTodayOpenLabel.textContent = prompt.actionLabel;
   }
 
   function openApprenticeToday({ feierabend = false } = {}) {
@@ -12682,11 +12701,13 @@ import { createDeviceModule } from "./core/device-management.js?v=0.44.3";
     event.preventDefault();
     void saveApprenticeReport(true);
   });
-  elements.apprenticeTodayOpen.addEventListener("click", () => openApprenticeToday());
-  elements.apprenticeWeekOpen.addEventListener("click", () => {
+  elements.apprenticeTodayOpen.addEventListener("click", () => {
+    if (elements.apprenticeTodayOpen.dataset.action !== "week") {
+      openApprenticeToday();
+      return;
+    }
     selectedWeekStart = currentWeekStart();
-    showDashboardPane("apprentice");
-    void refreshWeekData();
+    elements.navApprentice.click();
   });
   elements.apprenticeTodayForm.addEventListener("submit", (event) => {
     event.preventDefault();

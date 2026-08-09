@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.3">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.3">
-    <script type="module" src="./app.js?v=0.44.3"></script>
-    <script src="./version.js?v=0.44.3" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.4">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.4">
+    <script type="module" src="./app.js?v=0.44.4"></script>
+    <script src="./version.js?v=0.44.4" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.3</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.4</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -581,26 +581,23 @@
             </div>
           </section>
 
-          <section id="apprentice-today-section" class="section apprentice-today-section"
+          <section id="apprentice-today-section" class="apprentice-today-section"
             data-dashboard-pane="start" aria-labelledby="apprentice-today-heading" hidden>
-            <div class="section-heading">
-              <div>
+            <span class="apprentice-today-section__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
+            </span>
+            <div class="apprentice-today-section__copy">
+              <div class="apprentice-today-section__heading">
                 <p class="eyebrow">Ausbildungsnachweis</p>
-                <h2 id="apprentice-today-heading">Berichtsheft</h2>
+                <span id="apprentice-today-state" class="apprentice-today-section__state" aria-live="polite"></span>
               </div>
-              <span id="apprentice-today-state" class="site-list-summary" aria-live="polite"></span>
+              <h2 id="apprentice-today-heading">Berichtsheft heute</h2>
+              <p id="apprentice-today-summary" class="apprentice-today-summary"></p>
             </div>
-            <p id="apprentice-today-summary" class="apprentice-today-summary"></p>
-            <div class="assignment-quick-actions">
-              <button id="apprentice-today-open" class="assignment-quick-action" type="button">
-                <span aria-hidden="true">✎</span>
-                <strong>Heutigen Tag eintragen</strong>
-              </button>
-              <button id="apprentice-week-open" class="assignment-quick-action" type="button">
-                <span aria-hidden="true">▤</span>
-                <strong>Ganze Woche</strong>
-              </button>
-            </div>
+            <button id="apprentice-today-open" class="apprentice-today-section__action" type="button">
+              <span id="apprentice-today-open-label">Heute eintragen</span>
+              <span aria-hidden="true">›</span>
+            </button>
           </section>
 
           <section id="today-assignment-section" class="section" data-dashboard-pane="start" aria-labelledby="today-assignment-title">
@@ -1006,7 +1003,7 @@
               <a class="page-tab page-tab--active" href="#apprentice-panel">Übersicht</a>
               <a class="page-tab" href="#apprentice-days">Woche</a>
               <a class="page-tab" href="#apprentice-history">Verlauf</a>
-              <a class="page-tab" href="#apprentice-preview-panel">Export</a>
+              <a class="page-tab apprentice-tab--desktop" href="#apprentice-preview-panel">Export</a>
             </nav>
             <section id="apprentice-panel" class="week-review-panel apprentice-panel" aria-labelledby="apprentice-title" hidden>
               <div class="site-management-panel__heading">
@@ -2997,7 +2994,7 @@
             <svg class="nav-icon--desktop" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 0h3m-8 3h3"/></svg>
             <span>Meine Woche</span>
           </button>
-          <button id="nav-apprentice" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="work">
+          <button id="nav-apprentice" class="nav-item nav-item--desktop" type="button" hidden data-kurz="Azubi" data-nav-group="work">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
             <span>Azubi-Berichtsheft</span>
           </button>
