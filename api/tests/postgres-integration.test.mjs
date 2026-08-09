@@ -4984,6 +4984,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       method: "POST", sessionCookie: employeeCookie,
       payload: { token: overdueToken, clientOperationId: randomUUID() }
     });
+    assert.equal(overdueScan.response.status, 200, await overdueScan.response.clone().text());
     assert.equal(overdueScan.body.scan.outcome, "blocked");
     assert.equal(overdueScan.body.scan.device.inspectionState, "overdue");
     assert.equal(overdueScan.body.scan.device.effectiveStatus, "inspection_due");

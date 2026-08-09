@@ -362,13 +362,23 @@ function datePlusDays(date, days) {
   return value.toISOString().slice(0, 10);
 }
 
+function databaseDateKey(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.valueOf())) return null;
+    const part = (number) => String(number).padStart(2, "0");
+    return `${value.getFullYear()}-${part(value.getMonth() + 1)}-${part(value.getDate())}`;
+  }
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(value));
+  return match?.[1] || null;
+}
+
 export function deviceDto(row, userId, today = new Date().toISOString().slice(0, 10)) {
   const warningUntil = datePlusDays(today, Number(row.inspection_warning_days || 30));
-  const overdue = Boolean(row.inspection_required && row.next_inspection_on
-    && String(row.next_inspection_on).slice(0, 10) < today);
-  const dueSoon = Boolean(row.inspection_required && row.next_inspection_on
-    && String(row.next_inspection_on).slice(0, 10) >= today
-    && String(row.next_inspection_on).slice(0, 10) <= warningUntil);
+  const nextInspectionOn = databaseDateKey(row.next_inspection_on);
+  const overdue = Boolean(row.inspection_required && nextInspectionOn && nextInspectionOn < today);
+  const dueSoon = Boolean(row.inspection_required && nextInspectionOn
+    && nextInspectionOn >= today && nextInspectionOn <= warningUntil);
   const compliance = overdue ? "overdue" : dueSoon ? "due" : "ok";
   const effectiveStatus = !BLOCKING_STATUSES.has(row.status) && (overdue || dueSoon)
     ? "inspection_due"
@@ -392,10 +402,10 @@ export function deviceDto(row, userId, today = new Date().toISOString().slice(0,
     manufacturer: row.manufacturer,
     model: row.model,
     serialNumber: row.serial_number,
-    purchaseDate: row.purchase_date ? String(row.purchase_date).slice(0, 10) : null,
+    purchaseDate: databaseDateKey(row.purchase_date),
     purchasePriceCents: row.purchase_price_cents,
     supplier: row.supplier,
-    warrantyUntil: row.warranty_until ? String(row.warranty_until).slice(0, 10) : null,
+    warrantyUntil: databaseDateKey(row.warranty_until),
     condition: row.condition_key,
     note: row.note,
     status: row.status,
@@ -432,11 +442,11 @@ export function deviceDto(row, userId, today = new Date().toISOString().slice(0,
       name: row.vehicle_name
     } : null,
     inspectionRequired: row.inspection_required,
-    lastInspectionOn: row.last_inspection_on ? String(row.last_inspection_on).slice(0, 10) : null,
-    nextInspectionOn: row.next_inspection_on ? String(row.next_inspection_on).slice(0, 10) : null,
+    lastInspectionOn: databaseDateKey(row.last_inspection_on),
+    nextInspectionOn,
     inspectionState: compliance,
     maintenanceIntervalDays: row.maintenance_interval_days,
-    nextMaintenanceOn: row.next_maintenance_on ? String(row.next_maintenance_on).slice(0, 10) : null,
+    nextMaintenanceOn: databaseDateKey(row.next_maintenance_on),
     hasPhoto: Boolean(row.has_photo),
     photoUrl: row.has_photo ? `./api/v1/devices/${row.id}/photo` : null,
     battery: row.base_type === "battery" ? {
@@ -444,8 +454,7 @@ export function deviceDto(row, userId, today = new Date().toISOString().slice(0,
       voltage: row.voltage === null ? null : Number(row.voltage),
       capacityAh: row.capacity_ah === null ? null : Number(row.capacity_ah),
       cycleCount: row.cycle_count,
-      lastCapacityTestOn: row.last_capacity_test_on
-        ? String(row.last_capacity_test_on).slice(0, 10) : null,
+      lastCapacityTestOn: databaseDateKey(row.last_capacity_test_on),
       remainingCapacityPercent: row.measured_remaining_capacity_percent === null
         ? null : Number(row.measured_remaining_capacity_percent),
       compatibleSystem: row.compatible_system
@@ -1565,14 +1574,15 @@ async function ensureInspectionNotifications(client, context) {
   );
   for (const device of due.rows) {
     if (!device.fixed_owner_user_id && !manager) continue;
-    const overdue = String(device.next_inspection_on).slice(0, 10)
+    const inspectionDate = databaseDateKey(device.next_inspection_on);
+    const overdue = inspectionDate
       < (context.deviceToday || new Date().toISOString().slice(0, 10));
     await notify(
       client, context, device.fixed_owner_user_id || context.userId, device.id,
       overdue ? "inspection_overdue" : "inspection_due",
       `${device.name}: Prüfung ${overdue ? "überfällig" : "bald fällig"}`,
-      `${device.inventory_number} · Termin ${String(device.next_inspection_on).slice(0, 10)}`,
-      `inspection:${overdue ? "overdue" : "due"}:${device.id}:${String(device.next_inspection_on).slice(0, 10)}`
+      `${device.inventory_number} · Termin ${inspectionDate}`,
+      `inspection:${overdue ? "overdue" : "due"}:${device.id}:${inspectionDate}`
     );
   }
   const longLoanDays = settings.rows[0]?.long_loan_days ?? 14;

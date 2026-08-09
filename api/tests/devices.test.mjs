@@ -165,7 +165,7 @@ test("DTO trennt festen und aktuellen Besitzer und berechnet Prüfstatus", () =>
     current_owner_name: "Max Monteur",
     current_owner_status: "active",
     inspection_required: true,
-    next_inspection_on: "2026-08-08",
+    next_inspection_on: new Date(2026, 7, 8),
     lock_overdue_inspections: true,
     status: "loaned"
   }), ids.employee, "2026-08-09");
@@ -174,6 +174,7 @@ test("DTO trennt festen und aktuellen Besitzer und berechnet Prüfstatus", () =>
   assert.equal(device.isFixedOwner, true);
   assert.equal(device.isCurrentOwner, false);
   assert.equal(device.inspectionState, "overdue");
+  assert.equal(device.nextInspectionOn, "2026-08-08");
   assert.equal(device.effectiveStatus, "inspection_due");
   assert.equal(device.blocked, true);
   assert.deepEqual(device.actions, ["report_defect"]);
