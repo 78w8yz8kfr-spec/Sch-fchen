@@ -52,6 +52,15 @@ Modul dauerhaft freigegeben, und Piets Rolle wird nur dann wiederhergestellt,
 wenn ein vorhandener Wochenbericht oder eine historische Azubi-Zuweisung die
 Ausbildung belegt.
 
+Die Live-Rückmeldung zeigte anschließend den noch fehlenden Bestandsfall: Der
+Menüpunkt erschien kurz und verschwand, sobald die aktuelle Serverrolle geladen
+wurde. In diesem Konto gab es weder einen früheren Bericht noch eine
+historische Azubi-Zuweisung. Migration 104 löst deshalb das ausdrücklich
+gemeldete Piet-Konto innerhalb des Schaaf-Mandanten eindeutig auf und vergibt
+die fehlende Rolle auch ohne diese unvollständigen Altdaten. Gibt es mehrere
+gleichnamige, nicht eindeutig unterscheidbare Konten, erfolgt weiterhin keine
+automatische Rechtevergabe.
+
 ## Ablauf
 
 ```

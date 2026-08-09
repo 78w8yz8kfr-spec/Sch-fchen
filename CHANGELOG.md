@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Piets Berichtsheft bleibt nach dem Laden sichtbar.** Die erste
+  Bestandsreparatur war zu vorsichtig und verlangte einen alten Wochenbericht
+  oder eine frühere Azubi-Rolle. Im gemeldeten Konto fehlen diese historischen
+  Belege, obwohl es eindeutig das verwendete Piet-Konto der Schaaf Elektro
+  GmbH ist. Die neue Migration löst dieses Konto innerhalb des Mandanten
+  eindeutig auf, vergibt die fehlende Azubi-Rolle und bestätigt die dauerhafte
+  Modulfreigabe. Ein Pflichtupdate übernimmt die Korrektur in der offenen App.
+- Fassung 0.44.8, Speicher `schaefchen-online-v90`, Migration 104.
+
 - **Das Berichtsheft erscheint nun auch in einer bereits laufenden Sitzung
   wieder.** Beim Zurückkehren in die App übernimmt Schäfchen nicht mehr nur
   geänderte Modulfreigaben, sondern auch die aktuelle Rollenliste und den
