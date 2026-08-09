@@ -4,6 +4,7 @@ import {
   canManageDevicesFromSession,
   cameraScanErrorMessage,
   deviceStatusLabel,
+  includedPartIsEmpty,
   normalizeDeviceQrValue,
   offlineDeviceQueueKey,
   partitionMyDevices,
@@ -65,4 +66,14 @@ test("Verwaltungsaktionen bleiben anhand der Sitzung sichtbar, wenn Kennzahlen a
   assert.equal(canManageDevicesFromSession({ user: { roles: ["managing_director"] } }), true);
   assert.equal(canManageDevicesFromSession({ user: { roles: ["office"] } }), true);
   assert.equal(canManageDevicesFromSession({ user: { roles: ["foreman"] } }), false);
+});
+
+test("Eine versehentlich angefügte leere Teilezeile blockiert die Geräteanlage nicht", () => {
+  assert.equal(includedPartIsEmpty({
+    inventoryNumber: "M0042-02",
+    manufacturer: "Berner"
+  }), true, "automatisch vorbelegte Werte zählen nicht als erfasstes Teil");
+  assert.equal(includedPartIsEmpty({ name: "Akku 1" }), false);
+  assert.equal(includedPartIsEmpty({ categoryId: "battery" }), false);
+  assert.equal(includedPartIsEmpty({ inspectionRequired: true }), false);
 });

@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.2";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.3";
 let qrScannerLibraryPromise = null;
 
 function loadQrScannerLibrary() {
@@ -65,6 +65,15 @@ const DEVICE_MANAGER_ROLES = new Set([
 
 export function canManageDevicesFromSession(session) {
   return (session?.user?.roles || []).some((role) => DEVICE_MANAGER_ROLES.has(role));
+}
+
+export function includedPartIsEmpty(part = {}) {
+  const meaningful = [
+    part.name, part.categoryId, part.serialNumber, part.model,
+    part.batterySystem, part.voltage, part.capacityAh
+  ];
+  return meaningful.every((value) => String(value ?? "").trim() === "")
+    && part.inspectionRequired !== true;
 }
 
 export function deviceStatusLabel(status) {
@@ -186,7 +195,7 @@ const html = `
     </dialog>
 
     <dialog class="device-dialog device-editor-dialog" aria-labelledby="device-editor-title">
-      <form class="device-dialog__frame device-editor-form">
+      <form class="device-dialog__frame device-editor-form" novalidate>
         <button class="device-dialog__close device-editor-close" type="button" aria-label="Bearbeitung schließen">×</button>
         <p class="eyebrow">Inventarstammdaten</p>
         <h2 id="device-editor-title">Gerät anlegen</h2>
@@ -1234,6 +1243,69 @@ export function createDeviceModule({
     elements.editor.elements.setName.required = false;
   }
 
+  function partFieldLabel(field) {
+    const label = field.closest("label");
+    const text = label?.childNodes?.[0]?.textContent || field.getAttribute("aria-label") || "Pflichtfeld";
+    return text.trim().replace(/\s*\*$/, "");
+  }
+
+  function focusEditorProblem(field, prefix = "") {
+    const details = field.closest("details");
+    if (details) details.open = true;
+    const label = partFieldLabel(field);
+    const reason = field.validity?.valueMissing ? "fehlt" : "ist ungültig";
+    const message = `${prefix}${label} ${reason}. Bitte das markierte Feld prüfen.`;
+    elements.editorMessage.textContent = message;
+    showToast(message);
+    field.setAttribute("aria-invalid", "true");
+    field.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => field.focus({ preventScroll: true }), 180);
+  }
+
+  function unusedPartRow(row) {
+    // Inventarnummer und Hersteller werden beim Hinzufügen vorbefüllt. Sie
+    // allein bedeuten deshalb noch nicht, dass wirklich ein weiteres Teil
+    // angelegt werden soll.
+    return includedPartIsEmpty({
+      name: row.querySelector(".device-part-name").value,
+      categoryId: row.querySelector(".device-part-category").value,
+      serialNumber: row.querySelector(".device-part-serial").value,
+      model: row.querySelector(".device-part-model").value,
+      batterySystem: row.querySelector(".device-part-battery-system").value,
+      voltage: row.querySelector(".device-part-voltage").value,
+      capacityAh: row.querySelector(".device-part-capacity").value,
+      inspectionRequired: row.querySelector(".device-part-inspection").checked
+    });
+  }
+
+  function prepareEditorSubmission() {
+    const rows = [...elements.partList.querySelectorAll(".device-part-row")];
+    rows.filter(unusedPartRow).forEach((row) => row.remove());
+    if (rows.length && !elements.partList.children.length) disableIncludedParts();
+    else renumberPartRows();
+    elements.editor.querySelectorAll("[aria-invalid='true']").forEach((field) => {
+      field.removeAttribute("aria-invalid");
+    });
+    const invalid = elements.editor.querySelector("input:invalid, select:invalid, textarea:invalid");
+    if (!invalid) return true;
+    const row = invalid.closest(".device-part-row");
+    const prefix = row
+      ? `Teil ${[...elements.partList.children].indexOf(row) + 1}: `
+      : "";
+    focusEditorProblem(invalid, prefix);
+    return false;
+  }
+
+  function addIncludedPart() {
+    const last = elements.partList.lastElementChild;
+    const invalid = last?.querySelector("input:invalid, select:invalid, textarea:invalid");
+    if (invalid) {
+      focusEditorProblem(invalid, `Teil ${elements.partList.children.length}: `);
+      return;
+    }
+    addPartRow();
+  }
+
   function partPayload(row, mainPayload) {
     const numberOrNull = (value) => value === "" ? null : Number(value);
     const categoryId = row.querySelector(".device-part-category").value;
@@ -1327,6 +1399,7 @@ export function createDeviceModule({
 
   async function saveEditor(event) {
     event.preventDefault();
+    if (!prepareEditorSubmission()) return;
     const form = elements.editor.elements;
     const category = context.categories.find((item) => item.id === form.categoryId.value);
     const numberOrNull = (value) => value === "" ? null : Number(value);
@@ -2082,7 +2155,7 @@ export function createDeviceModule({
     }
   });
   elements.includedPartsEnable.addEventListener("click", enableIncludedParts);
-  elements.partAdd.addEventListener("click", () => addPartRow());
+  elements.partAdd.addEventListener("click", addIncludedPart);
   elements.categoryNew.addEventListener("click", async () => {
     const name = window.prompt("Name der neuen Gerätekategorie:");
     if (!name?.trim()) return;

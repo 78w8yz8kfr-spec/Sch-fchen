@@ -1,9 +1,14 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.2
+Technischer Stand: V0.44.3
 
 ## Abgeschlossen
+
+- PostgreSQL-Parameterbindung der firmenweiten Geräteübersicht korrigiert;
+  Büro und Administration laden den Gerätebestand wieder ohne internen Fehler
+- mobile Teileanlage mit eigener verständlicher Pflichtfeldmeldung je Teil;
+  versehentlich angefügte, inhaltlich leere Teile blockieren die Anlage nicht
 
 - ausfallsichere Geräteübersicht: Kennzahlen, Auswahldaten, Bestand, Hinweise
   und Sets laden unabhängig; berechtigte Benutzer verlieren „Gerät anlegen“
@@ -17,7 +22,7 @@ Technischer Stand: V0.44.2
 - QR-Livekamera und QR-Fotoerkennung mit lokal ausgeliefertem Decoder für
   Safari auf iPhone/iPad; die native Browsererkennung bleibt der schnelle
   Pfad, Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt und der
-  PWA-Speicher `schaefchen-online-v84` erzwingt die korrigierte Fassung
+  PWA-Speicher `schaefchen-online-v85` erzwingt die korrigierte Fassung
 - vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
   automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
   Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und

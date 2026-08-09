@@ -1252,26 +1252,33 @@ async function listDevices(client, context, url, administrator = false) {
   const search = (url.searchParams.get("search") || "").trim().slice(0, 100);
   const baseType = (url.searchParams.get("baseType") || "").trim();
   const status = (url.searchParams.get("status") || "").trim();
-  const params = [context.companyId, context.userId];
+  // Bei einer firmenweiten Verwaltungsansicht wird nur company_id benötigt.
+  // node-postgres lehnt zusätzliche Bindewerte ab ("bind message supplies 2
+  // parameters, but prepared statement requires 1"). Die Benutzer-ID wird
+  // deshalb erst ergänzt, wenn die Sicht tatsächlich darauf eingeschränkt
+  // werden muss.
+  const params = [context.companyId];
   const clauses = ["device.company_id = $1"];
   if (!manager || scope === "mine") {
+    params.push(context.userId);
+    const userParameter = `$${params.length}`;
     clauses.push(foreman && scope !== "mine"
-      ? `(fixed_assignment.user_id = $2 OR custody.user_id = $2 OR EXISTS (
+      ? `(fixed_assignment.user_id = ${userParameter} OR custody.user_id = ${userParameter} OR EXISTS (
           SELECT 1 FROM site_supervisors AS supervisor
           WHERE supervisor.company_id=device.company_id
             AND supervisor.construction_site_id=device.assigned_construction_site_id
-            AND supervisor.user_id=$2 AND supervisor.status IN ('planned','active')
+            AND supervisor.user_id=${userParameter} AND supervisor.status IN ('planned','active')
             AND supervisor.valid_from <= CURRENT_DATE
             AND (supervisor.valid_until IS NULL OR supervisor.valid_until >= CURRENT_DATE)
         ) OR EXISTS (
           SELECT 1 FROM site_assignments AS site_assignment
           WHERE site_assignment.company_id=device.company_id
             AND site_assignment.construction_site_id=device.assigned_construction_site_id
-            AND site_assignment.user_id=$2
+            AND site_assignment.user_id=${userParameter}
             AND site_assignment.status IN ('released','completed')
             AND site_assignment.work_date BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1
         ))`
-      : "(fixed_assignment.user_id = $2 OR custody.user_id = $2)");
+      : `(fixed_assignment.user_id = ${userParameter} OR custody.user_id = ${userParameter})`);
   }
   if (search) {
     params.push(`%${search}%`);

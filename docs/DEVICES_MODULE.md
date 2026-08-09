@@ -1,6 +1,6 @@
 # Maschinen & Geräte
 
-Stand: Fassung 0.44.2, Migrationen 095 bis 098.
+Stand: Fassung 0.44.3, Migrationen 095 bis 099.
 
 ## Fachlicher Ablauf
 
@@ -23,6 +23,11 @@ Inventar- und Seriennummer, QR-Token, Besitzerrelation und Historie. Nach dem
 Speichern steht ein gemeinsamer QR-Druckbogen bereit. Vorhandene Gegenstände
 lassen sich später hinzufügen; das Entfernen aus dem Set verlangt einen Grund
 und löscht weder Gegenstand noch Verlauf.
+
+Auf Mobilgeräten prüft Schäfchen Pflichtfelder selbst und nennt dabei das
+betroffene Einzelteil und Feld. Eine versehentlich zusätzlich erzeugte, noch
+inhaltlich leere Teilezeile wird vor dem Speichern verworfen; teilweise
+ausgefüllte Teile werden dagegen nie stillschweigend entfernt.
 
 Beim Scan löst die API den Token innerhalb der angemeldeten Firma auf:
 

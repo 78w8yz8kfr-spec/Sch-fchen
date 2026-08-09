@@ -8272,6 +8272,21 @@ body.hat-fassungshinweis {
   font-size: 0.74rem;
 }
 
+.device-editor-message:not(:empty) {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(227, 6, 19, 0.3);
+  border-radius: 12px;
+  background: rgba(227, 6, 19, 0.06);
+  color: var(--brand);
+  font-weight: 750;
+}
+
+.device-editor-form [aria-invalid="true"] {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.1);
+}
+
 .device-content {
   display: grid;
   gap: 18px;
