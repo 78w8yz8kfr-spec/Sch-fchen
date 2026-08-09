@@ -35,7 +35,7 @@ class FakeCache {
     const treffer = this.entries.get(cacheKey(request));
     if (treffer || !options.ignoreSearch) return treffer;
     // Wie im Browser: ohne Fragezeichenteil vergleichen. So findet eine Anfrage
-    // nach app.js?v=0.43.2 die abgelegte app.js?v=0.42.1.
+    // nach app.js?v=0.44.0 die abgelegte app.js?v=0.42.1.
     const ohneAbfrage = (wert) => new URL(wert, ORIGIN).pathname;
     const gesucht = ohneAbfrage(cacheKey(request));
     for (const [schluessel, antwort] of this.entries) {
@@ -150,11 +150,12 @@ test("Installation legt genau die App-Shell im Versionscache ab", async () => {
 
   assert.equal(worker.worker.skipWaitingCalled, true);
   const names = await worker.caches.keys();
-  assert.deepEqual(names, ["schaefchen-online-v81"]);
-  const shell = await worker.caches.open("schaefchen-online-v81");
+  assert.deepEqual(names, ["schaefchen-online-v82"]);
+  const shell = await worker.caches.open("schaefchen-online-v82");
   const cachedPaths = [...shell.entries.keys()];
   for (const required of [
-    "./", "./index.html", "./design-system.css?v=0.43.2", "./app.js?v=0.43.2",
+    "./", "./index.html", "./design-system.css?v=0.44.0", "./app.js?v=0.44.0",
+    "./core/device-management.js?v=0.44.0",
     "./platform-admin.html", "./vde/index.html", "./manifest.webmanifest", "./assets/mark.svg"
   ]) {
     assert.ok(cachedPaths.includes(required), `${required} fehlt in der App-Shell`);
@@ -163,7 +164,7 @@ test("Installation legt genau die App-Shell im Versionscache ab", async () => {
 
 test("Aktivierung räumt alte Caches ab, behält aber die Offline-Dokumente", async () => {
   const worker = loadServiceWorker();
-  await worker.caches.open("schaefchen-online-v81");
+  await worker.caches.open("schaefchen-online-v82");
   await worker.caches.open("schaefchen-online-v41");
   await worker.caches.open("irgendein-fremder-cache");
   await worker.caches.open("schaefchen-documents-v42-11111111-1111-4111-8111-111111111111");
@@ -176,7 +177,7 @@ test("Aktivierung räumt alte Caches ab, behält aber die Offline-Dokumente", as
   const remaining = (await worker.caches.keys()).sort();
   assert.deepEqual(remaining, [
     "schaefchen-documents-v42-11111111-1111-4111-8111-111111111111",
-    "schaefchen-online-v81"
+    "schaefchen-online-v82"
   ]);
 });
 
@@ -274,7 +275,7 @@ test("Seitenaufrufe laden ohne Zwischenspeicher und sichern die Hülle für offl
 
   assert.equal(await response.text(), "<!doctype html>frisch");
   assert.equal(worker.fetchCalls[0].options.cache, "no-store");
-  const shell = await worker.caches.open("schaefchen-online-v81");
+  const shell = await worker.caches.open("schaefchen-online-v82");
   assert.ok(await shell.match("./index.html"), "Die Hülle wurde nicht für offline gesichert");
 });
 
@@ -289,7 +290,7 @@ test("Offline führt jeder Bereich auf seine eigene Hülle zurück", async () =>
         throw new Error("offline");
       }
     });
-    const shell = await worker.caches.open("schaefchen-online-v81");
+    const shell = await worker.caches.open("schaefchen-online-v82");
     await shell.put(fallback, new Response(content));
 
     const response = await runFetch(worker, requestFor(path, { mode: "navigate" }));
@@ -301,8 +302,8 @@ test("Statische Dateien kommen zuerst aus dem Cache und werden sonst nachgeladen
   const worker = loadServiceWorker({
     fetchImplementation: async () => new Response("Frisch geladen", { status: 200 })
   });
-  const shell = await worker.caches.open("schaefchen-online-v81");
-  const cachedRequest = requestFor("/styles.css?v=0.43.2");
+  const shell = await worker.caches.open("schaefchen-online-v82");
+  const cachedRequest = requestFor("/styles.css?v=0.44.0");
   await shell.put(cachedRequest, new Response("Aus dem Cache"));
 
   const fromCache = await runFetch(worker, cachedRequest);
@@ -326,10 +327,10 @@ test("Waehrend einer Veroeffentlichung springt die vorherige Fassung ein", async
   const worker = loadServiceWorker({
     fetchImplementation: async () => { throw new Error("Der Server antwortet nicht."); }
   });
-  const shell = await worker.caches.open("schaefchen-online-v81");
+  const shell = await worker.caches.open("schaefchen-online-v82");
   await shell.put(requestFor("/app.js?v=0.42.1"), new Response("Vorherige Fassung"));
 
-  const neu = requestFor("/app.js?v=0.43.2");
+  const neu = requestFor("/app.js?v=0.44.0");
   const antwort = await runFetch(worker, neu);
   assert.equal(await antwort.text(), "Vorherige Fassung");
 });
@@ -340,10 +341,10 @@ test("Eine Fehlerseite des anlaufenden Dienstes ersetzt keine Datei", async () =
   const worker = loadServiceWorker({
     fetchImplementation: async () => new Response("<html>Dienst nicht erreichbar</html>", { status: 503 })
   });
-  const shell = await worker.caches.open("schaefchen-online-v81");
+  const shell = await worker.caches.open("schaefchen-online-v82");
   await shell.put(requestFor("/styles.css?v=0.42.1"), new Response("Vorherige Gestaltung"));
 
-  const antwort = await runFetch(worker, requestFor("/styles.css?v=0.43.2"));
+  const antwort = await runFetch(worker, requestFor("/styles.css?v=0.44.0"));
   assert.equal(await antwort.text(), "Vorherige Gestaltung");
 });
 
@@ -366,7 +367,7 @@ test("Fehlerhafte und undurchsichtige Antworten landen nicht im Cache", async ()
     const request = requestFor("/assets/fehlt.svg");
     await runFetch(worker, request);
     await new Promise((done) => setImmediate(done));
-    const shell = await worker.caches.open("schaefchen-online-v81");
+    const shell = await worker.caches.open("schaefchen-online-v82");
     assert.equal(await shell.match(request), undefined, "Diese Antwort hätte nicht abgelegt werden dürfen");
   }
 });

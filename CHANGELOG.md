@@ -4,6 +4,33 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Maschinen & Geräte ist als vollständiger Schäfchen-Bereich verfügbar.**
+  Maschinen, Werkzeuge, Mess- und Prüfgeräte, Akkus, Ladegeräte, Leitern und
+  weitere Betriebsmittel besitzen einen eigenen mandantengetrennten
+  Inventarstammsatz.
+  - Jeder Gegenstand erhält einen zufälligen, nicht erratbaren QR-Token ohne
+    Namen, Firma oder Inventarnummer. Einzelnes Etikett, Neudruck, bewusste
+    Token-Rotation und Druckbogen verwenden immer denselben Gerätestammsatz.
+  - Der mobile Ablauf ist auf „QR scannen → fertig“ reduziert: freie Geräte
+    werden automatisch übernommen; fremde feste oder aktuelle Besitzer werden
+    vor der bestätigten Übernahme deutlich genannt. Rückgabe, gezielte
+    Übergabe, Baustellenablage und Lager sind direkt am Gerät erreichbar.
+  - Fester Besitzer und aktueller Besitzer sind getrennte historisierte
+    Relationen. Gleichzeitige Scans werden über Gerätesperre und Zeilenversion
+    serialisiert; Offline-Wiederholungen sind über eine Client-ID idempotent
+    und Konflikte werden serverseitig entschieden.
+  - Akkus sind eigenständige Geräte mit Akkusystem, Spannung, Kapazität,
+    Ladezyklen, Kapazitätstest und eigenem QR-Code. Gerätesets und
+    Fahrzeugstandorte sind relational vorbereitet.
+  - Defekte, Fotos, konfigurierbare Prüfungssperre, Wartungsfristen,
+    Benachrichtigungen, schnelle QR-Inventur sowie unveränderliche Übergabe-,
+    Prüf- und Audit-Historien sind angebunden.
+  - Monteur, Vorarbeiter, Büro und Leitung erhalten getrennte Rechte;
+    Plattformkonten haben keinen operativen Gerätezugriff. RLS, zusammengesetzte
+    Mandanten-Fremdschlüssel und gleichförmige unbekannte QR-Antworten schützen
+    Firmengrenzen.
+- Fassung 0.44.0, Speicher `schaefchen-online-v82`, Migrationen 095 und 096.
+
 - **Die untere Leiste ist auf dem Telefon wieder vollständig bedienbar.** Die
   neuen fachlichen Bereiche bleiben erhalten, erscheinen aber nicht mehr als
   lose Desktop-Überschriften zwischen den Schaltflächen.
