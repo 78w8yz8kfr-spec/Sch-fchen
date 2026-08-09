@@ -419,7 +419,7 @@
           // Plattform ein Pflichtupdate setzt: der Server kann eine fehlende
           // Fassung nicht von einer zu alten unterscheiden. Das VDE-Modul waere
           // dann als einziges vollstaendig ausgefallen.
-          "X-Schaefchen-Version": "0.44.7",
+          "X-Schaefchen-Version": "0.44.8",
           ...(options.body ? { "Content-Type": "application/json" } : {}),
           ...options.headers
         }

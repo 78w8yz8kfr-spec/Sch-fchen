@@ -1,9 +1,14 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.7
+Technischer Stand: V0.44.8
 
 ## Abgeschlossen
+
+- eindeutige, mandantengebundene Zuordnung des gemeldeten Piet-Kontos zur
+  Azubi-Rolle auch ohne unvollständig übernommene historische Berichte oder
+  Rollen; dauerhafte Berichtsheft-Freigabe und notwendiges Update auf
+  PWA-Speicher `schaefchen-online-v90`
 
 - vollständige Aktualisierung von Rollen, Ausbilderstatus und Modulen beim
   Zurückkehren in eine laufende App-Sitzung; eine serverseitig reparierte
