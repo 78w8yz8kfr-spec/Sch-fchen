@@ -87,6 +87,28 @@ Entwurf ──einreichen──► Eingereicht ──freigeben──► Freigegeb
 * Jeder Schritt bleibt in `apprentice_report_events` stehen, erzeugt vom
   Datenbank-Trigger. Der Verlauf lässt sich nicht ändern und nicht löschen.
 
+## Mobile Bedienung
+
+Das Berichtsheft ist für Auszubildende ein eigener Hauptbereich **„Azubi“** in
+der unteren Navigation. Dort stehen Wochenwechsel, fünf Tageszeilen, Status,
+Bemerkung, Verlauf und Ausdruck zusammen. Der Bereich wird nicht als zweiter
+Bildschirm in die Startseite hineingeschoben.
+
+Auf **„Start“** erscheint nur ein kompakter Hinweis, wenn eine konkrete
+Handlung offen ist:
+
+* Nach begonnenem Arbeitstag fehlt der heutige Tätigkeitsnachweis: **„Heute
+  eintragen“** öffnet direkt die Tageserfassung.
+* Der Ausbilder hat die Woche mit Kommentar zurückgegeben: **„Woche öffnen“**
+  führt in die betroffene Woche.
+* Vor Arbeitsbeginn, nach einem vorhandenen Tageseintrag sowie bei
+  eingereichten oder freigegebenen Wochen bleibt die Startseite frei. Der
+  Status steht weiterhin vollständig im eigenen Berichtsheft-Bereich.
+
+Ausbilder erhalten keinen zusätzlichen Eintrag in einer bereits umfangreichen
+mobilen Verwaltungsleiste. Ihre Prüfliste bleibt über **„Mehr“** erreichbar;
+am Rechner steht der Bereich wie bisher in der Seitenleiste.
+
 ## Schnittstelle
 
 | Weg | Wer |
