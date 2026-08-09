@@ -5406,6 +5406,72 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     await setModule("permanent");
   });
 
+  await t.test("Material von der Baustelle aus: eintragen und weiterschalten", async () => {
+    // Wer das Material verbaut, sieht zuerst, was fehlt. Bisher konnte nur das
+    // Buero es eintragen; der Vorarbeiter blieb bei einer Notiz, in der es
+    // weder Menge noch Stand gibt.
+    const url =
+      `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/materials?date=${assignmentDate}`;
+    const angelegt = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: foremanCookie },
+      body: JSON.stringify({
+        itemName: "Kabeltrommel NYM-J 5x2,5",
+        quantity: 50,
+        unit: "m",
+        status: "planned",
+        note: "F\u00fcr den Anschluss der Verteilung"
+      })
+    });
+    assert.equal(angelegt.status, 201, await angelegt.clone().text());
+    const eintrag = (await angelegt.json()).siteMaterial;
+    assert.equal(eintrag.status, "planned");
+    assert.equal(eintrag.quantity, 50);
+
+    const weiter = await fetch(
+      `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/materials/${eintrag.id}?date=${assignmentDate}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: foremanCookie },
+        body: JSON.stringify({ status: "available", rowVersion: eintrag.rowVersion })
+      }
+    );
+    assert.equal(weiter.status, 200, await weiter.clone().text());
+    assert.equal((await weiter.json()).siteMaterial.status, "available");
+
+    // Der Eintrag steht auch in der Baustellenakte des Vorarbeiters.
+    const akte = await fetch(
+      `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
+      { headers: { Cookie: foremanCookie } }
+    );
+    assert.equal(akte.status, 200, await akte.clone().text());
+    assert.ok(
+      (await akte.json()).dashboard.materials.some((material) => material.id === eintrag.id),
+      "Der eigene Materialeintrag muss in der Akte auftauchen"
+    );
+
+    // Die Geschaeftsfuehrung darf ohne Einteilung eintragen - sie darf ohnehin
+    // jede Baustelle verwalten. Das ist kein Loch, sondern dieselbe Regel wie
+    // bei Notizen und Fotos.
+    const leitung = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: directorCookie },
+      body: JSON.stringify({ itemName: "Nachbestellung Buero", quantity: 1, unit: "St", status: "ordered" })
+    });
+    assert.equal(leitung.status, 201, await leitung.clone().text());
+
+    // Ein Monteur ohne Einteilung auf dieser Baustelle darf es nicht.
+    const fremd = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({ itemName: "Fremdeintrag", quantity: 1, unit: "St", status: "planned" })
+    });
+    assert.ok(
+      fremd.status === 403 || fremd.status === 404,
+      `Ein nicht eingeteilter Monteur darf nicht eintragen, bekam aber ${fremd.status}`
+    );
+  });
+
   await t.test("Material: der Schalter sperrt auch die Schnittstelle", async () => {
     // Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
     // Sonst bliebe er ueber die Schnittstelle bedienbar und der Schalter waere

@@ -36,6 +36,29 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   der Server wies die Korrektur zu Recht ab — und die Prüfung scheiterte jede
   Nacht eine Stunde lang an der Uhr statt an der Anwendung. Sie schiebt jetzt
   höchstens bis zum Anfang des Arbeitstages zurück.
+- Fassung 0.44.10, Speicher `schaefchen-online-v92`, Migration 106.
+
+- **Die Baustellenakte des Vorarbeiters kann jetzt etwas.** Die Akte gab es
+  längst, mit sieben Reitern — Übersicht, Aufgaben, Berichte, Fotos, Dokumente,
+  Material, Notizen. Angefasst hat sie fast nichts: **nur Fotos und Notizen**
+  ließen sich anlegen, alles andere war zum Ansehen da.
+  - **Material eintragen.** Wer es verbaut, sieht zuerst, was fehlt — der
+    Vorarbeiter weiß abends, was von der Rolle runter ist und was morgen früh
+    dabei sein muss. Eintragen konnte es nur das Büro; der einzige Weg war eine
+    Notiz, und dort hat Material keine Menge, keine Einheit und keinen Stand.
+    Jetzt trägt er es selbst ein und schaltet den Stand weiter: **benötigt →
+    bestellt → vor Ort → verbraucht**. Immer genau ein nächster Schritt, weil
+    der Eintrag den Verlauf abbildet und nicht rückwärts geht.
+  - Der Zugang ist derselbe wie bei Notizen und Fotos: **wer an diesem Tag dort
+    eingeteilt ist**. Material ist Sache des ganzen Trupps — wer die
+    Kabeltrommel holt, soll es eintragen dürfen. Das Büro darf es ohnehin.
+  - **Bericht schreiben.** In der Akte stand nur die Liste. Wer einen Bericht
+    schreiben wollte, musste sie verlassen und ihn auf der Startseite suchen —
+    obwohl er gerade auf der Baustelle steht, um die es geht. Jetzt führt ein
+    Knopf direkt zum Bericht für diese Baustelle, mit ihrer Prüfung und ihrem
+    Entwurfsspeicher.
+  - Das Datenmodell blieb, wie es war. Neu sind **zwei Wege dorthin, die nicht
+    über das Büro führen**.
 - Fassung 0.44.9, Speicher `schaefchen-online-v91`, Migration 105.
 
 - **Piets Berichtsheft bleibt nach dem Laden sichtbar.** Die erste

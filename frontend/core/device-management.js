@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.9";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.10";
 let qrScannerLibraryPromise = null;
 
 export const DEVICE_QR_SHEET_LAYOUT = Object.freeze({

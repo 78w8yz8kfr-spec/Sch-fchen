@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.9";
-import { serverIsNewer } from "./core/versions.js?v=0.44.9";
+} from "./core/work-time.js?v=0.44.10";
+import { serverIsNewer } from "./core/versions.js?v=0.44.10";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.9";
+} from "./core/sync-queue.js?v=0.44.10";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.9";
+} from "./core/permissions.js?v=0.44.10";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,9 +40,9 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.9";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.9";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
+} from "./core/state-store.js?v=0.44.10";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.10";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -191,6 +191,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     employeeSitePhotoSearch: document.querySelector("#employee-site-photo-search"),
     employeeSiteMaterialCount: document.querySelector("#employee-site-material-count"),
     employeeSiteMaterials: document.querySelector("#employee-site-materials"),
+    employeeSiteMaterialAdd: document.querySelector("#employee-site-material-add"),
+    employeeSiteMaterialForm: document.querySelector("#employee-site-material-form"),
+    employeeSiteMaterialName: document.querySelector("#employee-site-material-name"),
+    employeeSiteMaterialQuantity: document.querySelector("#employee-site-material-quantity"),
+    employeeSiteMaterialUnit: document.querySelector("#employee-site-material-unit"),
+    employeeSiteMaterialStatus: document.querySelector("#employee-site-material-status"),
+    employeeSiteMaterialNote: document.querySelector("#employee-site-material-note"),
+    employeeSiteMaterialCancel: document.querySelector("#employee-site-material-cancel"),
+    employeeSiteMaterialMessage: document.querySelector("#employee-site-material-message"),
+    employeeSiteReportWrite: document.querySelector("#employee-site-report-write"),
     employeeSiteVdeModule: document.querySelector("#employee-site-vde-module"),
     employeeSiteVdeCount: document.querySelector("#employee-site-vde-count"),
     employeeSiteVdeStart: document.querySelector("#employee-site-vde-start"),
@@ -1322,7 +1332,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.9",
+          "X-Schaefchen-Version": "0.44.10",
           ...options.headers
         }
       });
@@ -1357,7 +1367,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.9`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.10`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1379,7 +1389,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.9" }
+        headers: { "X-Schaefchen-Version": "0.44.10" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1426,7 +1436,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.9 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.10 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2782,7 +2792,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.9";
+  const EIGENE_FASSUNG = "0.44.10";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2821,7 +2831,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.9". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.10". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6791,7 +6801,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.9" }
+        headers: { "X-Schaefchen-Version": "0.44.10" }
       });
       if (response.ok) {
         await cache.put(
@@ -6850,6 +6860,51 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
       else showToast(error.message);
       button.disabled = false;
     }
+  }
+
+  // Der naechste sinnvolle Schritt eines Materialeintrags. Es ist immer genau
+  // einer: benoetigt wird bestellt, bestelltes kommt an, angekommenes wird
+  // verbaut. Eine Liste aller Staende waere hier auf dem Telefon zu viel - und
+  // rueckwaerts geht es nicht, weil der Eintrag den Verlauf abbildet.
+  function employeeSiteMaterialAction(material) {
+    return {
+      planned: { status: "ordered", label: "Bestellt" },
+      ordered: { status: "available", label: "Ist da" },
+      available: { status: "used", label: "Verbraucht" }
+    }[material.status] || null;
+  }
+
+  function appendEmployeeSiteMaterial(material) {
+    const item = document.createElement("li");
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const actions = document.createElement("div");
+    const badge = document.createElement("small");
+    const action = employeeSiteMaterialAction(material);
+
+    title.textContent = material.itemName;
+    meta.textContent = [
+      `${material.quantity.toLocaleString("de-DE")} ${material.unit}`,
+      material.note
+    ].filter(Boolean).join(" \u00b7 ");
+    content.append(title, meta);
+    actions.className = "employee-site-task-actions";
+    badge.textContent = materialStatusLabel(material.status);
+    actions.append(badge);
+    if (action) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = action.label;
+      button.disabled = !navigator.onLine;
+      button.addEventListener("click", () => {
+        void updateEmployeeSiteMaterial(material, action.status, button);
+      });
+      actions.append(button);
+    }
+    item.append(content, actions);
+    elements.employeeSiteMaterials.append(item);
   }
 
   function appendEmployeeSiteTask(task) {
@@ -7124,19 +7179,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     }
 
     elements.employeeSiteMaterialCount.textContent = String(dashboard.materials.length);
+    elements.employeeSiteMaterialAdd.disabled = !navigator.onLine;
     elements.employeeSiteMaterials.replaceChildren();
     if (dashboard.materials.length === 0) {
       appendEmployeeSiteEmpty(elements.employeeSiteMaterials, "Noch kein Material eingetragen.");
     } else {
       dashboard.materials.forEach((material) => {
-        appendEmployeeSiteItem(
-          elements.employeeSiteMaterials,
-          material.itemName,
-          [material.note, `${material.quantity.toLocaleString("de-DE")} ${material.unit}`]
-            .filter(Boolean)
-            .join(" · "),
-          materialStatusLabel(material.status)
-        );
+        appendEmployeeSiteMaterial(material);
       });
     }
 
@@ -7322,6 +7371,82 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     } finally {
       submit.disabled = false;
     }
+  }
+
+  function resetEmployeeSiteMaterialForm() {
+    elements.employeeSiteMaterialForm.reset();
+    elements.employeeSiteMaterialForm.hidden = true;
+    elements.employeeSiteMaterialMessage.textContent = "";
+  }
+
+  // Material von der Baustelle aus eintragen.
+  //
+  // Wer es verbaut, sieht zuerst, was fehlt: der Vorarbeiter weiss abends, was
+  // von der Rolle runter ist und was am naechsten Morgen dabei sein muss. Er
+  // konnte es hier bisher nur ansehen. Der einzige Weg, es dem Buero zu sagen,
+  // war eine Notiz - dort hat es keine Menge, keine Einheit und keinen Stand,
+  // und niemand kann danach suchen.
+  async function createEmployeeSiteMaterial() {
+    if (!employeeSiteState || !navigator.onLine) {
+      elements.employeeSiteMaterialMessage.textContent =
+        "F\u00fcr einen neuen Materialeintrag ist momentan eine Verbindung erforderlich.";
+      return;
+    }
+    const submit = elements.employeeSiteMaterialForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    elements.employeeSiteMaterialMessage.textContent = "Material wird gespeichert \u2026";
+    try {
+      await requestJson(
+        `./api/v1/construction-sites/${encodeURIComponent(employeeSiteState.site.id)}/materials?date=${encodeURIComponent(employeeSiteState.date)}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            itemName: elements.employeeSiteMaterialName.value,
+            quantity: Number(elements.employeeSiteMaterialQuantity.value),
+            unit: elements.employeeSiteMaterialUnit.value,
+            status: elements.employeeSiteMaterialStatus.value,
+            note: elements.employeeSiteMaterialNote.value
+          })
+        }
+      );
+      resetEmployeeSiteMaterialForm();
+      await refreshEmployeeSiteWorkspace();
+      showToast("Material eingetragen.");
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else elements.employeeSiteMaterialMessage.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  // Den Stand eines Eintrags weiterschalten - geplant, bestellt, da, verbaut.
+  // Das ist die Angabe, wegen der die Liste ueberhaupt gefuehrt wird.
+  async function updateEmployeeSiteMaterial(material, status, button) {
+    if (!employeeSiteState) return;
+    button.disabled = true;
+    try {
+      await requestJson(
+        `./api/v1/construction-sites/${encodeURIComponent(employeeSiteState.site.id)}/materials/${encodeURIComponent(material.id)}?date=${encodeURIComponent(employeeSiteState.date)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status, rowVersion: material.rowVersion })
+        }
+      );
+      await refreshEmployeeSiteWorkspace();
+      showToast("Materialstand aktualisiert.");
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else showToast(error.message);
+      button.disabled = false;
+    }
+  }
+
+  async function refreshEmployeeSiteWorkspace() {
+    const body = await requestJson(
+      `./api/v1/construction-sites/${encodeURIComponent(employeeSiteState.site.id)}/dashboard?date=${encodeURIComponent(employeeSiteState.date)}`
+    );
+    renderEmployeeSiteWorkspace(body.dashboard);
   }
 
   function currentSiteIndex() {
@@ -9544,10 +9669,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
+      elements.employeeSiteMaterialAdd.disabled = !online;
+      elements.employeeSiteReportWrite.disabled = !online;
       elements.employeeSiteVdeStart.disabled = !online;
-      elements.employeeSiteTasks
-        .querySelectorAll(".employee-site-task-actions button")
-        .forEach((button) => { button.disabled = !online; });
+      [elements.employeeSiteTasks, elements.employeeSiteMaterials].forEach((liste) => {
+        liste
+          .querySelectorAll(".employee-site-task-actions button")
+          .forEach((button) => { button.disabled = !online; });
+      });
       if (!online) {
         elements.employeeSitePhotoMessage.textContent =
           "Fotos können wieder hinzugefügt werden, sobald eine Verbindung besteht.";
@@ -13021,6 +13150,39 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
   elements.employeeSiteNoteForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void createEmployeeSiteNote();
+  });
+  elements.employeeSiteMaterialAdd.addEventListener("click", () => {
+    if (!navigator.onLine) {
+      showToast("F\u00fcr einen neuen Materialeintrag ist momentan eine Verbindung erforderlich.");
+      return;
+    }
+    resetEmployeeSiteMaterialForm();
+    elements.employeeSiteMaterialForm.hidden = false;
+    elements.employeeSiteMaterialName.focus({ preventScroll: true });
+  });
+  elements.employeeSiteMaterialCancel.addEventListener("click", resetEmployeeSiteMaterialForm);
+  elements.employeeSiteMaterialForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void createEmployeeSiteMaterial();
+  });
+  // Der Bericht wird dort geschrieben, wo er schon immer geschrieben wurde -
+  // auf der Feierabendkarte mit ihrer Pruefung und ihrem Entwurfsspeicher. Neu
+  // ist nur der Weg dorthin: von der Baustelle aus, um die es geht. Bisher
+  // musste man die Akte verlassen und sich erinnern, wo das Formular steckt.
+  elements.employeeSiteReportWrite.addEventListener("click", () => {
+    if (!navigator.onLine) {
+      showToast("Ein Bericht kann geschrieben werden, sobald wieder eine Verbindung besteht.");
+      return;
+    }
+    const assignment = assignments.find(
+      (eintrag) => eintrag.constructionSite?.id === employeeSiteState?.site.id
+    );
+    if (!assignment) {
+      showToast("F\u00fcr diese Baustelle ist heute kein Einsatz f\u00fcr dich eingeteilt.");
+      return;
+    }
+    showDashboardPane("start");
+    void openMobileReportForm(assignment, { leaveAfterSave: false });
   });
   elements.timeCorrectionForm.addEventListener("submit", async (event) => {
     event.preventDefault();
