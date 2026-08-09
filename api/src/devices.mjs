@@ -291,8 +291,8 @@ const DEVICE_SELECT = `
          custody.id AS custody_assignment_id,
          custody.user_id AS current_owner_user_id,
          custody.started_at AS custody_since,
-         current_user.first_name || ' ' || current_user.last_name AS current_owner_name,
-         current_user.status AS current_owner_status,
+         custody_user.first_name || ' ' || custody_user.last_name AS current_owner_name,
+         custody_user.status AS current_owner_status,
          location.name AS current_location_name,
          location.location_type AS current_location_type,
          previous_location.name AS last_known_location_name,
@@ -333,8 +333,8 @@ const DEVICE_SELECT = `
       AND assignment.assignment_type = 'custody' AND assignment.ended_at IS NULL
     LIMIT 1
   ) AS custody ON TRUE
-  LEFT JOIN users AS current_user
-    ON current_user.company_id = device.company_id AND current_user.id = custody.user_id
+  LEFT JOIN users AS custody_user
+    ON custody_user.company_id = device.company_id AND custody_user.id = custody.user_id
   LEFT JOIN device_locations AS location
     ON location.company_id = device.company_id AND location.id = device.current_location_id
   LEFT JOIN device_locations AS previous_location
@@ -894,7 +894,7 @@ async function listDevices(client, context, url, administrator = false) {
       OR COALESCE(device.serial_number,'') ILIKE $${params.length}
       OR COALESCE(device.manufacturer,'') ILIKE $${params.length}
       OR COALESCE(fixed_user.first_name || ' ' || fixed_user.last_name,'') ILIKE $${params.length}
-      OR COALESCE(current_user.first_name || ' ' || current_user.last_name,'') ILIKE $${params.length}
+      OR COALESCE(custody_user.first_name || ' ' || custody_user.last_name,'') ILIKE $${params.length}
       OR COALESCE(site.name,'') ILIKE $${params.length}
       OR COALESCE(vehicle.licence_plate,'') ILIKE $${params.length}
     )`);

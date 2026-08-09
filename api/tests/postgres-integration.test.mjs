@@ -597,8 +597,8 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.deepEqual(
       Object.keys(initialModules).sort(),
       [
-        "absences", "apprentice_reports", "assembly_reports", "documents",
-        "devices", "fleet", "materials", "site_daily_reports", "site_qr", "vde"
+        "absences", "apprentice_reports", "assembly_reports", "devices",
+        "documents", "fleet", "materials", "site_daily_reports", "site_qr", "vde"
       ]
     );
     // Der Standardumfang steht ohne Zutun offen. Das Spezialmodul VDE und das
