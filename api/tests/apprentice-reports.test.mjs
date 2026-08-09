@@ -148,6 +148,53 @@ integrationTest("Berichtsheft: Wochenbericht von der Anlage bis zur Freigabe", a
     }
   });
 
+  // Eine noch geoeffnete alte App kannte "apprentice" im Bearbeitungsformular
+  // nicht und schickte bei jeder harmlosen Aenderung "installer". Der Server
+  // muss diesen unbestaetigten Rollenverlust abweisen und auch den Ausbilder
+  // unveraendert lassen.
+  const azubiVorAltClient = await ownerPool.query(
+    "SELECT row_version FROM users WHERE company_id = $1 AND id = $2",
+    [companyId, azubiId]
+  );
+  const unbemerkteRollenAenderung = await ruf(
+    `/api/v1/admin/employees/${azubiId}`,
+    chefCookie,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        personnelNumber: `AZUBI-${kennung}`,
+        firstName: "Anna",
+        lastName: "Auszubildende",
+        role: "installer",
+        trainerUserId: null,
+        rowVersion: Number(azubiVorAltClient.rows[0].row_version)
+      })
+    }
+  );
+  assert.equal(unbemerkteRollenAenderung.status, 409, await unbemerkteRollenAenderung.clone().text());
+  assert.equal(
+    (await unbemerkteRollenAenderung.json()).error.code,
+    "employee_role_change_confirmation_required"
+  );
+  const azubiNachAltClient = await ownerPool.query(
+    `SELECT person.trainer_user_id,
+            EXISTS (
+              SELECT 1
+              FROM user_roles AS assignment
+              JOIN roles AS role
+                ON role.company_id = assignment.company_id AND role.id = assignment.role_id
+              WHERE assignment.company_id = person.company_id
+                AND assignment.user_id = person.id
+                AND assignment.revoked_at IS NULL
+                AND role.role_key = 'apprentice'
+            ) AS is_apprentice
+     FROM users AS person
+     WHERE person.company_id = $1 AND person.id = $2`,
+    [companyId, azubiId]
+  );
+  assert.equal(azubiNachAltClient.rows[0].is_apprentice, true);
+  assert.equal(azubiNachAltClient.rows[0].trainer_user_id, ausbilderId);
+
   // Ohne Freigabe der Plattform gibt es das Berichtsheft nicht. Es ist ein
   // eigener Bereich und gehoert nicht in den Grundumfang.
   const gesperrt = await ruf(`/api/v1/apprentice/reports?from=2026-01-01&to=2026-12-31`, azubiCookie);

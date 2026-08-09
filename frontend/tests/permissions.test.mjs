@@ -6,6 +6,7 @@ import {
   PLANNING_ROLES,
   canAdministerModules,
   canPlan,
+  editableEmployeeRole,
   employeeRoleLabel,
   isForeman,
   isProjectScopedSession,
@@ -104,6 +105,15 @@ test("Die Bezeichnung nennt den Vorarbeiter zuerst", () => {
   // genau das - und in der Planung ebenso.
   assert.equal(employeeRoleLabel(["apprentice"]), "Auszubildender");
   assert.equal(employeeRoleLabel(["apprentice", "installer"]), "Auszubildender");
+});
+
+test("Das Mitarbeiterformular behaelt die Azubi-Rolle", () => {
+  assert.equal(editableEmployeeRole(["apprentice"]), "apprentice");
+  assert.equal(editableEmployeeRole(["installer", "apprentice"]), "apprentice");
+  assert.equal(editableEmployeeRole(["foreman"]), "foreman");
+  assert.equal(editableEmployeeRole(["installer"]), "installer");
+  assert.equal(editableEmployeeRole(["unknown"]), "installer");
+  assert.equal(editableEmployeeRole(), "installer");
 });
 
 test("Der Vorarbeiter wird an seiner Rolle erkannt", () => {

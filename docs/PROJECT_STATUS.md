@@ -1,9 +1,16 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.5
+Technischer Stand: V0.44.6
 
 ## Abgeschlossen
+
+- automatische Wiederherstellung versehentlich durch die Mitarbeiterverwaltung
+  entfernter Azubi-Rollen bei belegter laufender Ausbildung; das persönliche
+  Berichtsheft erscheint wieder in der mobilen Navigation
+- sichere Rollenvorauswahl im Mitarbeiterformular und serverseitige Sperre
+  gegen unbestätigte Azubi-Rollenverluste aus einer noch geöffneten alten App;
+  PWA-Speicher `schaefchen-online-v88`
 
 - papierarmer Geräte-QR-Druckbogen mit bis zu 120 Etiketten auf einer
   A4-Seite; QR-Codes 18 × 18 mm, kompakte Geräte- und Inventarbeschriftung
@@ -30,8 +37,7 @@ Technischer Stand: V0.44.5
 
 - QR-Livekamera und QR-Fotoerkennung mit lokal ausgeliefertem Decoder für
   Safari auf iPhone/iPad; die native Browsererkennung bleibt der schnelle
-  Pfad, Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt und der
-  PWA-Speicher `schaefchen-online-v87` erzwingt die korrigierte Fassung
+  Pfad und die Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt
 - vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
   automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
   Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und

@@ -68,3 +68,21 @@ export function employeeRoleLabel(roles = []) {
   if (hatEine(roles, PLANNING_ROLES)) return "Planung";
   return "Monteur";
 }
+
+// Das Bearbeitungsformular kann genau eine Hauptrolle speichern. Ein Azubi
+// kann aus der historischen Umstellung zusaetzlich noch die Monteurrolle
+// besitzen; trotzdem muss das Formular "Auszubildender" vorauswaehlen. Sonst
+// macht bereits eine harmlose Aenderung an Name oder Telefon aus ihm einen
+// Monteur und nimmt ihm das Berichtsheft weg.
+const EDITABLE_EMPLOYEE_ROLES = new Set([
+  "installer",
+  "foreman",
+  "managing_director",
+  "dispatch_office",
+  "project_manager"
+]);
+
+export function editableEmployeeRole(roles = []) {
+  if ((roles || []).includes("apprentice")) return "apprentice";
+  return (roles || []).find((role) => EDITABLE_EMPLOYEE_ROLES.has(role)) || "installer";
+}

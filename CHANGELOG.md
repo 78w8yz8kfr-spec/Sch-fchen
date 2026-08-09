@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Berichtsheft bleibt einem Auszubildenden sicher erhalten.** Das
+  Mitarbeiterformular erkennt die Rolle „Auszubildender“ nun auch bei der
+  Vorauswahl und kann sie bei einer Änderung von Name, Telefon oder Ausbilder
+  nicht mehr unbemerkt durch „Monteur“ ersetzen. Der Server weist den
+  Rollenverlust auch bei einer noch geöffneten alten App-Fassung ab. Konten,
+  deren Azubi-Rolle nachweislich durch diesen Fehler entfernt wurde und deren
+  Ausbildung noch läuft, werden automatisch repariert; das Berichtsheft
+  erscheint danach wieder als „Azubi“ in der mobilen Navigation.
+- Fassung 0.44.6, Speicher `schaefchen-online-v88`, Migration 102.
+
 - **Der Geräte-QR-Druckbogen spart Papier.** Bis zu 120 ausgewählte Geräte
   stehen in einem festen Raster aus zehn Spalten und zwölf Reihen auf genau
   einer A4-Seite. Jeder QR-Code bleibt mit 18 × 18 mm unter der gewünschten

@@ -798,6 +798,29 @@ test("Verwaltung validiert Mitarbeiter, Baustelle und Einsatz vollständig", () 
   });
   assert.equal(employeeUpdate.phone, "+49 170 7654321");
   assert.equal(employeeUpdate.rowVersion, 2);
+  assert.equal(employeeUpdate.roleChangeConfirmed, false);
+  assert.equal(
+    validateEmployeeUpdate({
+      personnelNumber: "M-17",
+      firstName: "Mara",
+      lastName: "Vorarbeiterin",
+      role: "foreman",
+      roleChangeConfirmed: true,
+      rowVersion: 2
+    }).roleChangeConfirmed,
+    true
+  );
+  assert.throws(
+    () => validateEmployeeUpdate({
+      personnelNumber: "M-17",
+      firstName: "Mara",
+      lastName: "Vorarbeiterin",
+      role: "foreman",
+      roleChangeConfirmed: "ja",
+      rowVersion: 2
+    }),
+    /Bestätigung der Rollenänderung/
+  );
   // Ohne Angabe bleibt die Menge leer, nicht undefiniert: die Einsatzplanung
   // fragt sie bei jedem Mitarbeiter ab.
   assert.deepEqual(employee.drivingLicenceClasses, []);
