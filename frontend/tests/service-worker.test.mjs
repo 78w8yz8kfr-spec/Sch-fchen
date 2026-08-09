@@ -243,6 +243,33 @@ test("Offline liefert nur der eigene Dokumentencache ein Baustellendokument", as
   assert.match(await leaked.text(), /nicht für die Offline-Ansicht gespeichert/);
 });
 
+test("Ein vor dem Update gesichertes Dokument bleibt offline auffindbar", async () => {
+  // Die App-Fassung steht seit 0.44.9 im Adressteil, damit ein Pflichtupdate
+  // ein Dokument nicht durch seine eigene Meldung ersetzt. Abgelegt ist es
+  // aber weiterhin ohne sie - sonst waere mit jeder neuen Fassung alles
+  // Gesicherte auf einen Schlag verschwunden, und zwar genau dann, wenn kein
+  // Netz da ist, um es erneut zu holen.
+  const scope = "11111111-1111-4111-8111-111111111111";
+  const documentPath = "/api/v1/construction-sites/abc/documents/def/content";
+  const worker = loadServiceWorker({
+    fetchImplementation: async () => {
+      throw new Error("offline");
+    }
+  });
+  const cache = await worker.caches.open(`schaefchen-documents-v42-${scope}`);
+  await cache.put(
+    requestFor(`${documentPath}?offlineScope=${scope}`),
+    new Response("Vor dem Update gesichert")
+  );
+
+  const response = await runFetch(
+    worker,
+    requestFor(`${documentPath}?offlineScope=${scope}&appVersion=0.44.9`)
+  );
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "Vor dem Update gesichert");
+});
+
 test("Ohne gültigen Geltungsbereich bleibt der Dokumentencache offline verschlossen", async () => {
   const scope = "11111111-1111-4111-8111-111111111111";
   const documentPath = "/api/v1/construction-sites/abc/documents/def/content";

@@ -1469,8 +1469,14 @@
     elements.editorTitle.textContent =
       currentInspection?.name || "VDE-Prüfprotokoll";
     if (completed) {
+      // Diesem Verweis folgt der Browser selbst und gibt dabei keine Kopfzeile
+      // mit der App-Fassung mit. Waehrend eines Pflichtupdates lag statt des
+      // Protokolls dessen Meldung als JSON im Downloadordner; die Fassung darf
+      // deshalb ersatzweise im Adressteil stehen.
       elements.openPdf.href = apiPath(
-        `/inspections/${encodeURIComponent(currentInspection.id)}/pdf?date=${encodeURIComponent(accessDate)}`
+        `/inspections/${encodeURIComponent(currentInspection.id)}/pdf?date=${
+          encodeURIComponent(accessDate)
+        }&appVersion=0.44.9`
       );
       elements.saveState.textContent = `Unveränderlich abgeschlossen am ${
         new Intl.DateTimeFormat("de-DE", {

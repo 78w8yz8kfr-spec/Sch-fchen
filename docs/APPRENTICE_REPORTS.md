@@ -206,8 +206,11 @@ Nachweis ohne Unterschriften ungültig ist.
   `X-Schaefchen-Version` steht, kann er dabei nicht mitgeben; solange ein
   Pflichtupdate läuft, stand deshalb statt der Vorschau die Meldung über das
   notwendige Update. Die Fassung darf darum ersatzweise als `appVersion` im
-  Adressteil stehen. Schwächer wird die Abfrage dadurch nicht: wer die Zahl
-  frei wählen will, kann das bei der Kopfzeile ebenso.
+  Adressteil stehen (`browserFileUrl` in `app.js`). Schwächer wird die Abfrage
+  dadurch nicht: wer die Zahl frei wählen will, kann das bei der Kopfzeile
+  ebenso. Dasselbe gilt außerhalb des Berichtshefts für jedes Dokument, jedes
+  Baustellenfoto und jedes VDE-Protokoll — dort kam die Meldung als
+  „…&#46;pdf.json" im Downloadordner an.
 * Ein **Entwurf wird nicht gedruckt** (409). Auf Papier sieht er fertig aus und
   ist es nicht; im Ordner der Kammer fällt das erst am Ende der Ausbildung auf.
   Gedruckt wird, was eingereicht oder freigegeben ist — also unterschrieben.

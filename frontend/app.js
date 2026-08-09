@@ -1348,6 +1348,32 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     return body;
   }
 
+  // Eine Adresse, die der Browser selbst holt.
+  //
+  // Alles, was an einem Verweis haengt oder in einem Rahmen steht, laedt der
+  // Browser ohne die Kopfzeile mit der App-Fassung - er kennt sie nicht.
+  // Waehrend eines Pflichtupdates antwortete der Server darauf mit der
+  // Update-Meldung, und das Telefon legte diese 203 Byte JSON unter dem Namen
+  // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
+  // Fassung ersatzweise im Adressteil stehen.
+  function browserFileUrl(path) {
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.9`;
+  }
+
+  // Eine Datei holen, ohne die App zu verlassen.
+  //
+  // Der Verweis selbst darf das Blatt nicht mehr oeffnen: in einer
+  // eingerichteten App ersetzt der Browser damit die ganze Ansicht, und dort
+  // gibt es kein Zurueck - die App musste beendet werden. Geholt wird die
+  // Datei deshalb hier, und weitergereicht wird sie als fertiger Inhalt.
+  async function openDocumentFile(path, fileName) {
+    try {
+      await downloadFile(path, fileName);
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+
   async function downloadFile(path, fallbackName) {
     let response;
     try {
@@ -2067,12 +2093,29 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
   }
 
+  // „Öffnen“ neben einem Dokument - und „PDF“ neben einem fertigen Bericht.
+  //
+  // Angetippt holt die App die Datei selbst. Vorher folgte das Telefon dem
+  // Verweis: der Browser fragte ohne die Kopfzeile mit der App-Fassung, bekam
+  // waehrend eines Pflichtupdates die Update-Meldung als JSON und legte sie
+  // als „SE-R-….pdf.json“ ab. Und die Ansicht verliess dabei die App, ohne
+  // einen Weg zurueck.
+  //
+  // Die Adresse bleibt am Verweis stehen: wer ihn bewusst in einem eigenen
+  // Reiter oeffnet, soll dort das Dokument bekommen und nicht die Meldung.
   function documentDownloadLink(documentItem, compact = false) {
     const link = document.createElement("a");
+    const adresse = browserFileUrl(
+      `./api/v1/admin/documents/${encodeURIComponent(documentItem.id)}/content`
+    );
     link.className = compact ? "text-button document-download" : "download-link document-download";
-    link.href = `./api/v1/admin/documents/${encodeURIComponent(documentItem.id)}/content`;
+    link.href = adresse;
     link.download = documentItem.fileName;
     link.textContent = "Öffnen";
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void openDocumentFile(adresse, documentItem.fileName);
+    });
     return link;
   }
 
@@ -3569,11 +3612,15 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     return `./vde/index.html?${search.toString()}`;
   }
 
+  // Das fertige Pruefprotokoll haengt an einem Verweis, den der Browser selbst
+  // verfolgt - die Fassung gehoert deshalb in den Adressteil.
   function vdePdfUrl(inspectionId, date = null) {
     const search = new URLSearchParams({
       date: date || adminState?.date || localDateKey()
     });
-    return `./api/v1/vde/inspections/${encodeURIComponent(inspectionId)}/pdf?${search.toString()}`;
+    return browserFileUrl(
+      `./api/v1/vde/inspections/${encodeURIComponent(inspectionId)}/pdf?${search.toString()}`
+    );
   }
 
   function selectWorkspaceSection({
@@ -6686,13 +6733,26 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     list.append(item);
   }
 
-  function employeeSiteContentUrl(documentItem) {
+  // Die Adresse eines Baustellendokuments.
+  //
+  // Sie kommt in zwei Fassungen vor: die abgelegte, unter der das Dokument im
+  // Offline-Speicher steht, und die abgerufene mit der App-Fassung im
+  // Adressteil. Ohne diese Trennung waere entweder das Bild waehrend eines
+  // Pflichtupdates leer - der Browser holt es selbst und kennt die Kopfzeile
+  // nicht - oder jedes bereits offline gesicherte Dokument mit einem Schlag
+  // nicht mehr auffindbar, weil sich sein Schluessel geaendert haette.
+  function employeeSiteContentKey(documentItem) {
     if (!employeeSiteState) return "#";
     const siteId = encodeURIComponent(employeeSiteState.site.id);
     const documentId = encodeURIComponent(documentItem.id);
     const date = encodeURIComponent(employeeSiteState.date);
     const offlineScope = encodeURIComponent(session?.user?.id || cachedUserId || "anonymous");
     return `./api/v1/construction-sites/${siteId}/documents/${documentId}/content?date=${date}&offlineScope=${offlineScope}`;
+  }
+
+  function employeeSiteContentUrl(documentItem) {
+    const schluessel = employeeSiteContentKey(documentItem);
+    return schluessel === "#" ? schluessel : browserFileUrl(schluessel);
   }
 
   function documentCacheName(userId) {
@@ -6726,21 +6786,35 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     if (important.length === 0) return;
     const cache = await window.caches.open(documentCacheName(session.user.id));
     await Promise.allSettled(important.map(async (documentItem) => {
-      const request = new Request(employeeSiteContentUrl(documentItem), {
-        credentials: "same-origin"
+      // Abgelegt wird unter dem Schluessel ohne Fassung, geholt mit ihr.
+      // Sonst laege dasselbe Dokument nach jeder Fassung erneut im Speicher -
+      // und das zuvor gesicherte waere fort.
+      const response = await fetch(employeeSiteContentUrl(documentItem), {
+        credentials: "same-origin",
+        headers: { "X-Schaefchen-Version": "0.44.9" }
       });
-      const response = await fetch(request);
-      if (response.ok) await cache.put(request, response);
+      if (response.ok) {
+        await cache.put(
+          new Request(employeeSiteContentKey(documentItem), { credentials: "same-origin" }),
+          response
+        );
+      }
     }));
   }
 
+  // Auch hier holt die App die Datei selbst: ein „_blank“ ersetzt in einer
+  // eingerichteten App die ganze Ansicht, und dort gibt es kein Zurueck.
   function employeeSiteDocumentLink(documentItem) {
     const link = document.createElement("a");
+    const adresse = employeeSiteContentUrl(documentItem);
     link.className = "text-button";
-    link.href = employeeSiteContentUrl(documentItem);
-    link.target = "_blank";
-    link.rel = "noopener";
+    link.href = adresse;
+    link.download = documentItem.fileName || "Dokument";
     link.textContent = "Öffnen";
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void openDocumentFile(adresse, documentItem.fileName || "Dokument");
+    });
     return link;
   }
 
@@ -10051,8 +10125,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     // Auch hier holt der Browser das Blatt selbst: die Fassung gehoert in den
     // Adressteil, sonst zeigte der Rahmen die Meldung ueber das notwendige
     // Update statt des Wochenblatts.
-    elements.apprenticePreviewFrame.src =
-      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true&appVersion=0.44.9#toolbar=0`;
+    elements.apprenticePreviewFrame.src = `${browserFileUrl(
+      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true`
+    )}#toolbar=0`;
   }
 
   // Warum lassen sich die Felder nicht mehr beschreiben?
@@ -12721,7 +12796,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.9";
     // stand im neuen Reiter die Meldung ueber das notwendige Update statt der
     // Vorschau.
     window.open(
-      `./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true&appVersion=0.44.9`,
+      browserFileUrl(`./api/v1/apprentice/reports/${selectedWeekStart}/pdf?preview=true`),
       "_blank",
       "noopener"
     );

@@ -65,6 +65,13 @@ self.addEventListener("fetch", (event) => {
       .test(offlineScope || "")
       ? `${DOCUMENT_CACHE_PREFIX}${offlineScope}`
       : null;
+    // Abgelegt ist das Dokument ohne die App-Fassung im Adressteil: die steht
+    // nur an der Anfrage, damit ein Pflichtupdate ein Bild oder ein Blatt
+    // nicht durch seine eigene Meldung ersetzt. Gesucht wird deshalb ohne
+    // sie - sonst waere jedes zuvor gesicherte Dokument nach einer neuen
+    // Fassung offline verschwunden.
+    const cacheUrl = new URL(requestUrl);
+    cacheUrl.searchParams.delete("appVersion");
     event.respondWith(
       fetch(event.request)
         .catch(async () => {
@@ -72,7 +79,7 @@ self.addEventListener("fetch", (event) => {
           if (scopedCacheName) {
             const cacheNames = await caches.keys();
             if (cacheNames.includes(scopedCacheName)) {
-              cachedResponse = await (await caches.open(scopedCacheName)).match(event.request);
+              cachedResponse = await (await caches.open(scopedCacheName)).match(cacheUrl.href);
             }
           }
           return cachedResponse || new Response("Dieses Dokument wurde nicht für die Offline-Ansicht gespeichert.", {

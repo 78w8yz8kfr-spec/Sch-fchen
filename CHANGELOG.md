@@ -18,11 +18,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   Verwaltungsbereich, den er gar nicht sieht. Ein Ausbilder ohne Planungsrolle
   bekommt den Eintrag deshalb unten in die Hauptleiste; planende Ausbilder
   behalten den Weg über „Mehr“.
-- **Die PDF-Vorschau des Wochenblatts zeigt wieder das Blatt.** Rahmen und
-  neuer Reiter holt der Browser selbst und kann die Kopfzeile mit der
-  App-Fassung nicht mitgeben; solange ein Pflichtupdate lief, stand dort statt
-  der Vorschau die Meldung über das notwendige Update. Die Fassung darf nun
-  ersatzweise als `appVersion` im Adressteil stehen.
+- **„PDF“ und „Öffnen“ liefern wieder ein PDF — und die App bleibt offen.**
+  Alles, was der Browser selbst holt, gab die Kopfzeile mit der App-Fassung
+  nicht mit: die Vorschau des Wochenblatts, der fertige Bericht in der
+  Berichtsliste, jedes Dokument der Ablage, die Baustellenfotos und das
+  VDE-Protokoll. Solange ein Pflichtupdate lief, kam dort dessen Meldung als
+  JSON an — 203 Byte, auf dem Telefon abgelegt als
+  „SE-R-2026-00001-2026-07-27.pdf.json“. Die Fassung darf nun ersatzweise als
+  `appVersion` im Adressteil stehen. Dokumente holt die App außerdem selbst,
+  statt der Adresse zu folgen: bisher ersetzte das Blatt die ganze Ansicht,
+  und in einer eingerichteten App gibt es dort kein Zurück — sie musste
+  beendet werden. Bereits offline gesicherte Dokumente behalten ihren
+  Schlüssel und bleiben ohne Netz auffindbar.
 - Fassung 0.44.9, Speicher `schaefchen-online-v91`, Migration 105.
 
 - **Piets Berichtsheft bleibt nach dem Laden sichtbar.** Die erste

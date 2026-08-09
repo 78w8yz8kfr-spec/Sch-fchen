@@ -202,12 +202,34 @@ assert.match(
   designSystem,
   /\.nav-item--desktop\.nav-item--apprentice-mobile \{\s*display: grid !important;/
 );
-// Vorschau und neuer Reiter holt der Browser selbst und gibt dabei keine
-// Kopfzeile mit. Ohne die Fassung im Adressteil stand dort die Meldung ueber
-// das notwendige Update statt des Wochenblatts.
-for (const treffer of app.matchAll(/apprentice\/reports\/\$\{[^`]*?pdf\?preview=true[^`]*/g)) {
-  assert.match(treffer[0], /appVersion=0\.44\.9/, "Der Vorschau fehlt die Fassung im Adressteil");
+// Alles, was der Browser selbst holt - Vorschau im Rahmen, neuer Reiter,
+// Dokumente, Baustellenfotos, VDE-Protokoll -, gibt keine Kopfzeile mit. Ohne
+// die Fassung im Adressteil kam dort waehrend eines Pflichtupdates dessen
+// Meldung als JSON an: 203 Byte, abgelegt als "SE-R-….pdf.json".
+assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.9`;/);
+for (const stelle of [
+  /apprentice\/reports\/\$\{selectedWeekStart\}\/pdf\?preview=true/,
+  /admin\/documents\/\$\{encodeURIComponent\(documentItem\.id\)\}\/content/,
+  /vde\/inspections\/\$\{encodeURIComponent\(inspectionId\)\}\/pdf/
+]) {
+  const treffer = stelle.exec(app);
+  assert.ok(treffer, `Die Adresse ${stelle} steht nicht mehr in app.js`);
+  // Die Adresse steht unmittelbar in einem browserFileUrl(...) - dazwischen
+  // liegen hoechstens Zeilenumbruch, Einrueckung, der oeffnende Akzent und der
+  // gemeinsame Anfang der Schnittstelle.
+  const davor = app.slice(Math.max(0, treffer.index - 60), treffer.index);
+  assert.match(davor, /browserFileUrl\(\s*`?\.\/api\/v1\/$/,
+    `Die Adresse ${stelle} laeuft nicht ueber browserFileUrl`);
 }
+// Der Verweis darf die Ansicht nicht mehr ersetzen: in einer eingerichteten
+// App gibt es dort kein Zurueck, sie musste beendet werden.
+assert.match(app, /function openDocumentFile\(/);
+assert.match(app, /link\.addEventListener\("click", \(event\) => \{\s*event\.preventDefault\(\);\s*void openDocumentFile\(/);
+assert.doesNotMatch(app, /link\.target = "_blank";\s*link\.rel = "noopener";\s*link\.textContent = "Öffnen";/);
+// Offline gesicherte Dokumente behalten ihren Schluessel ohne die Fassung.
+assert.match(app, /function employeeSiteContentKey\(/);
+assert.match(worker, /cacheUrl\.searchParams\.delete\("appVersion"\)/);
+assert.match(vdeApp, /appVersion=0\.44\.9/);
 assert.match(app, /element === elements\.apprenticeSection[\s\S]{0,160}mayReviewApprentices\(\)/);
 // Seine bisherigen Berichte fuehren in ihre Woche zurueck und lassen sich von
 // dort drucken. Vorher war die Liste eine tote Aufzaehlung.
@@ -1401,7 +1423,10 @@ assert.ok(worker.includes('"./vde/styles.css?v=0.44.9"'));
 assert.ok(worker.includes('"./vde/app.js?v=0.44.9"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
-assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
+// Gesucht wird unter der abgelegten Adresse - ohne die App-Fassung, die nur an
+// der Anfrage steht. Sonst waere jedes zuvor gesicherte Dokument nach einer
+// neuen Fassung offline verschwunden.
+assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(cacheUrl\.href\)/);
 assert.doesNotMatch(
   worker.match(/if \(siteDocumentContent\) \{[\s\S]*?\n  \}/)?.[0] || "",
   /caches\.match\(event\.request\)/,
