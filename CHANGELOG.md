@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die QR-Livekamera funktioniert jetzt auch auf iPhone und iPad.** Safari
+  stellt die experimentelle `BarcodeDetector`-Schnittstelle standardmäßig
+  nicht bereit. Schäfchen nutzt deshalb einen mitgelieferten lokalen Decoder
+  für Livebilder und QR-Fotos; auf unterstützten Geräten bleibt die native
+  Erkennung der schnelle Weg. Die Produktions-Sicherheitsrichtlinie erlaubt
+  die Kamera nur der eigenen Schäfchen-Herkunft und weiterhin erst nach der
+  ausdrücklichen Freigabe des Benutzers.
+- Fassung 0.44.1, Speicher `schaefchen-online-v83`, Migration 097.
+
 - **Maschinen & Geräte ist als vollständiger Schäfchen-Bereich verfügbar.**
   Maschinen, Werkzeuge, Mess- und Prüfgeräte, Akkus, Ladegeräte, Leitern und
   weitere Betriebsmittel besitzen einen eigenen mandantengetrennten

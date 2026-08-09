@@ -32,6 +32,11 @@ const [html, styles, designSystem, app, worker, refreshHtml, refreshScript, mani
 ]);
 
 const manifest = JSON.parse(manifestSource);
+const [deviceManagement, qrScannerVendor, qrScannerWorker] = await Promise.all([
+  readFrontendFile("core/device-management.js"),
+  readFrontendFile("vendor/qr-scanner.min.js"),
+  readFrontendFile("vendor/qr-scanner-worker.min.js")
+]);
 
 assert.match(html, /lang="de"/);
 assert.match(html, /id="login-view"/);
@@ -628,16 +633,22 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.44\.0/);
-assert.match(html, /design-system\.css\?v=0\.44\.0/);
-assert.match(html, /app\.js\?v=0\.44\.0/);
-assert.match(html, /version\.js\?v=0\.44\.0/);
+assert.match(html, /styles\.css\?v=0\.44\.1/);
+assert.match(html, /design-system\.css\?v=0\.44\.1/);
+assert.match(html, /app\.js\?v=0\.44\.1/);
+assert.match(html, /version\.js\?v=0\.44\.1/);
 assert.match(html, /id="devices-section"[^>]*data-dashboard-pane="devices"/);
 assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
 assert.match(app, /createDeviceModule/);
 assert.match(app, /deviceModule\.handleDeepLink\(\)/);
 assert.match(styles, /\.device-scanner__camera/);
+assert.match(deviceManagement, /import\(QR_SCANNER_MODULE_URL\)/);
+assert.match(deviceManagement, /preferredCamera: "environment"/);
+assert.match(deviceManagement, /QrScanner\.scanImage\(file/);
+assert.doesNotMatch(deviceManagement, /if \(!\("BarcodeDetector" in window\)\)/);
+assert.match(qrScannerVendor, /qr-scanner-worker\.min\.js/);
+assert.match(qrScannerWorker, /export const createWorker/);
 assert.match(styles, /\.device-settings__form/);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
@@ -1293,18 +1304,20 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.0"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.0"'));
-assert.ok(worker.includes('"./app.js?v=0.44.0"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.0"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.0"'));
-assert.ok(worker.includes('"./version.js?v=0.44.0"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.1"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.1"'));
+assert.ok(worker.includes('"./app.js?v=0.44.1"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.1"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.1"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.1"'));
+assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
+assert.ok(worker.includes('"./version.js?v=0.44.1"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.0"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.0";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.1"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.1";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1332,7 +1345,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.44\.0$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.44\.1$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1340,11 +1353,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.0"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.0"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.1"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.1"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.0"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.0"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.1"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.1"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 assert.match(worker, /caches\.open\(scopedCacheName\)\)\.match\(event\.request\)/);
@@ -1391,9 +1404,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.44\.0/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.44\.0/);
-assert.match(vdeHtml, /app\.js\?v=0\.44\.0/);
+assert.match(vdeHtml, /styles\.css\?v=0\.44\.1/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.44\.1/);
+assert.match(vdeHtml, /app\.js\?v=0\.44\.1/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1409,7 +1422,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.44\.0/);
+assert.match(platformHtml, /design-system\.css\?v=0\.44\.1/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,

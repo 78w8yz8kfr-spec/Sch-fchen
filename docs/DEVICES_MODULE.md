@@ -1,6 +1,6 @@
 # Maschinen & Geräte
 
-Stand: Fassung 0.44.0, Migrationen 095 und 096.
+Stand: Fassung 0.44.1, Migrationen 095 bis 097.
 
 ## Fachlicher Ablauf
 
@@ -62,6 +62,13 @@ nach Firmennummer und Benutzer-ID. Unbekannte Tokens werden offline nicht
 erraten. Die Inventur benötigt derzeit eine Verbindung, weil ihre Soll-/Ist-
 Entscheidung bewusst serverseitig erfolgt.
 
+Die Livekamera verwendet die native QR-Erkennung, wenn der Browser sie
+bereitstellt. Safari auf iPhone und iPad fällt automatisch auf den lokal
+mitgelieferten, in einem Worker laufenden Decoder zurück. Derselbe Decoder
+liest ausgewählte QR-Fotos. Es werden keine Kamerabilder an einen Fremddienst
+übertragen; die Browserrichtlinie erlaubt die Kamera ausschließlich der
+eigenen Schäfchen-Herkunft und erst nach Zustimmung des Benutzers.
+
 ## Rollen
 
 | Rolle | Rechte |
@@ -99,7 +106,7 @@ Mitarbeiterarchivierung, Ausmusterung, Rollen und fremder Mandant. Migration
 095 besitzt einen eigenen SQL-Abnahmetest; der PostgreSQL-Integrationstest
 durchläuft die HTTP-Abläufe mit echten Sitzungen und RLS-Rolle.
 
-Für die Geräteabnahme vor Ort bleiben zusätzlich Browserberechtigung, Fokus,
-Etikettengröße und Scanabstand mit den tatsächlich eingesetzten Smartphones,
-Kameras und Druckern zu prüfen; diese Hardwaremerkmale lassen sich im
-Repository nicht simulieren.
+Für die Geräteabnahme vor Ort bleiben zusätzlich Fokus, Etikettengröße und
+Scanabstand mit den tatsächlich eingesetzten Smartphones, Kameras und
+Druckern zu prüfen; diese Hardwaremerkmale lassen sich im Repository nicht
+simulieren.
