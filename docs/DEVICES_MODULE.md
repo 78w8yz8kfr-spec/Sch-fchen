@@ -1,6 +1,6 @@
 # Maschinen & Geräte
 
-Stand: Fassung 0.44.4, Migrationen 095 bis 099.
+Stand: Fassung 0.44.5, Migrationen 095 bis 101.
 
 ## Fachlicher Ablauf
 
@@ -23,6 +23,13 @@ Inventar- und Seriennummer, QR-Token, Besitzerrelation und Historie. Nach dem
 Speichern steht ein gemeinsamer QR-Druckbogen bereit. Vorhandene Gegenstände
 lassen sich später hinzufügen; das Entfernen aus dem Set verlangt einen Grund
 und löscht weder Gegenstand noch Verlauf.
+
+Der gemeinsame Druckbogen ist auf eine A4-Seite im Hochformat begrenzt. Sein
+Raster aus zehn Spalten und zwölf Reihen nimmt bis zu 120 Gegenstände auf. Die
+QR-Codes messen 18 × 18 mm und bleiben damit sicher unter 2 × 2 cm; der knappe
+Rest jedes Feldes zeigt Gerätename und Inventarnummer. Feste Zeilenhöhen,
+abgeschnittene überlange Beschriftungen und fünf Millimeter Seitenrand
+verhindern, dass ein einzelnes Etikett eine zweite Druckseite erzeugt.
 
 Auf Mobilgeräten prüft Schäfchen Pflichtfelder selbst und nennt dabei das
 betroffene Einzelteil und Feld. Eine versehentlich zusätzlich erzeugte, noch

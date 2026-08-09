@@ -1,9 +1,12 @@
 # Projektstatus
 
 Stand: 09.08.2026
-Technischer Stand: V0.44.4
+Technischer Stand: V0.44.5
 
 ## Abgeschlossen
+
+- papierarmer Geräte-QR-Druckbogen mit bis zu 120 Etiketten auf einer
+  A4-Seite; QR-Codes 18 × 18 mm, kompakte Geräte- und Inventarbeschriftung
 
 - eigenständiger mobiler Azubi-Bereich in der unteren Hauptnavigation;
   eingereichte und freigegebene Wochen belegen die Startseite nicht mehr
@@ -28,7 +31,7 @@ Technischer Stand: V0.44.4
 - QR-Livekamera und QR-Fotoerkennung mit lokal ausgeliefertem Decoder für
   Safari auf iPhone/iPad; die native Browsererkennung bleibt der schnelle
   Pfad, Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt und der
-  PWA-Speicher `schaefchen-online-v86` erzwingt die korrigierte Fassung
+  PWA-Speicher `schaefchen-online-v87` erzwingt die korrigierte Fassung
 - vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
   automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
   Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und

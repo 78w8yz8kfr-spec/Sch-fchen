@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  DEVICE_QR_SHEET_LAYOUT,
   canManageDevicesFromSession,
   cameraScanErrorMessage,
+  deviceQrSheetStyles,
   deviceStatusLabel,
   includedPartIsEmpty,
   normalizeDeviceQrValue,
@@ -19,6 +21,24 @@ test("QR-Adresse und reiner Token werden gleich aufgelöst", () => {
   assert.equal(normalizeDeviceQrValue(token), token);
   assert.equal(normalizeDeviceQrValue(`https://schaefchen.example/?device=${token}`), token);
   assert.throws(() => normalizeDeviceQrValue("M0042"), /gehört nicht/);
+});
+
+test("Der QR-Druckbogen fasst 120 kleine Etiketten auf genau eine A4-Seite", () => {
+  const layout = DEVICE_QR_SHEET_LAYOUT;
+  const printableWidth = layout.pageWidthMm - (2 * layout.pageMarginMm);
+  const printableHeight = layout.pageHeightMm - (2 * layout.pageMarginMm);
+  const usedWidth = (layout.columns * layout.cellWidthMm)
+    + ((layout.columns - 1) * layout.gapMm);
+  const usedHeight = (layout.rows * layout.cellHeightMm)
+    + ((layout.rows - 1) * layout.gapMm);
+
+  assert.ok(layout.columns * layout.rows >= layout.maxLabels);
+  assert.ok(layout.qrSizeMm <= 20, "Der QR-Code darf höchstens 2 × 2 cm groß sein");
+  assert.ok(usedWidth <= printableWidth, "Der Druckbogen ist breiter als A4");
+  assert.ok(usedHeight <= printableHeight, "Der Druckbogen ist höher als A4");
+  assert.match(deviceQrSheetStyles(), /@page\{size:A4 portrait;margin:5mm\}/);
+  assert.match(deviceQrSheetStyles(), /grid-template-columns:repeat\(10,19\.8mm\)/);
+  assert.match(deviceQrSheetStyles(), /\.label svg\{[^}]*width:18mm;height:18mm/);
 });
 
 test("QR-Scanner verarbeitet native und browserunabhängige Decodergebnisse", () => {
