@@ -1,7 +1,14 @@
+<meta charset="utf-8">
 <title>Schäfchen Lager — Barcode-Prüfstand</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
+  /* Muss vor allem anderen stehen: `display` aus einer Klasse ist
+     staerker als das `hidden`-Attribut aus dem Browser-Stylesheet. Ohne
+     diese Zeile bleibt jede Karte sichtbar, die als Flex-Behaelter
+     ausgelegt ist — auch die noch leere Kamerakarte. */
+  [hidden] { display: none !important; }
+
   /* Farben und Masse folgen frontend/design-system.css, damit der Pruefstand
      nicht wie ein Fremdkoerper neben Schaefchen steht. Markenrot bleibt der
      einzige Akzent; Gruen, Gelb und Rot sind Zustandsfarben des Ergebnisses. */
@@ -364,6 +371,23 @@
 
   .leer-hinweis { margin: 0; color: var(--text-dritt); font-size: .86rem; }
 
+  .schalter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: .88rem;
+    color: var(--text-zweit);
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .schalter input {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--marke);
+    flex: none;
+  }
+  .schalter input:focus-visible { outline: 3px solid var(--marke); outline-offset: 2px; }
+
   .fuss {
     margin: 0;
     font-size: .78rem;
@@ -409,12 +433,21 @@
       </button>
     </div>
     <input class="sr" type="file" id="datei" accept="image/*" capture="environment">
+    <p class="hinweis" id="selbsttest-hinweis" hidden></p>
     <p class="hinweis" id="kamera-hinweis" hidden></p>
+    <button class="knopf knopf--klein" type="button" id="neues-fenster" hidden>
+      In eigenem Fenster öffnen
+    </button>
   </section>
 
   <section class="karte" id="kamera-karte" hidden>
     <h2 class="karte__titel">Live-Kamera</h2>
     <video id="video" playsinline muted></video>
+    <label class="schalter">
+      <input type="checkbox" id="nur-eigener">
+      <span>Nur den Schäfchen-Decoder verwenden</span>
+    </label>
+    <p class="hinweis" id="live-hinweis">Code ins Bild halten.</p>
     <button class="knopf knopf--klein" type="button" id="kamera-stopp">Kamera schließen</button>
   </section>
 
@@ -1515,41 +1548,133 @@ $('selbsttest-knopf').addEventListener('click', () => {
   const treffer = barcodeAusBild(bildDaten);
   const bestanden = treffer?.wert === EAN_SELBSTTEST.wert;
 
-  $('kamera-hinweis').hidden = false;
-  $('kamera-hinweis').textContent = bestanden
+  $('selbsttest-hinweis').hidden = false;
+  $('selbsttest-hinweis').textContent = bestanden
     ? `Selbsttest bestanden: ${EAN_SELBSTTEST.wert} gelesen. Der Decoder arbeitet auf diesem Gerät.`
     : `Selbsttest fehlgeschlagen — gelesen wurde ${treffer ? treffer.wert : 'nichts'}. Bitte melden.`;
 });
 
+// ---------------------------------------------------------------------------
+// Live-Kamera
+// ---------------------------------------------------------------------------
+
+/**
+ * Warum geht die Kamera nicht? Statt einer Sammelmeldung wird der Grund
+ * bestimmt, denn die Gegenmittel sind verschieden: eine Berechtigung erteilt
+ * man im Browser, ein fehlendes Kamerarecht des eingebetteten Fensters kann
+ * man nur umgehen, indem man die Seite in einem eigenen Fenster oeffnet.
+ */
+function kameraLage() {
+  const imRahmen = window.self !== window.top;
+
+  let richtlinieErlaubt = null;
+  try {
+    const richtlinie = document.permissionsPolicy || document.featurePolicy;
+    if (richtlinie?.allowsFeature) richtlinieErlaubt = richtlinie.allowsFeature('camera');
+  } catch {
+    richtlinieErlaubt = null;
+  }
+
+  return {
+    imRahmen,
+    richtlinieErlaubt,
+    sichererKontext: window.isSecureContext !== false,
+    schnittstelle: Boolean(navigator.mediaDevices?.getUserMedia)
+  };
+}
+
+function eigenesFensterAnbieten(anbieten) {
+  $('neues-fenster').hidden = !anbieten;
+}
+
+$('neues-fenster').addEventListener('click', () => {
+  window.open(window.location.href, '_blank', 'noopener');
+});
+
+function kameraFehlerText(fehler, lage) {
+  const name = String(fehler?.name || '');
+
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return lage.imRahmen
+      ? 'Die Kamera ist in diesem eingebetteten Fenster nicht freigegeben. '
+        + 'Öffne die Seite in einem eigenen Fenster — dort fragt der Browser ganz normal nach der Erlaubnis.'
+      : 'Der Kamerazugriff wurde abgelehnt. In den Browsereinstellungen die Kamera für diese Seite erlauben und erneut versuchen.';
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return 'Es wurde keine verwendbare Kamera gefunden. Der Weg über ein Foto funktioniert trotzdem.';
+  }
+  if (name === 'NotReadableError' || name === 'AbortError') {
+    return 'Die Kamera wird gerade von einer anderen App verwendet. Diese schließen und erneut versuchen.';
+  }
+  return `Die Kamera ließ sich nicht starten (${name || 'unbekannter Grund'}). Der Weg über ein Foto funktioniert trotzdem.`;
+}
+
 $('kamera-knopf').addEventListener('click', async () => {
   const hinweis = $('kamera-hinweis');
   hinweis.hidden = false;
+  eigenesFensterAnbieten(false);
+
+  const lage = kameraLage();
+
+  if (!lage.sichererKontext) {
+    hinweis.textContent = 'Diese Seite läuft ohne gesicherte Verbindung. '
+      + 'Browser geben die Kamera dann grundsätzlich nicht frei.';
+    return;
+  }
+  if (!lage.schnittstelle) {
+    hinweis.textContent = 'Dieser Browser stellt gar keine Kameraschnittstelle bereit.';
+    eigenesFensterAnbieten(lage.imRahmen);
+    return;
+  }
+  if (lage.richtlinieErlaubt === false) {
+    hinweis.textContent = 'Das eingebettete Fenster, in dem diese Seite läuft, hat kein Kamerarecht. '
+      + 'Das lässt sich von hier aus nicht ändern — die Seite in einem eigenen Fenster öffnen.';
+    eigenesFensterAnbieten(true);
+    return;
+  }
+
   hinweis.textContent = 'Kamera wird angefragt …';
 
   let strom;
   try {
     strom = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
       audio: false
     });
   } catch (fehler) {
-    const name = String(fehler?.name || '');
-    hinweis.textContent = name === 'NotAllowedError'
-      ? 'Die Kamera ist hier nicht freigegeben. Das kann an der Browsereinstellung liegen oder daran, dass diese Seite in einem Rahmen ohne Kamerarecht läuft. Der Weg über ein Foto funktioniert trotzdem.'
-      : `Die Kamera ließ sich nicht starten (${name || 'unbekannter Grund'}). Bitte den Weg über ein Foto verwenden.`;
+    hinweis.textContent = kameraFehlerText(fehler, lage);
+    eigenesFensterAnbieten(lage.imRahmen);
     return;
   }
 
-  hinweis.textContent = 'Kamera läuft. Code ins Bild halten.';
-  $('kamera-karte').hidden = false;
-
   const video = $('video');
   video.srcObject = strom;
-  await video.play();
+  video.setAttribute('playsinline', '');
+  try {
+    await video.play();
+  } catch (fehler) {
+    hinweis.textContent = `Das Kamerabild ließ sich nicht starten (${fehler?.name || 'unbekannt'}).`;
+    strom.getTracks().forEach((spur) => spur.stop());
+    return;
+  }
+
+  hinweis.textContent = 'Kamera läuft.';
+  $('kamera-karte').hidden = false;
 
   const leinwand = document.createElement('canvas');
   const stift = leinwand.getContext('2d', { willReadFrequently: true });
-  const leser = await nativenLeserHolen();
+  const nativ = await nativenLeserHolen();
+
+  const leseHinweisSetzen = () => {
+    const eigenerErzwungen = $('nur-eigener').checked;
+    $('live-hinweis').textContent = (!nativ || eigenerErzwungen)
+      ? 'Es liest der Schäfchen-Decoder. Code ins Bild halten.'
+      : 'Es liest der eingebaute Leser des Browsers. Für den eigenen Decoder den Schalter setzen.';
+  };
+  $('nur-eigener').checked = !nativ;
+  $('nur-eigener').disabled = !nativ;
+  $('nur-eigener').onchange = leseHinweisSetzen;
+  leseHinweisSetzen();
 
   laufendeKamera = scanSchleifeStarten({
     rahmenHolen: () => {
@@ -1564,29 +1689,38 @@ $('kamera-knopf').addEventListener('click', async () => {
         bildDaten: stift.getImageData(0, 0, leinwand.width, leinwand.height)
       };
     },
-    leser: leser || {
+    leser: {
+      // Welcher Leser drankommt, entscheidet sich bei jedem Bild neu: der
+      // Schalter soll wirken, ohne dass die Kamera neu gestartet wird.
       lesen: async (quelle) => {
+        const eigenerErzwungen = $('nur-eigener').checked;
+        if (nativ && !eigenerErzwungen) return nativ.lesen(quelle);
         const gefunden = barcodeAusBild(quelle.bildDaten, { zeilen: 31 });
         return gefunden ? gefunden.wert : null;
       }
     },
     onTreffer: (gedeutet, rohwert) => {
+      const durchEigenen = !nativ || $('nur-eigener').checked;
+
       $('ergebnis').hidden = false;
       $('ergebnis-titel').textContent = 'Live gelesen';
       $('ergebnis-zeit').textContent = new Date().toLocaleTimeString('de-DE');
-      chipSetzen($('nativ-chip'), leser ? 'gut' : 'still', leser ? 'gelesen' : 'nicht vorhanden');
-      wertSetzen($('nativ-wert'), leser ? rohwert : null);
-      chipSetzen($('eigen-chip'), leser ? 'still' : 'gut', leser ? 'nicht befragt' : 'gelesen');
-      wertSetzen($('eigen-wert'), leser ? null : rohwert);
+
+      chipSetzen($('nativ-chip'), durchEigenen ? 'still' : 'gut', durchEigenen ? 'nicht befragt' : 'gelesen');
+      wertSetzen($('nativ-wert'), durchEigenen ? null : rohwert);
+      chipSetzen($('eigen-chip'), durchEigenen ? 'gut' : 'still', durchEigenen ? 'gelesen' : 'nicht befragt');
+      wertSetzen($('eigen-wert'), durchEigenen ? rohwert : null);
       $('eigen-deutung').textContent = `Deutung: ${gedeutet.art} → ${gedeutet.wert}`;
+
       einzelheiten([
-        ['Bildbreite', String(leinwand.width)],
-        ['Leser', leser ? 'eingebauter Leser des Browsers' : 'Schäfchen-Decoder'],
+        ['Kamerabild', `${leinwand.width} × ${leinwand.height}`],
+        ['Leser', durchEigenen ? 'Schäfchen-Decoder' : 'eingebauter Leser des Browsers'],
         ['Rohwert', rohwert]
       ]);
+
       protokollieren({
-        nativ: leser ? rohwert : null,
-        eigen: leser ? null : rohwert,
+        nativ: durchEigenen ? null : rohwert,
+        eigen: durchEigenen ? rohwert : null,
         format: null,
         zeilen: 0,
         aufnahme: `${leinwand.width}×${leinwand.height}`,
