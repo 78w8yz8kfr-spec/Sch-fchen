@@ -1,0 +1,1165 @@
+<meta charset="utf-8">
+<title>Schäfchen Lager — Bedienung ansehen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  [hidden] { display: none !important; }
+
+  /* Farben und Masse aus frontend/design-system.css. */
+  :root {
+    --grund: #f5f6f7;
+    --flaeche: #ffffff;
+    --flaeche-leise: #fafbfb;
+    --rand: #e1e4e8;
+    --rand-stark: #cdd2d8;
+    --text: #1c1e21;
+    --text-zweit: #6c727a;
+    --text-dritt: #8a9097;
+    --marke: #e30613;
+    --marke-tief: #c9000c;
+    --marke-weich: #fff0f1;
+    --gut: #2f855a;
+    --gut-weich: #e9f7ef;
+    --warn: #a46910;
+    --warn-weich: #fff5df;
+    --schlecht: #c81e2a;
+    --schlecht-weich: #fff0f1;
+    --schiene: #17191d;
+    --schiene-text: #d9dce1;
+    --schatten: 0 1px 2px rgba(28, 30, 33, .06), 0 4px 16px rgba(28, 30, 33, .05);
+    --schrift: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --schrift-daten: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --grund: #131519; --flaeche: #1b1e23; --flaeche-leise: #23262c;
+      --rand: #2c3037; --rand-stark: #3a3f47;
+      --text: #e6e8eb; --text-zweit: #a1a7b0; --text-dritt: #7e858e;
+      --marke: #ff4d57; --marke-tief: #ff6b73; --marke-weich: #33161a;
+      --gut: #56b487; --gut-weich: #14301f;
+      --warn: #d8a44a; --warn-weich: #2f2413;
+      --schlecht: #f2717c; --schlecht-weich: #33161a;
+      --schiene: #0e1013; --schiene-text: #c8ccd3;
+      --schatten: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --grund: #131519; --flaeche: #1b1e23; --flaeche-leise: #23262c;
+    --rand: #2c3037; --rand-stark: #3a3f47;
+    --text: #e6e8eb; --text-zweit: #a1a7b0; --text-dritt: #7e858e;
+    --marke: #ff4d57; --marke-tief: #ff6b73; --marke-weich: #33161a;
+    --gut: #56b487; --gut-weich: #14301f;
+    --warn: #d8a44a; --warn-weich: #2f2413;
+    --schlecht: #f2717c; --schlecht-weich: #33161a;
+    --schiene: #0e1013; --schiene-text: #c8ccd3;
+    --schatten: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  }
+
+  body {
+    margin: 0;
+    background: var(--grund);
+    color: var(--text);
+    font-family: var(--schrift);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .blatt { max-width: 46rem; margin: 0 auto; padding: 18px 14px 56px; display: flex; flex-direction: column; gap: 18px; }
+
+  .kopf { display: flex; flex-direction: column; gap: 6px; }
+  .marke-zeile { display: flex; align-items: center; gap: 8px; font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--marke); margin: 0; }
+  .marke-punkt { width: 9px; height: 9px; border-radius: 50%; background: var(--marke); flex: none; }
+  h1 { margin: 0; font-size: 1.45rem; letter-spacing: -.02em; text-wrap: balance; }
+  .vorspann { margin: 0; color: var(--text-zweit); font-size: .92rem; }
+
+  .rollen { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rolle {
+    appearance: none; border: 1px solid var(--rand-stark); background: var(--flaeche);
+    color: var(--text-zweit); font: inherit; font-size: .84rem; font-weight: 600;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; min-height: 40px;
+  }
+  .rolle[aria-pressed="true"] { background: var(--marke); border-color: var(--marke); color: #fff; }
+  .rolle:focus-visible { outline: 3px solid var(--marke); outline-offset: 2px; }
+
+  .buehne { display: grid; grid-template-columns: 1fr; gap: 18px; }
+  @media (min-width: 46rem) { .buehne { grid-template-columns: 22rem 1fr; align-items: start; } }
+
+  /* Das Telefon: die Bedienung selbst, in Geraetebreite, damit sichtbar ist,
+     wie wenig gleichzeitig auf dem Schirm steht. */
+  .telefon {
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 18px;
+    box-shadow: var(--schatten);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 30rem;
+  }
+  .telefon__leiste {
+    background: var(--schiene); color: var(--schiene-text);
+    padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
+    font-size: .78rem; letter-spacing: .04em;
+  }
+  .telefon__leiste strong { font-size: .9rem; letter-spacing: 0; }
+  .telefon__inhalt { padding: 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+  .eyebrow { margin: 0; font-size: .66rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dritt); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .button {
+    appearance: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 50px; padding: 0 16px; border-radius: 10px;
+    border: 1px solid var(--rand-stark); background: var(--flaeche-leise); color: var(--text);
+    font: inherit; font-weight: 600; cursor: pointer; text-align: center; width: 100%;
+  }
+  .button:focus-visible { outline: 3px solid var(--marke); outline-offset: 2px; }
+  .button--action { background: var(--marke); border-color: var(--marke); color: #fff; min-height: 58px; font-size: 1.05rem; }
+  .button--secondary { background: var(--flaeche-leise); }
+  .button--quiet { border-color: transparent; background: transparent; color: var(--text-zweit); min-height: 40px; font-weight: 500; }
+
+  .stock-start, .stock-book, .stock-done, .stock-unknown { display: flex; flex-direction: column; gap: 12px; }
+
+  .stock-place { justify-content: space-between; min-height: 46px; font-weight: 500; }
+  .stock-place__label { font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; color: var(--text-dritt); font-weight: 700; }
+  .stock-place__name { font-weight: 700; }
+  .stock-place--leer { color: var(--text-zweit); font-style: normal; }
+
+  .stock-note { margin: 0; font-size: .84rem; color: var(--gut); background: var(--gut-weich); border-radius: 8px; padding: 8px 10px; }
+  .stock-error { margin: 0; font-size: .86rem; color: var(--schlecht); background: var(--schlecht-weich); border-radius: 8px; padding: 8px 10px; }
+
+  .stock-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stock-tile {
+    appearance: none; border: 1px solid var(--rand); background: var(--flaeche-leise); color: var(--text);
+    border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 2px;
+    text-align: left; cursor: pointer; font: inherit; min-height: 62px;
+  }
+  .stock-tile:focus-visible { outline: 3px solid var(--marke); outline-offset: 2px; }
+  .stock-tile__name { font-weight: 700; font-size: .95rem; }
+  .stock-tile__hint { font-size: .76rem; color: var(--text-dritt); }
+
+  .stock-item { display: flex; flex-direction: column; gap: 2px; }
+  .stock-item__name { margin: 0; font-size: 1.2rem; line-height: 1.25; text-wrap: balance; }
+  .stock-item__stock { margin: 4px 0 0; font-size: .88rem; font-weight: 600; font-family: var(--schrift-daten); }
+  .stock-item__stock--gut { color: var(--gut); }
+  .stock-item__stock--knapp { color: var(--warn); }
+  .stock-item__stock--leer { color: var(--text-zweit); }
+  .stock-item__stock--unplausibel { color: var(--schlecht); }
+  .stock-item__stock--unbekannt { color: var(--text-dritt); }
+
+  .stock-pack { margin: 0; font-size: .82rem; color: var(--warn); background: var(--warn-weich); border-radius: 8px; padding: 8px 10px; }
+
+  .stock-amount { display: flex; align-items: center; gap: 8px; }
+  .stock-amount__step { width: 54px; min-width: 54px; font-size: 1.4rem; min-height: 54px; }
+  .stock-amount__field { flex: 1; }
+  .stock-amount__input {
+    width: 100%; font: inherit; font-family: var(--schrift-daten); font-size: 1.5rem; font-weight: 700;
+    text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--rand-stark);
+    background: var(--flaeche); color: var(--text); min-height: 54px; box-sizing: border-box;
+  }
+  .stock-amount__input:focus-visible { outline: 3px solid var(--marke); outline-offset: 1px; }
+  .stock-amount__unit { font-size: .9rem; color: var(--text-zweit); min-width: 3.5rem; }
+
+  .stock-site { display: flex; flex-direction: column; gap: 4px; font-size: .74rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-dritt); }
+  .stock-site__select {
+    font: inherit; font-size: .95rem; text-transform: none; letter-spacing: 0; font-weight: 500;
+    color: var(--text); background: var(--flaeche); border: 1px solid var(--rand-stark);
+    border-radius: 8px; padding: 10px; min-height: 46px;
+  }
+
+  .stock-actions { display: flex; flex-direction: column; gap: 8px; }
+
+  .stock-done { align-items: center; text-align: center; }
+  .stock-done__mark {
+    margin: 0; width: 58px; height: 58px; border-radius: 50%;
+    background: var(--gut-weich); color: var(--gut);
+    display: grid; place-items: center; font-size: 1.9rem; font-weight: 700;
+  }
+  .stock-done__title { margin: 0; font-size: 1.15rem; }
+  .stock-done__item { margin: 0; color: var(--text-zweit); }
+  .stock-done__stock { margin: 0; font-family: var(--schrift-daten); font-weight: 700; }
+
+  .stock-unknown__code { margin: 0; font-family: var(--schrift-daten); font-size: 1.2rem; font-weight: 700; word-break: break-all; }
+  .stock-unknown__text { margin: 0; color: var(--text-zweit); font-size: .9rem; }
+
+  /* Bueroansichten: Listen statt Ablauf. Wer Artikel pflegt, sucht. */
+  .stock-list, .stock-form { display: flex; flex-direction: column; gap: 12px; }
+
+  .stock-head { display: flex; align-items: center; gap: 6px; }
+  .stock-head__title { margin: 0; font-size: 1.15rem; }
+  .stock-back { width: 44px; min-width: 44px; font-size: 1.2rem; }
+
+  .stock-group { display: flex; flex-direction: column; gap: 6px; }
+  .stock-group__name {
+    margin: 0; font-size: .68rem; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--text-dritt);
+  }
+
+  .stock-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .stock-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 1px 10px;
+    padding: 10px 12px; border-radius: 8px; background: var(--flaeche-leise);
+    border: 1px solid var(--rand);
+  }
+  .stock-row--tap { cursor: pointer; }
+  .stock-row--tap:hover { background: var(--grund); }
+  .stock-row__name { font-weight: 600; }
+  .stock-row__number { grid-column: 1; font-size: .78rem; color: var(--text-dritt); font-family: var(--schrift-daten); }
+  .stock-row__amount {
+    grid-row: 1 / span 2; grid-column: 2; align-self: center;
+    font-family: var(--schrift-daten); font-weight: 700; font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .stock-row__amount--gut { color: var(--gut); }
+  .stock-row__amount--knapp { color: var(--warn); }
+  .stock-row__amount--leer { color: var(--text-zweit); }
+  .stock-row__amount--unplausibel { color: var(--schlecht); }
+  .stock-row__amount--unbekannt { color: var(--text-dritt); }
+
+  .stock-empty { margin: 0; color: var(--text-dritt); font-size: .9rem; }
+
+  .stock-row__amount--mehr { color: var(--warn); }
+  .stock-row__amount--weniger { color: var(--schlecht); }
+  .stock-row__amount--offen { color: var(--text-dritt); }
+
+  .stock-codes__item { margin: 0; font-weight: 700; }
+  .stock-code-row { display: grid; grid-template-columns: 1fr 6rem; gap: 8px; }
+  .stock-codes-edit { display: flex; flex-direction: column; gap: 8px; }
+  .stock-code-add { display: flex; flex-direction: column; gap: 8px; }
+  .stock-hint { margin: 0; font-size: .8rem; color: var(--text-dritt); }
+  .stock-code-revoke { grid-row: 1 / span 2; grid-column: 2; width: auto; min-height: 36px; font-size: .8rem; }
+
+  .stock-order__supplier { margin: 0; font-weight: 700; }
+  .stock-order__status {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten);
+  }
+  .stock-row--order-line { grid-template-columns: 1fr 6.5rem; }
+  .stock-order__field { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+  .stock-order__input {
+    width: 100%; font: inherit; font-family: var(--schrift-daten); font-weight: 700;
+    text-align: right; padding: 8px; border-radius: 8px;
+    border: 1px solid var(--rand-stark); background: var(--flaeche); color: var(--text);
+    min-height: 44px; box-sizing: border-box;
+  }
+  .stock-order__input:focus-visible { outline: 3px solid var(--marke); outline-offset: 1px; }
+
+  .stock-inventory__where { margin: 0; font-weight: 700; }
+  .stock-inventory__progress {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten); font-variant-numeric: tabular-nums;
+  }
+  .stock-count {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 12px; border-radius: 10px;
+    background: var(--marke-weich); border: 1px solid var(--marke);
+  }
+  .stock-count__name { margin: 0; font-size: 1.1rem; }
+  .stock-count__expected {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten);
+  }
+
+  .stock-field { display: flex; flex-direction: column; gap: 4px; }
+  .stock-field > span {
+    font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-dritt);
+  }
+  .stock-field input, .stock-field select {
+    font: inherit; font-size: 1rem; color: var(--text); background: var(--flaeche);
+    border: 1px solid var(--rand-stark); border-radius: 8px; padding: 10px;
+    min-height: 46px; box-sizing: border-box; width: 100%;
+  }
+  .stock-field input:focus-visible, .stock-field select:focus-visible {
+    outline: 3px solid var(--marke); outline-offset: 1px;
+  }
+  .stock-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Werkbank: alles, was in der echten App nicht da waere. */
+  .werkbank { display: flex; flex-direction: column; gap: 14px; }
+  .karte {
+    background: var(--flaeche); border: 1px solid var(--rand); border-radius: 12px;
+    box-shadow: var(--schatten); padding: 14px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .karte__titel { margin: 0; font-size: .68rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text-dritt); }
+  .karte__text { margin: 0; font-size: .84rem; color: var(--text-zweit); }
+
+  .scan-knoepfe { display: flex; flex-direction: column; gap: 8px; }
+  .scan-knopf { min-height: 44px; font-size: .88rem; font-weight: 600; justify-content: flex-start; }
+  .scan-knopf small { color: var(--text-dritt); font-weight: 500; font-family: var(--schrift-daten); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rand); }
+  th { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dritt); }
+  td.zahl { text-align: right; font-family: var(--schrift-daten); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .negativ { color: var(--schlecht); }
+  .knapp { color: var(--warn); }
+  .tabelle-huelle { overflow-x: auto; }
+
+  .journal { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: .82rem; font-family: var(--schrift-daten); }
+  .journal li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 8px; background: var(--flaeche-leise); border-radius: 6px; }
+  .journal .wiederholt { color: var(--warn); }
+
+  .fuss { margin: 0; font-size: .78rem; color: var(--text-dritt); text-align: center; text-wrap: balance; }
+</style>
+
+<div class="blatt">
+
+  <header class="kopf">
+    <p class="marke-zeile"><span class="marke-punkt" aria-hidden="true"></span> Schäfchen · Lager</p>
+    <h1>So soll sich die Bedienung anfühlen</h1>
+    <p class="vorspann">
+      Links das Telefon des Monteurs, rechts die Werkbank. Die Daten sind erfunden und leben
+      nur in diesem Browser — der Ablauf, die Rollenrechte und die Mengenlogik sind dagegen
+      genau die, die später gegen die echte API laufen.
+    </p>
+  </header>
+
+  <div class="rollen" role="group" aria-label="Rolle wählen">
+    <button class="rolle" type="button" data-rolle="monteur" aria-pressed="true">Monteur</button>
+    <button class="rolle" type="button" data-rolle="vorarbeiter" aria-pressed="false">Vorarbeiter</button>
+    <button class="rolle" type="button" data-rolle="buero" aria-pressed="false">Büro</button>
+  </div>
+
+  <div class="buehne">
+    <div class="telefon">
+      <div class="telefon__leiste">
+        <strong>Lager</strong>
+        <span id="wer">Monteur</span>
+      </div>
+      <div class="telefon__inhalt" id="ansicht"></div>
+    </div>
+
+    <div class="werkbank">
+      <section class="karte">
+        <h2 class="karte__titel">Statt Kamera: Code auswählen</h2>
+        <p class="karte__text">
+          In der App scannt hier die Kamera. Hier tust du so, als hättest du gescannt.
+        </p>
+        <div class="scan-knoepfe" id="scan-knoepfe"></div>
+        <button class="button button--secondary" type="button" id="foto-knopf">
+          Echtes Etikett fotografieren
+        </button>
+        <input class="visually-hidden" type="file" id="datei" accept="image/*" capture="environment">
+        <p class="karte__text" id="foto-hinweis" hidden></p>
+      </section>
+
+      <section class="karte">
+        <h2 class="karte__titel">Bestand</h2>
+        <div class="tabelle-huelle">
+          <table>
+            <thead><tr><th>Artikel</th><th>Lagerplatz</th><th class="zahl">Menge</th></tr></thead>
+            <tbody id="bestand"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="karte">
+        <h2 class="karte__titel">Journal</h2>
+        <p class="karte__text" id="journal-leer">Noch nichts gebucht.</p>
+        <ul class="journal" id="journal"></ul>
+      </section>
+    </div>
+  </div>
+
+  <p class="fuss">
+    Vorschau der Lagerbedienung. Erfundene Daten, keine Verbindung, nichts wird gespeichert.
+  </p>
+</div>
+
+<script type="module">
+/*__DECODER__*/
+
+/*__SCANNER__*/
+
+/*__LAGER__*/
+
+/*__DEMO_QR__*/
+
+// ---------------------------------------------------------------------------
+// Erfundener Hintergrund: bildet die Antworten von /api/v1/stock/* nach,
+// damit die Bedienung genau den Code ausfuehrt, der spaeter echt laeuft.
+// ---------------------------------------------------------------------------
+
+const ORTE = [
+  { id: 'ort-0', name: 'Materiallager', path: 'Materiallager', locationType: 'warehouse' },
+  { id: 'ort-1', name: 'Regal A', path: 'Materiallager › Regal A', locationType: 'other' },
+  { id: 'ort-2', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1', locationType: 'other' },
+  { id: 'ort-3', name: 'Werkstatt', path: 'Werkstatt', locationType: 'workshop' }
+];
+
+const ARTIKEL = [
+  {
+    id: 'art-1', itemNumber: 'LAG-0001', name: 'Schalterdose tief', unit: 'Stück',
+    minimumStock: 50, targetStock: 300,
+    codes: [
+      { code: '4006381333931', gtin: '04006381333931', pack: 1, text: 'Einzelpackung' },
+      { code: '96385074', gtin: '00000096385074', pack: 100, text: 'Karton mit 100' }
+    ]
+  },
+  {
+    id: 'art-2', itemNumber: 'LAG-0002', name: 'NYM-J 3×1,5', unit: 'Meter',
+    minimumStock: 200, targetStock: 1000,
+    codes: [{ code: 'KABEL-TROMMEL-01', gtin: null, pack: 1, text: 'Eigenes Etikett' }]
+  },
+  {
+    id: 'art-3', itemNumber: 'LAG-0003', name: 'Sicherungsautomat B16', unit: 'Stück',
+    minimumStock: 20, targetStock: 60,
+    codes: [{ code: '5901234123457', gtin: '05901234123457', pack: 1, text: 'Einzelpackung' }]
+  }
+];
+
+const BAUSTELLEN = [
+  { id: 'bau-1', name: 'Neubau Grundschule, Haus B' },
+  { id: 'bau-2', name: 'Sanierung Rathaus' }
+];
+
+const bestand = new Map([
+  ['art-1|ort-0', 420], ['art-1|ort-2', 60],
+  ['art-2|ort-0', 150],
+  ['art-3|ort-0', 45]
+]);
+
+const journal = [];
+const gesehenerVorgang = new Set();
+
+const ROLLEN = {
+  monteur: { name: 'Monteur', rechte: {} },
+  vorarbeiter: { name: 'Vorarbeiter', rechte: { transfer: true } },
+  buero: { name: 'Büro', rechte: { transfer: true, manage: true } }
+};
+
+function bestandVon(artikelId) {
+  return ORTE
+    .map((ort) => ({ locationId: ort.id, locationName: ort.name, quantity: bestand.get(`${artikelId}|${ort.id}`) ?? 0 }))
+    .filter((zeile) => zeile.quantity !== 0);
+}
+
+function artikelAntwort(artikel, pack) {
+  return {
+    found: true,
+    kind: 'item',
+    packQuantity: pack,
+    item: {
+      id: artikel.id, itemNumber: artikel.itemNumber, name: artikel.name,
+      unit: artikel.unit, minimumStock: artikel.minimumStock, targetStock: artikel.targetStock,
+      totalQuantity: ORTE.reduce((summe, ort) => summe + (bestand.get(`${artikel.id}|${ort.id}`) ?? 0), 0)
+    },
+    levels: bestandVon(artikel.id)
+  };
+}
+
+/** Bildet POST /api/v1/stock/scan nach, inklusive der GTIN-Normalisierung. */
+function scanAufloesen(code) {
+  const ort = ORTE.find((eintrag) => eintrag.id === code);
+  if (ort) return { found: true, kind: 'location', location: ort };
+
+  const gtin = gtinNormalisieren(code);
+  const gesucht = gtin || String(code).trim().toUpperCase();
+
+  for (const artikel of ARTIKEL) {
+    const treffer = artikel.codes.find((eintrag) => (eintrag.gtin || eintrag.code.toUpperCase()) === gesucht);
+    if (treffer) return artikelAntwort(artikel, treffer.pack);
+  }
+
+  return { found: false, kind: gtin ? 'gtin' : 'text', code: String(code), normalized: gesucht };
+}
+
+/** Bildet POST /api/v1/stock/movements nach, samt Idempotenz. */
+function buchen(buchung) {
+  if (gesehenerVorgang.has(buchung.clientOperationId)) {
+    const alt = journal.find((eintrag) => eintrag.vorgangId === buchung.clientOperationId);
+    return { repeated: true, levels: bestandVon(buchung.itemId), movement: alt };
+  }
+  gesehenerVorgang.add(buchung.clientOperationId);
+
+  const aendern = (ortId, menge) => {
+    const schluessel = `${buchung.itemId}|${ortId}`;
+    bestand.set(schluessel, Math.round(((bestand.get(schluessel) ?? 0) + menge) * 1000) / 1000);
+  };
+  if (buchung.sourceLocationId) aendern(buchung.sourceLocationId, -buchung.quantity);
+  if (buchung.targetLocationId) aendern(buchung.targetLocationId, buchung.quantity);
+
+  const artikel = ARTIKEL.find((eintrag) => eintrag.id === buchung.itemId);
+  const eintrag = {
+    vorgangId: buchung.clientOperationId,
+    text: `${buchung.movementType} · ${mengeAlsText(buchung.quantity)} ${artikel?.unit || ''} · ${artikel?.name || ''}`,
+    zeit: new Date().toLocaleTimeString('de-DE')
+  };
+  journal.unshift(eintrag);
+
+  return { repeated: false, levels: bestandVon(buchung.itemId), movement: eintrag };
+}
+
+// ---------------------------------------------------------------------------
+// Bedienung
+// ---------------------------------------------------------------------------
+
+const $ = (id) => document.getElementById(id);
+let rolle = 'monteur';
+let zustand = lagerZustand();
+
+const GRUPPEN = [
+  { key: 'installation', name: 'Installationsmaterial' },
+  { key: 'cable', name: 'Kabel und Leitungen' },
+  { key: 'switches', name: 'Schalter und Steckdosen' },
+  { key: 'other', name: 'Sonstiges Material' }
+];
+
+/** Bildet GET /levels nach. */
+function alleBestandszeilen() {
+  const zeilen = [];
+  for (const artikel of ARTIKEL) {
+    for (const ort of ORTE) {
+      const menge = bestand.get(`${artikel.id}|${ort.id}`);
+      if (!menge) continue;
+      zeilen.push({
+        itemId: artikel.id, itemName: artikel.name, itemNumber: artikel.itemNumber,
+        unit: artikel.unit, locationId: ort.id, locationName: ort.name, quantity: menge
+      });
+    }
+  }
+  return zeilen;
+}
+
+/** Bildet GET /items nach. */
+function alleArtikel() {
+  return ARTIKEL.map((artikel) => ({
+    id: artikel.id, itemNumber: artikel.itemNumber, name: artikel.name, unit: artikel.unit,
+    minimumStock: artikel.minimumStock, targetStock: artikel.targetStock,
+    totalQuantity: ORTE.reduce((summe, ort) => summe + (bestand.get(`${artikel.id}|${ort.id}`) ?? 0), 0)
+  }));
+}
+
+/** Bildet GET /reorder nach: eine Rechnung, kein gespeicherter Zustand. */
+function alleVorschlaege() {
+  return knappeArtikel(alleArtikel()).map((artikel) => ({
+    ...artikel,
+    suggestedQuantity: Math.max(0, (artikel.targetStock ?? artikel.minimumStock) - artikel.totalQuantity),
+    supplierName: 'Sonepar'
+  }));
+}
+
+// --- Bestellwesen: bildet /api/v1/stock/orders/* nach --------------------
+const LIEFERANTEN = [{ id: 'lief-1', name: 'Sonepar Deutschland', supplierNumber: 'L-0001' }];
+const BESTELLUNGEN = [];
+let bestellZaehler = 41;
+
+function bestellungAusVorschlag() {
+  const zeilen = alleVorschlaege().map((eintrag, index) => ({
+    id: `pos-${BESTELLUNGEN.length + 1}-${index + 1}`,
+    linePosition: index + 1,
+    itemId: eintrag.id,
+    itemName: eintrag.name,
+    itemNumber: eintrag.itemNumber,
+    unit: eintrag.unit,
+    quantityOrdered: eintrag.suggestedQuantity,
+    quantityReceived: 0,
+    quantityOpen: eintrag.suggestedQuantity
+  }));
+  if (!zeilen.length) return null;
+
+  bestellZaehler += 1;
+  const bestellung = {
+    order: {
+      id: `best-${BESTELLUNGEN.length + 1}`,
+      orderNumber: `B-2026-${String(bestellZaehler).padStart(6, '0')}`,
+      supplierId: 'lief-1',
+      supplierName: LIEFERANTEN[0].name,
+      status: 'draft'
+    },
+    lines: zeilen
+  };
+  BESTELLUNGEN.unshift(bestellung);
+  return bestellung;
+}
+
+function codesVon(artikelId) {
+  const artikel = ARTIKEL.find((eintrag) => eintrag.id === artikelId);
+  return (artikel?.codes || []).map((code, index) => ({
+    id: `${artikelId}-code-${index}`,
+    code: code.code,
+    codeType: code.gtin ? 'gtin' : 'internal',
+    packQuantity: code.pack,
+    isPrimary: index === 0
+  }));
+}
+
+function bestellungHolen(id) {
+  return BESTELLUNGEN.find((eintrag) => eintrag.order.id === id) || null;
+}
+
+function offeneBestellungen() {
+  return BESTELLUNGEN
+    .filter((eintrag) => ['ordered', 'partially_received', 'draft'].includes(eintrag.order.status))
+    .map((eintrag) => eintrag.order);
+}
+
+const gebuchteEingaenge = new Set();
+
+function wareneingangBuchen(bestellung, eingang) {
+  for (const zeile of eingang.lines) {
+    if (gebuchteEingaenge.has(zeile.clientOperationId)) continue;
+    gebuchteEingaenge.add(zeile.clientOperationId);
+
+    const position = bestellung.lines.find((eintrag) => eintrag.id === zeile.purchaseOrderItemId);
+    if (!position) continue;
+
+    position.quantityReceived = Math.round((position.quantityReceived + zeile.quantity) * 1000) / 1000;
+    position.quantityOpen = Math.max(0, Math.round((position.quantityOrdered - position.quantityReceived) * 1000) / 1000);
+
+    const schluessel = `${position.itemId}|${eingang.locationId}`;
+    bestand.set(schluessel, Math.round(((bestand.get(schluessel) ?? 0) + zeile.quantity) * 1000) / 1000);
+
+    journal.unshift({
+      vorgangId: zeile.clientOperationId,
+      text: `receipt · ${mengeAlsText(zeile.quantity)} ${position.unit} · ${position.itemName}`,
+      zeit: new Date().toLocaleTimeString('de-DE')
+    });
+  }
+
+  bestellung.order.status = bestellung.lines.every((zeile) => zeile.quantityOpen === 0)
+    ? 'received' : 'partially_received';
+  return bestellung;
+}
+
+// --- Inventur: bildet /api/v1/stock/inventory/* nach ---------------------
+let laufendeInventur = null;
+
+function inventurAntwort() {
+  if (!laufendeInventur) return null;
+  const zeilen = laufendeInventur.zeilen.map((zeile) => {
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.itemId);
+    return {
+      itemId: zeile.itemId,
+      itemName: artikel?.name || '',
+      unit: artikel?.unit || '',
+      expectedQuantity: zeile.erwartet,
+      countedQuantity: zeile.gezaehlt,
+      difference: zeile.gezaehlt === null
+        ? null
+        : Math.round((zeile.gezaehlt - zeile.erwartet) * 1000) / 1000
+    };
+  });
+  return { session: laufendeInventur.session, lines: zeilen };
+}
+
+function inventurStarten(ortId) {
+  const ort = ORTE.find((eintrag) => eintrag.id === ortId);
+  laufendeInventur = {
+    session: { id: 'inv-demo', locationId: ortId, locationName: ort?.name || '', status: 'running' },
+    zeilen: ARTIKEL
+      .map((artikel) => ({ itemId: artikel.id, erwartet: bestand.get(`${artikel.id}|${ortId}`) ?? 0, gezaehlt: null }))
+      .filter((zeile) => zeile.erwartet !== 0)
+  };
+  return inventurAntwort();
+}
+
+function inventurZaehlen(itemId, menge) {
+  const vorhanden = laufendeInventur.zeilen.find((zeile) => zeile.itemId === itemId);
+  if (vorhanden) vorhanden.gezaehlt = menge;
+  else laufendeInventur.zeilen.push({ itemId, erwartet: 0, gezaehlt: menge });
+  return inventurAntwort();
+}
+
+function inventurAbschliessen() {
+  const ortId = laufendeInventur.session.locationId;
+  let korrekturen = 0;
+
+  for (const zeile of laufendeInventur.zeilen) {
+    if (zeile.gezaehlt === null || zeile.gezaehlt === zeile.erwartet) continue;
+    const differenz = zeile.gezaehlt - zeile.erwartet;
+    const schluessel = `${zeile.itemId}|${ortId}`;
+    bestand.set(schluessel, Math.round(((bestand.get(schluessel) ?? 0) + differenz) * 1000) / 1000);
+
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.itemId);
+    journal.unshift({
+      vorgangId: `inv-${zeile.itemId}`,
+      text: `correction · ${differenz > 0 ? '+' : '−'}${mengeAlsText(Math.abs(differenz))} ${artikel?.unit || ''} · ${artikel?.name || ''}`,
+      zeit: new Date().toLocaleTimeString('de-DE')
+    });
+    korrekturen += 1;
+  }
+
+  laufendeInventur = null;
+  return korrekturen;
+}
+
+/** Bildet POST /api/v1/stock/labels/sheet nach. */
+function etikettenHolen(ziele) {
+  return ziele.map((ziel) => {
+    const bild = DEMO_QR[ziel.id];
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === ziel.id);
+    const ort = ORTE.find((eintrag) => eintrag.id === ziel.id);
+    return {
+      targetType: ziel.targetType,
+      id: ziel.id,
+      label: artikel?.name || ort?.name || 'Ohne Namen',
+      sublabel: artikel?.itemNumber || '',
+      target: bild?.target || '',
+      // Fuer in der Vorschau neu angelegte Artikel gibt es kein vorbereitetes
+      // Bild; in der App kaeme es aus der API.
+      svg: bild?.svg || '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">'
+        + '<rect width="10" height="10" fill="#fff" stroke="#bbb" stroke-width=".3"/>'
+        + '<text x="5" y="5.6" font-size="1.4" text-anchor="middle" fill="#888">QR</text></svg>'
+    };
+  });
+}
+
+function etikettenDrucken(ziele) {
+  const fenster = window.open('', '_blank');
+  if (!fenster) return false;
+  fenster.document.write(etikettBogenHtml(etikettenHolen(ziele)));
+  fenster.document.close();
+  return true;
+}
+
+const optionen = () => ({
+  baustellen: BAUSTELLEN,
+  baustellePflicht: false,
+  bestand: alleBestandszeilen(),
+  artikel: alleArtikel(),
+  vorschlaege: alleVorschlaege(),
+  bestellungen: offeneBestellungen(),
+  gruppen: GRUPPEN
+});
+const rechte = () => ROLLEN[rolle].rechte;
+
+function zeichnen() {
+  $('ansicht').innerHTML = ansichtFuer(zustand, rechte(), optionen());
+  $('wer').textContent = ROLLEN[rolle].name;
+  verdrahten();
+  bestandZeichnen();
+  journalZeichnen();
+}
+
+function verdrahten() {
+  const wurzel = $('ansicht');
+
+  wurzel.querySelector('.stock-scan')?.addEventListener('click', () => {
+    $('scan-knoepfe').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  wurzel.querySelector('.stock-place')?.addEventListener('click', () => {
+    const naechster = ORTE[(ORTE.findIndex((o) => o.id === zustand.ort?.id) + 1) % ORTE.length];
+    zustand = scanVerarbeiten(zustand, { found: true, kind: 'location', location: naechster });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-cancel')?.addEventListener('click', () => {
+    zustand = lagerZustand({ ort: zustand.ort });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-home')?.addEventListener('click', () => {
+    zustand = lagerZustand({ ort: zustand.ort });
+    zeichnen();
+  });
+
+  const feld = wurzel.querySelector('.stock-amount__input');
+  feld?.addEventListener('input', () => { zustand.menge = feld.value; });
+
+  wurzel.querySelectorAll('.stock-amount__step').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      const jetzt = mengeAusText(zustand.menge) ?? 0;
+      const schritt = Number(knopf.dataset.schritt) * (zustand.gebinde > 1 ? zustand.gebinde : 1);
+      const neu = Math.max(0, Math.round((jetzt + schritt) * 1000) / 1000);
+      zustand.menge = neu > 0 ? mengeAlsText(neu) : '';
+      feld.value = zustand.menge;
+    });
+  });
+
+  wurzel.querySelector('.stock-site__select')?.addEventListener('change', (e) => {
+    zustand.baustelleId = e.target.value || null;
+  });
+
+  wurzel.querySelectorAll('.stock-do').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      zustand.vorgang = knopf.dataset.vorgang;
+      if (zustand.vorgang === 'umlagerung' && !zustand.zielOrtId) {
+        zustand.zielOrtId = ORTE.find((ort) => ort.id !== zustand.ort?.id)?.id || null;
+      }
+      const { buchung, fehler } = buchungBauen(zustand, optionen());
+      if (fehler) {
+        zustand = { ...zustand, fehler };
+        zeichnen();
+        return;
+      }
+      zustand = buchungVerarbeiten(zustand, buchen(buchung));
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelector('.stock-create')?.addEventListener('click', () => {
+    zustand = {
+      ...zustand,
+      schritt: SCHRITTE.ARTIKEL_NEU,
+      entwurf: artikelEntwurfAusScan(zustand.letzterScan, GRUPPEN),
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-new')?.addEventListener('click', () => {
+    zustand = { ...zustand, schritt: SCHRITTE.ARTIKEL_NEU, entwurf: { unit: 'Stück' }, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-save')?.addEventListener('click', () => {
+    const werte = {};
+    wurzel.querySelectorAll('[name]:not([data-code-index])').forEach((feld) => {
+      werte[feld.name] = feld.value;
+    });
+
+    // Die Codezeilen kommen aus dem Formular und nicht aus dem Entwurf: was
+    // dort steht, hat der Benutzer zuletzt getippt.
+    const codeFelder = [...wurzel.querySelectorAll('[name="code"][data-code-index]')];
+    const packFelder = [...wurzel.querySelectorAll('[name="packQuantity"][data-code-index]')];
+    werte.barcodes = codeFelder.map((feld, index) => ({
+      code: feld.value,
+      packQuantity: packFelder[index]?.value ?? 1,
+      codeType: gtinNormalisieren(feld.value) ? 'gtin' : 'internal',
+      isPrimary: index === 0
+    })).filter((zeile) => zeile.code.trim());
+
+    const { entwurf, fehler } = artikelFormularLesen(werte);
+    if (fehler) {
+      zustand = { ...zustand, entwurf: { ...zustand.entwurf, ...werte }, fehler };
+      zeichnen();
+      return;
+    }
+
+    ARTIKEL.push({
+      id: `art-${ARTIKEL.length + 1}`,
+      itemNumber: entwurf.itemNumber,
+      name: entwurf.name,
+      unit: entwurf.unit,
+      minimumStock: entwurf.minimumStock ?? 0,
+      targetStock: entwurf.targetStock ?? null,
+      codes: entwurf.barcodes.map((code) => ({
+        code: code.code,
+        gtin: gtinNormalisieren(code.code),
+        pack: code.packQuantity,
+        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigener Code'
+      }))
+    });
+
+    scanKnoepfeZeichnen();
+    zustand = lagerZustand({ ort: zustand.ort, schritt: SCHRITTE.ARTIKEL });
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-tile').forEach((kachel) => {
+    kachel.addEventListener('click', () => {
+      const ziele = {
+        bestand: SCHRITTE.BESTAND,
+        artikel: SCHRITTE.ARTIKEL,
+        nachbestellung: SCHRITTE.NACHBESTELLUNG,
+        inventur: SCHRITTE.INVENTUR,
+        bestellungen: SCHRITTE.BESTELLUNGEN
+      };
+      zustand = {
+        ...zustand,
+        schritt: ziele[kachel.dataset.ziel] || SCHRITTE.START,
+        inventur: inventurAntwort(),
+        zaehlArtikel: null,
+        fehler: null
+      };
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelector('.stock-inventory-start')?.addEventListener('click', () => {
+    const ortId = zustand.ort?.id || ORTE[0].id;
+    zustand = { ...zustand, inventur: inventurStarten(ortId), zaehlArtikel: null, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-count-save')?.addEventListener('click', () => {
+    const { zaehlung, fehler } = zaehlungBauen(zustand);
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+    zustand = {
+      ...zustand,
+      inventur: inventurZaehlen(zaehlung.itemId, zaehlung.quantity),
+      zaehlArtikel: null,
+      menge: '',
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-count__input')?.addEventListener('input', (e) => {
+    zustand.menge = e.target.value;
+  });
+
+  wurzel.querySelector('.stock-inventory-done')?.addEventListener('click', () => {
+    const korrekturen = inventurAbschliessen();
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: `Inventur abgeschlossen: ${korrekturen} Korrektur${korrekturen === 1 ? '' : 'en'} gebucht.` });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-inventory-cancel')?.addEventListener('click', () => {
+    laufendeInventur = null;
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Inventur abgebrochen.' });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-codes-open')?.addEventListener('click', () => {
+    zustand = {
+      ...zustand,
+      schritt: SCHRITTE.ARTIKEL_CODES,
+      codes: codesVon(zustand.artikel.id),
+      codeEntwurf: null,
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-code-scan')?.addEventListener('click', () => {
+    $('scan-knoepfe').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  wurzel.querySelector('.stock-code-save')?.addEventListener('click', () => {
+    const { nachtrag, fehler } = codeNachtragLesen({
+      code: wurzel.querySelector('.stock-code-input').value,
+      packQuantity: wurzel.querySelector('.stock-code-pack').value,
+      codeType: gtinNormalisieren(wurzel.querySelector('.stock-code-input').value) ? 'gtin' : 'internal'
+    });
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+
+    // Wie in der Datenbank: ein aktiver Code gehoert zu genau einem Artikel.
+    const gesucht = gtinNormalisieren(nachtrag.code) || nachtrag.code.toUpperCase();
+    const belegt = ARTIKEL.some((eintrag) => eintrag.codes.some(
+      (code) => (code.gtin || code.code.toUpperCase()) === gesucht
+    ));
+    if (belegt) {
+      zustand = { ...zustand, fehler: 'Diesen Code trägt bereits ein anderer Artikel.' };
+      zeichnen();
+      return;
+    }
+
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zustand.artikel.id);
+    artikel.codes.push({
+      code: nachtrag.code,
+      gtin: gtinNormalisieren(nachtrag.code),
+      pack: nachtrag.packQuantity,
+      text: nachtrag.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+    });
+    scanKnoepfeZeichnen();
+    zustand = { ...zustand, codes: codesVon(artikel.id), codeEntwurf: null, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-code-revoke').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      const artikel = ARTIKEL.find((eintrag) => eintrag.id === zustand.artikel.id);
+      const index = Number(knopf.dataset.code.split('-').pop());
+      artikel.codes.splice(index, 1);
+      scanKnoepfeZeichnen();
+      zustand = { ...zustand, codes: codesVon(artikel.id), fehler: null };
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelector('.stock-label-print')?.addEventListener('click', () => {
+    const gedruckt = etikettenDrucken([{ targetType: 'item', id: zustand.artikel.id }]);
+    if (!gedruckt) {
+      zustand = { ...zustand, fehler: 'Der Browser hat das Druckfenster blockiert.' };
+      zeichnen();
+    }
+  });
+
+  wurzel.querySelector('.stock-code-row-add')?.addEventListener('click', () => {
+    const vorhandene = [...wurzel.querySelectorAll('[name="code"]')].map((feld, index) => ({
+      code: feld.value,
+      packQuantity: wurzel.querySelectorAll('[name="packQuantity"]')[index]?.value ?? 1,
+      codeType: 'internal',
+      isPrimary: index === 0
+    }));
+    zustand = {
+      ...zustand,
+      entwurf: { ...zustand.entwurf, barcodes: [...vorhandene, leereCodezeile()] }
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-from-reorder')?.addEventListener('click', () => {
+    const bestellung = bestellungAusVorschlag();
+    zustand = bestellung
+      ? { ...zustand, schritt: SCHRITTE.BESTELLUNG, bestellung, eingang: {}, fehler: null }
+      : { ...zustand, fehler: 'Kein Artikel liegt unter seinem Mindestbestand.' };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-send')?.addEventListener('click', () => {
+    zustand.bestellung.order.status = 'ordered';
+    zustand = { ...zustand, eingang: eingangVorbelegen(zustand.bestellung), fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-order__input').forEach((feld) => {
+    feld.addEventListener('input', () => {
+      zustand.eingang = { ...(zustand.eingang || {}), [feld.dataset.position]: feld.value };
+    });
+  });
+
+  wurzel.querySelector('.stock-order-receive')?.addEventListener('click', () => {
+    const { eingang, fehler } = wareneingangBauen(zustand, {});
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+    const bestellung = wareneingangBuchen(zustand.bestellung, eingang);
+    zustand = {
+      ...zustand,
+      bestellung,
+      eingang: eingangVorbelegen(bestellung),
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-cancel')?.addEventListener('click', () => {
+    zustand.bestellung.order.status = 'cancelled';
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Bestellung storniert.' });
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-row--tap').forEach((zeile) => {
+    zeile.addEventListener('click', () => {
+      if (zeile.dataset.bestellung) {
+        const bestellung = bestellungHolen(zeile.dataset.bestellung);
+        zustand = {
+          ...zustand,
+          schritt: SCHRITTE.BESTELLUNG,
+          bestellung,
+          eingang: eingangVorbelegen(bestellung),
+          fehler: null
+        };
+        zeichnen();
+        return;
+      }
+      const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.dataset.artikel);
+      if (!artikel) return;
+      zustand = scanVerarbeiten(zustand, artikelAntwort(artikel, 1));
+      zeichnen();
+    });
+  });
+}
+
+function bestandZeichnen() {
+  const zeilen = [];
+  for (const artikel of ARTIKEL) {
+    for (const ort of ORTE) {
+      const menge = bestand.get(`${artikel.id}|${ort.id}`);
+      if (!menge) continue;
+      const lage = bestandLage(menge, 0);
+      zeilen.push(`<tr>
+        <td>${artikel.name}</td>
+        <td>${ort.name}</td>
+        <td class="zahl ${lage === 'unplausibel' ? 'negativ' : ''}">${mengeAlsText(menge)} ${artikel.unit}</td>
+      </tr>`);
+    }
+  }
+  $('bestand').innerHTML = zeilen.join('') || '<tr><td colspan="3">Kein Bestand.</td></tr>';
+}
+
+function journalZeichnen() {
+  $('journal-leer').hidden = journal.length > 0;
+  $('journal').innerHTML = journal.map((eintrag) => `
+    <li><span>${eintrag.text}</span><span>${eintrag.zeit}</span></li>
+  `).join('');
+}
+
+function scanKnoepfeZeichnen() {
+  const knoepfe = [];
+  knoepfe.push(`<button class="button button--secondary scan-knopf" type="button" data-code="ort-2">
+    Lagerplatz Fach A1 <small>Etikett</small></button>`);
+  knoepfe.push(`<button class="button button--secondary scan-knopf" type="button" data-code="ort-0">
+    Lagerplatz Materiallager <small>Etikett</small></button>`);
+  for (const artikel of ARTIKEL) {
+    for (const code of artikel.codes) {
+      knoepfe.push(`<button class="button button--secondary scan-knopf" type="button" data-code="${code.code}">
+        ${artikel.name} <small>${code.text}</small></button>`);
+    }
+  }
+  knoepfe.push(`<button class="button button--secondary scan-knopf" type="button" data-code="4260123456788">
+    Unbekannter Herstellercode <small>EAN-13</small></button>`);
+
+  $('scan-knoepfe').innerHTML = knoepfe.join('');
+  $('scan-knoepfe').querySelectorAll('[data-code]').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      const antwort = scanAufloesen(knopf.dataset.code);
+      zustand = zustand.schritt === SCHRITTE.INVENTUR
+        ? inventurScanVerarbeiten(zustand, antwort)
+        : scanVerarbeiten(zustand, antwort);
+      zeichnen();
+    });
+  });
+}
+
+document.querySelectorAll('.rolle').forEach((knopf) => {
+  knopf.addEventListener('click', () => {
+    rolle = knopf.dataset.rolle;
+    document.querySelectorAll('.rolle').forEach((anderer) => {
+      anderer.setAttribute('aria-pressed', String(anderer === knopf));
+    });
+    zeichnen();
+  });
+});
+
+$('foto-knopf').addEventListener('click', () => $('datei').click());
+
+$('datei').addEventListener('change', async (ereignis) => {
+  const datei = ereignis.target.files?.[0];
+  if (!datei) return;
+  const url = URL.createObjectURL(datei);
+
+  try {
+    const bild = new Image();
+    await new Promise((fertig, schief) => {
+      bild.onload = fertig;
+      bild.onerror = () => schief(new Error('Das Bild ließ sich nicht öffnen.'));
+      bild.src = url;
+    });
+
+    const leinwand = document.createElement('canvas');
+    const faktor = Math.min(1, 1600 / bild.naturalWidth);
+    leinwand.width = Math.round(bild.naturalWidth * faktor);
+    leinwand.height = Math.round(bild.naturalHeight * faktor);
+    const stift = leinwand.getContext('2d', { willReadFrequently: true });
+    stift.drawImage(bild, 0, 0, leinwand.width, leinwand.height);
+
+    const treffer = barcodeAusBild(stift.getImageData(0, 0, leinwand.width, leinwand.height), { zeilen: 41 });
+    $('foto-hinweis').hidden = false;
+
+    if (!treffer) {
+      $('foto-hinweis').textContent = 'Auf dem Foto war kein Code zu erkennen.';
+      return;
+    }
+    $('foto-hinweis').textContent = `Gelesen: ${treffer.wert} (${treffer.format}).`;
+    zustand = scanVerarbeiten(zustand, scanAufloesen(treffer.wert));
+    zeichnen();
+  } catch (fehler) {
+    $('foto-hinweis').hidden = false;
+    $('foto-hinweis').textContent = fehler.message;
+  } finally {
+    URL.revokeObjectURL(url);
+    ereignis.target.value = '';
+  }
+});
+
+scanKnoepfeZeichnen();
+zeichnen();
+</script>

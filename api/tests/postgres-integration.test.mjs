@@ -645,17 +645,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       Object.keys(initialModules).sort(),
       [
         "absences", "apprentice_reports", "assembly_reports", "devices",
-        "documents", "fleet", "materials", "site_daily_reports", "site_qr", "vde"
+        "documents", "fleet", "materials", "site_daily_reports", "site_qr",
+        "vde", "warehouse"
       ]
     );
-    // Der Standardumfang steht ohne Zutun offen. Das Spezialmodul VDE und das
-    // Berichtsheft gehoeren nicht dazu: beide gibt die Plattform je Firma frei,
-    // VDE als Spezialmodul, das Berichtsheft als eigener verkaufter Bereich.
+    // Der Standardumfang steht ohne Zutun offen. Drei Bereiche gehoeren nicht
+    // dazu, weil die Plattform sie je Firma freigibt: VDE als Spezialmodul,
+    // das Berichtsheft und die Lagerverwaltung als eigene verkaufte Bereiche.
+    // Die Materialverwaltung der Baustelle ist davon unberuehrt - sie ist
+    // etwas anderes als das Lager und bleibt im Standardumfang.
     assert.equal(initialModules.vde, false);
     assert.equal(initialModules.apprentice_reports, false);
+    assert.equal(initialModules.warehouse, false);
+    assert.equal(initialModules.materials, true);
     assert.ok(
       Object.entries(initialModules)
-        .filter(([key]) => !["vde", "apprentice_reports"].includes(key))
+        .filter(([key]) => !["vde", "apprentice_reports", "warehouse"].includes(key))
         .every(([, enabled]) => enabled === true)
     );
 
@@ -818,6 +823,74 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(updatedEditableEmployee.phone, "+49 171 7654321");
     assert.deepEqual(updatedEditableEmployee.roles, ["foreman"]);
     assert.ok(updatedEditableEmployee.rowVersion > editableEmployee.rowVersion);
+
+    // Die Firma entscheidet, wer das Lager fuehrt. Der Lagerist kommt zur
+    // Hauptrolle hinzu, statt sie zu ersetzen: in kleinen Betrieben fuehrt das
+    // Lager der Vorarbeiter, der ohnehin am Regal steht.
+    const lageristResponse = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${editableEmployee.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          personnelNumber: updatedEditableEmployee.personnelNumber,
+          firstName: updatedEditableEmployee.firstName,
+          lastName: updatedEditableEmployee.lastName,
+          email: updatedEditableEmployee.email,
+          phone: updatedEditableEmployee.phone,
+          role: "foreman",
+          warehouseManager: true,
+          rowVersion: updatedEditableEmployee.rowVersion
+        })
+      }
+    );
+    assert.equal(lageristResponse.status, 200, await lageristResponse.clone().text());
+    const mitLager = (await lageristResponse.json()).employee;
+    assert.deepEqual(mitLager.roles, ["foreman", "warehouse_manager"]);
+
+    // Eine Aenderung an Namen oder Telefon darf ihm das Lager nicht nehmen.
+    const namensaenderung = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${editableEmployee.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          personnelNumber: mitLager.personnelNumber,
+          firstName: "Erika Maria",
+          lastName: mitLager.lastName,
+          email: mitLager.email,
+          phone: mitLager.phone,
+          role: "foreman",
+          warehouseManager: true,
+          rowVersion: mitLager.rowVersion
+        })
+      }
+    );
+    assert.equal(namensaenderung.status, 200, await namensaenderung.clone().text());
+    const nachUmbenennung = (await namensaenderung.json()).employee;
+    assert.deepEqual(nachUmbenennung.roles, ["foreman", "warehouse_manager"]);
+
+    // Und sie laesst sich genauso wieder entziehen.
+    const ohneLagerResponse = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${editableEmployee.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          personnelNumber: nachUmbenennung.personnelNumber,
+          firstName: nachUmbenennung.firstName,
+          lastName: nachUmbenennung.lastName,
+          email: nachUmbenennung.email,
+          phone: nachUmbenennung.phone,
+          role: "foreman",
+          warehouseManager: false,
+          rowVersion: nachUmbenennung.rowVersion
+        })
+      }
+    );
+    assert.equal(ohneLagerResponse.status, 200, await ohneLagerResponse.clone().text());
+    updatedEditableEmployee = (await ohneLagerResponse.json()).employee;
+    assert.deepEqual(updatedEditableEmployee.roles, ["foreman"]);
 
     const customerResponse = await fetch(`${baseUrl}/api/v1/admin/customers`, {
       method: "POST",

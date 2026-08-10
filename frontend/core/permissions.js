@@ -83,6 +83,12 @@ export function employeeRoleLabel(roles = []) {
   if ((roles || []).includes("apprentice")) return "Auszubildender";
   if (isForeman(roles)) return "Vorarbeiter";
   if (hatEine(roles, PLANNING_ROLES)) return "Planung";
+  // Der Lagerist steht neben der Taetigkeit, nicht an ihrer Stelle: wer
+  // daneben Monteur ist, bleibt Monteur. Nur wer sonst nichts hat, heisst hier
+  // Lagerist - sonst laese er in seinem Konto "Monteur", ohne einer zu sein.
+  if ((roles || []).includes("warehouse_manager") && !(roles || []).includes("installer")) {
+    return "Lagerist";
+  }
   return "Monteur";
 }
 

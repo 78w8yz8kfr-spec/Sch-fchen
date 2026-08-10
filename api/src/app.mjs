@@ -55,6 +55,7 @@ import {
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
+import { handleStockRequest } from "./stock.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -201,7 +202,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.10";
+export const APPLICATION_VERSION = "0.44.11";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -6949,7 +6950,51 @@ async function createEmployee(client, context, input) {
      VALUES ($1, $2, $3, $4, 'Anlage in der Verwaltung')`,
     [context.companyId, inserted.rows[0].id, roleResult.rows[0].id, context.userId]
   );
+  if (input.warehouseManager) {
+    await assignWarehouseManagerRole(client, context, inserted.rows[0].id, true);
+  }
   return getEmployeeRecord(client, context, inserted.rows[0].id);
+}
+
+/**
+ * Setzt oder nimmt die Rolle "Lagerist" - zusaetzlich zur Hauptrolle.
+ *
+ * Wer das Lager fuehrt, bleibt daneben Monteur, Vorarbeiter oder Bueromensch.
+ * Die Rolle wird deshalb neben der Hauptrolle gehalten und beim Speichern des
+ * Mitarbeiters nicht mit abgeraeumt. Zurueckgenommen wird sie wie jede andere:
+ * mit Zeitpunkt und Grund, nicht durch Loeschen.
+ */
+async function assignWarehouseManagerRole(client, context, employeeId, gewuenscht) {
+  const rolle = await client.query(
+    "SELECT id FROM roles WHERE company_id = $1 AND role_key = 'warehouse_manager' AND status = 'active'",
+    [context.companyId]
+  );
+  if (rolle.rowCount !== 1) {
+    throw new InputError("Die Rolle Lagerist ist nicht verfügbar.", 409, "warehouse_role_missing");
+  }
+  const roleId = rolle.rows[0].id;
+
+  if (gewuenscht) {
+    await client.query(
+      `INSERT INTO user_roles (company_id, user_id, role_id, assigned_by_user_id, reason)
+       SELECT $1, $2, $3, $4, 'Lagerist in der Mitarbeiterverwaltung vergeben'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM user_roles
+         WHERE company_id = $1 AND user_id = $2 AND role_id = $3 AND revoked_at IS NULL
+       )`,
+      [context.companyId, employeeId, roleId, context.userId]
+    );
+    return;
+  }
+
+  await client.query(
+    `UPDATE user_roles
+     SET revoked_at = CURRENT_TIMESTAMP,
+         revoked_by_user_id = $3,
+         reason = 'Lagerist in der Mitarbeiterverwaltung entzogen'
+     WHERE company_id = $1 AND user_id = $2 AND role_id = $4 AND revoked_at IS NULL`,
+    [context.companyId, employeeId, context.userId, roleId]
+  );
 }
 
 async function updateEmployee(client, context, employeeId, input) {
@@ -7106,15 +7151,22 @@ async function updateEmployee(client, context, employeeId, input) {
     );
   }
 
+  // Die Lageristenrolle bleibt hier unangetastet: sie steht neben der
+  // Hauptrolle und wird eine Zeile weiter unten eigens gesetzt oder entzogen.
+  // Ohne diese Ausnahme naehme jede Namensaenderung dem Lageristen sein Lager.
   await client.query(
-    `UPDATE user_roles
+    `UPDATE user_roles AS zuordnung
      SET revoked_at = CURRENT_TIMESTAMP,
          revoked_by_user_id = $3,
          reason = 'Rollenänderung in der Mitarbeiterverwaltung'
-     WHERE company_id = $1
-       AND user_id = $2
-       AND revoked_at IS NULL
-       AND role_id <> $4`,
+     FROM roles AS rolle
+     WHERE zuordnung.company_id = $1
+       AND zuordnung.user_id = $2
+       AND zuordnung.revoked_at IS NULL
+       AND zuordnung.role_id <> $4
+       AND rolle.company_id = zuordnung.company_id
+       AND rolle.id = zuordnung.role_id
+       AND rolle.role_key <> 'warehouse_manager'`,
     [context.companyId, employeeId, context.userId, roleResult.rows[0].id]
   );
   await client.query(
@@ -7128,6 +7180,7 @@ async function updateEmployee(client, context, employeeId, input) {
      )`,
     [context.companyId, employeeId, roleResult.rows[0].id, context.userId]
   );
+  await assignWarehouseManagerRole(client, context, employeeId, input.warehouseManager);
 
   return getEmployeeRecord(client, context, employeeId);
 }
@@ -10472,6 +10525,25 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           })
         );
         if (handled?.document) return inlineDocument(response, handled.document);
+        if (handled) return json(response, handled.status, handled.body);
+      }
+
+      // Die Lagerverwaltung kapselt ihre Fachlogik ebenso in einem eigenen
+      // Modul. Die Sitzung wird auch hier aufgeloest, bevor das Modul etwas
+      // sieht: company_id und user_id kommen aus dem HttpOnly-Cookie und nie
+      // aus einem Barcode oder einem Frontend-Feld.
+      if (url.pathname.startsWith("/api/v1/stock")) {
+        const handled = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => handleStockRequest({
+            request,
+            url,
+            client,
+            context,
+            allowedOrigin: config.allowedOrigin
+          })
+        );
         if (handled) return json(response, handled.status, handled.body);
       }
 

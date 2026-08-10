@@ -5,6 +5,10 @@ const CONTENT_TYPES = new Map([
   [".html", "text/html; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
+  // Ohne diesen Eintrag kaeme eine .mjs-Datei als application/octet-stream an,
+  // und der Browser lehnt sie als Modul ab - der Bereich, der sie einbindet,
+  // bleibt dann leer. Betrifft den Barcode-Leser des Lagers.
+  [".mjs", "text/javascript; charset=utf-8"],
   [".svg", "image/svg+xml"],
   [".webmanifest", "application/manifest+json; charset=utf-8"],
   [".png", "image/png"],

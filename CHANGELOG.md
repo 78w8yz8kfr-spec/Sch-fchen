@@ -4,6 +4,109 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Lager ist in der App angekommen (Fassung 0.44.11).** Bisher lag es
+  vollständig, geprüft und unausgeliefert im Ordner `warehouse/`. Jetzt laufen
+  seine Migrationen im regulären Ablauf mit (107 bis 109), die Endpunkte hängen
+  unter `/api/v1/stock/*` in der Anwendung, und „Lager & Material“ steht in der
+  Navigation. Der Monteur scannt am Regal, tippt die Menge, bucht — drei
+  Schritte, ein Bild je Schritt; die Baustelle kommt aus seinem Tagesplan.
+  Zwei Dinge sind dabei bewusst keine Selbstverständlichkeit: Das Lager ist ein
+  **zuschaltbares Modul** mit eigenem Schlüssel `warehouse`, das die Plattform
+  je Firma freigibt — nicht `materials`, denn das ist die Materialverwaltung
+  der Baustelle und bleibt unverändert im Standardumfang. Und der **Lagerist**
+  ist eine eigene Rolle: wer das Lager führt, braucht dafür weder Kundendaten
+  noch Projektsteuerung, und welche Mitarbeiter sie bekommen, entscheidet die
+  Firma selbst in ihrer Mitarbeiterverwaltung. Ohne Freigabe bleibt jeder
+  Lagerendpunkt zu — auch für den Administrator der Firma, denn über den
+  verkauften Umfang entscheidet nicht der Kunde.
+- **Auch Ware ohne Barcode kommt ins Lager.** Kabeltrommel, Schüttgut, eigene
+  Konfektion: solche Artikel werden von Hand angelegt und bekommen ihr eigenes
+  Etikett zum Ausdrucken — A4, zehn Spalten, zwölf Reihen, 18 × 18 mm, dasselbe
+  erprobte Raster wie bei den Geräten. Ohne das wäre so ein Artikel nie
+  scannbar, und das ganze Lager hängt am Scannen. Codes lassen sich außerdem
+  jederzeit nachtragen, denn die Einzelpackung ist beim Anlegen dabei und der
+  Kartoncode mit Gebindemenge kommt erst mit der ersten Palette. Ein vertippter
+  Code wird zurückgenommen statt gelöscht: er bleibt in der Historie lesbar,
+  findet nichts mehr, und dieselbe Nummer lässt sich danach dem richtigen
+  Artikel geben. Vorher blockierte ein Vertipper die richtige Nummer dauerhaft.
+- **Das Lager zählt und bestellt.** Eine Inventur friert den Sollbestand beim
+  Start ein — die Zählerin stellt einen Unterschied zu genau diesem Stand fest,
+  und Buchungen währenddessen bleiben echte Bewegungen. Das Mengenfeld bleibt
+  leer, denn ein vorbelegter Sollwert hieße beim Durchtippen „stimmt", und eine
+  Inventur, die sich selbst bestätigt, ist keine. Null ist beim Zählen eine
+  gültige Antwort, leer gelassen keine. Nicht gezählte Zeilen bleiben
+  unangetastet, damit eine abgebrochene Zählung kein halbes Lager ausbucht.
+  Aus dem Nachbestellvorschlag entsteht jetzt eine Bestellung beim hinterlegten
+  Lieferanten, und der Wareneingang baut sie wieder ab — über dasselbe Journal
+  wie jeder andere Zugang, sodass es keinen zweiten Bestand neben dem ersten
+  gibt. Überlieferung ist erlaubt: sie kommt vor, und der Bestand soll die
+  Wirklichkeit zeigen und nicht die Bestellung. Storniert wird nur, solange
+  nichts geliefert ist.
+- **Das Lager lässt sich bedienen.** Der Monteur sieht einen Ablauf statt einer
+  Auswahl: Lagerplatz scannen, Artikel scannen, Menge, buchen. Der Lagerplatz
+  bleibt dabei über Buchungen hinweg stehen — im Lager wird selten nur ein
+  Artikel entnommen, und zweimal scannen je Entnahme wäre eine Zumutung. Wer
+  den Karton scannt, bucht die Gebindemenge und nicht ein Stück; die
+  Plusschaltfläche springt entsprechend in Hunderterschritten. Eine mit Komma
+  getippte Menge ist eine Menge — `Number('3,5')` ergibt sonst NaN, und eine
+  stillschweigend als null verbuchte Kabellänge fällt erst bei der Inventur
+  auf. Angeboten wird nur, was die Rolle auch darf: Entnahme und Rückgabe für
+  jeden, Umlagern ab Vorarbeiter, der Rest fürs Büro. Fürs Büro gibt es
+  daneben Bestand nach Lagerplatz, Artikelliste mit Anlage und den
+  Nachbestellvorschlag, sortiert nach dem, was am weitesten unter dem
+  Mindestbestand liegt. Ein unbekannter Code ist keine Sackgasse, sondern der
+  Einstieg in die Artikelanlage — mit übernommenem Code, damit derselbe Scan
+  danach sofort trifft.
+- **Die Lagerverwaltung beginnt außerhalb der App.** Material mit Barcodes und
+  QR-Codes entsteht im neuen Ordner `warehouse/` und wird erst als Ganzes
+  eingepflegt, statt die laufende App wochenlang halbfertig zu hinterlassen.
+  Konzept und Datenmodell stehen in `warehouse/docs/WAREHOUSE_MODULE.md`; Code
+  gibt es noch keinen. Der Modulschlüssel `materials` ist seit Migration 040
+  vorhanden und seit 082 im Standardumfang — es wird kein neuer Schalter
+  gebraucht, nur ein Inhalt dahinter. Wichtig für die Abgrenzung: Ein Geräte-QR
+  meint ein Exemplar, ein Artikel-Barcode meint eine Sorte; deshalb bekommt das
+  Lager eine Mengenbuchung statt der Besitzübergabe des Gerätemoduls.
+- **Das Lager hat sein Datenmodell.** `warehouse/database/migrations/200`
+  legt vierzehn Tabellen an: Artikelstamm mit eigener *und* Herstellernummer,
+  beliebig viele Codes je Artikel mit Gebindemenge, Lagerplätze über drei
+  Ebenen, Etiketten, Bestand, Buchungsjournal, Lieferanten, Bestellungen,
+  Inventur, Firmenregeln und Verlauf. Der Bestand wird ausschließlich von
+  einem Trigger aus dem Journal fortgeschrieben; die API hat auf die
+  Bestandstabelle nur Leserecht, damit beide nicht auseinanderlaufen können.
+  Herstellercodes werden auf GTIN-14 normalisiert, sonst findet ein
+  EAN-13-Scan den Artikel nicht wieder, den ein UPC-A-Scan angelegt hat. Eine
+  Entnahme über den vorhandenen Bestand hinaus wird gebucht statt abgewiesen —
+  wer 20 Klemmen nimmt, wo 15 stehen, hat 20 genommen, und ein blockierter
+  Monteur bucht sonst gar nicht. Fahrzeuge sind vorerst kein Lagerplatz, die
+  Baustelle bei der Entnahme bleibt optional.
+- **Das Lager hat seine Endpunkte.** `/api/v1/stock/*` legt Artikel mit
+  eigener und Herstellernummer an, gibt Etiketten aus, löst gescannte Codes
+  auf, bucht Zugang, Entnahme und Umlagerung, zeigt den Bestand je Lagerplatz
+  und schlägt Nachbestellungen vor. Entnehmen und zurückgeben darf jeder, der
+  das Modul sieht — das ist der Alltag des Monteurs, und dafür soll niemand
+  etwas freischalten müssen; umlagern setzt den Vorarbeiter voraus,
+  Anfangsbestand und Korrektur das Büro. Ein Nachdruck liest denselben
+  Etikett-Code wieder, nur „Code ersetzen“ widerruft ihn mit Pflichtgrund.
+  Ein unbekannter Code ist kein Fehler, sondern der Einstieg in die Neuanlage.
+  Dieselbe Offline-Buchung zählt nur einmal, auch wenn zwei Verbindungen sie
+  gleichzeitig schicken. Noch ohne Endpunkte, aber mit Tabellen: Lieferanten,
+  Bestellungen und Inventursitzungen.
+- **Das Lager kann Herstellercodes lesen.** Der bisherige Decoder konnte nur
+  QR, und die eingebaute Barcode-Erkennung des Browsers fehlt auf iPhone und
+  iPad — Strichcodes auf Verpackungen waren damit unerreichbar. Der neue
+  Leser in `warehouse/frontend/` liest EAN-13, EAN-8, UPC-A und Code 128, wo
+  möglich über den eingebauten Leser des Browsers, sonst selbst; Kamerabilder
+  verlassen das Gerät auch dann nicht. Drei Dinge entscheiden über die
+  Trefferquote: Der Schwellwert nimmt die Mitte zwischen hellster und
+  dunkelster Stelle der Umgebung statt deren Durchschnitt, weil ein
+  Durchschnitt bei unscharfen Bildern alle Balken gleichermaßen schmaler macht
+  und die Erkennung kippt. Vor und hinter einem Code muss eine helle Ruhezone
+  liegen — ohne sie liest sich ein beschädigter EAN-13 als kürzerer EAN-8 aus
+  seinen eigenen mittleren Ziffern. Und ein Treffer zählt erst, wenn zwei
+  Bildzeilen dasselbe sagen, denn eine verlesene Nummer kann eine gültige
+  Prüfziffer haben. Von rund 1800 künstlich beschädigten Codes werden 99,9
+  Prozent abgewiesen oder richtig gelesen. Dasselbe Etikett zweimal vor die
+  Kamera zu halten bucht nur einmal.
 - **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
   stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
   des Designsystems (`display: none !important` für alle Desktop-Einträge)

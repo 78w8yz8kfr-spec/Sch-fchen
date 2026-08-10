@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.10">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.10">
-    <script type="module" src="./app.js?v=0.44.10"></script>
-    <script src="./version.js?v=0.44.10" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.11">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.11">
+    <script type="module" src="./app.js?v=0.44.11"></script>
+    <script src="./version.js?v=0.44.11" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.10</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.11</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -1316,6 +1316,11 @@
             <div id="device-module"></div>
           </section>
 
+          <section id="stock-section" class="section stock-section" data-dashboard-pane="stock"
+                   aria-label="Lager und Material" hidden>
+            <div id="stock-module"></div>
+          </section>
+
           <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>
             <div class="section-heading">
               <div>
@@ -2266,6 +2271,17 @@
                   <option data-management-role value="dispatch_office">Büro / Disposition</option>
                   <option data-management-role value="project_manager">Projektleiter</option>
                 </select>
+                <!-- Das Lager ist eine Aufgabe neben der Taetigkeit: in kleinen
+                     Betrieben fuehrt es der Monteur, der ohnehin am Regal
+                     steht. Deshalb ein Schalter und kein weiterer Eintrag in
+                     der Rollenauswahl. -->
+                <div id="employee-warehouse-field" class="employee-warehouse" hidden>
+                  <label class="employee-warehouse__switch" for="employee-warehouse">
+                    <input id="employee-warehouse" type="checkbox">
+                    <span>Führt das Lager (Lagerist)</span>
+                  </label>
+                  <p class="field-help">Legt Artikel an, bucht Wareneingänge, zählt die Inventur und bestellt nach. Kundendaten und Projektsteuerung bleiben davon unberührt.</p>
+                </div>
                 <!-- Wer faehrt, muss den Schein haben. Die Einsatzplanung
                      warnt, wenn auf einer Baustelle niemand mit Schein steht -
                      dafuer muss er hier gepflegt werden. -->
@@ -2344,6 +2360,13 @@
                   <option data-management-role value="project_manager">Projektleiter</option>
                 </select>
                 <p class="field-help">Die Rollenänderung gilt nach dem nächsten Laden der App. Startpasswörter werden hier nicht angezeigt.</p>
+                <div id="employee-edit-warehouse-field" class="employee-warehouse" hidden>
+                  <label class="employee-warehouse__switch" for="employee-edit-warehouse">
+                    <input id="employee-edit-warehouse" type="checkbox">
+                    <span>Führt das Lager (Lagerist)</span>
+                  </label>
+                  <p class="field-help">Legt Artikel an, bucht Wareneingänge, zählt die Inventur und bestellt nach. Kundendaten und Projektsteuerung bleiben davon unberührt.</p>
+                </div>
                 <!-- Wer faehrt, muss den Schein haben. Die Einsatzplanung
                      warnt, wenn auf einer Baustelle niemand mit Schein steht -
                      dafuer muss er hier gepflegt werden. -->
@@ -3095,6 +3118,10 @@
           <button id="nav-devices" class="nav-item" type="button" hidden data-kurz="Geräte" data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
             <span>Maschinen &amp; Geräte</span>
+          </button>
+          <button id="nav-stock" class="nav-item" type="button" hidden data-kurz="Lager" data-nav-group="business">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5V20H3V9.5Z"/><path d="M8 20v-6h8v6"/><path d="M8 14h8"/></svg>
+            <span>Lager &amp; Material</span>
           </button>
 
           <p class="nav-group-label" data-nav-group-label="control">Steuerung</p>

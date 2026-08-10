@@ -256,6 +256,11 @@ export function validateEmployee(body) {
     email: optionalText(body.email, "E-Mail", 254),
     phone: optionalText(body.phone, "Telefon", 50),
     role,
+    // Das Lager ist eine Aufgabe neben der Taetigkeit, keine statt ihrer: in
+    // kleinen Betrieben fuehrt es der Monteur, der ohnehin am Regal steht.
+    // Deshalb ein Schalter zusaetzlich zur Hauptrolle und kein weiterer
+    // Eintrag in der Auswahlliste.
+    warehouseManager: boolean(body.warehouseManager, "Lagerist"),
     drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
     temporaryPassword: password(body.temporaryPassword)
   };
@@ -280,6 +285,8 @@ export function validateEmployeeUpdate(body) {
     // alte, bereits geoeffnete Fassung kann einen Azubi dadurch nicht mehr
     // unbemerkt zur Monteurrolle zuruecksetzen.
     roleChangeConfirmed: boolean(body.roleChangeConfirmed, "Bestätigung der Rollenänderung"),
+    // Siehe validateEmployee: der Lagerist kommt zur Hauptrolle hinzu.
+    warehouseManager: boolean(body.warehouseManager, "Lagerist"),
     // Der Ausbilder gehoert an den Mitarbeiter, nicht in eine eigene
     // Verwaltung daneben. Ob jemand ein Berichtsheft fuehrt, sagt seine Rolle.
     trainerUserId: optionalUuid(body.trainerUserId, "Ausbilder"),

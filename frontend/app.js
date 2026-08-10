@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.10";
-import { serverIsNewer } from "./core/versions.js?v=0.44.10";
+} from "./core/work-time.js?v=0.44.11";
+import { serverIsNewer } from "./core/versions.js?v=0.44.11";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.10";
+} from "./core/sync-queue.js?v=0.44.11";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.10";
+} from "./core/permissions.js?v=0.44.11";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,9 +40,10 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.10";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.10";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
+} from "./core/state-store.js?v=0.44.11";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.11";
+import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.11";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -497,6 +498,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     navCustomers: document.querySelector("#nav-customers"),
     navVehicles: document.querySelector("#nav-vehicles"),
     navDevices: document.querySelector("#nav-devices"),
+    navStock: document.querySelector("#nav-stock"),
     navDocuments: document.querySelector("#nav-documents"),
     navAnalytics: document.querySelector("#nav-analytics"),
     navMore: document.querySelector("#nav-more"),
@@ -553,6 +555,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     documentsContent: document.querySelector("#documents-content"),
     vehiclesShell: document.querySelector("#vehicles-shell"),
     deviceModuleRoot: document.querySelector("#device-module"),
+    stockModuleRoot: document.querySelector("#stock-module"),
     vehicleSearchField: document.querySelector("#vehicle-search-field"),
     vehicleNew: document.querySelector("#vehicle-new"),
     vehicleList: document.querySelector("#vehicle-list"),
@@ -826,6 +829,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     employeePhone: document.querySelector("#employee-phone"),
     employeeEmail: document.querySelector("#employee-email"),
     employeeRole: document.querySelector("#employee-role"),
+    employeeWarehouse: document.querySelector("#employee-warehouse"),
+    employeeWarehouseField: document.querySelector("#employee-warehouse-field"),
+    employeeEditWarehouse: document.querySelector("#employee-edit-warehouse"),
+    employeeEditWarehouseField: document.querySelector("#employee-edit-warehouse-field"),
     employeeManagementRoles: [...document.querySelectorAll("[data-management-role]")],
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
@@ -1154,6 +1161,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     onNotificationsChanged: () => renderNotifications()
   });
 
+  // Das Lager bucht auf die Baustelle, auf der der Monteur heute steht. Die
+  // Liste kommt deshalb aus seinem Tagesplan und nicht aus dem Baustellenstamm:
+  // wer auf der Grundschule arbeitet, soll dort nicht das Rathaus suchen.
+  const stockModule = createStockModule({
+    root: elements.stockModuleRoot,
+    requestJson,
+    showToast,
+    getSites: () => baustellenAusEinsaetzen(assignments)
+  });
+
   function createSignaturePad(canvas, clearButton) {
     const context = canvas.getContext("2d");
     let drawing = false;
@@ -1332,7 +1349,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.10",
+          "X-Schaefchen-Version": "0.44.11",
           ...options.headers
         }
       });
@@ -1367,7 +1384,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.10`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.11`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1389,7 +1406,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.10" }
+        headers: { "X-Schaefchen-Version": "0.44.11" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1436,7 +1453,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.10 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.11 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1538,6 +1555,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
     elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
     deviceModule.setEnabled(!elements.navDevices.hidden);
+    // Das Lager ist kein Bueroeintrag: der Monteur bucht dort seine Entnahme.
+    // Ob er darin mehr darf als buchen, entscheidet seine Rolle - das sagt die
+    // Schnittstelle, nicht die Navigation.
+    elements.navStock.hidden = demoMode || !moduleEnabled("warehouse");
+    stockModule.setEnabled(!elements.navStock.hidden);
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
     elements.navInspections.hidden = !planner || !vdeModuleEnabled();
@@ -1600,6 +1622,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     elements.loginForm.hidden = false;
     clearPlannerData();
     deviceModule.clear();
+    stockModule.clear();
     configureModeCopy();
     applyLoginCompanyIdentity();
     document.title = "Schäfchen";
@@ -2792,7 +2815,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.10";
+  const EIGENE_FASSUNG = "0.44.11";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2831,7 +2854,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.10". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.11". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -5995,7 +6018,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
         executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
         foreman: "Vorarbeiter",
         installer: "Monteur",
-        apprentice: "Auszubildender"
+        apprentice: "Auszubildender",
+        warehouse_manager: "Lagerist"
       };
       const marke = document.createElement("span");
       marke.className = "site-status site-status--active";
@@ -6271,6 +6295,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
     elements.employeeEditPhone.value = employee.phone || "";
     elements.employeeEditEmail.value = employee.email || "";
     elements.employeeEditRole.value = editableEmployeeRole(employee.roles);
+    // Der Schalter erscheint nur, wenn die Firma das Lager ueberhaupt hat.
+    elements.employeeEditWarehouseField.hidden = !moduleEnabled("warehouse");
+    elements.employeeEditWarehouse.checked = employee.roles.includes("warehouse_manager");
     // Der Ausbilder gehoert nur zu einem Auszubildenden, und nur, wenn die
     // Firma das Berichtsheft hat. Ein Feld fuer einen Bereich, den es nicht
     // gibt, verspricht mehr, als die App halten kann.
@@ -6437,6 +6464,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       adminState.sites.filter((site) => siteStatusGroup(site.status) === "active").length
     );
     renderDispatchSummary();
+    // Der Lageristenschalter steht nur dort, wo es ein Lager gibt.
+    elements.employeeWarehouseField.hidden = !moduleEnabled("warehouse");
     elements.employeeManagementRoles.forEach((option) => {
       option.hidden = !adminState.canCreateManagementRoles;
       option.disabled = !adminState.canCreateManagementRoles;
@@ -6801,7 +6830,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.10" }
+        headers: { "X-Schaefchen-Version": "0.44.11" }
       });
       if (response.ok) {
         await cache.put(
@@ -9699,7 +9728,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       customers: "business",
       employees: "business",
       vehicles: "business",
-      devices: "business"
+      devices: "business",
+      stock: "business"
     }[currentDashboardPane];
     const selectedGroups = currentDashboardPane === "more"
       ? new Set(["work", "control"])
@@ -9933,6 +9963,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       customers: elements.navCustomers,
       vehicles: elements.navVehicles,
       devices: elements.navDevices,
+      stock: elements.navStock,
       documents: elements.navDocuments,
       inspections: elements.navInspections,
       analytics: elements.navAnalytics,
@@ -9950,6 +9981,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       employees: elements.navMobileBusiness,
       vehicles: elements.navMobileBusiness,
       devices: elements.navDevices,
+      stock: elements.navStock,
       analytics: elements.navMore
     }[pane] || null;
     activateNavigation(activeButton, mobileActiveButton);
@@ -9974,6 +10006,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
       customers: "Kunden",
       vehicles: "Fahrzeuge",
       devices: "Maschinen & Geräte",
+      stock: "Lager & Material",
       documents: "Dokumentablage",
       inspections: "Prüfprotokolle",
       analytics: "Arbeitszeit-Auswertung",
@@ -11079,6 +11112,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
         phone: elements.employeePhone.value,
         email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
+        warehouseManager: moduleEnabled("warehouse") && elements.employeeWarehouse.checked,
         drivingLicenceClasses: readLicenceField(elements.employeeLicences),
         temporaryPassword: elements.employeeTemporaryPassword.value
       },
@@ -11137,6 +11171,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
           // alten Fehler damit sicher von einer bewussten Änderung trennen.
           roleChangeConfirmed:
             editableEmployeeRole(employee.roles) !== elements.employeeEditRole.value,
+          // Ohne Freigabe des Lagers steht der Schalter nicht zur Verfuegung;
+          // dann bleibt die Rolle so, wie sie ist, statt still zu verschwinden.
+          warehouseManager: moduleEnabled("warehouse")
+            ? elements.employeeEditWarehouse.checked
+            : employee.roles.includes("warehouse_manager"),
           // Ohne diese Angabe wuerde jede Namensaenderung den Ausbilder eines
           // Auszubildenden stillschweigend entfernen.
           trainerUserId: elements.employeeEditRole.value === "apprentice"
@@ -13487,6 +13526,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.10";
   elements.navDevices.addEventListener("click", () => {
     showDashboardPane("devices");
     void deviceModule.refresh();
+  });
+  elements.navStock.addEventListener("click", () => {
+    showDashboardPane("stock");
+    void stockModule.refresh();
   });
   elements.vehicleSearchField.addEventListener("input", renderVehicleList);
   elements.vehicleNew.addEventListener("click", () => openVehicleEditor(null));
