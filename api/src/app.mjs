@@ -55,6 +55,7 @@ import {
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
+import { handleStockRequest } from "../../warehouse/api/stock.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -10472,6 +10473,25 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           })
         );
         if (handled?.document) return inlineDocument(response, handled.document);
+        if (handled) return json(response, handled.status, handled.body);
+      }
+
+      // Die Lagerverwaltung kapselt ihre Fachlogik ebenso in einem eigenen
+      // Modul. Die Sitzung wird auch hier aufgeloest, bevor das Modul etwas
+      // sieht: company_id und user_id kommen aus dem HttpOnly-Cookie und nie
+      // aus einem Barcode oder einem Frontend-Feld.
+      if (url.pathname.startsWith("/api/v1/stock")) {
+        const handled = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => handleStockRequest({
+            request,
+            url,
+            client,
+            context,
+            allowedOrigin: config.allowedOrigin
+          })
+        );
         if (handled) return json(response, handled.status, handled.body);
       }
 

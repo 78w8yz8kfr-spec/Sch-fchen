@@ -17,9 +17,12 @@ import { loadCompanyModules } from "../../api/src/company-modules.mjs";
 
 export const STOCK_MODULE_KEY = "materials";
 
+// Der Lagerist fuehrt das Lager, ohne sonst Buerorechte zu haben. Er steht
+// deshalb hier und nicht in einer allgemeinen Verwaltungsliste: wer das Lager
+// fuehrt, braucht dafuer weder Kundendaten noch Projektsteuerung.
 const MANAGER_ROLES = new Set([
   "admin", "managing_director", "dispatch_office", "office", "planner",
-  "executive_assistant"
+  "executive_assistant", "warehouse_manager"
 ]);
 const TRANSFER_ROLES = new Set([...MANAGER_ROLES, "foreman"]);
 

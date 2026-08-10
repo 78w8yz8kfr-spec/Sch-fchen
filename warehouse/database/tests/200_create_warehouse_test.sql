@@ -373,8 +373,9 @@ BEGIN
             VALUES ('F-999200', 'Fremde Lagerfirma GmbH', 'Fremde Lagerfirma')
             RETURNING id INTO fremde;
 
-            -- Die neue Firma bekommt Warengruppen, Lager, Einstellungen und
-            -- das Modul ohne Zutun.
+            -- Die neue Firma bekommt Warengruppen, Lager und Einstellungen
+            -- ohne Zutun. Das Modul selbst bekommt sie seit Migration 202
+            -- nicht mehr von allein: die Plattform schaltet es je Firma frei.
             IF (SELECT COUNT(*) FROM stock_item_groups WHERE company_id = fremde) < 9 THEN
                 RAISE EXCEPTION 'Eine neue Firma bekommt nicht alle Warengruppen';
             END IF;
@@ -390,12 +391,20 @@ BEGIN
             ) THEN
                 RAISE EXCEPTION 'Eine neue Firma bekommt keine Lagereinstellungen';
             END IF;
-            IF NOT EXISTS (
+            IF EXISTS (
                 SELECT 1 FROM company_module_entitlements AS recht
                 JOIN module_catalog AS modul ON modul.id = recht.module_id
                 WHERE recht.company_id = fremde AND modul.module_key = 'materials'
+                  AND recht.entitlement_status <> 'inactive'
             ) THEN
-                RAISE EXCEPTION 'Eine neue Firma bekommt die Lagerverwaltung nicht';
+                RAISE EXCEPTION 'Eine neue Firma bekommt die Lagerverwaltung von selbst';
+            END IF;
+            -- Die Grundausstattung steht trotzdem bereit, damit die Freigabe
+            -- spaeter nur ein Schalter ist und keine Einrichtung.
+            IF NOT EXISTS (
+                SELECT 1 FROM module_catalog WHERE module_key = 'materials'
+            ) THEN
+                RAISE EXCEPTION 'Der Modulschluessel materials fehlt im Katalog';
             END IF;
 
             INSERT INTO users (company_id, personnel_number, first_name, last_name)

@@ -55,13 +55,33 @@ async function erwarteFehler(pool, context, method, pfad, body, code) {
   );
 }
 
+/**
+ * Schaltet die Lagerverwaltung fuer eine Firma frei — genau das, was die
+ * Plattformverwaltung tut. Seit Migration 202 bekommt sie keine Firma mehr
+ * von selbst.
+ */
+async function lagerFreischalten(ownerPool, companyId) {
+  await ownerPool.query(
+    `INSERT INTO company_module_entitlements (
+       company_id, module_id, entitlement_status, included_in_plan, change_reason
+     )
+     SELECT $1, katalog.id, 'permanent', TRUE, 'Abnahmetest'
+     FROM module_catalog AS katalog WHERE katalog.module_key = 'materials'
+     ON CONFLICT (company_id, module_id) DO UPDATE
+     SET entitlement_status = 'permanent', included_in_plan = TRUE,
+         change_reason = 'Abnahmetest'`,
+    [companyId]
+  );
+}
+
 /** Eine eigene Firma je Lauf: der Test darf nicht an Altdaten haengen. */
-async function firmaAnlegen(ownerPool, kennung) {
+async function firmaAnlegen(ownerPool, kennung, mitLager = true) {
   const firma = await ownerPool.query(
     `INSERT INTO companies (company_number, legal_name, display_name)
      VALUES ($1, $2, $3) RETURNING id`,
     [`F-9${kennung}`, `Lagerabnahme ${kennung} GmbH`, `Lagerabnahme ${kennung}`]
   );
+  if (mitLager) await lagerFreischalten(ownerPool, firma.rows[0].id);
   return firma.rows[0].id;
 }
 
@@ -103,6 +123,37 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
   const buero = await mitarbeiterAnlegen(ownerPool, companyId, `LAG-B-${kennung}`, "office");
   const monteur = await mitarbeiterAnlegen(ownerPool, companyId, `LAG-M-${kennung}`, "installer");
   const vorarbeiter = await mitarbeiterAnlegen(ownerPool, companyId, `LAG-V-${kennung}`, "foreman");
+
+  await t.test("ohne Freigabe der Plattform bleibt das Lager zu", async () => {
+    const ohneLager = await firmaAnlegen(ownerPool, `${kennung}Z`, false);
+    const chef = await mitarbeiterAnlegen(ownerPool, ohneLager, `LAG-Z-${kennung}`, "admin");
+
+    // Auch der Administrator der Firma kommt nicht hinein: ueber den Umfang
+    // entscheidet die Plattform, nicht der Kunde.
+    await erwarteFehler(apiPool, chef, "GET", "/api/v1/stock/contexts",
+      undefined, "stock_module_disabled");
+
+    await lagerFreischalten(ownerPool, ohneLager);
+    const danach = await aufrufen(apiPool, chef, "GET", "/api/v1/stock/contexts");
+    assert.equal(danach.status, 200, "Nach der Freigabe steht das Lager offen");
+  });
+
+  await t.test("der Lagerist führt das Lager, ohne Büromensch zu sein", async () => {
+    const lagerist = await mitarbeiterAnlegen(
+      ownerPool, companyId, `LAG-L-${kennung}`, "warehouse_manager"
+    );
+
+    const sicht = await aufrufen(apiPool, lagerist, "GET", "/api/v1/stock/contexts");
+    assert.equal(sicht.body.context.permissions.manage, true, "Er verwaltet das Lager");
+    assert.equal(sicht.body.context.permissions.transfer, true);
+
+    // Und er kann auch wirklich anlegen, nicht nur die Schaltfläche sehen.
+    const artikel = await aufrufen(apiPool, lagerist, "POST", "/api/v1/stock/items", {
+      itemNumber: `LAGERIST-${kennung}`, name: "Vom Lageristen angelegt",
+      groupKey: "other", unit: "Stück"
+    });
+    assert.equal(artikel.status, 201);
+  });
 
   await t.test("die Firma bekommt Warengruppen, Lager und Rechte ohne Zutun", async () => {
     const { status, body } = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/contexts");
