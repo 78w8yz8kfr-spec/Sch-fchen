@@ -9,7 +9,7 @@ import {
   nativeErkennungErzeugen,
   erkennungWaehlen,
   scanSchleifeStarten
-} from '../barcode-scanner.mjs';
+} from '../core/barcode-scanner.mjs';
 
 // Die Werte stammen aus dem SQL-Abnahmetest der Migration 200. Frontend und
 // Datenbank muessen denselben Code auf dieselbe GTIN abbilden, sonst entsteht

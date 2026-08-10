@@ -55,7 +55,7 @@ import {
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
-import { handleStockRequest } from "../../warehouse/api/stock.mjs";
+import { handleStockRequest } from "./stock.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -202,7 +202,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.10";
+export const APPLICATION_VERSION = "0.44.11";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")

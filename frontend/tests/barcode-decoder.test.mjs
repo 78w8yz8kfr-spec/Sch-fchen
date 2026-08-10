@@ -10,7 +10,7 @@ import {
   musterAbweichung,
   bitsZuLaeufen,
   NUR_FUER_TESTS
-} from '../barcode-decoder.mjs';
+} from '../core/barcode-decoder.mjs';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const referenz = JSON.parse(readFileSync(join(hier, 'fixtures', 'barcodes.json'), 'utf8'));

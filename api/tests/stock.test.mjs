@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 
-import { createPool, withTenantTransaction } from "../../../api/src/database.mjs";
-import { handleStockRequest } from "../stock.mjs";
+import { createPool, withTenantTransaction } from "../src/database.mjs";
+import { handleStockRequest } from "../src/stock.mjs";
 
-// Der Test spricht den Endpunktbaum direkt an und nicht ueber HTTP: die
-// Verdrahtung in `app.mjs` ist der Einpflegeschritt und existiert noch nicht.
-// Sitzungsaufloesung, Mandantengrenze und Rollen laufen trotzdem echt, weil
-// `withTenantTransaction` dieselbe Datenbankrolle und dieselben
-// Sitzungsvariablen setzt wie die laufende API.
+// Der Test spricht den Endpunktbaum direkt an und nicht ueber HTTP. Die
+// Sitzungsaufloesung, die Mandantengrenze und die Rollen laufen trotzdem
+// echt, weil `withTenantTransaction` dieselbe Datenbankrolle und dieselben
+// Sitzungsvariablen setzt wie die laufende API - der Weg ueber `app.mjs`
+// unterscheidet sich davon nur um das Aufloesen des Sitzungskekses.
 
 const enabled = process.env.API_INTEGRATION_TEST === "true";
 const integrationTest = enabled ? test : test.skip;
@@ -57,8 +57,8 @@ async function erwarteFehler(pool, context, method, pfad, body, code) {
 
 /**
  * Schaltet die Lagerverwaltung fuer eine Firma frei — genau das, was die
- * Plattformverwaltung tut. Seit Migration 202 bekommt sie keine Firma mehr
- * von selbst.
+ * Plattformverwaltung tut. Der Schluessel 'warehouse' gehoert nicht zum
+ * Standardumfang; ohne diese Freigabe bleibt das Lager zu.
  */
 async function lagerFreischalten(ownerPool, companyId) {
   await ownerPool.query(
@@ -66,7 +66,7 @@ async function lagerFreischalten(ownerPool, companyId) {
        company_id, module_id, entitlement_status, included_in_plan, change_reason
      )
      SELECT $1, katalog.id, 'permanent', TRUE, 'Abnahmetest'
-     FROM module_catalog AS katalog WHERE katalog.module_key = 'materials'
+     FROM module_catalog AS katalog WHERE katalog.module_key = 'warehouse'
      ON CONFLICT (company_id, module_id) DO UPDATE
      SET entitlement_status = 'permanent', included_in_plan = TRUE,
          change_reason = 'Abnahmetest'`,

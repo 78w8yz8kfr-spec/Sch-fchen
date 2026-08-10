@@ -1,6 +1,6 @@
 -- Codes eines Artikels bekommen einen Lebenslauf.
 --
--- Migration 200 legt Codes an und laesst sie nie wieder los: die Tabelle hat
+-- Migration 107 legt Codes an und laesst sie nie wieder los: die Tabelle hat
 -- kein UPDATE-Recht, keinen Status und einen unbedingt eindeutigen Index. Ein
 -- vertippter Code blockiert damit dauerhaft den richtigen, denn derselbe Code
 -- laesst sich kein zweites Mal speichern und der falsche nicht entfernen.

@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Lager ist in der App angekommen (Fassung 0.44.11).** Bisher lag es
+  vollständig, geprüft und unausgeliefert im Ordner `warehouse/`. Jetzt laufen
+  seine Migrationen im regulären Ablauf mit (107 bis 109), die Endpunkte hängen
+  unter `/api/v1/stock/*` in der Anwendung, und „Lager & Material“ steht in der
+  Navigation. Der Monteur scannt am Regal, tippt die Menge, bucht — drei
+  Schritte, ein Bild je Schritt; die Baustelle kommt aus seinem Tagesplan.
+  Zwei Dinge sind dabei bewusst keine Selbstverständlichkeit: Das Lager ist ein
+  **zuschaltbares Modul** mit eigenem Schlüssel `warehouse`, das die Plattform
+  je Firma freigibt — nicht `materials`, denn das ist die Materialverwaltung
+  der Baustelle und bleibt unverändert im Standardumfang. Und der **Lagerist**
+  ist eine eigene Rolle: wer das Lager führt, braucht dafür weder Kundendaten
+  noch Projektsteuerung, und welche Mitarbeiter sie bekommen, entscheidet die
+  Firma selbst in ihrer Mitarbeiterverwaltung. Ohne Freigabe bleibt jeder
+  Lagerendpunkt zu — auch für den Administrator der Firma, denn über den
+  verkauften Umfang entscheidet nicht der Kunde.
 - **Auch Ware ohne Barcode kommt ins Lager.** Kabeltrommel, Schüttgut, eigene
   Konfektion: solche Artikel werden von Hand angelegt und bekommen ihr eigenes
   Etikett zum Ausdrucken — A4, zehn Spalten, zwölf Reihen, 18 × 18 mm, dasselbe

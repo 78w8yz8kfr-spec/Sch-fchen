@@ -14,20 +14,29 @@
 
 BEGIN;
 
--- Der Modulschluessel existiert seit Migration 040 und gehoert seit 082 zum
--- Standardumfang. Hier bekommt er nur seine jetzt zutreffende Beschreibung.
-UPDATE module_catalog
-SET description = 'Artikelstamm, Lagerbestand, Materialverbrauch und Barcodes.'
-WHERE module_key = 'materials';
-
-INSERT INTO company_module_entitlements (
-    company_id, module_id, entitlement_status, included_in_plan, change_reason
+-- Das Lager bekommt einen eigenen Modulschluessel.
+--
+-- Nicht 'materials': das ist die Materialverwaltung der Baustelle - was der
+-- Vorarbeiter braucht, bestellt und verbaut hat. Sie gehoert seit jeher zum
+-- Standardumfang und bleibt dort. Das Lager ist etwas anderes: Artikelstamm,
+-- Bestand je Lagerplatz, Wareneingang, Inventur, Bestellwesen. Ein eigener,
+-- verkaufbarer Bereich - deshalb ein eigener Schluessel.
+--
+-- Freigeschaltet wird hier niemand. 'warehouse' steht nicht im Standardumfang
+-- von platform_default_module_keys(); die Plattform erteilt ihn je Firma.
+INSERT INTO module_catalog (
+    module_key, name, description, category, is_special, requires_platform_approval
+) VALUES (
+    'warehouse', 'Lagerverwaltung',
+    'Artikelstamm, Lagerbestand, Barcodes, Wareneingang, Inventur und Bestellwesen.',
+    'business', FALSE, TRUE
 )
-SELECT tenant.id, catalog.id, 'permanent', TRUE,
-       'Lagerverwaltung gehoert zum Standardumfang'
-FROM companies AS tenant
-JOIN module_catalog AS catalog ON catalog.module_key = 'materials'
-ON CONFLICT (company_id, module_id) DO NOTHING;
+ON CONFLICT (module_key) DO UPDATE
+SET name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    category = EXCLUDED.category,
+    is_special = EXCLUDED.is_special,
+    requires_platform_approval = EXCLUDED.requires_platform_approval;
 
 -- ---------------------------------------------------------------------------
 -- Stammdaten

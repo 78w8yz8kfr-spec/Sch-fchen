@@ -52,7 +52,7 @@ import {
   leereCodezeile,
   codeNachtragLesen,
   artikelCodesAnsicht
-} from '../stock-management.js';
+} from '../core/stock-management.js';
 
 const REGAL = { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' };
 const LAGER = { id: 'ort-0', name: 'Materiallager', path: 'Materiallager' };

@@ -15,7 +15,7 @@ import { toString as qrToString } from "qrcode";
 import { InputError, readJson, validateId } from "../../api/src/validation.mjs";
 import { loadCompanyModules } from "../../api/src/company-modules.mjs";
 
-export const STOCK_MODULE_KEY = "materials";
+export const STOCK_MODULE_KEY = "warehouse";
 
 // Der Lagerist fuehrt das Lager, ohne sonst Buerorechte zu haben. Er steht
 // deshalb hier und nicht in einer allgemeinen Verwaltungsliste: wer das Lager

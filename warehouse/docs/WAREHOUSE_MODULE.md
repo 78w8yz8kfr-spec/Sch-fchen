@@ -1,10 +1,10 @@
 # Lagerverwaltung
 
-Stand: Fassung 1, Migration 200 angelegt und abgenommen.
+Stand: eingepflegt mit Fassung 0.44.11 (Migrationen 107 bis 109).
 
 Dieses Dokument legt fest, was die Lagerverwaltung fachlich tut, wie ihre
-Daten aussehen und wie sie später in Schäfchen eingepflegt wird. Es ist die
-verbindliche Grundlage und wird bei jeder fachlichen Änderung mitgeführt.
+Daten aussehen und wie sie in Schäfchen hängt. Es ist die verbindliche
+Grundlage und wird bei jeder fachlichen Änderung mitgeführt.
 
 ## Abgrenzung: drei Dinge, die leicht verwechselt werden
 
@@ -114,7 +114,7 @@ Modul hängt am Scannen. Codes lassen sich jederzeit nachtragen: die
 Einzelpackung ist beim Anlegen dabei, der Kartoncode mit Gebindemenge kommt
 erst mit der ersten Palette. Ein vertippter Code wird zurückgenommen statt
 gelöscht — er bleibt in der Historie lesbar, findet nichts mehr, und dieselbe
-Nummer ist danach wieder vergebbar (Migration 201).
+Nummer ist danach wieder vergebbar (Migration 108).
 
 ## Datenmodell
 
@@ -242,7 +242,7 @@ Kamerabild verlässt das Gerät.
 
 Der vorhandene QR-Decoder liest keine eindimensionalen Barcodes, und
 `BarcodeDetector` fehlt auf iOS. Diese Lücke schließt
-`warehouse/frontend/barcode-decoder.mjs` — siehe „Der Barcode-Leser“.
+`frontend/core/barcode-decoder.mjs` — siehe „Der Barcode-Leser“.
 
 ## Der Barcode-Leser
 
@@ -278,7 +278,7 @@ von EAN-13 selbst und keine der Umsetzung: eine einzelne Prüfziffer kann nicht
 jede verlesene Nummer entlarven.
 
 Die GTIN-Normalisierung steht bewusst zweimal da — in `barcode-scanner.mjs`
-und als `stock_normalize_gtin` in Migration 200. Beide Seiten brauchen sie:
+und als `stock_normalize_gtin` in Migration 107. Beide Seiten brauchen sie:
 das Frontend, um offline nachzuschlagen, die Datenbank, um die Eindeutigkeit
 zu erzwingen. Dass sie dasselbe tun, ist gegen 3504 Eingaben geprüft worden.
 
@@ -292,7 +292,7 @@ Kontraste und zerknitterte Verpackungen. Dafür ist die Abnahme vor Ort da.
 
 ## Die API
 
-`warehouse/api/stock.mjs` bedient `/api/v1/stock/*`. `handleStockRequest` hat
+`api/src/stock.mjs` bedient `/api/v1/stock/*`. `handleStockRequest` hat
 absichtlich dieselbe Signatur wie `handleDeviceRequest`; beim Einpflegen
 wandert die Datei nach `api/src/stock.mjs`, zwei Importe verkürzen sich auf
 `./`, und in `app.mjs` kommt derselbe Block hinzu, den das Gerätemodul schon
@@ -375,33 +375,43 @@ des Sitzungsmandanten aufgelöst; unbekannte, widerrufene und fremdmandantige
 Codes liefern dieselbe Antwort, damit niemand über die Fehlermeldung erfährt,
 ob es den Artikel anderswo gibt.
 
-## Einpflegen in Schäfchen
+## Freigabe, Rolle und Einbau
 
-Der Modulschlüssel existiert bereits: `materials` steht seit Migration 040 im
-`module_catalog` und seit 082 im Standardumfang. Es wird also kein neuer
-Schalter gebraucht, nur ein Inhalt hinter dem vorhandenen.
+**Der Bereich hat einen eigenen Modulschlüssel: `warehouse`.** Nicht
+`materials` — das ist die Materialverwaltung der Baustelle, gehört seit
+Migration 040 zum Katalog, seit 082 zum Standardumfang und bleibt dort. Wer das
+Lager kauft, kauft etwas anderes: Artikelstamm, Bestand je Lagerplatz,
+Wareneingang, Inventur, Bestellwesen. `warehouse` steht deshalb **nicht** in
+`platform_default_module_keys()`; die Plattformverwaltung erteilt ihn je Firma.
+Ohne Freigabe antwortet jeder Endpunkt unter `/api/v1/stock/*` mit
+`stock_module_disabled` — auch dem Administrator der Firma gegenüber.
 
-Damit der Umzug später ein Verschieben und keine Portierung wird, hält sich der
-externe Ordner an die Regeln des Hauptprojekts:
+**Die Rolle „Lagerist“ (`warehouse_manager`, Migration 109)** entsteht in jeder
+Firma, aber sie trägt zunächst niemand. Wer sie bekommt, entscheidet die Firma
+in ihrer Mitarbeiterverwaltung. Sie führt das Lager vollständig — Artikel,
+Bestände, Wareneingang, Inventur, Bestellungen — ohne Kundendaten und ohne
+Projektsteuerung. Beides zusammen ergibt den Zugang: die Plattform verkauft den
+Bereich, die Firma besetzt ihn.
 
-1. Migrationen liegen in `warehouse/database/migrations/` und beginnen bei
-   `200`. Beim Einpflegen werden sie auf die nächste freie Schäfchen-Nummer
-   umnummeriert — aktuell wäre das 107. Nur eine einzige Migration darf dabei
-   entstehen, sonst zerfällt die Anlage in halb geladene Zwischenstände.
-2. Jede Tabelle bekommt von Anfang an RLS, `GRANT` an `schaefchen_api`,
-   zusammengesetzte Fremdschlüssel und den Schutz gegen Hartlöschen. Nachrüsten
-   wäre teurer als von vornherein mitschreiben.
-3. Endpunkte werden unter `/api/v1/stock/*` entworfen und verwenden denselben
-   Transaktionswrapper und dieselbe Validierung wie `api/src/devices.mjs`.
-4. Die Zusammenführung von `storage_locations` und `device_locations` ist eine
+**Wo die Teile liegen:** Migrationen 107 bis 109 in `database/migrations/`,
+Endpunkte in `api/src/stock.mjs` (eingehängt in `api/src/app.mjs`), Ablauf und
+Ansichten in `frontend/core/stock-management.js`, die Verdrahtung mit Browser
+und API in `frontend/core/stock-module.js`, Leser und Scan-Deutung in
+`frontend/core/barcode-decoder.mjs` und `barcode-scanner.mjs`. Der Bereich
+hängt als „Lager & Material“ in der Navigation und ist sichtbar, sobald die
+Firma die Freigabe hat.
+
+**Was bewusst offen blieb:**
+
+1. Die Zusammenführung von `storage_locations` und `device_locations` ist eine
    eigene, spätere Migration mit Datenübernahme — nicht Teil der Erstanlage.
-5. `site_material_entries` erhält beim Einpflegen die optionalen Spalten
-   `stock_item_id` und `stock_movement_id`. Bestehende Freitextzeilen bleiben
-   gültig und unverändert.
+2. `site_material_entries` bekommt später die optionalen Spalten
+   `stock_item_id` und `stock_movement_id`, damit aus dem Bedarf der Baustelle
+   eine echte Entnahme wird. Bestehende Freitextzeilen bleiben gültig.
 
 ## Getroffene Entscheidungen
 
-- **Fahrzeuge sind vorerst kein Lagerplatz.** Migration 200 kennt weder Typ
+- **Fahrzeuge sind vorerst kein Lagerplatz.** Migration 107 kennt weder Typ
   noch Fremdschlüssel dafür. Nachrüstbar, ohne die Bewegungslogik anzufassen.
 - **Die Baustelle bei einer Entnahme ist optional.** `construction_site_id`
   darf leer bleiben. Die Firmenregel `require_site_on_issue` kann sie
@@ -429,7 +439,7 @@ externe Ordner an die Regeln des Hauptprojekts:
 
 ## Abnahme
 
-`warehouse/database/tests/200_create_warehouse_test.sql` prüft bereits:
+`database/tests/107_create_warehouse_test.sql` prüft bereits:
 GTIN-Normalisierung von EAN-8, EAN-13 und UPC-A samt abgewiesener falscher
 Prüfziffer, Artikelanlage mit eigener und Herstellernummer, mehrere Codes je
 Artikel mit Gebindemenge, Lagerhierarchie mit abgewiesener vierter Ebene und

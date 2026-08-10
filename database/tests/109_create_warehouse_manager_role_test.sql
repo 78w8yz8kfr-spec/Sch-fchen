@@ -1,4 +1,4 @@
-\echo 'Teste Migration 202_stock_role_and_platform_switch.sql ...'
+\echo 'Teste Migration 109_create_warehouse_manager_role.sql ...'
 
 DO $$
 DECLARE
@@ -32,7 +32,7 @@ BEGIN
         IF NOT (SELECT is_system FROM roles WHERE id = lagerist) THEN
             RAISE EXCEPTION 'Der Lagerist ist keine Systemrolle';
         END IF;
-        IF (SELECT permissions -> 'materials' ->> 'scope' FROM roles WHERE id = lagerist) <> 'company' THEN
+        IF (SELECT permissions -> 'warehouse' ->> 'scope' FROM roles WHERE id = lagerist) <> 'company' THEN
             RAISE EXCEPTION 'Dem Lageristen fehlt das Lagerrecht';
         END IF;
         -- Er fuehrt das Lager, nicht die Firma.
@@ -50,35 +50,26 @@ BEGIN
             RAISE EXCEPTION 'Der Rollenschluessel liess sich aendern';
         END IF;
 
-        -- Das Lager gehoert nicht mehr zum Standardumfang.
-        IF 'materials' = ANY(platform_default_module_keys()) THEN
-            RAISE EXCEPTION 'Die Lagerverwaltung steht noch im Standardumfang';
+        -- Die Rolle allein oeffnet nichts: das Lager ist ein eigener Bereich,
+        -- den die Plattform je Firma freischaltet.
+        IF 'warehouse' = ANY(platform_default_module_keys()) THEN
+            RAISE EXCEPTION 'Die Lagerverwaltung steht im Standardumfang';
         END IF;
-        IF NOT ('devices' = ANY(platform_default_module_keys())) THEN
-            RAISE EXCEPTION 'Die uebrigen Standardmodule wurden mit entfernt';
+        -- Die Materialverwaltung der Baustelle ist davon unberuehrt geblieben.
+        IF NOT ('materials' = ANY(platform_default_module_keys())) THEN
+            RAISE EXCEPTION 'Die Materialverwaltung wurde mit abgeschaltet';
         END IF;
-
-        -- Keine Firma hat die Lagerverwaltung noch offen.
         IF EXISTS (
             SELECT 1 FROM company_module_entitlements AS recht
             JOIN module_catalog AS katalog ON katalog.id = recht.module_id
-            WHERE katalog.module_key = 'materials' AND recht.entitlement_status <> 'inactive'
+            WHERE katalog.module_key = 'warehouse' AND recht.entitlement_status <> 'inactive'
         ) THEN
-            RAISE EXCEPTION 'Eine Firma hat die Lagerverwaltung noch freigeschaltet';
-        END IF;
-
-        -- Die Entscheidung bleibt nachvollziehbar: geloescht wurde nichts.
-        IF NOT EXISTS (
-            SELECT 1 FROM company_module_entitlements AS recht
-            JOIN module_catalog AS katalog ON katalog.id = recht.module_id
-            WHERE katalog.module_key = 'materials'
-        ) THEN
-            RAISE EXCEPTION 'Die bisherigen Freigaben wurden geloescht statt stillgelegt';
+            RAISE EXCEPTION 'Eine Firma hat die Lagerverwaltung ohne Freigabe';
         END IF;
 
         -- Eine neue Firma bekommt die Rolle, aber nicht das Modul.
         INSERT INTO companies (company_number, legal_name, display_name)
-        VALUES ('F-999202', 'Lagerrollenfirma GmbH', 'Lagerrollenfirma')
+        VALUES ('F-999109', 'Lagerrollenfirma GmbH', 'Lagerrollenfirma')
         RETURNING id INTO neue;
 
         IF NOT EXISTS (
@@ -89,10 +80,19 @@ BEGIN
         IF EXISTS (
             SELECT 1 FROM company_module_entitlements AS recht
             JOIN module_catalog AS katalog ON katalog.id = recht.module_id
-            WHERE recht.company_id = neue AND katalog.module_key = 'materials'
+            WHERE recht.company_id = neue AND katalog.module_key = 'warehouse'
               AND recht.entitlement_status <> 'inactive'
         ) THEN
             RAISE EXCEPTION 'Eine neue Firma bekommt die Lagerverwaltung von selbst';
+        END IF;
+        -- Die Materialverwaltung dagegen steht ihr wie bisher offen.
+        IF NOT EXISTS (
+            SELECT 1 FROM company_module_entitlements AS recht
+            JOIN module_catalog AS katalog ON katalog.id = recht.module_id
+            WHERE recht.company_id = neue AND katalog.module_key = 'materials'
+              AND recht.entitlement_status <> 'inactive'
+        ) THEN
+            RAISE EXCEPTION 'Eine neue Firma bekommt die Materialverwaltung nicht mehr';
         END IF;
 
         RAISE EXCEPTION 'ABNAHME_ZURUECK';
@@ -102,4 +102,4 @@ BEGIN
 END;
 $$;
 
-\echo 'Migration 202_stock_role_and_platform_switch.sql ist fachlich abgenommen.'
+\echo 'Migration 109_create_warehouse_manager_role.sql ist fachlich abgenommen.'

@@ -645,17 +645,22 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       Object.keys(initialModules).sort(),
       [
         "absences", "apprentice_reports", "assembly_reports", "devices",
-        "documents", "fleet", "materials", "site_daily_reports", "site_qr", "vde"
+        "documents", "fleet", "materials", "site_daily_reports", "site_qr",
+        "vde", "warehouse"
       ]
     );
-    // Der Standardumfang steht ohne Zutun offen. Das Spezialmodul VDE und das
-    // Berichtsheft gehoeren nicht dazu: beide gibt die Plattform je Firma frei,
-    // VDE als Spezialmodul, das Berichtsheft als eigener verkaufter Bereich.
+    // Der Standardumfang steht ohne Zutun offen. Drei Bereiche gehoeren nicht
+    // dazu, weil die Plattform sie je Firma freigibt: VDE als Spezialmodul,
+    // das Berichtsheft und die Lagerverwaltung als eigene verkaufte Bereiche.
+    // Die Materialverwaltung der Baustelle ist davon unberuehrt - sie ist
+    // etwas anderes als das Lager und bleibt im Standardumfang.
     assert.equal(initialModules.vde, false);
     assert.equal(initialModules.apprentice_reports, false);
+    assert.equal(initialModules.warehouse, false);
+    assert.equal(initialModules.materials, true);
     assert.ok(
       Object.entries(initialModules)
-        .filter(([key]) => !["vde", "apprentice_reports"].includes(key))
+        .filter(([key]) => !["vde", "apprentice_reports", "warehouse"].includes(key))
         .every(([, enabled]) => enabled === true)
     );
 

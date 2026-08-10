@@ -1,4 +1,4 @@
-\echo 'Teste Migration 201_stock_barcode_lifecycle.sql ...'
+\echo 'Teste Migration 108_stock_barcode_lifecycle.sql ...'
 
 DO $$
 DECLARE
@@ -129,4 +129,4 @@ BEGIN
 END;
 $$;
 
-\echo 'Migration 201_stock_barcode_lifecycle.sql ist fachlich abgenommen.'
+\echo 'Migration 108_stock_barcode_lifecycle.sql ist fachlich abgenommen.'

@@ -1,137 +1,91 @@
-# Lagerverwaltung (externe Entwicklung)
+# Lagerverwaltung — Werkbank
 
-Hier entsteht die Lager- und Materialverwaltung mit Barcodes und QR-Codes.
-Sie wird bewusst **außerhalb** der laufenden Schäfchen-App entwickelt und
-später als Ganzes eingepflegt.
+Die Lager- und Materialverwaltung mit Barcodes und QR-Codes ist **eingepflegt**.
+Sie lief bis Fassung 0.44.11 außerhalb der App und liegt seitdem dort, wo alle
+anderen Bereiche liegen:
 
-## Warum getrennt
+| Was | Wo |
+| --- | --- |
+| Konzept, Datenmodell, Abgrenzung | `warehouse/docs/WAREHOUSE_MODULE.md` |
+| Migrationen | `database/migrations/107`, `108`, `109` |
+| SQL-Abnahmetests | `database/tests/107`, `108`, `109` |
+| Endpunkte `/api/v1/stock/*` | `api/src/stock.mjs` |
+| Abnahme gegen eine echte Datenbank | `api/tests/stock.test.mjs` |
+| Ablauf, Zustand und Ansichten | `frontend/core/stock-management.js` |
+| Verdrahtung mit Browser und API | `frontend/core/stock-module.js` |
+| Barcode-Leser und Scan-Deutung | `frontend/core/barcode-decoder.mjs`, `barcode-scanner.mjs` |
+| Tests dazu | `frontend/tests/stock-management.test.mjs`, `barcode-*.test.mjs` |
 
-Die Lagerverwaltung ist groß genug, um die App wochenlang halbfertig zu
-hinterlassen, wenn sie mitten in `api/src` und `frontend/` wachsen würde. Hier
-kann sie eigenständig entstehen, eigene Migrationen und Tests mitbringen und
-erst dann in die App wandern, wenn sie vollständig ist.
-
-Getrennt heißt aber nicht anders: Es gelten dieselben Regeln wie im
-Hauptprojekt — `AGENTS.md`, Mandantentrennung über `company_id`, Row Level
-Security, keine harten Löschungen, idempotente Migrationen mit SQL-Test,
-einfach vor komplex.
-
-## Was der Ordner enthält
+Übrig bleibt in diesem Ordner die Werkbank: die beiden eigenständigen Seiten,
+mit denen sich Leser und Bedienung ohne laufende App vorführen und prüfen
+lassen.
 
 ```
 warehouse/
-  README.md                        dieser Überblick
-  docs/WAREHOUSE_MODULE.md         Konzept, Datenmodell, Einpflegeplan
-  database/migrations/             eigene Migrationen ab Nummer 200
-  database/tests/                  SQL-Abnahmetests dazu
-  frontend/barcode-decoder.mjs     EAN-13, EAN-8, UPC-A und Code 128 aus einem Kamerabild
-  frontend/barcode-scanner.mjs     Leserwahl, Deutung eines Scans, Scan-Schleife
-  frontend/stock-management.js     Ablauf, Zustand und Ansichten der Bedienung
-  frontend/tests/                  Tests dazu, mit unabhängigen Referenzmustern
-  frontend/testseite/              Vorlage des Barcode-Prüfstands
-  frontend/demo/                   Vorlage der klickbaren Bedienungsvorschau
-  api/stock.mjs                    Endpunkte /api/v1/stock/*
-  api/tests/                       Abnahme gegen eine echte Datenbank
+  README.md                  dieser Überblick
+  docs/WAREHOUSE_MODULE.md   Konzept, Datenmodell, Endpunkte
+  frontend/einbetten.mjs     bettet ausgelieferte Moduldateien wörtlich ein
+  frontend/testseite/        Vorlage des Barcode-Prüfstands
+  frontend/demo/             Vorlage der klickbaren Bedienungsvorschau
 ```
 
-Die beiden eigenständigen Seiten `barcode-testseite.html` und
-`oberflaeche-demo.html` werden aus ihren Vorlagen gebaut und nicht von Hand
-bearbeitet:
+Beide Seiten werden aus ihren Vorlagen gebaut und nicht von Hand bearbeitet:
 
 ```bash
+npm --prefix api ci --ignore-scripts
+ln -sfn ../api/node_modules warehouse/node_modules   # nur fuer die Demo (qrcode)
 node warehouse/frontend/testseite/bauen.mjs
 node warehouse/frontend/demo/bauen.mjs
 ```
 
-Beide betten die ausgelieferten Moduldateien wörtlich ein; das Bauskript
-bricht ab, wenn Modulsyntax übrig bleibt. So zeigen die Seiten genau den Code,
-der später auch läuft.
+Sie betten die ausgelieferten Moduldateien aus `frontend/core/` wörtlich ein;
+das Bauskript bricht ab, wenn Modulsyntax übrig bleibt. So zeigen die Seiten
+genau den Code, der auch in der App läuft — die Demo allerdings gegen einen
+erfundenen Hintergrund statt gegen die echte API.
 
 ## Stand
 
 | Schritt | Stand |
 | --- | --- |
-| Konzept und Datenmodell | `docs/WAREHOUSE_MODULE.md`, Fassung 1 |
-| Migration 200 (14 Tabellen) | steht, idempotent, zweimal hintereinander geprüft |
-| SQL-Abnahmetest | steht, grün, gegen verfälschte Erwartungen gegengeprüft |
+| Konzept und Datenmodell | `docs/WAREHOUSE_MODULE.md` |
+| Migration 107 (14 Tabellen) | steht, idempotent, zweimal hintereinander geprüft |
+| Migration 108 (Lebenslauf der Codes) | steht |
+| Migration 109 (Rolle „Lagerist“) | steht |
 | Barcode-Leser für EAN-13/EAN-8/UPC-A/Code 128 | steht, 28 Tests grün |
-| API `/api/v1/stock/*` | Artikel, Lagerplätze, Etiketten, Scan, Buchungen, Bestand, Nachbestellung — 16 Tests grün |
-| API für Lieferanten, Bestellungen, Inventur | offen; die Tabellen stehen, die Endpunkte fehlen |
-| Bedienoberfläche: Monteursablauf | steht — scannen, Menge, buchen |
-| Bedienoberfläche: Büro | steht — Bestand, Artikelanlage, Nachbestellung |
-| Inventur: API und Bedienung | steht — 13 Abnahmen, 8 Tests, 19 Prüfungen im Browser |
-| Bestellwesen: API und Bedienung | steht — 15 Abnahmen, 12 Tests, 20 Prüfungen im Browser |
-| Codes nachtragen, zurücknehmen, Etikettendruck | steht — Migration 201, 13 Abnahmen, 10 Tests, 20 Prüfungen im Browser |
-| Einhängen in app.mjs und Merge | offen |
-| Einpflegen in Schäfchen | offen |
+| API `/api/v1/stock/*` | vollständig — 58 Abnahmen gegen eine echte Datenbank |
+| Bedienoberfläche | Monteursablauf, Büroansichten, Inventur, Bestellwesen, Codes und Etikettendruck |
+| Einhängen in `app.mjs` und Navigation | steht (Fassung 0.44.11) |
+| Freigabe je Firma über die Plattform | steht — Modulschlüssel `warehouse` |
+| Rolle „Lagerist“, von der Firma vergeben | steht |
+| Kamera-Livebild im In-App-Browser | offen, siehe unten |
 
 ## Prüfen
 
-Die Migration setzt auf dem vollständigen Schäfchen-Schema auf und läuft nach
-`database/migrations`:
+Alles läuft im regulären Ablauf des Hauptprojekts mit:
 
 ```bash
-sh database/scripts/run-sql-directories.sh warehouse/database/migrations
-sh database/scripts/run-sql-directories.sh warehouse/database/tests
+make db-test                       # Migrationen 107-109 samt Abnahmetests
+npm --prefix api test              # 58 Lagerabnahmen unter 175
+node --test frontend/tests/*.test.mjs
 ```
 
-Beide Skripte erwarten dieselben `POSTGRES_*`-Variablen wie `make db-migrate`.
-Geprüft wurde gegen einen kompletten Neuaufbau: 106 Migrationen, API-Rolle,
-Seeds, Migration 200 und anschließend alle Abnahmetests.
+Die API-Abnahme braucht `API_INTEGRATION_TEST=true` und die `POSTGRES_*`- sowie
+`API_DB_*`-Variablen; ohne sie überspringt sie sich selbst wie die übrigen
+Integrationstests des Projekts. Sie bringt ihre Firma je Lauf selbst mit und
+ist wiederholbar.
 
-Die Frontend-Tests brauchen weder Datenbank noch Netz noch `node_modules`:
+## Was offen ist
 
-```bash
-node --test warehouse/frontend/tests/*.test.mjs
-```
-
-Der API-Test spricht `handleStockRequest` direkt an — die Verdrahtung in
-`app.mjs` ist der Einpflegeschritt und existiert noch nicht. Mandantengrenze,
-Datenbankrolle und Rollenrechte laufen trotzdem echt, weil derselbe
-Transaktionswrapper verwendet wird wie in der laufenden API. Er bringt seine
-Firma je Lauf selbst mit und ist wiederholbar:
-
-```bash
-npm --prefix api ci --ignore-scripts
-ln -sfn ../api/node_modules warehouse/node_modules
-API_INTEGRATION_TEST=true node --test warehouse/api/tests/stock.test.mjs
-```
-
-Der Symlink ist nötig, weil `stock.mjs` hier außerhalb von `api/` liegt und
-Node die Abhängigkeiten der API sonst nicht findet. Die Importe stehen
-absichtlich so, wie sie nach dem Einpflegen richtig sind — dann entfällt der
-Symlink ersatzlos.
-
-Ohne `API_INTEGRATION_TEST=true` überspringt er sich selbst, wie die übrigen
-Integrationstests des Projekts auch.
-
-## Was Schäfchen schon mitbringt
-
-Die Lagerverwaltung beginnt nicht bei null:
-
-- **Modulschlüssel `materials`** existiert seit Migration 040 im
-  `module_catalog` („Materialverwaltung — Materialbestand und -verbrauch“) und
-  gehört seit Migration 082 zum Standardumfang. Es wird kein neuer Schalter
-  gebraucht.
-- **QR-Erzeugung, -Widerruf und -Auflösung** sind im Gerätemodul (Migration
-  095, `api/src/devices.mjs`) fertig gebaut und dienen als Vorlage.
-- **A4-Etikettenbogen**, zehn Spalten × zwölf Reihen, 18 × 18 mm, wird
-  übernommen.
-- **Lokaler QR-Decoder** in `frontend/vendor/` läuft im Worker und ist der
-  iOS-Rückfall. Kamerabilder verlassen das Gerät nicht.
-- **Dokumentenmodell** (`documents`, `document_links`) nimmt Lieferscheinfotos
-  auf; das Modul legt keine eigene Dateiablage an.
-
-Was gefehlt hat, war ein Leser für eindimensionale Barcodes — der vorhandene
-Decoder kann nur QR, und `BarcodeDetector` gibt es auf iOS nicht. Der steht
-jetzt in `frontend/barcode-decoder.mjs`, als eigener Code statt als fremdes
-Minifikat, und liest EAN-13, EAN-8, UPC-A und Code 128. Beim Einpflegen wandert
-er nach `frontend/vendor/`s Nachbarschaft und teilt sich mit dem Gerätemodul
-Kamerastart und Fehlermeldungen; bis dahin bleibt er hier eigenständig.
+Das **Kamera-Livebild** läuft im eigenständigen Browser, aber nicht im
+In-App-Browser mancher Anwendungen: dort liefert `getUserMedia` kein Bild.
+Foto und Handeingabe fangen das ab, und die Meldung sagt es. Der Prüfstand
+`barcode-testseite.html` zeigt, dass der Leser selbst nicht das Problem ist.
 
 ## Abgrenzung in einem Satz
 
 Geräte sind Einzelstücke mit einem Besitzer, Lagermaterial sind Mengen an
 Orten — und `site_material_entries` bleibt die Bedarfsliste der Baustelle, aus
-der später die Entnahme gespeist wird. Die ausführliche Abgrenzung steht im
-Konzept.
+der später die Entnahme gespeist wird. Deshalb hat das Lager auch einen eigenen
+Modulschlüssel `warehouse` bekommen und nicht den vorhandenen `materials`: der
+gehört der Baustelle und bleibt im Standardumfang. Die ausführliche Abgrenzung
+steht im Konzept.

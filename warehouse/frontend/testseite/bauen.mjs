@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { einbetten, platzhalterErsetzen } from '../einbetten.mjs';
 
-const frontend = new URL('../', import.meta.url);
+const frontend = new URL('../../../frontend/core/', import.meta.url);
 
 const seite = platzhalterErsetzen(
   readFileSync(new URL('vorlage.html', import.meta.url), 'utf8'),

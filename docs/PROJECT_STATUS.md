@@ -1,9 +1,22 @@
 # Projektstatus
 
-Stand: 09.08.2026
-Technischer Stand: V0.44.9
+Stand: 10.08.2026
+Technischer Stand: V0.44.11
 
 ## Abgeschlossen
+
+- Lager- und Materialverwaltung mit Barcodes und QR-Codes in der App: Migration
+  107 (vierzehn Tabellen, Bestand nur über Trigger aus dem Journal), 108
+  (Lebenslauf der Codes), 109 (Systemrolle „Lagerist“); Endpunkte
+  `/api/v1/stock/*` in `api/src/stock.mjs`, Bedienung in
+  `frontend/core/stock-module.js` und `stock-management.js`, eigener
+  Barcode-Leser für EAN-13, EAN-8, UPC-A und Code 128; PWA-Speicher
+  `schaefchen-online-v93`
+- eigener Modulschlüssel `warehouse`, nicht im Standardumfang: die
+  Plattformverwaltung gibt das Lager je Firma frei. Der vorhandene Schlüssel
+  `materials` bleibt unberührt bei der Materialverwaltung der Baustelle
+- Rolle „Lagerist“ in jeder Firma vorhanden, aber zunächst unbesetzt: wer sie
+  bekommt, entscheidet die Firma in ihrer Mitarbeiterverwaltung
 
 - sichtbarer Menüpunkt „Azubi“ in der mobilen Bereichsleiste: die Ausnahme für
   das Berichtsheft steht nun hinter der allgemeinen Ausblendregel des
@@ -427,6 +440,10 @@ Technischer Stand: V0.44.9
   Lizenzprozess
 - genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden
   bewusst keine Daten erfunden
+- Kamera-Livebild des Lagerscanners auf einem echten Gerät: im eigenständigen
+  Browser läuft es, im In-App-Browser mancher Anwendungen liefert
+  `getUserMedia` kein Bild. Foto und Handeingabe fangen das ab, die Meldung
+  sagt es — der reale Nachweis am Regal fehlt trotzdem
 
 Die vollständigen Gates mit Priorität und Abschlussnachweis stehen in
 [`ROADMAP_ACCEPTANCE.md`](ROADMAP_ACCEPTANCE.md) und

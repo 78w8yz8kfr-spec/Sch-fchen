@@ -1,4 +1,4 @@
-\echo 'Teste Migration 200_create_warehouse.sql ...'
+\echo 'Teste Migration 107_create_warehouse.sql ...'
 
 DO $$
 DECLARE
@@ -374,8 +374,8 @@ BEGIN
             RETURNING id INTO fremde;
 
             -- Die neue Firma bekommt Warengruppen, Lager und Einstellungen
-            -- ohne Zutun. Das Modul selbst bekommt sie seit Migration 202
-            -- nicht mehr von allein: die Plattform schaltet es je Firma frei.
+            -- ohne Zutun. Das Modul selbst bekommt sie nicht von allein: die
+            -- Plattform schaltet 'warehouse' je Firma frei.
             IF (SELECT COUNT(*) FROM stock_item_groups WHERE company_id = fremde) < 9 THEN
                 RAISE EXCEPTION 'Eine neue Firma bekommt nicht alle Warengruppen';
             END IF;
@@ -394,7 +394,7 @@ BEGIN
             IF EXISTS (
                 SELECT 1 FROM company_module_entitlements AS recht
                 JOIN module_catalog AS modul ON modul.id = recht.module_id
-                WHERE recht.company_id = fremde AND modul.module_key = 'materials'
+                WHERE recht.company_id = fremde AND modul.module_key = 'warehouse'
                   AND recht.entitlement_status <> 'inactive'
             ) THEN
                 RAISE EXCEPTION 'Eine neue Firma bekommt die Lagerverwaltung von selbst';
@@ -402,9 +402,9 @@ BEGIN
             -- Die Grundausstattung steht trotzdem bereit, damit die Freigabe
             -- spaeter nur ein Schalter ist und keine Einrichtung.
             IF NOT EXISTS (
-                SELECT 1 FROM module_catalog WHERE module_key = 'materials'
+                SELECT 1 FROM module_catalog WHERE module_key = 'warehouse'
             ) THEN
-                RAISE EXCEPTION 'Der Modulschluessel materials fehlt im Katalog';
+                RAISE EXCEPTION 'Der Modulschluessel warehouse fehlt im Katalog';
             END IF;
 
             INSERT INTO users (company_id, personnel_number, first_name, last_name)
@@ -456,4 +456,4 @@ BEGIN
 END;
 $$;
 
-\echo 'Migration 200_create_warehouse.sql ist fachlich abgenommen.'
+\echo 'Migration 107_create_warehouse.sql ist fachlich abgenommen.'

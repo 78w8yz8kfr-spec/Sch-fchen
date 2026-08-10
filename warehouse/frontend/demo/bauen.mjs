@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { toString as qrToString } from 'qrcode';
 import { einbetten, platzhalterErsetzen } from '../einbetten.mjs';
 
-const frontend = new URL('../', import.meta.url);
+const frontend = new URL('../../../frontend/core/', import.meta.url);
 
 // Die Vorschau hat keine API, die QR-Bilder erzeugen koennte. Fuer die festen
 // Demo-Gegenstaende entstehen sie deshalb hier beim Bauen — mit demselben
