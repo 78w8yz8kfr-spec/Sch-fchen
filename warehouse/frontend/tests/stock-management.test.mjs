@@ -30,7 +30,14 @@ import {
   bestandAnsicht,
   artikelListeAnsicht,
   nachbestellungAnsicht,
-  artikelFormularAnsicht
+  artikelFormularAnsicht,
+  zaehlmengeAusText,
+  inventurFortschritt,
+  differenzText,
+  differenzLage,
+  inventurScanVerarbeiten,
+  zaehlungBauen,
+  inventurAnsicht
 } from '../stock-management.js';
 
 const REGAL = { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' };
@@ -526,4 +533,121 @@ test('auch die Büroansichten maskieren fremden Text', () => {
   assert.ok(!html.includes('<script>'));
   assert.ok(!html.includes('<b>Ort</b>'));
   assert.ok(html.includes('&lt;script&gt;'));
+});
+
+// ---------------------------------------------------------------------------
+// Inventur
+// ---------------------------------------------------------------------------
+
+const INVENTUR = {
+  session: { id: 'inv-1', locationId: REGAL.id, locationName: 'Fach A1', status: 'running' },
+  lines: [
+    { itemId: 'art-1', itemName: 'Schalterdose tief', unit: 'Stück', expectedQuantity: 100, countedQuantity: 98, difference: -2 },
+    { itemId: 'art-2', itemName: 'NYM-J 3×1,5', unit: 'Meter', expectedQuantity: 40, countedQuantity: 40, difference: 0 },
+    { itemId: 'art-3', itemName: 'Klemme', unit: 'Stück', expectedQuantity: 12, countedQuantity: null, difference: null }
+  ]
+};
+
+test('beim Zählen ist null gültig, leer aber nicht', () => {
+  assert.equal(zaehlmengeAusText('0'), 0, 'Ein leeres Fach ist ein Zählergebnis');
+  assert.equal(zaehlmengeAusText('97'), 97);
+  assert.equal(zaehlmengeAusText('3,5'), 3.5);
+  assert.equal(zaehlmengeAusText(''), null, 'Nichts eingetragen ist keine Zählung');
+  assert.equal(zaehlmengeAusText('   '), null);
+  assert.equal(zaehlmengeAusText('-1'), null);
+  assert.equal(zaehlmengeAusText('viel'), null);
+});
+
+test('der Fortschritt zählt Gezähltes, Offenes und Abweichungen getrennt', () => {
+  assert.deepEqual(inventurFortschritt(INVENTUR.lines), {
+    gesamt: 3, gezaehlt: 2, offen: 1, abweichungen: 1
+  });
+  assert.deepEqual(inventurFortschritt([]), { gesamt: 0, gezaehlt: 0, offen: 0, abweichungen: 0 });
+});
+
+test('die Abweichung wird als Vorzeichen gelesen, nicht als Vorwurf', () => {
+  assert.equal(differenzText(-2, 'Stück'), '−2 Stück');
+  assert.equal(differenzText(12, 'Stück'), '+12 Stück');
+  assert.equal(differenzText(0, 'Stück'), 'stimmt');
+  assert.equal(differenzText(null), 'noch nicht gezählt');
+
+  assert.equal(differenzLage(null), 'offen');
+  assert.equal(differenzLage(0), 'gut');
+  assert.equal(differenzLage(5), 'mehr');
+  assert.equal(differenzLage(-5), 'weniger');
+});
+
+test('ein Scan während der Inventur zählt, statt zu buchen', () => {
+  const zustand = lagerZustand({ schritt: SCHRITTE.INVENTUR, inventur: INVENTUR });
+
+  const gezaehlt = inventurScanVerarbeiten(zustand, {
+    found: true, kind: 'item', packQuantity: 1,
+    item: { id: 'art-1', name: 'Schalterdose tief', unit: 'Stück' }
+  });
+  assert.equal(gezaehlt.zaehlArtikel.id, 'art-1');
+  assert.equal(gezaehlt.zaehlArtikel.erwartet, 100);
+  assert.equal(gezaehlt.zaehlArtikel.bisher, 98);
+  assert.equal(gezaehlt.menge, '', 'Das Feld bleibt leer, damit niemand den Sollwert bestätigt');
+  assert.equal(gezaehlt.schritt, SCHRITTE.INVENTUR, 'Die Inventur wird nicht verlassen');
+
+  // Ein Artikel, der hier gar nicht liegen sollte, hat Soll null.
+  const fund = inventurScanVerarbeiten(zustand, {
+    found: true, kind: 'item', packQuantity: 1,
+    item: { id: 'art-9', name: 'Überraschung', unit: 'Stück' }
+  });
+  assert.equal(fund.zaehlArtikel.erwartet, 0);
+  assert.equal(fund.zaehlArtikel.bisher, null);
+
+  // Ein Lagerplatz oder ein unbekannter Code bucht nichts und wechselt nichts.
+  const ort = inventurScanVerarbeiten(zustand, { found: true, kind: 'location', location: LAGER });
+  assert.equal(ort.zaehlArtikel, null);
+  assert.match(ort.fehler, /nur gezählt/);
+
+  const unbekannt = inventurScanVerarbeiten(zustand, { found: false, kind: 'gtin', code: '123' });
+  assert.match(unbekannt.fehler, /keinem Artikel/);
+});
+
+test('eine Zählung ohne Eingabe wird nicht übernommen', () => {
+  const basis = lagerZustand({
+    schritt: SCHRITTE.INVENTUR,
+    inventur: INVENTUR,
+    zaehlArtikel: { id: 'art-1', name: 'Dose', unit: 'Stück', erwartet: 100, bisher: null }
+  });
+
+  assert.match(zaehlungBauen({ ...basis, menge: '' }).fehler, /gezählte Menge/);
+  assert.match(zaehlungBauen(lagerZustand({ menge: '5' })).fehler, /scannen/);
+
+  assert.deepEqual(zaehlungBauen({ ...basis, menge: '97' }).zaehlung, { itemId: 'art-1', quantity: 97 });
+  assert.deepEqual(zaehlungBauen({ ...basis, menge: '0' }).zaehlung, { itemId: 'art-1', quantity: 0 });
+});
+
+test('die Inventuransicht zeigt Fortschritt, Abweichungen und Rollen', () => {
+  const zustand = lagerZustand({ schritt: SCHRITTE.INVENTUR, inventur: INVENTUR });
+
+  const vorarbeiter = inventurAnsicht(zustand, { transfer: true });
+  assert.ok(vorarbeiter.includes('2 von 3 gezählt'));
+  assert.ok(vorarbeiter.includes('1 Abweichung'));
+  assert.ok(vorarbeiter.includes('Fach A1'));
+  assert.ok(vorarbeiter.includes('−2 Stück'));
+  assert.ok(vorarbeiter.includes('noch nicht gezählt'));
+  assert.ok(!vorarbeiter.includes('stock-inventory-done'), 'Der Vorarbeiter schließt nicht ab');
+  assert.ok(vorarbeiter.includes('Abschließen kann das Büro'));
+
+  const buero = inventurAnsicht(zustand, { transfer: true, manage: true });
+  assert.ok(buero.includes('stock-inventory-done'));
+  assert.ok(buero.includes('1 ungezählt'), 'Der Abschluss warnt vor ungezählten Zeilen');
+});
+
+test('ohne laufende Inventur bietet nur der Vorarbeiter den Start an', () => {
+  const leer = lagerZustand({ schritt: SCHRITTE.INVENTUR });
+
+  assert.ok(inventurAnsicht(leer, { transfer: true }).includes('stock-inventory-start'));
+  assert.ok(!inventurAnsicht(leer, {}).includes('stock-inventory-start'));
+  assert.ok(inventurAnsicht(leer, {}).includes('startet der Vorarbeiter'));
+});
+
+test('die Inventurkachel steht ab Vorarbeiter bereit', () => {
+  assert.ok(!startAnsicht(lagerZustand(), {}).includes('data-ziel="inventur"'));
+  assert.ok(startAnsicht(lagerZustand(), { transfer: true }).includes('data-ziel="inventur"'));
+  assert.ok(startAnsicht(lagerZustand(), { manage: true, transfer: true }).includes('data-ziel="inventur"'));
 });

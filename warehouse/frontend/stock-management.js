@@ -21,7 +21,8 @@ export const SCHRITTE = Object.freeze({
   BESTAND: 'bestand',
   ARTIKEL: 'artikel',
   ARTIKEL_NEU: 'artikelNeu',
-  NACHBESTELLUNG: 'nachbestellung'
+  NACHBESTELLUNG: 'nachbestellung',
+  INVENTUR: 'inventur'
 });
 
 // Was der Benutzer waehlt, und was daraus in der Datenbank wird. Die
@@ -57,6 +58,12 @@ export function lagerZustand(vorgabe = {}) {
     zielOrtId: null,
     letzterScan: null,
     bestaetigung: null,
+    // Vollstaendig aufgezaehlt, auch wo es null ist: ein Zustand, dessen
+    // Schluessel je nach Weg auftauchen und verschwinden, laesst Vergleiche
+    // gegen null mal stimmen und mal nicht.
+    entwurf: null,
+    inventur: null,
+    zaehlArtikel: null,
     hinweis: null,
     fehler: null,
     ...vorgabe
@@ -337,6 +344,13 @@ export function startAnsicht(zustand, rechte = {}) {
        <span class="stock-tile__hint">Was liegt wo</span>
      </button>`
   ];
+
+  if (rechte.transfer) {
+    kacheln.push(`<button class="stock-tile" type="button" data-ziel="inventur">
+       <span class="stock-tile__name">Inventur</span>
+       <span class="stock-tile__hint">Zählen und richtigstellen</span>
+     </button>`);
+  }
 
   if (rechte.manage) {
     kacheln.push(`<button class="stock-tile" type="button" data-ziel="artikel">
@@ -665,8 +679,11 @@ export function nachbestellungAnsicht(vorschlaege = []) {
   </div>`;
 }
 
-export function artikelFormularAnsicht(entwurf = {}, gruppen = [], fehler = null) {
-  const code = entwurf.barcodes?.[0];
+export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
+  // Ein leerer Entwurf kommt als null aus dem Zustand und als undefined aus
+  // einem direkten Aufruf; beide meinen dasselbe leere Formular.
+  const daten = entwurf || {};
+  const code = daten.barcodes?.[0];
 
   return `<div class="stock-form">
     ${kopfzeile('Artikel anlegen')}
@@ -674,25 +691,25 @@ export function artikelFormularAnsicht(entwurf = {}, gruppen = [], fehler = null
       ? `<p class="stock-note">Der gescannte Code <strong>${sicher(code.code)}</strong> wird übernommen.</p>`
       : ''}
     <label class="stock-field"><span>Artikelnummer</span>
-      <input name="itemNumber" value="${sicher(entwurf.itemNumber || '')}" autocomplete="off" maxlength="40"></label>
+      <input name="itemNumber" value="${sicher(daten.itemNumber || '')}" autocomplete="off" maxlength="40"></label>
     <label class="stock-field"><span>Bezeichnung</span>
-      <input name="name" value="${sicher(entwurf.name || '')}" autocomplete="off" maxlength="180"></label>
+      <input name="name" value="${sicher(daten.name || '')}" autocomplete="off" maxlength="180"></label>
     <label class="stock-field"><span>Einheit</span>
-      <input name="unit" value="${sicher(entwurf.unit || 'Stück')}" autocomplete="off" maxlength="20"></label>
+      <input name="unit" value="${sicher(daten.unit || 'Stück')}" autocomplete="off" maxlength="20"></label>
     <label class="stock-field"><span>Warengruppe</span>
       <select name="groupKey">
         ${gruppen.map((gruppe) => `
-          <option value="${sicher(gruppe.key)}"${gruppe.key === entwurf.groupKey ? ' selected' : ''}>
+          <option value="${sicher(gruppe.key)}"${gruppe.key === daten.groupKey ? ' selected' : ''}>
             ${sicher(gruppe.name)}
           </option>`).join('')}
       </select></label>
     <label class="stock-field"><span>Herstellernummer (freiwillig)</span>
-      <input name="manufacturerNumber" value="${sicher(entwurf.manufacturerNumber || '')}" autocomplete="off" maxlength="80"></label>
+      <input name="manufacturerNumber" value="${sicher(daten.manufacturerNumber || '')}" autocomplete="off" maxlength="80"></label>
     <div class="stock-field-pair">
       <label class="stock-field"><span>Mindestbestand</span>
-        <input name="minimumStock" inputmode="decimal" value="${sicher(entwurf.minimumStock ?? '')}" autocomplete="off"></label>
+        <input name="minimumStock" inputmode="decimal" value="${sicher(daten.minimumStock ?? '')}" autocomplete="off"></label>
       <label class="stock-field"><span>Zielbestand</span>
-        <input name="targetStock" inputmode="decimal" value="${sicher(entwurf.targetStock ?? '')}" autocomplete="off"></label>
+        <input name="targetStock" inputmode="decimal" value="${sicher(daten.targetStock ?? '')}" autocomplete="off"></label>
     </div>
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
     <button class="button button--action stock-save" type="button">Anlegen</button>
@@ -700,7 +717,147 @@ export function artikelFormularAnsicht(entwurf = {}, gruppen = [], fehler = null
   </div>`;
 }
 
+// ---------------------------------------------------------------------------
+// Inventur
+// ---------------------------------------------------------------------------
+
+/**
+ * Beim Zaehlen ist null eine gueltige Antwort: das Fach ist leer. Leer
+ * gelassen ist dagegen keine Antwort — sonst wuerde ein versehentliches
+ * Tippen einen Bestand ausbuchen.
+ */
+export function zaehlmengeAusText(text) {
+  const menge = bestandsmengeAusText(text);
+  if (menge === null || menge === undefined) return null;
+  return menge;
+}
+
+export function inventurFortschritt(zeilen = []) {
+  const gezaehlt = zeilen.filter((zeile) => zeile.countedQuantity !== null).length;
+  return {
+    gesamt: zeilen.length,
+    gezaehlt,
+    offen: zeilen.length - gezaehlt,
+    abweichungen: zeilen.filter((zeile) => zeile.difference !== null && zeile.difference !== 0).length
+  };
+}
+
+export function differenzText(differenz, einheit) {
+  if (differenz === null || differenz === undefined) return 'noch nicht gezählt';
+  if (differenz === 0) return 'stimmt';
+  const zeichen = differenz > 0 ? '+' : '−';
+  return `${zeichen}${mengeAlsText(Math.abs(differenz))} ${einheit || ''}`.trim();
+}
+
+export function differenzLage(differenz) {
+  if (differenz === null || differenz === undefined) return 'offen';
+  if (differenz === 0) return 'gut';
+  return differenz > 0 ? 'mehr' : 'weniger';
+}
+
+/** Ein Scan waehrend der Inventur zaehlt, statt zu buchen. */
+export function inventurScanVerarbeiten(zustand, antwort) {
+  if (!antwort?.found || antwort.kind !== 'item') {
+    return {
+      ...zustand,
+      fehler: antwort?.found === false
+        ? 'Dieser Code gehört zu keinem Artikel. Während der Inventur wird nur gezählt.'
+        : 'Während der Inventur wird nur gezählt.'
+    };
+  }
+
+  const zeile = (zustand.inventur?.lines || []).find((eintrag) => eintrag.itemId === antwort.item.id);
+
+  return {
+    ...zustand,
+    zaehlArtikel: {
+      id: antwort.item.id,
+      name: antwort.item.name,
+      unit: antwort.item.unit,
+      erwartet: zeile ? zeile.expectedQuantity : 0,
+      bisher: zeile ? zeile.countedQuantity : null
+    },
+    menge: '',
+    fehler: null
+  };
+}
+
+export function zaehlungBauen(zustand) {
+  if (!zustand.zaehlArtikel) return { fehler: 'Zuerst einen Artikel scannen.' };
+  const menge = zaehlmengeAusText(zustand.menge);
+  if (menge === null) return { fehler: 'Bitte eine gezählte Menge eintragen — null ist erlaubt.' };
+  return { zaehlung: { itemId: zustand.zaehlArtikel.id, quantity: menge } };
+}
+
+export function inventurAnsicht(zustand, rechte = {}) {
+  const inventur = zustand.inventur;
+  if (!inventur) {
+    return `<div class="stock-list">
+      ${kopfzeile('Inventur')}
+      <p class="stock-empty">Für diesen Lagerplatz läuft keine Inventur.</p>
+      ${rechte.transfer
+        ? '<button class="button button--action stock-inventory-start" type="button">Inventur starten</button>'
+        : '<p class="stock-empty">Eine Inventur startet der Vorarbeiter.</p>'}
+    </div>`;
+  }
+
+  const fortschritt = inventurFortschritt(inventur.lines);
+  const zaehlung = zustand.zaehlArtikel;
+
+  return `<div class="stock-list stock-inventory">
+    ${kopfzeile('Inventur')}
+    <p class="stock-inventory__where">${sicher(inventur.session.locationName)}</p>
+    <p class="stock-inventory__progress">
+      ${fortschritt.gezaehlt} von ${fortschritt.gesamt} gezählt${fortschritt.abweichungen
+        ? ` · ${fortschritt.abweichungen} Abweichung${fortschritt.abweichungen === 1 ? '' : 'en'}`
+        : ''}
+    </p>
+
+    ${zaehlung
+      ? `<div class="stock-count">
+          <p class="eyebrow">Gezählt wird</p>
+          <h3 class="stock-count__name">${sicher(zaehlung.name)}</h3>
+          <p class="stock-count__expected">Soll: ${sicher(mengeAlsText(zaehlung.erwartet))} ${sicher(zaehlung.unit)}</p>
+          <div class="stock-amount">
+            <label class="stock-amount__field">
+              <span class="visually-hidden">Gezählte Menge</span>
+              <input class="stock-amount__input stock-count__input" type="text"
+                     inputmode="decimal" autocomplete="off" value="${sicher(zustand.menge)}"
+                     placeholder="0">
+            </label>
+            <span class="stock-amount__unit">${sicher(zaehlung.unit)}</span>
+          </div>
+          <button class="button button--action stock-count-save" type="button">Zählung übernehmen</button>
+        </div>`
+      : '<button class="button button--action stock-scan" type="button">Artikel scannen</button>'}
+
+    ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+
+    <ul class="stock-rows">
+      ${inventur.lines.map((zeile) => `
+        <li class="stock-row">
+          <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+          <span class="stock-row__number">
+            Soll ${sicher(mengeAlsText(zeile.expectedQuantity))}${zeile.countedQuantity !== null
+              ? ` · gezählt ${sicher(mengeAlsText(zeile.countedQuantity))}` : ''}
+          </span>
+          <span class="stock-row__amount stock-row__amount--${differenzLage(zeile.difference)}">
+            ${sicher(differenzText(zeile.difference, zeile.unit))}
+          </span>
+        </li>`).join('')}
+    </ul>
+
+    ${rechte.manage
+      ? `<button class="button button--action stock-inventory-done" type="button">
+           Inventur abschließen${fortschritt.offen ? ` (${fortschritt.offen} ungezählt)` : ''}
+         </button>`
+      : '<p class="stock-empty">Abschließen kann das Büro.</p>'}
+    <button class="button button--quiet stock-inventory-cancel" type="button">Inventur abbrechen</button>
+  </div>`;
+}
+
 export function ansichtFuer(zustand, rechte, optionen = {}) {
+  if (zustand.schritt === SCHRITTE.INVENTUR) return inventurAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
