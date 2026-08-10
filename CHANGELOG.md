@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Lagerverwaltung beginnt außerhalb der App.** Material mit Barcodes und
+  QR-Codes entsteht im neuen Ordner `warehouse/` und wird erst als Ganzes
+  eingepflegt, statt die laufende App wochenlang halbfertig zu hinterlassen.
+  Konzept und Datenmodell stehen in `warehouse/docs/WAREHOUSE_MODULE.md`; Code
+  gibt es noch keinen. Der Modulschlüssel `materials` ist seit Migration 040
+  vorhanden und seit 082 im Standardumfang — es wird kein neuer Schalter
+  gebraucht, nur ein Inhalt dahinter. Wichtig für die Abgrenzung: Ein Geräte-QR
+  meint ein Exemplar, ein Artikel-Barcode meint eine Sorte; deshalb bekommt das
+  Lager eine Mengenbuchung statt der Besitzübergabe des Gerätemoduls.
 - **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
   stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
   des Designsystems (`display: none !important` für alle Desktop-Einträge)
