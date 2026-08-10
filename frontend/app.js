@@ -6018,7 +6018,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
         executive_assistant: "Assistenz der Geschäftsführung (Bestand)",
         foreman: "Vorarbeiter",
         installer: "Monteur",
-        apprentice: "Auszubildender"
+        apprentice: "Auszubildender",
+        warehouse_manager: "Lagerist"
       };
       const marke = document.createElement("span");
       marke.className = "site-status site-status--active";

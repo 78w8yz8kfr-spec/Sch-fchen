@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { compareApplicationVersions } from "../src/app.mjs";
 import { securityHeaders } from "../src/static.mjs";
+import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { serveStatic } from "../src/static.mjs";
 
 test("verpflichtende Updates vergleichen semantische App-Versionen", () => {
   assert.equal(compareApplicationVersions("0.42.1", "0.42.1"), 0);
@@ -18,4 +22,28 @@ test("Browser-Sicherheitsregeln erlauben nur Schäfchens eigene QR-Kamera", () =
   assert.match(headers["Content-Security-Policy"], /worker-src 'self' blob:/);
   assert.match(headers["Content-Security-Policy"], /img-src 'self' data: blob:/);
   assert.match(headers["Content-Security-Policy"], /frame-ancestors 'none'/);
+});
+
+// Der Barcode-Leser des Lagers ist die erste ausgelieferte .mjs-Datei. Fehlt
+// ihr Typ in der Tabelle, kommt sie als application/octet-stream an, der
+// Browser lehnt sie als Modul ab, und der Lagerbereich bleibt leer - ohne dass
+// im Serverprotokoll etwas auffaellt.
+test("ausgelieferte .mjs-Dateien kommen als JavaScript beim Browser an", async () => {
+  const frontend = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend");
+  const server = createServer((request, response) => {
+    void serveStatic(request, response, frontend, new URL(request.url, "http://intern").pathname);
+  });
+  await new Promise((fertig) => server.listen(0, "127.0.0.1", fertig));
+  const { port } = server.address();
+
+  try {
+    const modul = await fetch(`http://127.0.0.1:${port}/core/barcode-decoder.mjs`);
+    assert.equal(modul.status, 200);
+    assert.equal(modul.headers.get("content-type"), "text/javascript; charset=utf-8");
+
+    const skript = await fetch(`http://127.0.0.1:${port}/app.js`);
+    assert.equal(skript.headers.get("content-type"), "text/javascript; charset=utf-8");
+  } finally {
+    await new Promise((fertig) => server.close(fertig));
+  }
 });
