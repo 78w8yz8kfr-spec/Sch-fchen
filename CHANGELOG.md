@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Lager lässt sich bedienen.** Der Monteur sieht einen Ablauf statt einer
+  Auswahl: Lagerplatz scannen, Artikel scannen, Menge, buchen. Der Lagerplatz
+  bleibt dabei über Buchungen hinweg stehen — im Lager wird selten nur ein
+  Artikel entnommen, und zweimal scannen je Entnahme wäre eine Zumutung. Wer
+  den Karton scannt, bucht die Gebindemenge und nicht ein Stück; die
+  Plusschaltfläche springt entsprechend in Hunderterschritten. Eine mit Komma
+  getippte Menge ist eine Menge — `Number('3,5')` ergibt sonst NaN, und eine
+  stillschweigend als null verbuchte Kabellänge fällt erst bei der Inventur
+  auf. Angeboten wird nur, was die Rolle auch darf: Entnahme und Rückgabe für
+  jeden, Umlagern ab Vorarbeiter, der Rest fürs Büro. Fürs Büro gibt es
+  daneben Bestand nach Lagerplatz, Artikelliste mit Anlage und den
+  Nachbestellvorschlag, sortiert nach dem, was am weitesten unter dem
+  Mindestbestand liegt. Ein unbekannter Code ist keine Sackgasse, sondern der
+  Einstieg in die Artikelanlage — mit übernommenem Code, damit derselbe Scan
+  danach sofort trifft.
 - **Die Lagerverwaltung beginnt außerhalb der App.** Material mit Barcodes und
   QR-Codes entsteht im neuen Ordner `warehouse/` und wird erst als Ganzes
   eingepflegt, statt die laufende App wochenlang halbfertig zu hinterlassen.
