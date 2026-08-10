@@ -438,6 +438,10 @@
     <button class="knopf knopf--klein" type="button" id="neues-fenster" hidden>
       In eigenem Fenster öffnen
     </button>
+    <details id="kamera-diagnose" hidden>
+      <summary>Kamera-Diagnose</summary>
+      <dl class="werte-liste" id="kamera-diagnose-liste"></dl>
+    </details>
   </section>
 
   <section class="karte" id="kamera-karte" hidden>
@@ -1591,14 +1595,65 @@ $('neues-fenster').addEventListener('click', () => {
   window.open(window.location.href, '_blank', 'noopener');
 });
 
+/**
+ * Ein Bild sagt hier mehr als eine Beschreibung: die Zeilen unten reichen,
+ * um von aussen zu erkennen, woran die Kamera haengt.
+ */
+function kameraDiagnose(lage, fehlername) {
+  const liste = $('kamera-diagnose-liste');
+  liste.replaceChildren();
+
+  const zeilen = [
+    ['Fenster', lage.imRahmen ? 'eingebettet' : 'eigenständig'],
+    ['Verbindung', lage.sichererKontext ? 'gesichert' : 'ungesichert'],
+    ['Kameraschnittstelle', lage.schnittstelle ? 'vorhanden' : 'fehlt'],
+    ['Kamerarecht des Fensters', lage.richtlinieErlaubt === null
+      ? 'nicht feststellbar'
+      : lage.richtlinieErlaubt ? 'erteilt' : 'fehlt'],
+    ['Browser', inAppBrowser() ? 'in einer App eingebaut' : 'eigenständig'],
+    ['Letzter Fehler', fehlername || 'keiner'],
+    ['Kennung', navigator.userAgent]
+  ];
+
+  for (const [name, wert] of zeilen) {
+    const dt = document.createElement('dt');
+    dt.textContent = name;
+    const dd = document.createElement('dd');
+    dd.textContent = wert;
+    liste.append(dt, dd);
+  }
+  $('kamera-diagnose').hidden = false;
+}
+
+/**
+ * Laeuft die Seite im eingebauten Browser einer App statt im Browser selbst?
+ * Das ist kein Randfall: ein Link aus einer App landet fast immer dort, und
+ * viele dieser eingebauten Browser geben die Kamera grundsaetzlich nicht
+ * frei. Der Ratschlag "in den Browsereinstellungen erlauben" geht dort ins
+ * Leere — dort hilft nur, die Adresse im richtigen Browser zu oeffnen.
+ */
+function inAppBrowser() {
+  const kennung = String(navigator.userAgent || '');
+  const iOS = /iPhone|iPad|iPod/.test(kennung);
+  // Safari auf iOS nennt sich "Safari"; ein eingebauter Browser laesst das weg.
+  if (iOS && !/Safari\//.test(kennung)) return true;
+  return /\bFB[A-Z]{2}|Instagram|Line\/|wv\)|; wv|WebView/.test(kennung);
+}
+
 function kameraFehlerText(fehler, lage) {
   const name = String(fehler?.name || '');
 
   if (name === 'NotAllowedError' || name === 'SecurityError') {
-    return lage.imRahmen
-      ? 'Die Kamera ist in diesem eingebetteten Fenster nicht freigegeben. '
-        + 'Öffne die Seite in einem eigenen Fenster — dort fragt der Browser ganz normal nach der Erlaubnis.'
-      : 'Der Kamerazugriff wurde abgelehnt. In den Browsereinstellungen die Kamera für diese Seite erlauben und erneut versuchen.';
+    if (lage.imRahmen) {
+      return 'Die Kamera ist in diesem eingebetteten Fenster nicht freigegeben. '
+        + 'Öffne die Seite in einem eigenen Fenster — dort fragt der Browser ganz normal nach der Erlaubnis.';
+    }
+    if (inAppBrowser()) {
+      return 'Diese Seite läuft im eingebauten Browser einer App, und der gibt die Kamera nicht frei. '
+        + 'Die Adresse über „Teilen“ in Safari beziehungsweise Chrome öffnen — dort fragt der Browser nach der Erlaubnis. '
+        + 'Der Weg über ein Foto funktioniert hier trotzdem.';
+    }
+    return 'Der Kamerazugriff wurde abgelehnt. In den Browsereinstellungen die Kamera für diese Seite erlauben und erneut versuchen.';
   }
   if (name === 'NotFoundError' || name === 'OverconstrainedError') {
     return 'Es wurde keine verwendbare Kamera gefunden. Der Weg über ein Foto funktioniert trotzdem.';
@@ -1619,17 +1674,20 @@ $('kamera-knopf').addEventListener('click', async () => {
   if (!lage.sichererKontext) {
     hinweis.textContent = 'Diese Seite läuft ohne gesicherte Verbindung. '
       + 'Browser geben die Kamera dann grundsätzlich nicht frei.';
+    kameraDiagnose(lage, null);
     return;
   }
   if (!lage.schnittstelle) {
     hinweis.textContent = 'Dieser Browser stellt gar keine Kameraschnittstelle bereit.';
     eigenesFensterAnbieten(lage.imRahmen);
+    kameraDiagnose(lage, null);
     return;
   }
   if (lage.richtlinieErlaubt === false) {
     hinweis.textContent = 'Das eingebettete Fenster, in dem diese Seite läuft, hat kein Kamerarecht. '
       + 'Das lässt sich von hier aus nicht ändern — die Seite in einem eigenen Fenster öffnen.';
     eigenesFensterAnbieten(true);
+    kameraDiagnose(lage, null);
     return;
   }
 
@@ -1644,6 +1702,7 @@ $('kamera-knopf').addEventListener('click', async () => {
   } catch (fehler) {
     hinweis.textContent = kameraFehlerText(fehler, lage);
     eigenesFensterAnbieten(lage.imRahmen);
+    kameraDiagnose(lage, fehler?.name || 'unbekannt');
     return;
   }
 
@@ -1659,6 +1718,7 @@ $('kamera-knopf').addEventListener('click', async () => {
   }
 
   hinweis.textContent = 'Kamera läuft.';
+  kameraDiagnose(lage, null);
   $('kamera-karte').hidden = false;
 
   const leinwand = document.createElement('canvas');
