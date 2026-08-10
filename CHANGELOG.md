@@ -26,6 +26,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   wer 20 Klemmen nimmt, wo 15 stehen, hat 20 genommen, und ein blockierter
   Monteur bucht sonst gar nicht. Fahrzeuge sind vorerst kein Lagerplatz, die
   Baustelle bei der Entnahme bleibt optional.
+- **Das Lager kann Herstellercodes lesen.** Der bisherige Decoder konnte nur
+  QR, und die eingebaute Barcode-Erkennung des Browsers fehlt auf iPhone und
+  iPad — Strichcodes auf Verpackungen waren damit unerreichbar. Der neue
+  Leser in `warehouse/frontend/` liest EAN-13, EAN-8, UPC-A und Code 128, wo
+  möglich über den eingebauten Leser des Browsers, sonst selbst; Kamerabilder
+  verlassen das Gerät auch dann nicht. Drei Dinge entscheiden über die
+  Trefferquote: Der Schwellwert nimmt die Mitte zwischen hellster und
+  dunkelster Stelle der Umgebung statt deren Durchschnitt, weil ein
+  Durchschnitt bei unscharfen Bildern alle Balken gleichermaßen schmaler macht
+  und die Erkennung kippt. Vor und hinter einem Code muss eine helle Ruhezone
+  liegen — ohne sie liest sich ein beschädigter EAN-13 als kürzerer EAN-8 aus
+  seinen eigenen mittleren Ziffern. Und ein Treffer zählt erst, wenn zwei
+  Bildzeilen dasselbe sagen, denn eine verlesene Nummer kann eine gültige
+  Prüfziffer haben. Von rund 1800 künstlich beschädigten Codes werden 99,9
+  Prozent abgewiesen oder richtig gelesen. Dasselbe Etikett zweimal vor die
+  Kamera zu halten bucht nur einmal.
 - **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
   stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
   des Designsystems (`display: none !important` für alle Desktop-Einträge)

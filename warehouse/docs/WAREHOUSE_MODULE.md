@@ -231,11 +231,55 @@ offline nicht geraten. Die Kamera nutzt die native Erkennung des Browsers,
 sonst den lokal mitgelieferten Decoder aus `frontend/vendor/` — kein
 Kamerabild verlässt das Gerät.
 
-Ein offener Punkt: Der vorhandene Decoder liest QR. **Eindimensionale
-Barcodes (EAN-13, Code-128) kann er nicht**, und die `BarcodeDetector`-API
-fehlt auf iOS. Für Herstellercodes wird deshalb eine zweite, ebenfalls lokal
-mitgelieferte Bibliothek gebraucht. Das ist der erste technische Baustein nach
-diesem Konzept.
+Der vorhandene QR-Decoder liest keine eindimensionalen Barcodes, und
+`BarcodeDetector` fehlt auf iOS. Diese Lücke schließt
+`warehouse/frontend/barcode-decoder.mjs` — siehe „Der Barcode-Leser“.
+
+## Der Barcode-Leser
+
+`barcode-decoder.mjs` liest EAN-13, EAN-8, UPC-A und Code 128 aus einem
+Kamerabild. Er ist eigener Code und keine eingebundene Bibliothek: der Weg
+über Bildzeile, örtlichen Schwellwert, Lauflängen und Zeichentabellen ist
+überschaubar, vollständig prüfbar und kostet keine 300 Kilobyte fremdes
+Minifikat. `barcode-scanner.mjs` entscheidet darüber, welcher Leser zum
+Einsatz kommt, und deutet den gelesenen Wert.
+
+Vier Entscheidungen tragen die Erkennungsrate:
+
+- **Der eingebaute Leser hat Vorrang.** Wo `BarcodeDetector` die
+  eindimensionalen Formate beherrscht, wird er genommen. Kann ein Browser nur
+  QR, bringt er nichts, was der mitgelieferte Decoder nicht auch kann — dann
+  bleibt es beim eigenen. Auf iOS gibt es ihn ohnehin nicht.
+- **Der Schwellwert ist die Mitte zwischen hellstem und dunkelstem Wert der
+  Umgebung, nicht deren Durchschnitt.** Ein Durchschnitt verschiebt unter
+  Unschärfe jede Kante in dieselbe Richtung; Balken werden durchgängig
+  schmaler. Genau daran kippt die Zeichenerkennung, weil ein falsches Zeichen
+  dem verzerrten Muster knapp besser entspricht als das richtige.
+- **Vor und hinter einem Code muss eine Ruhezone liegen.** Ohne diese
+  Bedingung liest sich ein beschädigter EAN-13 als kürzerer EAN-8 aus seinen
+  eigenen mittleren Ziffern. Gefordert werden fünf Modulbreiten statt der nach
+  Norm neun bis elf, damit ein knapp angeschnittenes Foto noch funktioniert.
+- **Ein Treffer braucht zwei übereinstimmende Bildzeilen.** Die Prüfziffer
+  allein genügt nicht: eine verlesene Nummer kann rechnerisch gültig sein.
+  Verschiedene Zeilen verlesen sich praktisch nie gleich.
+
+Gemessen an rund 1800 künstlich beschädigten Codes werden 99,9 Prozent
+abgewiesen oder richtig gelesen. Der verbleibende Fall ist eine Eigenschaft
+von EAN-13 selbst und keine der Umsetzung: eine einzelne Prüfziffer kann nicht
+jede verlesene Nummer entlarven.
+
+Die GTIN-Normalisierung steht bewusst zweimal da — in `barcode-scanner.mjs`
+und als `stock_normalize_gtin` in Migration 200. Beide Seiten brauchen sie:
+das Frontend, um offline nachzuschlagen, die Datenbank, um die Eindeutigkeit
+zu erzwingen. Dass sie dasselbe tun, ist gegen 3504 Eingaben geprüft worden.
+
+Ein Scan wird in drei Fälle geteilt, genau wie beim Speichern: eigenes
+Etikett (UUID in einer Schäfchen-Adresse), Herstellercode (gültige GTIN) und
+Freitext. Derselbe Code, zweimal hintereinander gelesen, bucht nur einmal —
+eine Kamera sieht ein hingehaltenes Etikett viele Male je Sekunde.
+
+Nicht simulierbar bleibt der Rest: Scanabstand, Etikettengröße, gedruckte
+Kontraste und zerknitterte Verpackungen. Dafür ist die Abnahme vor Ort da.
 
 ## Rollen
 

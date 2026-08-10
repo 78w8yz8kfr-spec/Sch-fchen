@@ -24,9 +24,12 @@ warehouse/
   docs/WAREHOUSE_MODULE.md         Konzept, Datenmodell, Einpflegeplan
   database/migrations/             eigene Migrationen ab Nummer 200
   database/tests/                  SQL-Abnahmetests dazu
+  frontend/barcode-decoder.mjs     EAN-13, EAN-8, UPC-A und Code 128 aus einem Kamerabild
+  frontend/barcode-scanner.mjs     Leserwahl, Deutung eines Scans, Scan-Schleife
+  frontend/tests/                  Tests dazu, mit unabhängigen Referenzmustern
 ```
 
-`api/` und `frontend/` kommen dazu, sobald das Datenmodell steht.
+`api/` kommt dazu, sobald die Endpunkte stehen.
 
 ## Stand
 
@@ -35,8 +38,8 @@ warehouse/
 | Konzept und Datenmodell | `docs/WAREHOUSE_MODULE.md`, Fassung 1 |
 | Migration 200 (14 Tabellen) | steht, idempotent, zweimal hintereinander geprüft |
 | SQL-Abnahmetest | steht, grün, gegen verfälschte Erwartungen gegengeprüft |
-| Barcode-Leser für EAN-13/Code-128 | offen, siehe unten |
-| API `/api/v1/stock/*` | offen |
+| Barcode-Leser für EAN-13/EAN-8/UPC-A/Code 128 | steht, 28 Tests grün |
+| API `/api/v1/stock/*` | offen, als Nächstes |
 | Bedienoberfläche | offen |
 | Einpflegen in Schäfchen | offen |
 
@@ -53,6 +56,12 @@ sh database/scripts/run-sql-directories.sh warehouse/database/tests
 Beide Skripte erwarten dieselben `POSTGRES_*`-Variablen wie `make db-migrate`.
 Geprüft wurde gegen einen kompletten Neuaufbau: 106 Migrationen, API-Rolle,
 Seeds, Migration 200 und anschließend alle Abnahmetests.
+
+Die Frontend-Tests brauchen weder Datenbank noch Netz noch `node_modules`:
+
+```bash
+node --test warehouse/frontend/tests/*.test.mjs
+```
 
 ## Was Schäfchen schon mitbringt
 
@@ -71,9 +80,12 @@ Die Lagerverwaltung beginnt nicht bei null:
 - **Dokumentenmodell** (`documents`, `document_links`) nimmt Lieferscheinfotos
   auf; das Modul legt keine eigene Dateiablage an.
 
-Fehlt: ein Leser für eindimensionale Barcodes. Der vorhandene Decoder kann nur
-QR, und `BarcodeDetector` gibt es auf iOS nicht. Für EAN-13 und Code-128 wird
-eine zweite, ebenfalls lokal mitgelieferte Bibliothek gebraucht.
+Was gefehlt hat, war ein Leser für eindimensionale Barcodes — der vorhandene
+Decoder kann nur QR, und `BarcodeDetector` gibt es auf iOS nicht. Der steht
+jetzt in `frontend/barcode-decoder.mjs`, als eigener Code statt als fremdes
+Minifikat, und liest EAN-13, EAN-8, UPC-A und Code 128. Beim Einpflegen wandert
+er nach `frontend/vendor/`s Nachbarschaft und teilt sich mit dem Gerätemodul
+Kamerastart und Fehlermeldungen; bis dahin bleibt er hier eigenständig.
 
 ## Abgrenzung in einem Satz
 
