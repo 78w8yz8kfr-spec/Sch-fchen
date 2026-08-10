@@ -59,7 +59,8 @@ der später auch läuft.
 | API für Lieferanten, Bestellungen, Inventur | offen; die Tabellen stehen, die Endpunkte fehlen |
 | Bedienoberfläche: Monteursablauf | steht — scannen, Menge, buchen |
 | Bedienoberfläche: Büro | steht — Bestand, Artikelanlage, Nachbestellung |
-| Bedienoberfläche: Inventur, Wareneingang gegen Bestellung | offen |
+| Inventur: API und Bedienung | steht — 13 Abnahmen, 8 Tests, 19 Prüfungen im Browser |
+| Lieferanten, Bestellungen, Wareneingang gegen Bestellung | offen — Tabellen stehen, Endpunkte fehlen |
 | Einpflegen in Schäfchen | offen |
 
 ## Prüfen

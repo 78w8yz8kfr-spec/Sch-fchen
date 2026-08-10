@@ -220,6 +220,26 @@
 
   .stock-empty { margin: 0; color: var(--text-dritt); font-size: .9rem; }
 
+  .stock-row__amount--mehr { color: var(--warn); }
+  .stock-row__amount--weniger { color: var(--schlecht); }
+  .stock-row__amount--offen { color: var(--text-dritt); }
+
+  .stock-inventory__where { margin: 0; font-weight: 700; }
+  .stock-inventory__progress {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten); font-variant-numeric: tabular-nums;
+  }
+  .stock-count {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 12px; border-radius: 10px;
+    background: var(--marke-weich); border: 1px solid var(--marke);
+  }
+  .stock-count__name { margin: 0; font-size: 1.1rem; }
+  .stock-count__expected {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten);
+  }
+
   .stock-field { display: flex; flex-direction: column; gap: 4px; }
   .stock-field > span {
     font-size: .68rem; font-weight: 700; letter-spacing: .06em;
@@ -498,6 +518,68 @@ function alleVorschlaege() {
   }));
 }
 
+// --- Inventur: bildet /api/v1/stock/inventory/* nach ---------------------
+let laufendeInventur = null;
+
+function inventurAntwort() {
+  if (!laufendeInventur) return null;
+  const zeilen = laufendeInventur.zeilen.map((zeile) => {
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.itemId);
+    return {
+      itemId: zeile.itemId,
+      itemName: artikel?.name || '',
+      unit: artikel?.unit || '',
+      expectedQuantity: zeile.erwartet,
+      countedQuantity: zeile.gezaehlt,
+      difference: zeile.gezaehlt === null
+        ? null
+        : Math.round((zeile.gezaehlt - zeile.erwartet) * 1000) / 1000
+    };
+  });
+  return { session: laufendeInventur.session, lines: zeilen };
+}
+
+function inventurStarten(ortId) {
+  const ort = ORTE.find((eintrag) => eintrag.id === ortId);
+  laufendeInventur = {
+    session: { id: 'inv-demo', locationId: ortId, locationName: ort?.name || '', status: 'running' },
+    zeilen: ARTIKEL
+      .map((artikel) => ({ itemId: artikel.id, erwartet: bestand.get(`${artikel.id}|${ortId}`) ?? 0, gezaehlt: null }))
+      .filter((zeile) => zeile.erwartet !== 0)
+  };
+  return inventurAntwort();
+}
+
+function inventurZaehlen(itemId, menge) {
+  const vorhanden = laufendeInventur.zeilen.find((zeile) => zeile.itemId === itemId);
+  if (vorhanden) vorhanden.gezaehlt = menge;
+  else laufendeInventur.zeilen.push({ itemId, erwartet: 0, gezaehlt: menge });
+  return inventurAntwort();
+}
+
+function inventurAbschliessen() {
+  const ortId = laufendeInventur.session.locationId;
+  let korrekturen = 0;
+
+  for (const zeile of laufendeInventur.zeilen) {
+    if (zeile.gezaehlt === null || zeile.gezaehlt === zeile.erwartet) continue;
+    const differenz = zeile.gezaehlt - zeile.erwartet;
+    const schluessel = `${zeile.itemId}|${ortId}`;
+    bestand.set(schluessel, Math.round(((bestand.get(schluessel) ?? 0) + differenz) * 1000) / 1000);
+
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.itemId);
+    journal.unshift({
+      vorgangId: `inv-${zeile.itemId}`,
+      text: `correction · ${differenz > 0 ? '+' : '−'}${mengeAlsText(Math.abs(differenz))} ${artikel?.unit || ''} · ${artikel?.name || ''}`,
+      zeit: new Date().toLocaleTimeString('de-DE')
+    });
+    korrekturen += 1;
+  }
+
+  laufendeInventur = null;
+  return korrekturen;
+}
+
 const optionen = () => ({
   baustellen: BAUSTELLEN,
   baustellePflicht: false,
@@ -625,11 +707,57 @@ function verdrahten() {
       const ziele = {
         bestand: SCHRITTE.BESTAND,
         artikel: SCHRITTE.ARTIKEL,
-        nachbestellung: SCHRITTE.NACHBESTELLUNG
+        nachbestellung: SCHRITTE.NACHBESTELLUNG,
+        inventur: SCHRITTE.INVENTUR
       };
-      zustand = { ...zustand, schritt: ziele[kachel.dataset.ziel] || SCHRITTE.START };
+      zustand = {
+        ...zustand,
+        schritt: ziele[kachel.dataset.ziel] || SCHRITTE.START,
+        inventur: inventurAntwort(),
+        zaehlArtikel: null,
+        fehler: null
+      };
       zeichnen();
     });
+  });
+
+  wurzel.querySelector('.stock-inventory-start')?.addEventListener('click', () => {
+    const ortId = zustand.ort?.id || ORTE[0].id;
+    zustand = { ...zustand, inventur: inventurStarten(ortId), zaehlArtikel: null, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-count-save')?.addEventListener('click', () => {
+    const { zaehlung, fehler } = zaehlungBauen(zustand);
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+    zustand = {
+      ...zustand,
+      inventur: inventurZaehlen(zaehlung.itemId, zaehlung.quantity),
+      zaehlArtikel: null,
+      menge: '',
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-count__input')?.addEventListener('input', (e) => {
+    zustand.menge = e.target.value;
+  });
+
+  wurzel.querySelector('.stock-inventory-done')?.addEventListener('click', () => {
+    const korrekturen = inventurAbschliessen();
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: `Inventur abgeschlossen: ${korrekturen} Korrektur${korrekturen === 1 ? '' : 'en'} gebucht.` });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-inventory-cancel')?.addEventListener('click', () => {
+    laufendeInventur = null;
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Inventur abgebrochen.' });
+    zeichnen();
   });
 
   wurzel.querySelectorAll('.stock-row--tap').forEach((zeile) => {
@@ -684,7 +812,10 @@ function scanKnoepfeZeichnen() {
   $('scan-knoepfe').innerHTML = knoepfe.join('');
   $('scan-knoepfe').querySelectorAll('[data-code]').forEach((knopf) => {
     knopf.addEventListener('click', () => {
-      zustand = scanVerarbeiten(zustand, scanAufloesen(knopf.dataset.code));
+      const antwort = scanAufloesen(knopf.dataset.code);
+      zustand = zustand.schritt === SCHRITTE.INVENTUR
+        ? inventurScanVerarbeiten(zustand, antwort)
+        : scanVerarbeiten(zustand, antwort);
       zeichnen();
     });
   });

@@ -300,6 +300,7 @@ hat.
 | `POST /movements` | buchen, idempotent über `clientOperationId` |
 | `GET /levels` | Bestand je Lagerplatz |
 | `GET /reorder` | Nachbestellvorschlag aus Mindest- und Zielbestand |
+| `GET/POST /inventory`, `…/:id`, `…/:id/count`, `…/:id/complete`, `…/:id/cancel` | Inventur starten, zählen, abschließen, abbrechen |
 
 Drei Dinge, die dabei bewusst so und nicht anders sind:
 
@@ -326,10 +327,17 @@ Umlagern setzt den Überblick des Vorarbeiters voraus. Anfangsbestand,
 Wareneingang, Korrektur und Verschrottung gehören ins Büro, weil sie den
 Bestand aus dem Nichts verändern.
 
-Noch nicht gebaut: Lieferanten, Bestellungen und Inventursitzungen haben ihre
-Tabellen, aber keine Endpunkte. Der Nachbestellvorschlag rechnet bereits und
-zeigt den hinterlegten Lieferanten an; er kann nur noch keine Bestellung
-erzeugen.
+**Der Sollbestand einer Inventur wird beim Start eingefroren**, nicht beim
+Abschluss gelesen. Die Zählerin stellt einen Unterschied zu genau diesem Stand
+fest; Buchungen, die währenddessen entstehen, sind echte Bewegungen und
+bleiben erhalten, statt von der Korrektur überschrieben zu werden. Nicht
+gezählte Zeilen bleiben unangetastet — sie auf null zu setzen wäre die
+gefährlichere Annahme, weil eine abgebrochene Zählung dann ein halbes Lager
+ausbuchen würde.
+
+Noch nicht gebaut: Lieferanten und Bestellungen haben ihre Tabellen, aber
+keine Endpunkte. Der Nachbestellvorschlag rechnet bereits und zeigt den
+hinterlegten Lieferanten an; er kann nur noch keine Bestellung erzeugen.
 
 ## Rollen
 
@@ -413,10 +421,13 @@ Löschschutz, Grunddaten einer neu angelegten Firma samt Modulfreigabe sowie
 zwei Wege, auf denen ein fremder Mandant Ort oder Mitarbeiter mitzubenutzen
 versucht.
 
-Noch offen, weil der Code dafür fehlt: Inventur mit Differenz und
-Korrekturbuchung, Bestellung mit Teillieferung, zwei echt gleichzeitige
-Entnahmen über getrennte Verbindungen sowie sämtliche Rollen- und
-Endpunktprüfungen der API.
+Die Inventur ist inzwischen ebenfalls abgenommen: eingefrorener Sollbestand,
+Zählung mit Berichtigung, überraschender Fund mit Soll null, Korrektur genau
+der Abweichungen, unangetastete ungezählte Zeilen, Abbruch mit Pflichtgrund,
+Rollen und fremder Mandant.
+
+Noch offen, weil der Code dafür fehlt: Bestellung mit Teillieferung und zwei
+echt gleichzeitige Entnahmen über getrennte Verbindungen.
 
 Nicht simulierbar bleiben Scanabstand, Etikettenhaftung im Fahrzeug und die
 Lesbarkeit zerknitterter Herstellercodes. Diese Punkte gehören in die Abnahme
