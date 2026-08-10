@@ -184,6 +184,57 @@
   .stock-unknown__code { margin: 0; font-family: var(--schrift-daten); font-size: 1.2rem; font-weight: 700; word-break: break-all; }
   .stock-unknown__text { margin: 0; color: var(--text-zweit); font-size: .9rem; }
 
+  /* Bueroansichten: Listen statt Ablauf. Wer Artikel pflegt, sucht. */
+  .stock-list, .stock-form { display: flex; flex-direction: column; gap: 12px; }
+
+  .stock-head { display: flex; align-items: center; gap: 6px; }
+  .stock-head__title { margin: 0; font-size: 1.15rem; }
+  .stock-back { width: 44px; min-width: 44px; font-size: 1.2rem; }
+
+  .stock-group { display: flex; flex-direction: column; gap: 6px; }
+  .stock-group__name {
+    margin: 0; font-size: .68rem; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--text-dritt);
+  }
+
+  .stock-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .stock-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 1px 10px;
+    padding: 10px 12px; border-radius: 8px; background: var(--flaeche-leise);
+    border: 1px solid var(--rand);
+  }
+  .stock-row--tap { cursor: pointer; }
+  .stock-row--tap:hover { background: var(--grund); }
+  .stock-row__name { font-weight: 600; }
+  .stock-row__number { grid-column: 1; font-size: .78rem; color: var(--text-dritt); font-family: var(--schrift-daten); }
+  .stock-row__amount {
+    grid-row: 1 / span 2; grid-column: 2; align-self: center;
+    font-family: var(--schrift-daten); font-weight: 700; font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .stock-row__amount--gut { color: var(--gut); }
+  .stock-row__amount--knapp { color: var(--warn); }
+  .stock-row__amount--leer { color: var(--text-zweit); }
+  .stock-row__amount--unplausibel { color: var(--schlecht); }
+  .stock-row__amount--unbekannt { color: var(--text-dritt); }
+
+  .stock-empty { margin: 0; color: var(--text-dritt); font-size: .9rem; }
+
+  .stock-field { display: flex; flex-direction: column; gap: 4px; }
+  .stock-field > span {
+    font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-dritt);
+  }
+  .stock-field input, .stock-field select {
+    font: inherit; font-size: 1rem; color: var(--text); background: var(--flaeche);
+    border: 1px solid var(--rand-stark); border-radius: 8px; padding: 10px;
+    min-height: 46px; box-sizing: border-box; width: 100%;
+  }
+  .stock-field input:focus-visible, .stock-field select:focus-visible {
+    outline: 3px solid var(--marke); outline-offset: 1px;
+  }
+  .stock-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
   /* Werkbank: alles, was in der echten App nicht da waere. */
   .werkbank { display: flex; flex-direction: column; gap: 14px; }
   .karte {
@@ -406,7 +457,55 @@ const $ = (id) => document.getElementById(id);
 let rolle = 'monteur';
 let zustand = lagerZustand();
 
-const optionen = () => ({ baustellen: BAUSTELLEN, baustellePflicht: false });
+const GRUPPEN = [
+  { key: 'installation', name: 'Installationsmaterial' },
+  { key: 'cable', name: 'Kabel und Leitungen' },
+  { key: 'switches', name: 'Schalter und Steckdosen' },
+  { key: 'other', name: 'Sonstiges Material' }
+];
+
+/** Bildet GET /levels nach. */
+function alleBestandszeilen() {
+  const zeilen = [];
+  for (const artikel of ARTIKEL) {
+    for (const ort of ORTE) {
+      const menge = bestand.get(`${artikel.id}|${ort.id}`);
+      if (!menge) continue;
+      zeilen.push({
+        itemId: artikel.id, itemName: artikel.name, itemNumber: artikel.itemNumber,
+        unit: artikel.unit, locationId: ort.id, locationName: ort.name, quantity: menge
+      });
+    }
+  }
+  return zeilen;
+}
+
+/** Bildet GET /items nach. */
+function alleArtikel() {
+  return ARTIKEL.map((artikel) => ({
+    id: artikel.id, itemNumber: artikel.itemNumber, name: artikel.name, unit: artikel.unit,
+    minimumStock: artikel.minimumStock, targetStock: artikel.targetStock,
+    totalQuantity: ORTE.reduce((summe, ort) => summe + (bestand.get(`${artikel.id}|${ort.id}`) ?? 0), 0)
+  }));
+}
+
+/** Bildet GET /reorder nach: eine Rechnung, kein gespeicherter Zustand. */
+function alleVorschlaege() {
+  return knappeArtikel(alleArtikel()).map((artikel) => ({
+    ...artikel,
+    suggestedQuantity: Math.max(0, (artikel.targetStock ?? artikel.minimumStock) - artikel.totalQuantity),
+    supplierName: 'Sonepar'
+  }));
+}
+
+const optionen = () => ({
+  baustellen: BAUSTELLEN,
+  baustellePflicht: false,
+  bestand: alleBestandszeilen(),
+  artikel: alleArtikel(),
+  vorschlaege: alleVorschlaege(),
+  gruppen: GRUPPEN
+});
 const rechte = () => ROLLEN[rolle].rechte;
 
 function zeichnen() {
@@ -475,19 +574,70 @@ function verdrahten() {
   });
 
   wurzel.querySelector('.stock-create')?.addEventListener('click', () => {
-    const entwurf = artikelEntwurfAusScan(zustand.letzterScan, [{ key: 'installation' }]);
-    $('foto-hinweis').hidden = false;
-    $('foto-hinweis').textContent =
-      `In der App öffnet sich hier die Artikelanlage — vorbelegt mit dem Code `
-      + `${entwurf.barcodes[0].code} als ${entwurf.barcodes[0].codeType}. `
-      + `In dieser Vorschau ist die Anlage nicht gebaut.`;
+    zustand = {
+      ...zustand,
+      schritt: SCHRITTE.ARTIKEL_NEU,
+      entwurf: artikelEntwurfAusScan(zustand.letzterScan, GRUPPEN),
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-new')?.addEventListener('click', () => {
+    zustand = { ...zustand, schritt: SCHRITTE.ARTIKEL_NEU, entwurf: { unit: 'Stück' }, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-save')?.addEventListener('click', () => {
+    const werte = {};
+    wurzel.querySelectorAll('[name]').forEach((feld) => { werte[feld.name] = feld.value; });
+    werte.barcodes = zustand.entwurf?.barcodes || [];
+
+    const { entwurf, fehler } = artikelFormularLesen(werte);
+    if (fehler) {
+      zustand = { ...zustand, entwurf: { ...zustand.entwurf, ...werte }, fehler };
+      zeichnen();
+      return;
+    }
+
+    ARTIKEL.push({
+      id: `art-${ARTIKEL.length + 1}`,
+      itemNumber: entwurf.itemNumber,
+      name: entwurf.name,
+      unit: entwurf.unit,
+      minimumStock: entwurf.minimumStock ?? 0,
+      targetStock: entwurf.targetStock ?? null,
+      codes: entwurf.barcodes.map((code) => ({
+        code: code.code,
+        gtin: gtinNormalisieren(code.code),
+        pack: code.packQuantity,
+        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+      }))
+    });
+
+    scanKnoepfeZeichnen();
+    zustand = lagerZustand({ ort: zustand.ort, schritt: SCHRITTE.ARTIKEL });
+    zeichnen();
   });
 
   wurzel.querySelectorAll('.stock-tile').forEach((kachel) => {
     kachel.addEventListener('click', () => {
-      $('foto-hinweis').hidden = false;
-      $('foto-hinweis').textContent = `„${kachel.querySelector('.stock-tile__name').textContent}" `
-        + 'ist in dieser Vorschau noch nicht gebaut — der Bestand steht rechts.';
+      const ziele = {
+        bestand: SCHRITTE.BESTAND,
+        artikel: SCHRITTE.ARTIKEL,
+        nachbestellung: SCHRITTE.NACHBESTELLUNG
+      };
+      zustand = { ...zustand, schritt: ziele[kachel.dataset.ziel] || SCHRITTE.START };
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelectorAll('.stock-row--tap').forEach((zeile) => {
+    zeile.addEventListener('click', () => {
+      const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.dataset.artikel);
+      if (!artikel) return;
+      zustand = scanVerarbeiten(zustand, artikelAntwort(artikel, 1));
+      zeichnen();
     });
   });
 }

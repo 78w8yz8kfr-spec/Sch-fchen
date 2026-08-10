@@ -26,10 +26,26 @@ warehouse/
   database/tests/                  SQL-Abnahmetests dazu
   frontend/barcode-decoder.mjs     EAN-13, EAN-8, UPC-A und Code 128 aus einem Kamerabild
   frontend/barcode-scanner.mjs     Leserwahl, Deutung eines Scans, Scan-Schleife
+  frontend/stock-management.js     Ablauf, Zustand und Ansichten der Bedienung
   frontend/tests/                  Tests dazu, mit unabhängigen Referenzmustern
+  frontend/testseite/              Vorlage des Barcode-Prüfstands
+  frontend/demo/                   Vorlage der klickbaren Bedienungsvorschau
   api/stock.mjs                    Endpunkte /api/v1/stock/*
   api/tests/                       Abnahme gegen eine echte Datenbank
 ```
+
+Die beiden eigenständigen Seiten `barcode-testseite.html` und
+`oberflaeche-demo.html` werden aus ihren Vorlagen gebaut und nicht von Hand
+bearbeitet:
+
+```bash
+node warehouse/frontend/testseite/bauen.mjs
+node warehouse/frontend/demo/bauen.mjs
+```
+
+Beide betten die ausgelieferten Moduldateien wörtlich ein; das Bauskript
+bricht ab, wenn Modulsyntax übrig bleibt. So zeigen die Seiten genau den Code,
+der später auch läuft.
 
 ## Stand
 
@@ -41,7 +57,9 @@ warehouse/
 | Barcode-Leser für EAN-13/EAN-8/UPC-A/Code 128 | steht, 28 Tests grün |
 | API `/api/v1/stock/*` | Artikel, Lagerplätze, Etiketten, Scan, Buchungen, Bestand, Nachbestellung — 16 Tests grün |
 | API für Lieferanten, Bestellungen, Inventur | offen; die Tabellen stehen, die Endpunkte fehlen |
-| Bedienoberfläche | offen |
+| Bedienoberfläche: Monteursablauf | steht — scannen, Menge, buchen |
+| Bedienoberfläche: Büro | steht — Bestand, Artikelanlage, Nachbestellung |
+| Bedienoberfläche: Inventur, Wareneingang gegen Bestellung | offen |
 | Einpflegen in Schäfchen | offen |
 
 ## Prüfen

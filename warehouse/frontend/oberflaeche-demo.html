@@ -184,6 +184,57 @@
   .stock-unknown__code { margin: 0; font-family: var(--schrift-daten); font-size: 1.2rem; font-weight: 700; word-break: break-all; }
   .stock-unknown__text { margin: 0; color: var(--text-zweit); font-size: .9rem; }
 
+  /* Bueroansichten: Listen statt Ablauf. Wer Artikel pflegt, sucht. */
+  .stock-list, .stock-form { display: flex; flex-direction: column; gap: 12px; }
+
+  .stock-head { display: flex; align-items: center; gap: 6px; }
+  .stock-head__title { margin: 0; font-size: 1.15rem; }
+  .stock-back { width: 44px; min-width: 44px; font-size: 1.2rem; }
+
+  .stock-group { display: flex; flex-direction: column; gap: 6px; }
+  .stock-group__name {
+    margin: 0; font-size: .68rem; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--text-dritt);
+  }
+
+  .stock-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .stock-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 1px 10px;
+    padding: 10px 12px; border-radius: 8px; background: var(--flaeche-leise);
+    border: 1px solid var(--rand);
+  }
+  .stock-row--tap { cursor: pointer; }
+  .stock-row--tap:hover { background: var(--grund); }
+  .stock-row__name { font-weight: 600; }
+  .stock-row__number { grid-column: 1; font-size: .78rem; color: var(--text-dritt); font-family: var(--schrift-daten); }
+  .stock-row__amount {
+    grid-row: 1 / span 2; grid-column: 2; align-self: center;
+    font-family: var(--schrift-daten); font-weight: 700; font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .stock-row__amount--gut { color: var(--gut); }
+  .stock-row__amount--knapp { color: var(--warn); }
+  .stock-row__amount--leer { color: var(--text-zweit); }
+  .stock-row__amount--unplausibel { color: var(--schlecht); }
+  .stock-row__amount--unbekannt { color: var(--text-dritt); }
+
+  .stock-empty { margin: 0; color: var(--text-dritt); font-size: .9rem; }
+
+  .stock-field { display: flex; flex-direction: column; gap: 4px; }
+  .stock-field > span {
+    font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-dritt);
+  }
+  .stock-field input, .stock-field select {
+    font: inherit; font-size: 1rem; color: var(--text); background: var(--flaeche);
+    border: 1px solid var(--rand-stark); border-radius: 8px; padding: 10px;
+    min-height: 46px; box-sizing: border-box; width: 100%;
+  }
+  .stock-field input:focus-visible, .stock-field select:focus-visible {
+    outline: 3px solid var(--marke); outline-offset: 1px;
+  }
+  .stock-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
   /* Werkbank: alles, was in der echten App nicht da waere. */
   .werkbank { display: flex; flex-direction: column; gap: 14px; }
   .karte {
@@ -1045,7 +1096,14 @@ const SCHRITTE = Object.freeze({
   START: 'start',
   BUCHEN: 'buchen',
   UNBEKANNT: 'unbekannt',
-  BESTAETIGT: 'bestaetigt'
+  BESTAETIGT: 'bestaetigt',
+  // Die drei Bueroansichten. Sie stehen bewusst neben dem Monteursablauf und
+  // nicht in ihm: wer Artikel pflegt, sitzt am Schreibtisch und sucht, statt
+  // dem naechsten Schritt zu folgen.
+  BESTAND: 'bestand',
+  ARTIKEL: 'artikel',
+  ARTIKEL_NEU: 'artikelNeu',
+  NACHBESTELLUNG: 'nachbestellung'
 });
 
 // Was der Benutzer waehlt, und was daraus in der Datenbank wird. Die
@@ -1496,10 +1554,244 @@ function unbekanntAnsicht(zustand, rechte = {}) {
     </div>`;
 }
 
-function ansichtFuer(zustand, rechte, optionen) {
+// ---------------------------------------------------------------------------
+// Bueroansichten
+// ---------------------------------------------------------------------------
+
+/**
+ * Der Bestand wird nach Lagerplatz gebuendelt, nicht nach Artikel. Die Frage
+ * im Buero lautet "was liegt im Fach A1", wenn jemand danach sucht; die Frage
+ * nach einem einzelnen Artikel beantwortet die Artikelansicht.
+ */
+function bestandNachOrt(zeilen = []) {
+  const orte = new Map();
+
+  for (const zeile of zeilen) {
+    if (!orte.has(zeile.locationId)) {
+      orte.set(zeile.locationId, { id: zeile.locationId, name: zeile.locationName, zeilen: [] });
+    }
+    orte.get(zeile.locationId).zeilen.push(zeile);
+  }
+
+  return [...orte.values()]
+    .map((ort) => ({
+      ...ort,
+      zeilen: [...ort.zeilen].sort((a, b) => a.itemName.localeCompare(b.itemName, 'de'))
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+/**
+ * Wie weit ist ein Artikel vom Mindestbestand entfernt? Null heisst leer, eins
+ * heisst gerade erreicht. Danach wird der Nachbestellvorschlag sortiert: wer
+ * am weitesten unten liegt, steht oben.
+ */
+function deckungsgrad(artikel) {
+  if (!artikel?.minimumStock || artikel.minimumStock <= 0) return null;
+  return Math.max(0, artikel.totalQuantity) / artikel.minimumStock;
+}
+
+function nachbestellungZeilen(vorschlaege = []) {
+  return [...vorschlaege]
+    .map((eintrag) => ({ ...eintrag, deckung: deckungsgrad(eintrag) }))
+    .sort((a, b) => (a.deckung ?? 1) - (b.deckung ?? 1));
+}
+
+/** Mengen im Artikelstamm duerfen null sein — anders als Buchungsmengen. */
+function bestandsmengeAusText(text) {
+  if (text === undefined || text === null || String(text).trim() === '') return null;
+  const bereinigt = String(text).trim().replace(',', '.');
+  if (!/^\d*\.?\d*$/.test(bereinigt) || bereinigt === '.') return undefined;
+  const wert = Number(bereinigt);
+  if (!Number.isFinite(wert) || wert < 0) return undefined;
+  return Math.round(wert * 1000) / 1000;
+}
+
+/**
+ * Prueft das Artikelformular, bevor es abgeschickt wird.
+ *
+ * Dieselben Regeln stehen in der API und in der Datenbank; hier stehen sie ein
+ * drittes Mal, damit niemand erst nach dem Absenden erfaehrt, dass die
+ * Artikelnummer fehlt. Die Datenbank bleibt die Grenze, das hier ist die
+ * Hoeflichkeit.
+ */
+function artikelFormularLesen(werte = {}) {
+  const text = (wert) => String(wert ?? '').trim();
+
+  const itemNumber = text(werte.itemNumber).toUpperCase();
+  if (!itemNumber) return { fehler: 'Die Artikelnummer fehlt.' };
+  if (itemNumber.length > 40) return { fehler: 'Die Artikelnummer ist zu lang.' };
+
+  const name = text(werte.name);
+  if (!name) return { fehler: 'Die Bezeichnung fehlt.' };
+  if (name.length > 180) return { fehler: 'Die Bezeichnung ist zu lang.' };
+
+  const unit = text(werte.unit);
+  if (!unit) return { fehler: 'Die Einheit fehlt.' };
+
+  const groupKey = text(werte.groupKey);
+  if (!groupKey) return { fehler: 'Die Warengruppe fehlt.' };
+
+  const minimumStock = bestandsmengeAusText(werte.minimumStock);
+  if (minimumStock === undefined) return { fehler: 'Der Mindestbestand ist keine gültige Menge.' };
+
+  const targetStock = bestandsmengeAusText(werte.targetStock);
+  if (targetStock === undefined) return { fehler: 'Der Zielbestand ist keine gültige Menge.' };
+  if (targetStock !== null && minimumStock !== null && targetStock < minimumStock) {
+    return { fehler: 'Der Zielbestand liegt unter dem Mindestbestand.' };
+  }
+
+  const codes = (werte.barcodes || []).filter((eintrag) => text(eintrag?.code));
+  const barcodes = [];
+  for (const eintrag of codes) {
+    const menge = mengeAusText(eintrag.packQuantity ?? 1);
+    if (menge === null) return { fehler: 'Eine Gebindemenge ist keine gültige Menge.' };
+    barcodes.push({
+      code: text(eintrag.code),
+      codeType: eintrag.codeType === 'gtin' ? 'gtin' : 'internal',
+      packQuantity: menge,
+      isPrimary: eintrag.isPrimary === true
+    });
+  }
+  if (barcodes.filter((eintrag) => eintrag.isPrimary).length > 1) {
+    return { fehler: 'Nur ein Code darf der Hauptcode sein.' };
+  }
+
+  const entwurf = { itemNumber, name, unit, groupKey, barcodes };
+  if (minimumStock !== null) entwurf.minimumStock = minimumStock;
+  if (targetStock !== null) entwurf.targetStock = targetStock;
+  if (text(werte.manufacturer)) entwurf.manufacturer = text(werte.manufacturer);
+  if (text(werte.manufacturerNumber)) entwurf.manufacturerNumber = text(werte.manufacturerNumber);
+
+  return { entwurf };
+}
+
+function kopfzeile(titel) {
+  return `<div class="stock-head">
+    <button class="button button--quiet stock-home stock-back" type="button" aria-label="Zurück">←</button>
+    <h2 class="stock-head__title">${sicher(titel)}</h2>
+  </div>`;
+}
+
+function bestandAnsicht(zeilen = []) {
+  const orte = bestandNachOrt(zeilen);
+  if (!orte.length) {
+    return `<div class="stock-list">
+      ${kopfzeile('Bestand')}
+      <p class="stock-empty">Für dieses Lager ist noch nichts gebucht.</p>
+    </div>`;
+  }
+
+  return `<div class="stock-list">
+    ${kopfzeile('Bestand')}
+    ${orte.map((ort) => `
+      <section class="stock-group">
+        <h3 class="stock-group__name">${sicher(ort.name)}</h3>
+        <ul class="stock-rows">
+          ${ort.zeilen.map((zeile) => `
+            <li class="stock-row">
+              <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+              <span class="stock-row__number">${sicher(zeile.itemNumber)}</span>
+              <span class="stock-row__amount stock-row__amount--${bestandLage(zeile.quantity)}">
+                ${sicher(bestandText(zeile.quantity, zeile.unit))}
+              </span>
+            </li>`).join('')}
+        </ul>
+      </section>`).join('')}
+  </div>`;
+}
+
+function artikelListeAnsicht(artikel = [], rechte = {}) {
+  return `<div class="stock-list">
+    ${kopfzeile('Artikel')}
+    ${rechte.manage ? '<button class="button button--action stock-new" type="button">Artikel anlegen</button>' : ''}
+    ${artikel.length
+      ? `<ul class="stock-rows">
+          ${artikel.map((eintrag) => `
+            <li class="stock-row stock-row--tap" data-artikel="${sicher(eintrag.id)}">
+              <span class="stock-row__name">${sicher(eintrag.name)}</span>
+              <span class="stock-row__number">${sicher(eintrag.itemNumber)}</span>
+              <span class="stock-row__amount stock-row__amount--${bestandLage(eintrag.totalQuantity, eintrag.minimumStock)}">
+                ${sicher(bestandText(eintrag.totalQuantity, eintrag.unit))}
+              </span>
+            </li>`).join('')}
+        </ul>`
+      : '<p class="stock-empty">Noch kein Artikel angelegt.</p>'}
+  </div>`;
+}
+
+function nachbestellungAnsicht(vorschlaege = []) {
+  const zeilen = nachbestellungZeilen(vorschlaege);
+  if (!zeilen.length) {
+    return `<div class="stock-list">
+      ${kopfzeile('Nachbestellung')}
+      <p class="stock-empty">Kein Artikel liegt unter seinem Mindestbestand.</p>
+    </div>`;
+  }
+
+  return `<div class="stock-list">
+    ${kopfzeile('Nachbestellung')}
+    <ul class="stock-rows">
+      ${zeilen.map((eintrag) => `
+        <li class="stock-row stock-row--order">
+          <span class="stock-row__name">${sicher(eintrag.name)}</span>
+          <span class="stock-row__number">
+            ${sicher(bestandText(eintrag.totalQuantity, eintrag.unit))} von ${sicher(mengeAlsText(eintrag.minimumStock))}
+            ${eintrag.supplierName ? ` · ${sicher(eintrag.supplierName)}` : ''}
+          </span>
+          <span class="stock-row__amount stock-row__amount--knapp">
+            + ${sicher(bestandText(eintrag.suggestedQuantity, eintrag.unit))}
+          </span>
+        </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+function artikelFormularAnsicht(entwurf = {}, gruppen = [], fehler = null) {
+  const code = entwurf.barcodes?.[0];
+
+  return `<div class="stock-form">
+    ${kopfzeile('Artikel anlegen')}
+    ${code
+      ? `<p class="stock-note">Der gescannte Code <strong>${sicher(code.code)}</strong> wird übernommen.</p>`
+      : ''}
+    <label class="stock-field"><span>Artikelnummer</span>
+      <input name="itemNumber" value="${sicher(entwurf.itemNumber || '')}" autocomplete="off" maxlength="40"></label>
+    <label class="stock-field"><span>Bezeichnung</span>
+      <input name="name" value="${sicher(entwurf.name || '')}" autocomplete="off" maxlength="180"></label>
+    <label class="stock-field"><span>Einheit</span>
+      <input name="unit" value="${sicher(entwurf.unit || 'Stück')}" autocomplete="off" maxlength="20"></label>
+    <label class="stock-field"><span>Warengruppe</span>
+      <select name="groupKey">
+        ${gruppen.map((gruppe) => `
+          <option value="${sicher(gruppe.key)}"${gruppe.key === entwurf.groupKey ? ' selected' : ''}>
+            ${sicher(gruppe.name)}
+          </option>`).join('')}
+      </select></label>
+    <label class="stock-field"><span>Herstellernummer (freiwillig)</span>
+      <input name="manufacturerNumber" value="${sicher(entwurf.manufacturerNumber || '')}" autocomplete="off" maxlength="80"></label>
+    <div class="stock-field-pair">
+      <label class="stock-field"><span>Mindestbestand</span>
+        <input name="minimumStock" inputmode="decimal" value="${sicher(entwurf.minimumStock ?? '')}" autocomplete="off"></label>
+      <label class="stock-field"><span>Zielbestand</span>
+        <input name="targetStock" inputmode="decimal" value="${sicher(entwurf.targetStock ?? '')}" autocomplete="off"></label>
+    </div>
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+    <button class="button button--action stock-save" type="button">Anlegen</button>
+    <button class="button button--quiet stock-home" type="button">Abbrechen</button>
+  </div>`;
+}
+
+function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.BESTAND) return bestandAnsicht(optionen.bestand);
+  if (zustand.schritt === SCHRITTE.ARTIKEL) return artikelListeAnsicht(optionen.artikel, rechte);
+  if (zustand.schritt === SCHRITTE.NACHBESTELLUNG) return nachbestellungAnsicht(optionen.vorschlaege);
+  if (zustand.schritt === SCHRITTE.ARTIKEL_NEU) {
+    return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler);
+  }
   return startAnsicht(zustand, rechte);
 }
 
@@ -1627,7 +1919,55 @@ const $ = (id) => document.getElementById(id);
 let rolle = 'monteur';
 let zustand = lagerZustand();
 
-const optionen = () => ({ baustellen: BAUSTELLEN, baustellePflicht: false });
+const GRUPPEN = [
+  { key: 'installation', name: 'Installationsmaterial' },
+  { key: 'cable', name: 'Kabel und Leitungen' },
+  { key: 'switches', name: 'Schalter und Steckdosen' },
+  { key: 'other', name: 'Sonstiges Material' }
+];
+
+/** Bildet GET /levels nach. */
+function alleBestandszeilen() {
+  const zeilen = [];
+  for (const artikel of ARTIKEL) {
+    for (const ort of ORTE) {
+      const menge = bestand.get(`${artikel.id}|${ort.id}`);
+      if (!menge) continue;
+      zeilen.push({
+        itemId: artikel.id, itemName: artikel.name, itemNumber: artikel.itemNumber,
+        unit: artikel.unit, locationId: ort.id, locationName: ort.name, quantity: menge
+      });
+    }
+  }
+  return zeilen;
+}
+
+/** Bildet GET /items nach. */
+function alleArtikel() {
+  return ARTIKEL.map((artikel) => ({
+    id: artikel.id, itemNumber: artikel.itemNumber, name: artikel.name, unit: artikel.unit,
+    minimumStock: artikel.minimumStock, targetStock: artikel.targetStock,
+    totalQuantity: ORTE.reduce((summe, ort) => summe + (bestand.get(`${artikel.id}|${ort.id}`) ?? 0), 0)
+  }));
+}
+
+/** Bildet GET /reorder nach: eine Rechnung, kein gespeicherter Zustand. */
+function alleVorschlaege() {
+  return knappeArtikel(alleArtikel()).map((artikel) => ({
+    ...artikel,
+    suggestedQuantity: Math.max(0, (artikel.targetStock ?? artikel.minimumStock) - artikel.totalQuantity),
+    supplierName: 'Sonepar'
+  }));
+}
+
+const optionen = () => ({
+  baustellen: BAUSTELLEN,
+  baustellePflicht: false,
+  bestand: alleBestandszeilen(),
+  artikel: alleArtikel(),
+  vorschlaege: alleVorschlaege(),
+  gruppen: GRUPPEN
+});
 const rechte = () => ROLLEN[rolle].rechte;
 
 function zeichnen() {
@@ -1696,19 +2036,70 @@ function verdrahten() {
   });
 
   wurzel.querySelector('.stock-create')?.addEventListener('click', () => {
-    const entwurf = artikelEntwurfAusScan(zustand.letzterScan, [{ key: 'installation' }]);
-    $('foto-hinweis').hidden = false;
-    $('foto-hinweis').textContent =
-      `In der App öffnet sich hier die Artikelanlage — vorbelegt mit dem Code `
-      + `${entwurf.barcodes[0].code} als ${entwurf.barcodes[0].codeType}. `
-      + `In dieser Vorschau ist die Anlage nicht gebaut.`;
+    zustand = {
+      ...zustand,
+      schritt: SCHRITTE.ARTIKEL_NEU,
+      entwurf: artikelEntwurfAusScan(zustand.letzterScan, GRUPPEN),
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-new')?.addEventListener('click', () => {
+    zustand = { ...zustand, schritt: SCHRITTE.ARTIKEL_NEU, entwurf: { unit: 'Stück' }, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-save')?.addEventListener('click', () => {
+    const werte = {};
+    wurzel.querySelectorAll('[name]').forEach((feld) => { werte[feld.name] = feld.value; });
+    werte.barcodes = zustand.entwurf?.barcodes || [];
+
+    const { entwurf, fehler } = artikelFormularLesen(werte);
+    if (fehler) {
+      zustand = { ...zustand, entwurf: { ...zustand.entwurf, ...werte }, fehler };
+      zeichnen();
+      return;
+    }
+
+    ARTIKEL.push({
+      id: `art-${ARTIKEL.length + 1}`,
+      itemNumber: entwurf.itemNumber,
+      name: entwurf.name,
+      unit: entwurf.unit,
+      minimumStock: entwurf.minimumStock ?? 0,
+      targetStock: entwurf.targetStock ?? null,
+      codes: entwurf.barcodes.map((code) => ({
+        code: code.code,
+        gtin: gtinNormalisieren(code.code),
+        pack: code.packQuantity,
+        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+      }))
+    });
+
+    scanKnoepfeZeichnen();
+    zustand = lagerZustand({ ort: zustand.ort, schritt: SCHRITTE.ARTIKEL });
+    zeichnen();
   });
 
   wurzel.querySelectorAll('.stock-tile').forEach((kachel) => {
     kachel.addEventListener('click', () => {
-      $('foto-hinweis').hidden = false;
-      $('foto-hinweis').textContent = `„${kachel.querySelector('.stock-tile__name').textContent}" `
-        + 'ist in dieser Vorschau noch nicht gebaut — der Bestand steht rechts.';
+      const ziele = {
+        bestand: SCHRITTE.BESTAND,
+        artikel: SCHRITTE.ARTIKEL,
+        nachbestellung: SCHRITTE.NACHBESTELLUNG
+      };
+      zustand = { ...zustand, schritt: ziele[kachel.dataset.ziel] || SCHRITTE.START };
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelectorAll('.stock-row--tap').forEach((zeile) => {
+    zeile.addEventListener('click', () => {
+      const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.dataset.artikel);
+      if (!artikel) return;
+      zustand = scanVerarbeiten(zustand, artikelAntwort(artikel, 1));
+      zeichnen();
     });
   });
 }
