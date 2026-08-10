@@ -13,6 +13,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   gebraucht, nur ein Inhalt dahinter. Wichtig für die Abgrenzung: Ein Geräte-QR
   meint ein Exemplar, ein Artikel-Barcode meint eine Sorte; deshalb bekommt das
   Lager eine Mengenbuchung statt der Besitzübergabe des Gerätemoduls.
+- **Das Lager hat sein Datenmodell.** `warehouse/database/migrations/200`
+  legt vierzehn Tabellen an: Artikelstamm mit eigener *und* Herstellernummer,
+  beliebig viele Codes je Artikel mit Gebindemenge, Lagerplätze über drei
+  Ebenen, Etiketten, Bestand, Buchungsjournal, Lieferanten, Bestellungen,
+  Inventur, Firmenregeln und Verlauf. Der Bestand wird ausschließlich von
+  einem Trigger aus dem Journal fortgeschrieben; die API hat auf die
+  Bestandstabelle nur Leserecht, damit beide nicht auseinanderlaufen können.
+  Herstellercodes werden auf GTIN-14 normalisiert, sonst findet ein
+  EAN-13-Scan den Artikel nicht wieder, den ein UPC-A-Scan angelegt hat. Eine
+  Entnahme über den vorhandenen Bestand hinaus wird gebucht statt abgewiesen —
+  wer 20 Klemmen nimmt, wo 15 stehen, hat 20 genommen, und ein blockierter
+  Monteur bucht sonst gar nicht. Fahrzeuge sind vorerst kein Lagerplatz, die
+  Baustelle bei der Entnahme bleibt optional.
 - **Das Berichtsheft ist am Telefon wieder erreichbar.** Der Menüpunkt „Azubi“
   stand zwar in der unteren Leiste, wurde dort aber von einer allgemeinen Regel
   des Designsystems (`display: none !important` für alle Desktop-Einträge)

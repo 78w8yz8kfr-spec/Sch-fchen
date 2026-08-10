@@ -32,16 +32,27 @@ warehouse/
 
 | Schritt | Stand |
 | --- | --- |
-| Konzept und Datenmodell | steht in `docs/WAREHOUSE_MODULE.md`, Fassung 1 |
-| Migration 200 (Anlage aller Tabellen) | offen |
-| SQL-Abnahmetest | offen |
+| Konzept und Datenmodell | `docs/WAREHOUSE_MODULE.md`, Fassung 1 |
+| Migration 200 (14 Tabellen) | steht, idempotent, zweimal hintereinander geprüft |
+| SQL-Abnahmetest | steht, grün, gegen verfälschte Erwartungen gegengeprüft |
 | Barcode-Leser für EAN-13/Code-128 | offen, siehe unten |
 | API `/api/v1/stock/*` | offen |
 | Bedienoberfläche | offen |
 | Einpflegen in Schäfchen | offen |
 
-Vor der Migration sind die vier Punkte unter „Offene Entscheidungen“ im
-Konzept zu beantworten.
+## Prüfen
+
+Die Migration setzt auf dem vollständigen Schäfchen-Schema auf und läuft nach
+`database/migrations`:
+
+```bash
+sh database/scripts/run-sql-directories.sh warehouse/database/migrations
+sh database/scripts/run-sql-directories.sh warehouse/database/tests
+```
+
+Beide Skripte erwarten dieselben `POSTGRES_*`-Variablen wie `make db-migrate`.
+Geprüft wurde gegen einen kompletten Neuaufbau: 106 Migrationen, API-Rolle,
+Seeds, Migration 200 und anschließend alle Abnahmetests.
 
 ## Was Schäfchen schon mitbringt
 

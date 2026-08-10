@@ -1,11 +1,10 @@
 # Lagerverwaltung
 
-Stand: Konzept, Fassung 1. Noch kein Code, noch keine Migration.
+Stand: Fassung 1, Migration 200 angelegt und abgenommen.
 
 Dieses Dokument legt fest, was die Lagerverwaltung fachlich tut, wie ihre
-Daten aussehen und wie sie später in Schäfchen eingepflegt wird. Es wird vor
-der ersten Migration abgenommen; danach gilt es als verbindliche Grundlage und
-wird bei jeder fachlichen Änderung mitgeführt.
+Daten aussehen und wie sie später in Schäfchen eingepflegt wird. Es ist die
+verbindliche Grundlage und wird bei jeder fachlichen Änderung mitgeführt.
 
 ## Abgrenzung: drei Dinge, die leicht verwechselt werden
 
@@ -136,9 +135,18 @@ Lieferung ändern.
 
 ### `storage_locations`
 
-Name, Typ (`warehouse`, `workshop`, `vehicle`, `construction_site`, `other`),
-optionaler Verweis auf Baustelle oder Fahrzeug, `parent_location_id` für die
-Hierarchie Lager → Regal → Fach (maximal drei Ebenen, per Trigger begrenzt).
+Name, Typ (`warehouse`, `workshop`, `construction_site`, `other`), optionaler
+Verweis auf eine Baustelle, `parent_location_id` für die Hierarchie
+Lager → Regal → Fach. Ein Trigger berechnet die Ebenentiefe aus dem
+übergeordneten Platz und weist die vierte Ebene ab; damit kann auch kein
+Kreis entstehen. Ein Fachname wie „A1“ darf in jedem Regal einmal vorkommen,
+aber nicht zweimal im selben.
+
+**Fahrzeuge sind in Fassung 1 kein Lagerort.** Weder Typ noch Fremdschlüssel
+dafür existieren. Sobald der Fuhrpark tatsächlich Material führen soll,
+ergänzt eine spätere Migration Typ `vehicle` und `vehicle_id`; die
+Bewegungslogik ändert sich dadurch nicht, weil ein Fahrzeug dann einfach ein
+weiterer Ort ist.
 
 Das Gerätemodul hat mit `device_locations` bereits eine sehr ähnliche Tabelle,
 inklusive Typ `warehouse`. Diese Doppelung ist bekannt und bewusst: Solange die
@@ -150,15 +158,22 @@ Migration mit Datenübernahme und steht im Einpflegeplan unten.
 
 ### `stock_movements`
 
-Das Journal. Artikel, Menge (immer positiv), Bewegungsart (`receipt`, `issue`,
-`transfer`, `return`, `correction`, `scrap`), Quell- und Zielort, optionale
-Baustelle, optionale Bestellposition, handelnder Benutzer, Zeitpunkt, Grund,
-Herkunft (`api`, `qr_scan`, `offline_sync`, `inventory`) und
-`client_operation_id`. Ein CHECK erzwingt die Ortslogik: Zugang hat nur ein
-Ziel, Entnahme nur eine Quelle, Umlagerung beides und beide verschieden.
+Das Journal. Artikel, Menge (immer positiv), Bewegungsart (`opening`,
+`receipt`, `issue`, `transfer`, `return`, `correction`, `scrap`), Quell- und
+Zielort, optionale Baustelle, optionale Bestellposition, handelnder Benutzer,
+Zeitpunkt, Grund, Herkunft (`api`, `qr_scan`, `offline_sync`, `inventory`,
+`import`) und `client_operation_id`. Ein CHECK erzwingt die Ortslogik: Zugang
+hat nur ein Ziel, Entnahme nur eine Quelle, Umlagerung beides und beide
+verschieden, eine Korrektur genau eine Richtung. Verschrottung und Korrektur
+verlangen zusätzlich einen Grund.
 
-Zeilen dieser Tabelle werden nie geändert und nie gelöscht. Eine Fehlbuchung
-wird durch eine Gegenbuchung mit Pflichtgrund aufgehoben, die auf das Original
+`opening` ist der Anfangsbestand und bleibt im Journal von einem echten
+Wareneingang unterscheidbar — gleich, ob er gezählt, importiert oder Stück für
+Stück zugewachsen ist.
+
+Zeilen dieser Tabelle werden nie geändert und nie gelöscht; ein Trigger weist
+`UPDATE` und `DELETE` ab. Eine Fehlbuchung wird durch eine Gegenbuchung mit
+Pflichtgrund aufgehoben, die über `reverses_movement_id` auf das Original
 verweist.
 
 ### `stock_levels`
@@ -166,11 +181,16 @@ verweist.
 `(company_id, item_id, location_id)` eindeutig, dazu Menge und `row_version`.
 Der Bestand ist aus dem Journal ableitbar, wird aber fortgeschrieben, weil die
 Bestandsliste die meistgelesene Ansicht des Moduls ist und eine Summe über
-Jahre von Bewegungen dafür zu teuer wird. Beide Schreibvorgänge — Journalzeile
-und Bestandszeile — liegen immer in **einer** Transaktion, die die Bestandszeile
-mit `FOR UPDATE` sperrt. Ein SQL-Abnahmetest vergleicht regelmäßig die Summe
-des Journals gegen `stock_levels`; weichen sie ab, ist das ein Fehler und kein
-Rundungsproblem.
+Jahre von Bewegungen dafür zu teuer wird.
+
+Fortgeschrieben wird er **ausschließlich von einem Trigger** auf
+`stock_movements`, und die API besitzt auf `stock_levels` weder INSERT- noch
+UPDATE-Recht — nur SELECT. Damit können Journal und Bestand nicht
+auseinanderlaufen, auch nicht durch einen Fehler in der API. Der Trigger
+verwendet ein `INSERT … ON CONFLICT DO UPDATE`, das die Bestandszeile selbst
+sperrt; zwei gleichzeitige Entnahmen addieren sich deshalb korrekt, ohne dass
+die API etwas sperren müsste. Ein SQL-Abnahmetest vergleicht zusätzlich die
+Summe des Journals gegen `stock_levels`.
 
 ## Mengen, Einheiten und Unterdeckung
 
@@ -256,29 +276,53 @@ externe Ordner an die Regeln des Hauptprojekts:
    `stock_item_id` und `stock_movement_id`. Bestehende Freitextzeilen bleiben
    gültig und unverändert.
 
-## Offene Entscheidungen
+## Getroffene Entscheidungen
 
-Diese Punkte brauchen eine Ansage, bevor die Migration geschrieben wird:
+- **Fahrzeuge sind vorerst kein Lagerplatz.** Migration 200 kennt weder Typ
+  noch Fremdschlüssel dafür. Nachrüstbar, ohne die Bewegungslogik anzufassen.
+- **Die Baustelle bei einer Entnahme ist optional.** `construction_site_id`
+  darf leer bleiben. Die Firmenregel `require_site_on_issue` kann sie
+  verlangen und steht standardmäßig aus; sie kostet an jeder Buchung einen
+  Schritt und wird erst sinnvoll, wenn Material tatsächlich abgerechnet wird.
+- **Eigene Artikelnummer und Herstellernummer stehen nebeneinander.**
+  `item_number` ist Pflicht und firmenweit eindeutig, `manufacturer_number`
+  optional und indiziert. Beide sind such- und scanbar; die Herstellernummer
+  bleibt für die Bestellung beim Lieferanten führend.
+- **Der Startbestand darf auf allen drei Wegen entstehen** — gezählt,
+  importiert oder über die ersten Wareneingänge zugewachsen. Alle drei
+  erzeugen dieselbe Bewegungsart `opening`, unterscheidbar über `source_type`
+  (`inventory`, `import`, `api`). Damit bleibt später sichtbar, wie belastbar
+  ein Anfangsbestand war.
 
-- **Fahrzeuge als Lager.** Bekommt jedes Fahrzeug automatisch einen
-  Lagerplatz, oder nur die, die tatsächlich Material führen?
-- **Baustelle bei Entnahme.** Pflicht oder optional? Pflicht macht das Material
-  abrechenbar, kostet aber an jeder Buchung einen Schritt.
-- **Artikelnummern.** Eigene Nummernlogik, Herstellernummer, oder beides
-  nebeneinander?
-- **Startbestand.** Wird der vorhandene Lagerbestand gezählt, aus einer Liste
-  importiert, oder wächst er einfach über die ersten Wareneingänge zu?
+## Was noch offen ist
+
+- **Barcode-Leser für EAN-13 und Code-128.** Der vorhandene Decoder liest nur
+  QR. Erster technischer Baustein.
+- **API `/api/v1/stock/*`** und Bedienoberfläche.
+- **Nummernkreis für `item_number`.** Die Datenbank verlangt nur Eindeutigkeit;
+  ob die API fortlaufend vorschlägt oder frei lässt, ist noch nicht entschieden.
+- **Zusammenführung von `storage_locations` und `device_locations`**, siehe
+  Einpflegeplan.
 
 ## Abnahme
 
-Automatisiert zu prüfen sind: Artikelanlage mit mehreren Codes und
-Gebindemengen, GTIN-Normalisierung inklusive ungültiger Prüfziffer, Zugang,
-Entnahme, Umlagerung, Rückgabe, Verschrottung mit Pflichtgrund,
-Offline-Idempotenz derselben `client_operation_id`, zwei gleichzeitige
-Entnahmen desselben Artikels, Unterdeckung mit und ohne
-`block_negative_stock`, Journal-gegen-Bestand-Abgleich, Inventur mit Differenz
-und Korrekturbuchung, Bestellung mit Teillieferung, Rollen sowie ein fremder
-Mandant auf jedem Endpunkt.
+`warehouse/database/tests/200_create_warehouse_test.sql` prüft bereits:
+GTIN-Normalisierung von EAN-8, EAN-13 und UPC-A samt abgewiesener falscher
+Prüfziffer, Artikelanlage mit eigener und Herstellernummer, mehrere Codes je
+Artikel mit Gebindemenge, Lagerhierarchie mit abgewiesener vierter Ebene und
+wiederverwendbarem Fachnamen, Anfangsbestand, Zugang, Entnahme mit und ohne
+Baustelle, Umlagerung, Journal-gegen-Bestand-Abgleich, alle vier
+Richtungsregeln, Pflichtgrund bei Verschrottung, Idempotenz derselben
+`client_operation_id`, Unveränderlichkeit der Buchungen, Unterdeckung mit und
+ohne `block_negative_stock`, unveränderliche Einheit nach der ersten Buchung,
+Löschschutz, Grunddaten einer neu angelegten Firma samt Modulfreigabe sowie
+zwei Wege, auf denen ein fremder Mandant Ort oder Mitarbeiter mitzubenutzen
+versucht.
+
+Noch offen, weil der Code dafür fehlt: Inventur mit Differenz und
+Korrekturbuchung, Bestellung mit Teillieferung, zwei echt gleichzeitige
+Entnahmen über getrennte Verbindungen sowie sämtliche Rollen- und
+Endpunktprüfungen der API.
 
 Nicht simulierbar bleiben Scanabstand, Etikettenhaftung im Fahrzeug und die
 Lesbarkeit zerknitterter Herstellercodes. Diese Punkte gehören in die Abnahme
