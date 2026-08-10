@@ -281,6 +281,56 @@ eine Kamera sieht ein hingehaltenes Etikett viele Male je Sekunde.
 Nicht simulierbar bleibt der Rest: Scanabstand, Etikettengröße, gedruckte
 Kontraste und zerknitterte Verpackungen. Dafür ist die Abnahme vor Ort da.
 
+## Die API
+
+`warehouse/api/stock.mjs` bedient `/api/v1/stock/*`. `handleStockRequest` hat
+absichtlich dieselbe Signatur wie `handleDeviceRequest`; beim Einpflegen
+wandert die Datei nach `api/src/stock.mjs`, zwei Importe verkürzen sich auf
+`./`, und in `app.mjs` kommt derselbe Block hinzu, den das Gerätemodul schon
+hat.
+
+| Endpunkt | Zweck |
+| --- | --- |
+| `GET /contexts` | Warengruppen, Lagerplätze als Baum mit lesbarem Pfad, Firmenregeln, eigene Rechte |
+| `GET /items`, `GET /items/:id` | Artikelliste mit Bestandssumme; Einzelansicht mit Beständen, Codes und den letzten fünfzig Buchungen |
+| `POST /items` | Artikel anlegen, mitsamt beliebig vielen Codes und Gebindemengen |
+| `POST /locations` | Regal oder Fach anlegen |
+| `POST /labels` | eigenes Etikett ausgeben; Nachdruck liest denselben Token, `replace` widerruft mit Pflichtgrund |
+| `POST /scan` | Code auflösen: Etikett, GTIN oder Freitext |
+| `POST /movements` | buchen, idempotent über `clientOperationId` |
+| `GET /levels` | Bestand je Lagerplatz |
+| `GET /reorder` | Nachbestellvorschlag aus Mindest- und Zielbestand |
+
+Drei Dinge, die dabei bewusst so und nicht anders sind:
+
+**Die GTIN-Normalisierung beim Scannen macht die Datenbank**, nicht eine
+zweite Rechnung in der API. `stock_normalize_gtin` ist ohnehin da, und zwei
+Rechnungen, die auseinanderlaufen, erzeugen denselben Artikel zweimal. Im
+Frontend steht die Rechnung ein zweites Mal, weil sie dort offline gebraucht
+wird — dass beide übereinstimmen, ist gegen 3504 Eingaben geprüft.
+
+**Ein nicht gefundener Code ist kein Fehler**, sondern der Einstieg in die
+Neuanlage: die Antwort sagt, ob der Code eine GTIN oder Freitext war und wie
+er normalisiert aussieht. Unbekannte, widerrufene und fremdmandantige
+Etiketten sehen dabei alle gleich aus.
+
+**Die Ortslogik steht als CHECK in der Datenbank und noch einmal in der API.**
+Die Datenbank ist die Grenze, die API die Übersetzung: der Monteur soll einen
+Satz lesen und keine Constraint. Dasselbe gilt für Unterdeckung, ungültige
+GTIN, zu tiefe Lagerplätze und die gesperrte Einheit — `mapDatabaseError`
+macht aus jeder dieser Datenbankgrenzen eine Meldung mit eigenem Fehlercode.
+
+Wer was darf: Entnahme und Rückgabe kann jeder, der das Modul sieht — das ist
+der Alltag des Monteurs, und dafür soll niemand etwas freischalten müssen.
+Umlagern setzt den Überblick des Vorarbeiters voraus. Anfangsbestand,
+Wareneingang, Korrektur und Verschrottung gehören ins Büro, weil sie den
+Bestand aus dem Nichts verändern.
+
+Noch nicht gebaut: Lieferanten, Bestellungen und Inventursitzungen haben ihre
+Tabellen, aber keine Endpunkte. Der Nachbestellvorschlag rechnet bereits und
+zeigt den hinterlegten Lieferanten an; er kann nur noch keine Bestellung
+erzeugen.
+
 ## Rollen
 
 | Rolle | Rechte |

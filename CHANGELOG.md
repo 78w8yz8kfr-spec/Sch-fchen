@@ -26,6 +26,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   wer 20 Klemmen nimmt, wo 15 stehen, hat 20 genommen, und ein blockierter
   Monteur bucht sonst gar nicht. Fahrzeuge sind vorerst kein Lagerplatz, die
   Baustelle bei der Entnahme bleibt optional.
+- **Das Lager hat seine Endpunkte.** `/api/v1/stock/*` legt Artikel mit
+  eigener und Herstellernummer an, gibt Etiketten aus, löst gescannte Codes
+  auf, bucht Zugang, Entnahme und Umlagerung, zeigt den Bestand je Lagerplatz
+  und schlägt Nachbestellungen vor. Entnehmen und zurückgeben darf jeder, der
+  das Modul sieht — das ist der Alltag des Monteurs, und dafür soll niemand
+  etwas freischalten müssen; umlagern setzt den Vorarbeiter voraus,
+  Anfangsbestand und Korrektur das Büro. Ein Nachdruck liest denselben
+  Etikett-Code wieder, nur „Code ersetzen“ widerruft ihn mit Pflichtgrund.
+  Ein unbekannter Code ist kein Fehler, sondern der Einstieg in die Neuanlage.
+  Dieselbe Offline-Buchung zählt nur einmal, auch wenn zwei Verbindungen sie
+  gleichzeitig schicken. Noch ohne Endpunkte, aber mit Tabellen: Lieferanten,
+  Bestellungen und Inventursitzungen.
 - **Das Lager kann Herstellercodes lesen.** Der bisherige Decoder konnte nur
   QR, und die eingebaute Barcode-Erkennung des Browsers fehlt auf iPhone und
   iPad — Strichcodes auf Verpackungen waren damit unerreichbar. Der neue

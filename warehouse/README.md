@@ -27,9 +27,9 @@ warehouse/
   frontend/barcode-decoder.mjs     EAN-13, EAN-8, UPC-A und Code 128 aus einem Kamerabild
   frontend/barcode-scanner.mjs     Leserwahl, Deutung eines Scans, Scan-Schleife
   frontend/tests/                  Tests dazu, mit unabhängigen Referenzmustern
+  api/stock.mjs                    Endpunkte /api/v1/stock/*
+  api/tests/                       Abnahme gegen eine echte Datenbank
 ```
-
-`api/` kommt dazu, sobald die Endpunkte stehen.
 
 ## Stand
 
@@ -39,7 +39,8 @@ warehouse/
 | Migration 200 (14 Tabellen) | steht, idempotent, zweimal hintereinander geprüft |
 | SQL-Abnahmetest | steht, grün, gegen verfälschte Erwartungen gegengeprüft |
 | Barcode-Leser für EAN-13/EAN-8/UPC-A/Code 128 | steht, 28 Tests grün |
-| API `/api/v1/stock/*` | offen, als Nächstes |
+| API `/api/v1/stock/*` | Artikel, Lagerplätze, Etiketten, Scan, Buchungen, Bestand, Nachbestellung — 16 Tests grün |
+| API für Lieferanten, Bestellungen, Inventur | offen; die Tabellen stehen, die Endpunkte fehlen |
 | Bedienoberfläche | offen |
 | Einpflegen in Schäfchen | offen |
 
@@ -62,6 +63,20 @@ Die Frontend-Tests brauchen weder Datenbank noch Netz noch `node_modules`:
 ```bash
 node --test warehouse/frontend/tests/*.test.mjs
 ```
+
+Der API-Test spricht `handleStockRequest` direkt an — die Verdrahtung in
+`app.mjs` ist der Einpflegeschritt und existiert noch nicht. Mandantengrenze,
+Datenbankrolle und Rollenrechte laufen trotzdem echt, weil derselbe
+Transaktionswrapper verwendet wird wie in der laufenden API. Er bringt seine
+Firma je Lauf selbst mit und ist wiederholbar:
+
+```bash
+npm --prefix api ci --ignore-scripts
+API_INTEGRATION_TEST=true node --test warehouse/api/tests/stock.test.mjs
+```
+
+Ohne `API_INTEGRATION_TEST=true` überspringt er sich selbst, wie die übrigen
+Integrationstests des Projekts auch.
 
 ## Was Schäfchen schon mitbringt
 
