@@ -7889,6 +7889,33 @@ select:focus-visible {
   padding: 12px 14px 14px;
 }
 
+/* Der Lageristenschalter steht zwischen Rolle und Führerschein: eine Aufgabe
+   neben der Tätigkeit, deshalb ein Kästchen und keine weitere Auswahl. */
+.employee-warehouse {
+  display: grid;
+  gap: 4px;
+}
+
+.employee-warehouse__switch {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.employee-warehouse__switch input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--brand);
+}
+
+.employee-warehouse__switch span {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .licence-field > legend {
   padding: 0 6px;
   font-size: 0.72rem;

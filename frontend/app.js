@@ -829,6 +829,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
     employeePhone: document.querySelector("#employee-phone"),
     employeeEmail: document.querySelector("#employee-email"),
     employeeRole: document.querySelector("#employee-role"),
+    employeeWarehouse: document.querySelector("#employee-warehouse"),
+    employeeWarehouseField: document.querySelector("#employee-warehouse-field"),
+    employeeEditWarehouse: document.querySelector("#employee-edit-warehouse"),
+    employeeEditWarehouseField: document.querySelector("#employee-edit-warehouse-field"),
     employeeManagementRoles: [...document.querySelectorAll("[data-management-role]")],
     employeeTemporaryPassword: document.querySelector("#employee-temporary-password"),
     employeeMessage: document.querySelector("#employee-message"),
@@ -6290,6 +6294,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
     elements.employeeEditPhone.value = employee.phone || "";
     elements.employeeEditEmail.value = employee.email || "";
     elements.employeeEditRole.value = editableEmployeeRole(employee.roles);
+    // Der Schalter erscheint nur, wenn die Firma das Lager ueberhaupt hat.
+    elements.employeeEditWarehouseField.hidden = !moduleEnabled("warehouse");
+    elements.employeeEditWarehouse.checked = employee.roles.includes("warehouse_manager");
     // Der Ausbilder gehoert nur zu einem Auszubildenden, und nur, wenn die
     // Firma das Berichtsheft hat. Ein Feld fuer einen Bereich, den es nicht
     // gibt, verspricht mehr, als die App halten kann.
@@ -6456,6 +6463,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
       adminState.sites.filter((site) => siteStatusGroup(site.status) === "active").length
     );
     renderDispatchSummary();
+    // Der Lageristenschalter steht nur dort, wo es ein Lager gibt.
+    elements.employeeWarehouseField.hidden = !moduleEnabled("warehouse");
     elements.employeeManagementRoles.forEach((option) => {
       option.hidden = !adminState.canCreateManagementRoles;
       option.disabled = !adminState.canCreateManagementRoles;
@@ -11102,6 +11111,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
         phone: elements.employeePhone.value,
         email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
+        warehouseManager: moduleEnabled("warehouse") && elements.employeeWarehouse.checked,
         drivingLicenceClasses: readLicenceField(elements.employeeLicences),
         temporaryPassword: elements.employeeTemporaryPassword.value
       },
@@ -11160,6 +11170,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.11";
           // alten Fehler damit sicher von einer bewussten Änderung trennen.
           roleChangeConfirmed:
             editableEmployeeRole(employee.roles) !== elements.employeeEditRole.value,
+          // Ohne Freigabe des Lagers steht der Schalter nicht zur Verfuegung;
+          // dann bleibt die Rolle so, wie sie ist, statt still zu verschwinden.
+          warehouseManager: moduleEnabled("warehouse")
+            ? elements.employeeEditWarehouse.checked
+            : employee.roles.includes("warehouse_manager"),
           // Ohne diese Angabe wuerde jede Namensaenderung den Ausbilder eines
           // Auszubildenden stillschweigend entfernen.
           trainerUserId: elements.employeeEditRole.value === "apprentice"

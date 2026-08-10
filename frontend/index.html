@@ -2271,6 +2271,17 @@
                   <option data-management-role value="dispatch_office">Büro / Disposition</option>
                   <option data-management-role value="project_manager">Projektleiter</option>
                 </select>
+                <!-- Das Lager ist eine Aufgabe neben der Taetigkeit: in kleinen
+                     Betrieben fuehrt es der Monteur, der ohnehin am Regal
+                     steht. Deshalb ein Schalter und kein weiterer Eintrag in
+                     der Rollenauswahl. -->
+                <div id="employee-warehouse-field" class="employee-warehouse" hidden>
+                  <label class="employee-warehouse__switch" for="employee-warehouse">
+                    <input id="employee-warehouse" type="checkbox">
+                    <span>Führt das Lager (Lagerist)</span>
+                  </label>
+                  <p class="field-help">Legt Artikel an, bucht Wareneingänge, zählt die Inventur und bestellt nach. Kundendaten und Projektsteuerung bleiben davon unberührt.</p>
+                </div>
                 <!-- Wer faehrt, muss den Schein haben. Die Einsatzplanung
                      warnt, wenn auf einer Baustelle niemand mit Schein steht -
                      dafuer muss er hier gepflegt werden. -->
@@ -2349,6 +2360,13 @@
                   <option data-management-role value="project_manager">Projektleiter</option>
                 </select>
                 <p class="field-help">Die Rollenänderung gilt nach dem nächsten Laden der App. Startpasswörter werden hier nicht angezeigt.</p>
+                <div id="employee-edit-warehouse-field" class="employee-warehouse" hidden>
+                  <label class="employee-warehouse__switch" for="employee-edit-warehouse">
+                    <input id="employee-edit-warehouse" type="checkbox">
+                    <span>Führt das Lager (Lagerist)</span>
+                  </label>
+                  <p class="field-help">Legt Artikel an, bucht Wareneingänge, zählt die Inventur und bestellt nach. Kundendaten und Projektsteuerung bleiben davon unberührt.</p>
+                </div>
                 <!-- Wer faehrt, muss den Schein haben. Die Einsatzplanung
                      warnt, wenn auf einer Baustelle niemand mit Schein steht -
                      dafuer muss er hier gepflegt werden. -->
