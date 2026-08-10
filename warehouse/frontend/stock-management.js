@@ -24,7 +24,8 @@ export const SCHRITTE = Object.freeze({
   NACHBESTELLUNG: 'nachbestellung',
   INVENTUR: 'inventur',
   BESTELLUNGEN: 'bestellungen',
-  BESTELLUNG: 'bestellung'
+  BESTELLUNG: 'bestellung',
+  ARTIKEL_CODES: 'artikelCodes'
 });
 
 export const BESTELLSTATUS = Object.freeze({
@@ -76,6 +77,8 @@ export function lagerZustand(vorgabe = {}) {
     zaehlArtikel: null,
     bestellung: null,
     eingang: null,
+    codes: null,
+    codeEntwurf: null,
     hinweis: null,
     fehler: null,
     ...vorgabe
@@ -437,6 +440,9 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
       </div>
 
       ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+      ${rechte.manage
+        ? '<button class="button button--quiet stock-codes-open" type="button">Codes und Etikett</button>'
+        : ''}
       <button class="button button--quiet stock-cancel" type="button">Abbrechen</button>
     </div>`;
 }
@@ -727,9 +733,39 @@ export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
       <label class="stock-field"><span>Zielbestand</span>
         <input name="targetStock" inputmode="decimal" value="${sicher(daten.targetStock ?? '')}" autocomplete="off"></label>
     </div>
+    ${codeFelder(daten)}
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
     <button class="button button--action stock-save" type="button">Anlegen</button>
     <button class="button button--quiet stock-home" type="button">Abbrechen</button>
+  </div>`;
+}
+
+/**
+ * Die Codezeilen des Anlegeformulars.
+ *
+ * Ohne sie kann ein handangelegter Artikel nie einen Code bekommen und ist
+ * damit nie scannbar. Leer lassen ist ausdruecklich erlaubt — dann bekommt er
+ * spaeter ein eigenes Etikett, und der Hinweis sagt das auch.
+ */
+function codeFelder(daten) {
+  const zeilen = (daten.barcodes || []).length ? daten.barcodes : [leereCodezeile()];
+
+  return `<div class="stock-codes-edit">
+    <p class="eyebrow">Codes</p>
+    ${zeilen.map((zeile, index) => `
+      <div class="stock-code-row" data-code-index="${index}">
+        <label class="stock-field"><span>Code ${index + 1}</span>
+          <input name="code" data-code-index="${index}" autocomplete="off" maxlength="64"
+                 value="${sicher(zeile.code || '')}" placeholder="Barcode oder eigener Code"></label>
+        <label class="stock-field"><span>Gebinde</span>
+          <input name="packQuantity" data-code-index="${index}" inputmode="decimal" autocomplete="off"
+                 value="${sicher(zeile.packQuantity ?? 1)}"></label>
+      </div>`).join('')}
+    <button class="button button--quiet stock-code-row-add" type="button">Weitere Codezeile</button>
+    <p class="stock-hint">
+      Kein Barcode auf der Ware? Dann leer lassen — nach dem Anlegen lässt sich
+      ein eigenes Etikett drucken.
+    </p>
   </div>`;
 }
 
@@ -869,6 +905,152 @@ export function inventurAnsicht(zustand, rechte = {}) {
          </button>`
       : '<p class="stock-empty">Abschließen kann das Büro.</p>'}
     <button class="button button--quiet stock-inventory-cancel" type="button">Inventur abbrechen</button>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Codes und Etiketten
+// ---------------------------------------------------------------------------
+
+// Dieselben Masse wie der Geraetebogen: erprobt, passt auf eine A4-Seite und
+// bleibt mit 18 mal 18 Millimetern sicher unter zwei Zentimetern.
+export const ETIKETT_BOGEN = Object.freeze({
+  maxEtiketten: 120,
+  spalten: 10,
+  reihen: 12,
+  seiteBreiteMm: 210,
+  seiteHoeheMm: 297,
+  seitenrandMm: 5,
+  zelleBreiteMm: 19.8,
+  zelleHoeheMm: 23.5,
+  spaltMm: 0.2,
+  qrGroesseMm: 18
+});
+
+export function etikettBogenStile() {
+  const b = ETIKETT_BOGEN;
+  const breite = b.seiteBreiteMm - (2 * b.seitenrandMm);
+  const hoehe = b.seiteHoeheMm - (2 * b.seitenrandMm);
+  return `
+    @page{size:A4 portrait;margin:${b.seitenrandMm}mm}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,sans-serif;color:#111}
+    .sheet{display:grid;grid-template-columns:repeat(${b.spalten},${b.zelleBreiteMm}mm);grid-auto-rows:${b.zelleHoeheMm}mm;gap:${b.spaltMm}mm;width:${breite}mm;align-content:start}
+    .label{display:grid;grid-template-rows:${b.qrGroesseMm}mm 2.2mm 2.2mm;align-items:center;overflow:hidden;border:.15mm solid #aaa;padding:.3mm;text-align:center;break-inside:avoid;page-break-inside:avoid}
+    .label__qr{display:grid;place-items:center;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm;margin:auto}
+    .label svg{display:block;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm;max-width:${b.qrGroesseMm}mm;max-height:${b.qrGroesseMm}mm}
+    .label strong,.label span{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:2.2mm}
+    .label strong{font-size:4.5pt}
+    .label span{font-size:4.2pt}
+    @media screen{body{min-width:${b.seiteBreiteMm}mm;padding:${b.seitenrandMm}mm;background:#f4f4f5}.sheet{margin:auto;background:#fff}}
+    @media print{html,body{width:${breite}mm;height:${hoehe}mm;overflow:hidden}.label{border-color:#000}}
+  `;
+}
+
+/**
+ * Baut den Druckbogen aus den Bildern, die die API liefert.
+ *
+ * Das SVG kommt aus der eigenen API und wird deshalb unveraendert eingesetzt;
+ * alles andere — Name und Nummer unter dem Code — ist Text aus der Datenbank
+ * und wird maskiert.
+ */
+export function etikettBogenHtml(labels = []) {
+  const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map((etikett) => `
+    <div class="label">
+      <div class="label__qr">${etikett.svg || ''}</div>
+      <strong>${sicher(etikett.label || '')}</strong>
+      <span>${sicher(etikett.sublabel || '')}</span>
+    </div>`).join('');
+
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Lageretiketten</title>
+<style>${etikettBogenStile()}</style>
+</head><body><div class="sheet">${zellen}</div></body></html>`;
+}
+
+export function codeArtText(codeType) {
+  if (codeType === 'gtin') return 'Herstellercode';
+  if (codeType === 'code128') return 'Strichcode';
+  return 'Eigener Code';
+}
+
+/** Eine leere Codezeile fuer das Formular. */
+export function leereCodezeile() {
+  return { code: '', codeType: 'internal', packQuantity: 1, isPrimary: false };
+}
+
+/**
+ * Prueft einen einzeln nachgetragenen Code.
+ *
+ * Ein gescannter Code kommt als GTIN oder als Freitext herein; getippt wird er
+ * genauso behandelt, damit derselbe Code auf beiden Wegen dasselbe ergibt.
+ */
+export function codeNachtragLesen(werte = {}) {
+  const code = String(werte.code ?? '').trim();
+  if (!code) return { fehler: 'Der Code fehlt.' };
+  if (code.length > 64) return { fehler: 'Der Code ist zu lang.' };
+
+  const menge = mengeAusText(werte.packQuantity ?? 1);
+  if (menge === null) return { fehler: 'Die Gebindemenge ist keine gültige Menge.' };
+
+  return {
+    nachtrag: {
+      code,
+      codeType: werte.codeType === 'gtin' ? 'gtin' : 'internal',
+      packQuantity: menge,
+      isPrimary: werte.isPrimary === true
+    }
+  };
+}
+
+export function artikelCodesAnsicht(zustand, rechte = {}) {
+  const artikel = zustand.artikel;
+  if (!artikel) return '';
+
+  const codes = zustand.codes || [];
+
+  return `<div class="stock-list stock-codes">
+    ${kopfzeile('Codes und Etikett')}
+    <p class="stock-codes__item">${sicher(artikel.name)} · ${sicher(artikel.itemNumber)}</p>
+
+    ${codes.length
+      ? `<ul class="stock-rows">
+          ${codes.map((code) => `
+            <li class="stock-row">
+              <span class="stock-row__name">${sicher(code.code)}</span>
+              <span class="stock-row__number">
+                ${sicher(codeArtText(code.codeType))}${code.packQuantity > 1
+                  ? ` · Gebinde ${sicher(mengeAlsText(code.packQuantity))}` : ''}${code.isPrimary ? ' · Hauptcode' : ''}
+              </span>
+              ${rechte.manage
+                ? `<button class="button button--quiet stock-code-revoke" type="button"
+                           data-code="${sicher(code.id)}">Zurücknehmen</button>`
+                : ''}
+            </li>`).join('')}
+        </ul>`
+      : `<p class="stock-empty">
+           Dieser Artikel hat keinen Code — er lässt sich also nicht scannen.
+           ${rechte.manage ? 'Entweder einen Herstellercode hinzufügen oder ein eigenes Etikett drucken.' : ''}
+         </p>`}
+
+    ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+
+    ${rechte.manage
+      ? `<div class="stock-code-add">
+           <label class="stock-field"><span>Code hinzufügen</span>
+             <input class="stock-code-input" name="code" autocomplete="off" maxlength="64"
+                    value="${sicher(zustand.codeEntwurf?.code || '')}" placeholder="Scannen oder eintippen"></label>
+           <label class="stock-field"><span>Gebindemenge</span>
+             <input class="stock-code-pack" name="packQuantity" inputmode="decimal" autocomplete="off"
+                    value="${sicher(zustand.codeEntwurf?.packQuantity ?? 1)}"></label>
+           <button class="button button--secondary stock-code-scan" type="button">Code scannen</button>
+           <button class="button button--action stock-code-save" type="button">Code hinzufügen</button>
+         </div>
+         <button class="button button--action stock-label-print" type="button">Eigenes Etikett drucken</button>`
+      : ''}
+    <button class="button button--quiet stock-home" type="button">Zurück</button>
   </div>`;
 }
 
@@ -1017,6 +1199,7 @@ export function ansichtFuer(zustand, rechte, optionen = {}) {
     return bestellungenAnsicht(optionen.bestellungen, rechte, zustand.fehler);
   }
   if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.ARTIKEL_CODES) return artikelCodesAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);

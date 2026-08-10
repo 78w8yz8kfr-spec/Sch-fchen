@@ -44,7 +44,14 @@ import {
   wareneingangBauen,
   eingangVorbelegen,
   bestellungenAnsicht,
-  bestellungAnsicht
+  bestellungAnsicht,
+  ETIKETT_BOGEN,
+  etikettBogenStile,
+  etikettBogenHtml,
+  codeArtText,
+  leereCodezeile,
+  codeNachtragLesen,
+  artikelCodesAnsicht
 } from '../stock-management.js';
 
 const REGAL = { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' };
@@ -820,4 +827,124 @@ test('ein Hinweis in der Bestellliste wird auch gezeigt', () => {
   assert.ok(html.includes('role="alert"'));
 
   assert.ok(!bestellungenAnsicht([], { manage: true }).includes('role="alert"'));
+});
+
+// ---------------------------------------------------------------------------
+// Codes und Etiketten
+// ---------------------------------------------------------------------------
+
+test('der Etikettenbogen hat die erprobten Maße des Gerätemoduls', () => {
+  assert.equal(ETIKETT_BOGEN.spalten * ETIKETT_BOGEN.reihen, ETIKETT_BOGEN.maxEtiketten);
+  assert.ok(ETIKETT_BOGEN.qrGroesseMm < 20, 'Ein Etikett muss unter zwei Zentimetern bleiben');
+
+  // Der Bogen darf keine zweite Seite erzeugen.
+  const breite = ETIKETT_BOGEN.spalten * (ETIKETT_BOGEN.zelleBreiteMm + ETIKETT_BOGEN.spaltMm);
+  const hoehe = ETIKETT_BOGEN.reihen * (ETIKETT_BOGEN.zelleHoeheMm + ETIKETT_BOGEN.spaltMm);
+  assert.ok(breite <= ETIKETT_BOGEN.seiteBreiteMm - 2 * ETIKETT_BOGEN.seitenrandMm + 0.5, `Breite ${breite}`);
+  assert.ok(hoehe <= ETIKETT_BOGEN.seiteHoeheMm - 2 * ETIKETT_BOGEN.seitenrandMm + 0.5, `Höhe ${hoehe}`);
+
+  const stile = etikettBogenStile();
+  assert.ok(stile.includes('size:A4 portrait'));
+  assert.ok(stile.includes('18mm'));
+});
+
+test('der Druckbogen setzt die Bilder ein und maskiert die Beschriftung', () => {
+  const html = etikettBogenHtml([
+    { svg: '<svg id="qr"></svg>', label: 'Kabeltrommel', sublabel: 'LAG-0002' },
+    { svg: '<svg></svg>', label: '<script>böse</script>', sublabel: '"><b>x</b>' }
+  ]);
+
+  assert.ok(html.includes('<svg id="qr"></svg>'), 'Das eigene SVG bleibt unverändert');
+  assert.ok(html.includes('Kabeltrommel'));
+  assert.ok(html.includes('LAG-0002'));
+  assert.ok(!html.includes('<script>böse'), 'Text aus der Datenbank wird maskiert');
+  assert.ok(!html.includes('<b>x</b>'));
+  assert.ok(html.startsWith('<!doctype html>'));
+
+  // Mehr als ein Bogen passt nicht auf eine Seite.
+  const viele = etikettBogenHtml(Array.from({ length: 200 }, () => ({ svg: '<svg></svg>', label: 'x' })));
+  assert.equal((viele.match(/class="label"/g) || []).length, ETIKETT_BOGEN.maxEtiketten);
+});
+
+test('jede Codeart hat einen verständlichen Namen', () => {
+  assert.equal(codeArtText('gtin'), 'Herstellercode');
+  assert.equal(codeArtText('code128'), 'Strichcode');
+  assert.equal(codeArtText('internal'), 'Eigener Code');
+  assert.equal(codeArtText(undefined), 'Eigener Code');
+});
+
+test('ein nachgetragener Code wird geprüft wie beim Anlegen', () => {
+  assert.deepEqual(codeNachtragLesen({ code: ' 4006381333931 ', codeType: 'gtin' }).nachtrag, {
+    code: '4006381333931', codeType: 'gtin', packQuantity: 1, isPrimary: false
+  });
+  assert.equal(codeNachtragLesen({ code: 'KARTON-1', packQuantity: '100' }).nachtrag.packQuantity, 100);
+  assert.equal(codeNachtragLesen({ code: 'X', packQuantity: '2,5' }).nachtrag.packQuantity, 2.5);
+
+  assert.match(codeNachtragLesen({}).fehler, /Code fehlt/);
+  assert.match(codeNachtragLesen({ code: '   ' }).fehler, /Code fehlt/);
+  assert.match(codeNachtragLesen({ code: 'X', packQuantity: '0' }).fehler, /Gebindemenge/);
+  assert.match(codeNachtragLesen({ code: 'X'.repeat(65) }).fehler, /zu lang/);
+});
+
+test('das Anlegeformular hat Codezeilen und sagt, dass leer erlaubt ist', () => {
+  const html = artikelFormularAnsicht({ unit: 'Stück' }, [{ key: 'other', name: 'Sonstiges' }]);
+
+  assert.ok(html.includes('data-code-index="0"'), 'Auch ein leeres Formular hat eine Codezeile');
+  assert.ok(html.includes('stock-code-row-add'));
+  assert.ok(html.includes('Kein Barcode auf der Ware'));
+  assert.ok(html.includes('eigenes Etikett drucken'));
+
+  const zwei = artikelFormularAnsicht(
+    { barcodes: [leereCodezeile(), { code: '96385074', packQuantity: 100 }] }, []
+  );
+  assert.ok(zwei.includes('data-code-index="1"'));
+  assert.ok(zwei.includes('value="96385074"'));
+  assert.ok(zwei.includes('value="100"'));
+});
+
+test('die Codeansicht nennt Art, Gebinde und Hauptcode', () => {
+  const zustand = lagerZustand({
+    schritt: SCHRITTE.ARTIKEL_CODES,
+    artikel: ARTIKEL,
+    codes: [
+      { id: 'c1', code: '4006381333931', codeType: 'gtin', packQuantity: 1, isPrimary: true },
+      { id: 'c2', code: '96385074', codeType: 'gtin', packQuantity: 100, isPrimary: false }
+    ]
+  });
+
+  const buero = artikelCodesAnsicht(zustand, { manage: true });
+  assert.ok(buero.includes('Herstellercode'));
+  assert.ok(buero.includes('Gebinde 100'));
+  assert.ok(buero.includes('Hauptcode'));
+  assert.ok(buero.includes('stock-code-revoke'));
+  assert.ok(buero.includes('stock-label-print'));
+  assert.ok(buero.includes('stock-code-scan'));
+
+  const monteur = artikelCodesAnsicht(zustand, {});
+  assert.ok(!monteur.includes('stock-code-revoke'), 'Der Monteur nimmt keine Codes zurück');
+  assert.ok(!monteur.includes('stock-label-print'));
+  assert.ok(monteur.includes('4006381333931'), 'Lesen darf er');
+});
+
+test('ein Artikel ohne Code sagt, dass er nicht scannbar ist', () => {
+  const zustand = lagerZustand({
+    schritt: SCHRITTE.ARTIKEL_CODES, artikel: ARTIKEL, codes: []
+  });
+
+  const html = artikelCodesAnsicht(zustand, { manage: true });
+  assert.ok(html.includes('lässt sich also nicht scannen'));
+  assert.ok(html.includes('eigenes Etikett'));
+});
+
+test('zur Codeansicht kommt nur die Verwaltung', () => {
+  const zustand = lagerZustand({ schritt: SCHRITTE.BUCHEN, ort: REGAL, artikel: ARTIKEL });
+
+  assert.ok(!buchenAnsicht(zustand, {}, {}).includes('stock-codes-open'));
+  assert.ok(buchenAnsicht(zustand, { manage: true }, {}).includes('stock-codes-open'));
+
+  const optionen = { gruppen: [] };
+  assert.ok(
+    ansichtFuer(lagerZustand({ schritt: SCHRITTE.ARTIKEL_CODES, artikel: ARTIKEL, codes: [] }), { manage: true }, optionen)
+      .includes('Codes und Etikett')
+  );
 });
