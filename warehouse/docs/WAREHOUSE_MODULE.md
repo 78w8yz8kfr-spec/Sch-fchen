@@ -107,6 +107,15 @@ Der Etikettendruck übernimmt den A4-Bogen des Gerätemoduls: zehn Spalten, zwö
 Reihen, 18 × 18 mm je Code, feste Zeilenhöhen. Das Raster ist erprobt und
 erzeugt nachweislich keine zweite Druckseite.
 
+**Ein Artikel ohne Herstellercode ist der Normalfall, nicht die Ausnahme** —
+Kabeltrommel, Schüttgut, eigene Konfektion. Er wird von Hand angelegt und
+bekommt sein eigenes Etikett; ohne das wäre er nie scannbar, und das ganze
+Modul hängt am Scannen. Codes lassen sich jederzeit nachtragen: die
+Einzelpackung ist beim Anlegen dabei, der Kartoncode mit Gebindemenge kommt
+erst mit der ersten Palette. Ein vertippter Code wird zurückgenommen statt
+gelöscht — er bleibt in der Historie lesbar, findet nichts mehr, und dieselbe
+Nummer ist danach wieder vergebbar (Migration 201).
+
 ## Datenmodell
 
 | Bereich | Tabellen | Zweck |
@@ -301,6 +310,8 @@ hat.
 | `GET /levels` | Bestand je Lagerplatz |
 | `GET /reorder` | Nachbestellvorschlag aus Mindest- und Zielbestand |
 | `GET/POST /inventory`, `…/:id`, `…/:id/count`, `…/:id/complete`, `…/:id/cancel` | Inventur starten, zählen, abschließen, abbrechen |
+| `POST /items/:id/barcodes`, `…/:codeId/revoke` | Code nachtragen und mit Grund zurücknehmen |
+| `POST /labels/sheet` | QR-Bilder für einen Etikettenbogen |
 | `GET/POST /suppliers` | Lieferanten |
 | `GET/POST /orders`, `…/:id`, `…/:id/send`, `…/:id/receive`, `…/:id/cancel` | Bestellung anlegen (auch direkt aus dem Nachbestellvorschlag), bestellen, Wareneingang, stornieren |
 

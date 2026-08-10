@@ -61,6 +61,7 @@ der später auch läuft.
 | Bedienoberfläche: Büro | steht — Bestand, Artikelanlage, Nachbestellung |
 | Inventur: API und Bedienung | steht — 13 Abnahmen, 8 Tests, 19 Prüfungen im Browser |
 | Bestellwesen: API und Bedienung | steht — 15 Abnahmen, 12 Tests, 20 Prüfungen im Browser |
+| Codes nachtragen, zurücknehmen, Etikettendruck | steht — Migration 201, 13 Abnahmen, 10 Tests, 20 Prüfungen im Browser |
 | Einhängen in app.mjs und Merge | offen |
 | Einpflegen in Schäfchen | offen |
 

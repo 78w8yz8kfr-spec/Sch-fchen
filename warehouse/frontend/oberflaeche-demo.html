@@ -224,6 +224,13 @@
   .stock-row__amount--weniger { color: var(--schlecht); }
   .stock-row__amount--offen { color: var(--text-dritt); }
 
+  .stock-codes__item { margin: 0; font-weight: 700; }
+  .stock-code-row { display: grid; grid-template-columns: 1fr 6rem; gap: 8px; }
+  .stock-codes-edit { display: flex; flex-direction: column; gap: 8px; }
+  .stock-code-add { display: flex; flex-direction: column; gap: 8px; }
+  .stock-hint { margin: 0; font-size: .8rem; color: var(--text-dritt); }
+  .stock-code-revoke { grid-row: 1 / span 2; grid-column: 2; width: auto; min-height: 36px; font-size: .8rem; }
+
   .stock-order__supplier { margin: 0; font-weight: 700; }
   .stock-order__status {
     margin: 0; font-size: .84rem; color: var(--text-zweit);
@@ -1141,7 +1148,8 @@ const SCHRITTE = Object.freeze({
   NACHBESTELLUNG: 'nachbestellung',
   INVENTUR: 'inventur',
   BESTELLUNGEN: 'bestellungen',
-  BESTELLUNG: 'bestellung'
+  BESTELLUNG: 'bestellung',
+  ARTIKEL_CODES: 'artikelCodes'
 });
 
 const BESTELLSTATUS = Object.freeze({
@@ -1193,6 +1201,8 @@ function lagerZustand(vorgabe = {}) {
     zaehlArtikel: null,
     bestellung: null,
     eingang: null,
+    codes: null,
+    codeEntwurf: null,
     hinweis: null,
     fehler: null,
     ...vorgabe
@@ -1554,6 +1564,9 @@ function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
       </div>
 
       ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+      ${rechte.manage
+        ? '<button class="button button--quiet stock-codes-open" type="button">Codes und Etikett</button>'
+        : ''}
       <button class="button button--quiet stock-cancel" type="button">Abbrechen</button>
     </div>`;
 }
@@ -1844,9 +1857,39 @@ function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
       <label class="stock-field"><span>Zielbestand</span>
         <input name="targetStock" inputmode="decimal" value="${sicher(daten.targetStock ?? '')}" autocomplete="off"></label>
     </div>
+    ${codeFelder(daten)}
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
     <button class="button button--action stock-save" type="button">Anlegen</button>
     <button class="button button--quiet stock-home" type="button">Abbrechen</button>
+  </div>`;
+}
+
+/**
+ * Die Codezeilen des Anlegeformulars.
+ *
+ * Ohne sie kann ein handangelegter Artikel nie einen Code bekommen und ist
+ * damit nie scannbar. Leer lassen ist ausdruecklich erlaubt — dann bekommt er
+ * spaeter ein eigenes Etikett, und der Hinweis sagt das auch.
+ */
+function codeFelder(daten) {
+  const zeilen = (daten.barcodes || []).length ? daten.barcodes : [leereCodezeile()];
+
+  return `<div class="stock-codes-edit">
+    <p class="eyebrow">Codes</p>
+    ${zeilen.map((zeile, index) => `
+      <div class="stock-code-row" data-code-index="${index}">
+        <label class="stock-field"><span>Code ${index + 1}</span>
+          <input name="code" data-code-index="${index}" autocomplete="off" maxlength="64"
+                 value="${sicher(zeile.code || '')}" placeholder="Barcode oder eigener Code"></label>
+        <label class="stock-field"><span>Gebinde</span>
+          <input name="packQuantity" data-code-index="${index}" inputmode="decimal" autocomplete="off"
+                 value="${sicher(zeile.packQuantity ?? 1)}"></label>
+      </div>`).join('')}
+    <button class="button button--quiet stock-code-row-add" type="button">Weitere Codezeile</button>
+    <p class="stock-hint">
+      Kein Barcode auf der Ware? Dann leer lassen — nach dem Anlegen lässt sich
+      ein eigenes Etikett drucken.
+    </p>
   </div>`;
 }
 
@@ -1986,6 +2029,152 @@ function inventurAnsicht(zustand, rechte = {}) {
          </button>`
       : '<p class="stock-empty">Abschließen kann das Büro.</p>'}
     <button class="button button--quiet stock-inventory-cancel" type="button">Inventur abbrechen</button>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Codes und Etiketten
+// ---------------------------------------------------------------------------
+
+// Dieselben Masse wie der Geraetebogen: erprobt, passt auf eine A4-Seite und
+// bleibt mit 18 mal 18 Millimetern sicher unter zwei Zentimetern.
+const ETIKETT_BOGEN = Object.freeze({
+  maxEtiketten: 120,
+  spalten: 10,
+  reihen: 12,
+  seiteBreiteMm: 210,
+  seiteHoeheMm: 297,
+  seitenrandMm: 5,
+  zelleBreiteMm: 19.8,
+  zelleHoeheMm: 23.5,
+  spaltMm: 0.2,
+  qrGroesseMm: 18
+});
+
+function etikettBogenStile() {
+  const b = ETIKETT_BOGEN;
+  const breite = b.seiteBreiteMm - (2 * b.seitenrandMm);
+  const hoehe = b.seiteHoeheMm - (2 * b.seitenrandMm);
+  return `
+    @page{size:A4 portrait;margin:${b.seitenrandMm}mm}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,sans-serif;color:#111}
+    .sheet{display:grid;grid-template-columns:repeat(${b.spalten},${b.zelleBreiteMm}mm);grid-auto-rows:${b.zelleHoeheMm}mm;gap:${b.spaltMm}mm;width:${breite}mm;align-content:start}
+    .label{display:grid;grid-template-rows:${b.qrGroesseMm}mm 2.2mm 2.2mm;align-items:center;overflow:hidden;border:.15mm solid #aaa;padding:.3mm;text-align:center;break-inside:avoid;page-break-inside:avoid}
+    .label__qr{display:grid;place-items:center;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm;margin:auto}
+    .label svg{display:block;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm;max-width:${b.qrGroesseMm}mm;max-height:${b.qrGroesseMm}mm}
+    .label strong,.label span{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:2.2mm}
+    .label strong{font-size:4.5pt}
+    .label span{font-size:4.2pt}
+    @media screen{body{min-width:${b.seiteBreiteMm}mm;padding:${b.seitenrandMm}mm;background:#f4f4f5}.sheet{margin:auto;background:#fff}}
+    @media print{html,body{width:${breite}mm;height:${hoehe}mm;overflow:hidden}.label{border-color:#000}}
+  `;
+}
+
+/**
+ * Baut den Druckbogen aus den Bildern, die die API liefert.
+ *
+ * Das SVG kommt aus der eigenen API und wird deshalb unveraendert eingesetzt;
+ * alles andere — Name und Nummer unter dem Code — ist Text aus der Datenbank
+ * und wird maskiert.
+ */
+function etikettBogenHtml(labels = []) {
+  const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map((etikett) => `
+    <div class="label">
+      <div class="label__qr">${etikett.svg || ''}</div>
+      <strong>${sicher(etikett.label || '')}</strong>
+      <span>${sicher(etikett.sublabel || '')}</span>
+    </div>`).join('');
+
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Lageretiketten</title>
+<style>${etikettBogenStile()}</style>
+</head><body><div class="sheet">${zellen}</div></body></html>`;
+}
+
+function codeArtText(codeType) {
+  if (codeType === 'gtin') return 'Herstellercode';
+  if (codeType === 'code128') return 'Strichcode';
+  return 'Eigener Code';
+}
+
+/** Eine leere Codezeile fuer das Formular. */
+function leereCodezeile() {
+  return { code: '', codeType: 'internal', packQuantity: 1, isPrimary: false };
+}
+
+/**
+ * Prueft einen einzeln nachgetragenen Code.
+ *
+ * Ein gescannter Code kommt als GTIN oder als Freitext herein; getippt wird er
+ * genauso behandelt, damit derselbe Code auf beiden Wegen dasselbe ergibt.
+ */
+function codeNachtragLesen(werte = {}) {
+  const code = String(werte.code ?? '').trim();
+  if (!code) return { fehler: 'Der Code fehlt.' };
+  if (code.length > 64) return { fehler: 'Der Code ist zu lang.' };
+
+  const menge = mengeAusText(werte.packQuantity ?? 1);
+  if (menge === null) return { fehler: 'Die Gebindemenge ist keine gültige Menge.' };
+
+  return {
+    nachtrag: {
+      code,
+      codeType: werte.codeType === 'gtin' ? 'gtin' : 'internal',
+      packQuantity: menge,
+      isPrimary: werte.isPrimary === true
+    }
+  };
+}
+
+function artikelCodesAnsicht(zustand, rechte = {}) {
+  const artikel = zustand.artikel;
+  if (!artikel) return '';
+
+  const codes = zustand.codes || [];
+
+  return `<div class="stock-list stock-codes">
+    ${kopfzeile('Codes und Etikett')}
+    <p class="stock-codes__item">${sicher(artikel.name)} · ${sicher(artikel.itemNumber)}</p>
+
+    ${codes.length
+      ? `<ul class="stock-rows">
+          ${codes.map((code) => `
+            <li class="stock-row">
+              <span class="stock-row__name">${sicher(code.code)}</span>
+              <span class="stock-row__number">
+                ${sicher(codeArtText(code.codeType))}${code.packQuantity > 1
+                  ? ` · Gebinde ${sicher(mengeAlsText(code.packQuantity))}` : ''}${code.isPrimary ? ' · Hauptcode' : ''}
+              </span>
+              ${rechte.manage
+                ? `<button class="button button--quiet stock-code-revoke" type="button"
+                           data-code="${sicher(code.id)}">Zurücknehmen</button>`
+                : ''}
+            </li>`).join('')}
+        </ul>`
+      : `<p class="stock-empty">
+           Dieser Artikel hat keinen Code — er lässt sich also nicht scannen.
+           ${rechte.manage ? 'Entweder einen Herstellercode hinzufügen oder ein eigenes Etikett drucken.' : ''}
+         </p>`}
+
+    ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+
+    ${rechte.manage
+      ? `<div class="stock-code-add">
+           <label class="stock-field"><span>Code hinzufügen</span>
+             <input class="stock-code-input" name="code" autocomplete="off" maxlength="64"
+                    value="${sicher(zustand.codeEntwurf?.code || '')}" placeholder="Scannen oder eintippen"></label>
+           <label class="stock-field"><span>Gebindemenge</span>
+             <input class="stock-code-pack" name="packQuantity" inputmode="decimal" autocomplete="off"
+                    value="${sicher(zustand.codeEntwurf?.packQuantity ?? 1)}"></label>
+           <button class="button button--secondary stock-code-scan" type="button">Code scannen</button>
+           <button class="button button--action stock-code-save" type="button">Code hinzufügen</button>
+         </div>
+         <button class="button button--action stock-label-print" type="button">Eigenes Etikett drucken</button>`
+      : ''}
+    <button class="button button--quiet stock-home" type="button">Zurück</button>
   </div>`;
 }
 
@@ -2134,6 +2323,7 @@ function ansichtFuer(zustand, rechte, optionen = {}) {
     return bestellungenAnsicht(optionen.bestellungen, rechte, zustand.fehler);
   }
   if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.ARTIKEL_CODES) return artikelCodesAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
@@ -2146,6 +2336,8 @@ function ansichtFuer(zustand, rechte, optionen = {}) {
   return startAnsicht(zustand, rechte);
 }
 
+
+const DEMO_QR = {"art-1":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3301","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3301","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m2 0h3m2 0h1m3 0h6m2 0h7M2 3.5h1m5 0h1m4 0h2m2 0h1m1 0h2m1 0h1m5 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m2 0h4m3 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h4m2 0h7m5 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h1m1 0h2m3 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h1m4 0h1m1 0h1m5 0h1m2 0h1m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m1 0h1m1 0h1m2 0h1m2 0h1m2 0h1M2 10.5h1m1 0h5m3 0h2m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h5M2 11.5h4m6 0h5m1 0h1m1 0h2m3 0h1m2 0h2m1 0h2m1 0h1M2 12.5h4m2 0h8m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2M2 13.5h1m1 0h1m1 0h1m2 0h2m9 0h6m4 0h3M2 14.5h8m3 0h1m3 0h6m2 0h2m3 0h2m1 0h1M2 15.5h2m1 0h1m1 0h1m1 0h3m1 0h1m2 0h2m3 0h1m1 0h3m1 0h3m1 0h4M2 16.5h4m2 0h1m2 0h2m1 0h1m1 0h3m1 0h1m1 0h2m3 0h7M5 17.5h1m4 0h1m3 0h1m1 0h1m5 0h3m1 0h3m3 0h1M3 18.5h3m2 0h1m3 0h1m1 0h2m1 0h3m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M4 19.5h1m1 0h2m1 0h2m9 0h2m3 0h2m1 0h2m1 0h4M6 20.5h1m1 0h2m1 0h1m2 0h5m3 0h2m2 0h1m1 0h3m1 0h1M3 21.5h1m6 0h1m6 0h2m3 0h3m1 0h2m1 0h4M5 22.5h2m1 0h3m2 0h1m1 0h1m3 0h1m4 0h1m4 0h3M2 23.5h1m1 0h1m4 0h1m1 0h3m1 0h1m2 0h1m1 0h2m3 0h2m1 0h1m3 0h1m1 0h1M2 24.5h1m1 0h1m1 0h1m1 0h1m3 0h3m2 0h1m1 0h1m2 0h3m1 0h1m2 0h1m2 0h2M2 25.5h1m2 0h2m4 0h3m2 0h1m4 0h1m1 0h2m2 0h1m4 0h3M2 26.5h1m3 0h5m2 0h7m4 0h1m1 0h5m3 0h1M10 27.5h1m2 0h1m1 0h2m3 0h7m3 0h1m1 0h3M2 28.5h7m2 0h1m1 0h2m1 0h2m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1M2 29.5h1m5 0h1m1 0h1m2 0h1m1 0h2m5 0h5m3 0h4M2 30.5h1m1 0h3m1 0h1m1 0h1m1 0h2m3 0h5m4 0h6m1 0h1M2 31.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m4 0h4m1 0h2m2 0h2m1 0h2M2 32.5h1m1 0h3m1 0h1m1 0h4m3 0h1m5 0h1m2 0h4m1 0h2M2 33.5h1m5 0h1m3 0h1m2 0h3m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1M2 34.5h7m1 0h1m2 0h2m1 0h1m1 0h2m4 0h1m1 0h2m1 0h1m1 0h1m1 0h1\"/></svg>\n"},"art-2":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3302","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3302","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m2 0h3m2 0h1m3 0h6m2 0h7M2 3.5h1m5 0h1m3 0h3m2 0h1m1 0h2m1 0h1m5 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h4m2 0h1m1 0h1m2 0h4m3 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h7m5 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h1m1 0h3m2 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h1m2 0h1m1 0h1m1 0h1m5 0h1m2 0h1m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m1 0h2m3 0h1m2 0h1m2 0h1M2 10.5h1m1 0h5m3 0h1m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h5M2 11.5h5m5 0h5m1 0h1m1 0h2m3 0h1m2 0h2m1 0h2m1 0h1M4 12.5h7m2 0h3m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2M2 13.5h3m4 0h2m9 0h6m4 0h3M4 14.5h1m2 0h3m2 0h2m1 0h1m1 0h6m2 0h2m3 0h2m1 0h1M2 15.5h2m3 0h1m3 0h1m5 0h1m3 0h1m1 0h3m1 0h3m1 0h4M2 16.5h4m2 0h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h2m3 0h7M9 17.5h1m3 0h2m1 0h1m5 0h3m1 0h3m3 0h1M3 18.5h1m1 0h1m2 0h2m2 0h4m1 0h3m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M2 19.5h1m1 0h1m2 0h1m1 0h2m9 0h2m3 0h2m1 0h2m1 0h4M2 20.5h1m3 0h4m1 0h1m2 0h1m1 0h3m3 0h2m2 0h1m1 0h3m1 0h1M2 21.5h2m2 0h2m2 0h2m3 0h1m1 0h2m3 0h3m1 0h2m1 0h4M2 22.5h1m2 0h5m2 0h5m2 0h1m4 0h1m4 0h3M2 23.5h3m2 0h1m3 0h1m3 0h1m2 0h1m1 0h2m3 0h2m1 0h1m3 0h1m1 0h1M2 24.5h1m1 0h1m1 0h1m1 0h3m1 0h2m3 0h1m1 0h1m2 0h3m1 0h1m2 0h1m2 0h2M2 25.5h1m1 0h1m1 0h1m3 0h4m2 0h1m4 0h1m1 0h2m2 0h1m4 0h3M2 26.5h1m3 0h3m1 0h1m3 0h6m4 0h1m1 0h5m3 0h1M10 27.5h1m2 0h1m1 0h2m3 0h7m3 0h1m1 0h3M2 28.5h7m3 0h3m1 0h2m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1M2 29.5h1m5 0h1m1 0h4m1 0h1m6 0h5m3 0h4M2 30.5h1m1 0h3m1 0h1m1 0h1m1 0h2m3 0h5m4 0h6m1 0h1M2 31.5h1m1 0h3m1 0h1m1 0h5m1 0h1m4 0h4m1 0h2m2 0h2m1 0h2M2 32.5h1m1 0h3m1 0h1m1 0h4m3 0h1m5 0h1m2 0h4m1 0h2M2 33.5h1m5 0h1m3 0h1m1 0h4m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1M2 34.5h7m1 0h1m3 0h1m1 0h1m1 0h2m4 0h1m1 0h2m1 0h1m1 0h1m1 0h1\"/></svg>\n"},"art-3":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3303","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3303","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m3 0h2m2 0h1m3 0h6m2 0h7M2 3.5h1m5 0h1m4 0h2m2 0h1m1 0h2m1 0h1m5 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h4m2 0h1m1 0h1m2 0h4m3 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h7m5 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h1m6 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h1m4 0h1m1 0h1m5 0h1m2 0h1m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m1 0h1m4 0h1m2 0h1m2 0h1M2 10.5h1m1 0h5m3 0h2m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h5M3 11.5h3m5 0h6m1 0h1m1 0h2m3 0h1m2 0h2m1 0h2m1 0h1M3 12.5h3m1 0h4m1 0h4m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2M4 13.5h1m1 0h1m2 0h2m1 0h1m7 0h6m4 0h3M4 14.5h2m2 0h2m1 0h1m1 0h3m1 0h6m2 0h2m3 0h2m1 0h1M2 15.5h1m1 0h1m4 0h1m1 0h2m1 0h1m1 0h2m3 0h1m1 0h3m1 0h3m1 0h4M2 16.5h4m2 0h1m2 0h2m3 0h3m1 0h1m1 0h2m3 0h7M5 17.5h1m3 0h2m2 0h2m1 0h1m5 0h3m1 0h3m3 0h1M3 18.5h1m1 0h1m2 0h2m2 0h1m1 0h2m1 0h3m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M4 19.5h1m2 0h1m1 0h3m3 0h1m4 0h2m3 0h2m1 0h2m1 0h4M2 20.5h1m3 0h1m1 0h2m2 0h1m1 0h2m1 0h2m3 0h2m2 0h1m1 0h3m1 0h1M2 21.5h1m4 0h1m2 0h3m4 0h2m3 0h3m1 0h2m1 0h4M5 22.5h1m1 0h4m1 0h2m5 0h1m4 0h1m4 0h3M2 23.5h3m6 0h1m3 0h2m1 0h1m1 0h2m3 0h2m1 0h1m3 0h1m1 0h1M2 24.5h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m2 0h1m1 0h1m2 0h3m1 0h1m2 0h1m2 0h2M2 25.5h1m3 0h1m4 0h2m1 0h1m1 0h1m4 0h1m1 0h2m2 0h1m4 0h3M2 26.5h1m3 0h3m1 0h1m3 0h6m4 0h1m1 0h5m3 0h1M10 27.5h2m1 0h1m2 0h1m3 0h7m3 0h1m1 0h3M2 28.5h7m4 0h3m1 0h1m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1M2 29.5h1m5 0h1m1 0h1m2 0h1m2 0h1m5 0h5m3 0h4M2 30.5h1m1 0h3m1 0h1m1 0h1m2 0h3m1 0h5m4 0h6m1 0h1M2 31.5h1m1 0h3m1 0h1m1 0h3m8 0h4m1 0h2m2 0h2m1 0h2M2 32.5h1m1 0h3m1 0h1m1 0h5m2 0h1m5 0h1m2 0h4m1 0h2M2 33.5h1m5 0h1m3 0h6m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1M2 34.5h7m1 0h1m2 0h2m1 0h1m1 0h2m4 0h1m1 0h2m1 0h1m1 0h1m1 0h1\"/></svg>\n"},"ort-0":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3310","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3310","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m1 0h2m3 0h1m2 0h3m2 0h1m4 0h7M2 3.5h1m5 0h1m4 0h1m5 0h1m2 0h2m2 0h1m1 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m3 0h1m3 0h1m1 0h1m2 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h2m1 0h3m2 0h1m1 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m3 0h1m1 0h5m3 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h2m1 0h3m4 0h1m7 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M11 9.5h2m13 0h1M2 10.5h1m1 0h1m3 0h2m3 0h1m2 0h3m2 0h1m3 0h2m2 0h1m2 0h1m1 0h1M2 11.5h3m1 0h1m4 0h3m1 0h4m2 0h1m1 0h1m1 0h2m1 0h1m2 0h1m2 0h1M2 12.5h2m1 0h1m1 0h2m5 0h1m1 0h2m1 0h3m1 0h1m1 0h3m3 0h2m1 0h1M2 13.5h1m1 0h2m3 0h3m2 0h1m1 0h2m3 0h2m1 0h3m2 0h3M2 14.5h1m3 0h3m2 0h1m3 0h3m2 0h1m3 0h1m1 0h3m5 0h1M3 15.5h3m4 0h1m2 0h2m5 0h2m2 0h5m2 0h1m1 0h2M2 16.5h1m2 0h4m2 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h3m3 0h1m2 0h1m1 0h1M2 17.5h1m7 0h2m1 0h1m2 0h2m2 0h1m1 0h1m1 0h1m2 0h3M5 18.5h6m2 0h2m1 0h2m4 0h1m2 0h2m1 0h2m3 0h1M2 19.5h1m1 0h2m1 0h1m1 0h3m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1m2 0h1m2 0h1m1 0h2M4 20.5h1m2 0h2m1 0h2m1 0h3m1 0h1m1 0h1m1 0h1m1 0h5m1 0h1m1 0h4M2 21.5h2m1 0h2m3 0h1m3 0h3m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h2M2 22.5h1m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m2 0h2m2 0h1m1 0h3m3 0h2M3 23.5h1m1 0h1m1 0h1m1 0h2m3 0h5m2 0h1m1 0h1m1 0h1m2 0h2m4 0h1M2 24.5h4m1 0h2m1 0h1m4 0h4m2 0h1m1 0h1m1 0h8m1 0h1M6 25.5h1m2 0h1m2 0h1m1 0h1m1 0h2m2 0h2m2 0h1m1 0h2m1 0h1m3 0h2M2 26.5h3m3 0h2m2 0h1m1 0h1m2 0h1m3 0h2m2 0h7m1 0h1M10 27.5h1m2 0h2m1 0h2m3 0h2m1 0h3m3 0h1m2 0h2M2 28.5h7m1 0h3m1 0h1m1 0h4m1 0h4m1 0h1m1 0h1m1 0h5M2 29.5h1m5 0h1m3 0h4m1 0h1m2 0h1m1 0h1m1 0h3m3 0h2m1 0h1M2 30.5h1m1 0h3m1 0h1m3 0h1m2 0h3m2 0h1m1 0h1m1 0h7m3 0h1M2 31.5h1m1 0h3m1 0h1m3 0h3m1 0h2m2 0h3m1 0h1m2 0h1m1 0h6M2 32.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h5m1 0h6m2 0h2m1 0h3M2 33.5h1m5 0h1m2 0h2m1 0h3m3 0h1m4 0h6M2 34.5h7m1 0h1m1 0h1m1 0h2m5 0h2m2 0h2m1 0h3m3 0h1\"/></svg>\n"},"ort-1":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3311","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3311","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m3 0h2m2 0h1m3 0h6m2 0h7M2 3.5h1m5 0h1m2 0h4m2 0h1m1 0h2m1 0h1m5 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h1m2 0h1m2 0h1m1 0h1m2 0h4m3 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h7m5 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h1m1 0h1m4 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h1m4 0h1m1 0h1m5 0h1m2 0h1m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m1 0h3m2 0h1m2 0h1m2 0h1M2 10.5h1m1 0h5m3 0h2m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h5M2 11.5h4m5 0h6m1 0h1m1 0h2m3 0h1m2 0h2m1 0h2m1 0h1M2 12.5h4m2 0h3m2 0h3m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2M2 13.5h3m1 0h1m2 0h2m1 0h1m3 0h1m3 0h6m4 0h3M2 14.5h4m1 0h4m2 0h2m2 0h6m2 0h2m3 0h2m1 0h1M2 15.5h1m4 0h1m1 0h6m1 0h2m3 0h1m1 0h3m1 0h3m1 0h4M2 16.5h4m2 0h2m1 0h2m1 0h1m1 0h3m1 0h1m1 0h2m3 0h7M13 17.5h2m1 0h1m5 0h3m1 0h3m3 0h1M3 18.5h3m2 0h1m3 0h4m1 0h3m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M2 19.5h1m1 0h1m2 0h1m1 0h3m8 0h2m3 0h2m1 0h2m1 0h4M3 20.5h1m2 0h4m4 0h2m1 0h2m3 0h2m2 0h1m1 0h3m1 0h1M10 21.5h3m3 0h3m3 0h3m1 0h2m1 0h4M3 22.5h1m1 0h7m1 0h2m1 0h1m2 0h1m4 0h1m4 0h3M2 23.5h2m5 0h3m3 0h1m2 0h1m1 0h2m3 0h2m1 0h1m3 0h1m1 0h1M2 24.5h1m2 0h2m1 0h1m3 0h3m2 0h1m1 0h1m2 0h3m1 0h1m2 0h1m2 0h2M2 25.5h1m1 0h3m2 0h6m1 0h1m4 0h1m1 0h2m2 0h1m4 0h3M2 26.5h1m3 0h3m1 0h1m2 0h7m4 0h1m1 0h5m3 0h1M10 27.5h1m2 0h1m1 0h2m3 0h7m3 0h1m1 0h3M2 28.5h7m2 0h4m1 0h2m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1M2 29.5h1m5 0h1m1 0h1m2 0h1m2 0h1m5 0h5m3 0h4M2 30.5h1m1 0h3m1 0h1m1 0h1m1 0h4m1 0h5m4 0h6m1 0h1M2 31.5h1m1 0h3m1 0h1m1 0h3m1 0h1m6 0h4m1 0h2m2 0h2m1 0h2M2 32.5h1m1 0h3m1 0h1m1 0h3m1 0h1m2 0h1m5 0h1m2 0h4m1 0h2M2 33.5h1m5 0h1m3 0h2m1 0h3m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1M2 34.5h7m1 0h1m3 0h1m1 0h1m1 0h2m4 0h1m1 0h2m1 0h1m1 0h1m1 0h1\"/></svg>\n"},"ort-2":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3312","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3312","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m3 0h2m2 0h1m3 0h6m2 0h7M2 3.5h1m5 0h1m2 0h1m1 0h2m2 0h1m1 0h2m1 0h1m5 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h1m1 0h1m2 0h4m3 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h4m2 0h7m5 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h1m2 0h1m1 0h1m1 0h1m5 0h1m2 0h1m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m1 0h1m4 0h1m2 0h1m2 0h1M2 10.5h1m1 0h5m3 0h1m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h5M2 11.5h5m4 0h6m1 0h1m1 0h2m3 0h1m2 0h2m1 0h2m1 0h1M4 12.5h12m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2M2 13.5h1m1 0h1m4 0h2m1 0h1m3 0h1m3 0h6m4 0h3M4 14.5h1m1 0h5m1 0h4m1 0h6m2 0h2m3 0h2m1 0h1M2 15.5h1m2 0h1m1 0h1m3 0h2m1 0h1m2 0h1m3 0h1m1 0h3m1 0h3m1 0h4M2 16.5h4m2 0h5m1 0h1m1 0h3m1 0h1m1 0h2m3 0h7M5 17.5h1m3 0h2m3 0h1m1 0h1m5 0h3m1 0h3m3 0h1M3 18.5h1m1 0h1m2 0h2m2 0h1m1 0h2m1 0h3m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M4 19.5h1m1 0h2m1 0h3m8 0h2m3 0h2m1 0h2m1 0h4M2 20.5h2m2 0h1m1 0h2m4 0h1m2 0h2m3 0h2m2 0h1m1 0h3m1 0h1M2 21.5h1m3 0h2m2 0h1m1 0h1m2 0h4m3 0h3m1 0h2m1 0h4M2 22.5h2m1 0h2m1 0h2m1 0h3m5 0h1m4 0h1m4 0h3M2 23.5h1m4 0h1m2 0h4m1 0h1m2 0h1m1 0h2m3 0h2m1 0h1m3 0h1m1 0h1M2 24.5h1m2 0h2m1 0h3m1 0h2m3 0h1m1 0h1m2 0h3m1 0h1m2 0h1m2 0h2M2 25.5h1m3 0h1m2 0h1m1 0h4m1 0h1m4 0h1m1 0h2m2 0h1m4 0h3M2 26.5h1m3 0h5m3 0h6m4 0h1m1 0h5m3 0h1M10 27.5h1m2 0h1m1 0h2m3 0h7m3 0h1m1 0h3M2 28.5h7m4 0h2m1 0h2m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1M2 29.5h1m5 0h1m1 0h4m8 0h5m3 0h4M2 30.5h1m1 0h3m1 0h1m1 0h1m1 0h4m1 0h5m4 0h6m1 0h1M2 31.5h1m1 0h3m1 0h1m1 0h2m9 0h4m1 0h2m2 0h2m1 0h2M2 32.5h1m1 0h3m1 0h1m1 0h3m1 0h1m2 0h1m5 0h1m2 0h4m1 0h2M2 33.5h1m5 0h1m3 0h6m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1M2 34.5h7m1 0h1m2 0h2m1 0h1m1 0h2m4 0h1m1 0h2m1 0h1m1 0h1m1 0h1\"/></svg>\n"},"ort-3":{"token":"3f2504e0-4f89-41d3-9a0c-0305e82c3313","target":"https://app.example/?lager=3f2504e0-4f89-41d3-9a0c-0305e82c3313","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"480\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h37v37H0z\"/><path stroke=\"#111111\" d=\"M2 2.5h7m2 0h3m2 0h1m3 0h6m2 0h7M2 3.5h1m5 0h1m2 0h4m2 0h1m1 0h2m1 0h1m5 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h1m1 0h1m2 0h4m3 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h1m2 0h2m1 0h7m5 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h1m2 0h1m3 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h1m4 0h1m1 0h1m5 0h1m2 0h1m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m1 0h2m3 0h1m2 0h1m2 0h1M2 10.5h1m1 0h5m3 0h2m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h5M3 11.5h3m6 0h5m1 0h1m1 0h2m3 0h1m2 0h2m1 0h2m1 0h1M3 12.5h3m1 0h5m1 0h3m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2M3 13.5h2m1 0h1m2 0h2m5 0h1m3 0h6m4 0h3M4 14.5h3m1 0h4m1 0h1m1 0h1m1 0h6m2 0h2m3 0h2m1 0h1M2 15.5h4m3 0h1m1 0h1m4 0h2m3 0h1m1 0h3m1 0h3m1 0h4M2 16.5h4m2 0h2m1 0h2m3 0h3m1 0h1m1 0h2m3 0h7M9 17.5h1m4 0h1m1 0h1m5 0h3m1 0h3m3 0h1M3 18.5h1m1 0h1m2 0h2m2 0h4m1 0h3m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M2 19.5h1m1 0h1m1 0h2m1 0h2m4 0h1m4 0h2m3 0h2m1 0h2m1 0h4M2 20.5h2m2 0h4m1 0h2m1 0h5m3 0h2m2 0h1m1 0h3m1 0h1M2 21.5h2m3 0h1m2 0h1m5 0h3m3 0h3m1 0h2m1 0h4M3 22.5h1m1 0h1m2 0h9m2 0h1m4 0h1m4 0h3M2 23.5h1m7 0h4m1 0h2m1 0h1m1 0h2m3 0h2m1 0h1m3 0h1m1 0h1M2 24.5h1m2 0h2m1 0h1m1 0h1m1 0h3m2 0h1m1 0h1m2 0h3m1 0h1m2 0h1m2 0h2M2 25.5h1m1 0h1m1 0h1m2 0h4m3 0h1m4 0h1m1 0h2m2 0h1m4 0h3M2 26.5h1m3 0h5m3 0h6m4 0h1m1 0h5m3 0h1M10 27.5h2m1 0h1m2 0h1m3 0h7m3 0h1m1 0h3M2 28.5h7m3 0h4m1 0h1m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1M2 29.5h1m5 0h1m1 0h1m2 0h1m1 0h2m5 0h5m3 0h4M2 30.5h1m1 0h3m1 0h1m1 0h1m2 0h1m3 0h5m4 0h6m1 0h1M2 31.5h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m4 0h4m1 0h2m2 0h2m1 0h2M2 32.5h1m1 0h3m1 0h1m1 0h3m4 0h1m5 0h1m2 0h4m1 0h2M2 33.5h1m5 0h1m3 0h1m1 0h4m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1M2 34.5h7m1 0h1m3 0h1m1 0h1m1 0h2m4 0h1m1 0h2m1 0h1m1 0h1m1 0h1\"/></svg>\n"}};
 
 // ---------------------------------------------------------------------------
 // Erfundener Hintergrund: bildet die Antworten von /api/v1/stock/* nach,
@@ -2345,6 +2537,17 @@ function bestellungAusVorschlag() {
   return bestellung;
 }
 
+function codesVon(artikelId) {
+  const artikel = ARTIKEL.find((eintrag) => eintrag.id === artikelId);
+  return (artikel?.codes || []).map((code, index) => ({
+    id: `${artikelId}-code-${index}`,
+    code: code.code,
+    codeType: code.gtin ? 'gtin' : 'internal',
+    packQuantity: code.pack,
+    isPrimary: index === 0
+  }));
+}
+
 function bestellungHolen(id) {
   return BESTELLUNGEN.find((eintrag) => eintrag.order.id === id) || null;
 }
@@ -2445,6 +2648,35 @@ function inventurAbschliessen() {
   return korrekturen;
 }
 
+/** Bildet POST /api/v1/stock/labels/sheet nach. */
+function etikettenHolen(ziele) {
+  return ziele.map((ziel) => {
+    const bild = DEMO_QR[ziel.id];
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === ziel.id);
+    const ort = ORTE.find((eintrag) => eintrag.id === ziel.id);
+    return {
+      targetType: ziel.targetType,
+      id: ziel.id,
+      label: artikel?.name || ort?.name || 'Ohne Namen',
+      sublabel: artikel?.itemNumber || '',
+      target: bild?.target || '',
+      // Fuer in der Vorschau neu angelegte Artikel gibt es kein vorbereitetes
+      // Bild; in der App kaeme es aus der API.
+      svg: bild?.svg || '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">'
+        + '<rect width="10" height="10" fill="#fff" stroke="#bbb" stroke-width=".3"/>'
+        + '<text x="5" y="5.6" font-size="1.4" text-anchor="middle" fill="#888">QR</text></svg>'
+    };
+  });
+}
+
+function etikettenDrucken(ziele) {
+  const fenster = window.open('', '_blank');
+  if (!fenster) return false;
+  fenster.document.write(etikettBogenHtml(etikettenHolen(ziele)));
+  fenster.document.close();
+  return true;
+}
+
 const optionen = () => ({
   baustellen: BAUSTELLEN,
   baustellePflicht: false,
@@ -2538,8 +2770,20 @@ function verdrahten() {
 
   wurzel.querySelector('.stock-save')?.addEventListener('click', () => {
     const werte = {};
-    wurzel.querySelectorAll('[name]').forEach((feld) => { werte[feld.name] = feld.value; });
-    werte.barcodes = zustand.entwurf?.barcodes || [];
+    wurzel.querySelectorAll('[name]:not([data-code-index])').forEach((feld) => {
+      werte[feld.name] = feld.value;
+    });
+
+    // Die Codezeilen kommen aus dem Formular und nicht aus dem Entwurf: was
+    // dort steht, hat der Benutzer zuletzt getippt.
+    const codeFelder = [...wurzel.querySelectorAll('[name="code"][data-code-index]')];
+    const packFelder = [...wurzel.querySelectorAll('[name="packQuantity"][data-code-index]')];
+    werte.barcodes = codeFelder.map((feld, index) => ({
+      code: feld.value,
+      packQuantity: packFelder[index]?.value ?? 1,
+      codeType: gtinNormalisieren(feld.value) ? 'gtin' : 'internal',
+      isPrimary: index === 0
+    })).filter((zeile) => zeile.code.trim());
 
     const { entwurf, fehler } = artikelFormularLesen(werte);
     if (fehler) {
@@ -2559,7 +2803,7 @@ function verdrahten() {
         code: code.code,
         gtin: gtinNormalisieren(code.code),
         pack: code.packQuantity,
-        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigener Code'
       }))
     });
 
@@ -2624,6 +2868,89 @@ function verdrahten() {
   wurzel.querySelector('.stock-inventory-cancel')?.addEventListener('click', () => {
     laufendeInventur = null;
     zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Inventur abgebrochen.' });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-codes-open')?.addEventListener('click', () => {
+    zustand = {
+      ...zustand,
+      schritt: SCHRITTE.ARTIKEL_CODES,
+      codes: codesVon(zustand.artikel.id),
+      codeEntwurf: null,
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-code-scan')?.addEventListener('click', () => {
+    $('scan-knoepfe').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  wurzel.querySelector('.stock-code-save')?.addEventListener('click', () => {
+    const { nachtrag, fehler } = codeNachtragLesen({
+      code: wurzel.querySelector('.stock-code-input').value,
+      packQuantity: wurzel.querySelector('.stock-code-pack').value,
+      codeType: gtinNormalisieren(wurzel.querySelector('.stock-code-input').value) ? 'gtin' : 'internal'
+    });
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+
+    // Wie in der Datenbank: ein aktiver Code gehoert zu genau einem Artikel.
+    const gesucht = gtinNormalisieren(nachtrag.code) || nachtrag.code.toUpperCase();
+    const belegt = ARTIKEL.some((eintrag) => eintrag.codes.some(
+      (code) => (code.gtin || code.code.toUpperCase()) === gesucht
+    ));
+    if (belegt) {
+      zustand = { ...zustand, fehler: 'Diesen Code trägt bereits ein anderer Artikel.' };
+      zeichnen();
+      return;
+    }
+
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zustand.artikel.id);
+    artikel.codes.push({
+      code: nachtrag.code,
+      gtin: gtinNormalisieren(nachtrag.code),
+      pack: nachtrag.packQuantity,
+      text: nachtrag.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+    });
+    scanKnoepfeZeichnen();
+    zustand = { ...zustand, codes: codesVon(artikel.id), codeEntwurf: null, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-code-revoke').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      const artikel = ARTIKEL.find((eintrag) => eintrag.id === zustand.artikel.id);
+      const index = Number(knopf.dataset.code.split('-').pop());
+      artikel.codes.splice(index, 1);
+      scanKnoepfeZeichnen();
+      zustand = { ...zustand, codes: codesVon(artikel.id), fehler: null };
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelector('.stock-label-print')?.addEventListener('click', () => {
+    const gedruckt = etikettenDrucken([{ targetType: 'item', id: zustand.artikel.id }]);
+    if (!gedruckt) {
+      zustand = { ...zustand, fehler: 'Der Browser hat das Druckfenster blockiert.' };
+      zeichnen();
+    }
+  });
+
+  wurzel.querySelector('.stock-code-row-add')?.addEventListener('click', () => {
+    const vorhandene = [...wurzel.querySelectorAll('[name="code"]')].map((feld, index) => ({
+      code: feld.value,
+      packQuantity: wurzel.querySelectorAll('[name="packQuantity"]')[index]?.value ?? 1,
+      codeType: 'internal',
+      isPrimary: index === 0
+    }));
+    zustand = {
+      ...zustand,
+      entwurf: { ...zustand.entwurf, barcodes: [...vorhandene, leereCodezeile()] }
+    };
     zeichnen();
   });
 

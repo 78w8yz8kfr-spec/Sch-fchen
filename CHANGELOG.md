@@ -4,6 +4,16 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Auch Ware ohne Barcode kommt ins Lager.** Kabeltrommel, Schüttgut, eigene
+  Konfektion: solche Artikel werden von Hand angelegt und bekommen ihr eigenes
+  Etikett zum Ausdrucken — A4, zehn Spalten, zwölf Reihen, 18 × 18 mm, dasselbe
+  erprobte Raster wie bei den Geräten. Ohne das wäre so ein Artikel nie
+  scannbar, und das ganze Lager hängt am Scannen. Codes lassen sich außerdem
+  jederzeit nachtragen, denn die Einzelpackung ist beim Anlegen dabei und der
+  Kartoncode mit Gebindemenge kommt erst mit der ersten Palette. Ein vertippter
+  Code wird zurückgenommen statt gelöscht: er bleibt in der Historie lesbar,
+  findet nichts mehr, und dieselbe Nummer lässt sich danach dem richtigen
+  Artikel geben. Vorher blockierte ein Vertipper die richtige Nummer dauerhaft.
 - **Das Lager zählt und bestellt.** Eine Inventur friert den Sollbestand beim
   Start ein — die Zählerin stellt einen Unterschied zu genau diesem Stand fest,
   und Buchungen währenddessen bleiben echte Bewegungen. Das Mengenfeld bleibt

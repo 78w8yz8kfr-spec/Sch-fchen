@@ -224,6 +224,13 @@
   .stock-row__amount--weniger { color: var(--schlecht); }
   .stock-row__amount--offen { color: var(--text-dritt); }
 
+  .stock-codes__item { margin: 0; font-weight: 700; }
+  .stock-code-row { display: grid; grid-template-columns: 1fr 6rem; gap: 8px; }
+  .stock-codes-edit { display: flex; flex-direction: column; gap: 8px; }
+  .stock-code-add { display: flex; flex-direction: column; gap: 8px; }
+  .stock-hint { margin: 0; font-size: .8rem; color: var(--text-dritt); }
+  .stock-code-revoke { grid-row: 1 / span 2; grid-column: 2; width: auto; min-height: 36px; font-size: .8rem; }
+
   .stock-order__supplier { margin: 0; font-weight: 700; }
   .stock-order__status {
     margin: 0; font-size: .84rem; color: var(--text-zweit);
@@ -368,6 +375,8 @@
 /*__SCANNER__*/
 
 /*__LAGER__*/
+
+/*__DEMO_QR__*/
 
 // ---------------------------------------------------------------------------
 // Erfundener Hintergrund: bildet die Antworten von /api/v1/stock/* nach,
@@ -567,6 +576,17 @@ function bestellungAusVorschlag() {
   return bestellung;
 }
 
+function codesVon(artikelId) {
+  const artikel = ARTIKEL.find((eintrag) => eintrag.id === artikelId);
+  return (artikel?.codes || []).map((code, index) => ({
+    id: `${artikelId}-code-${index}`,
+    code: code.code,
+    codeType: code.gtin ? 'gtin' : 'internal',
+    packQuantity: code.pack,
+    isPrimary: index === 0
+  }));
+}
+
 function bestellungHolen(id) {
   return BESTELLUNGEN.find((eintrag) => eintrag.order.id === id) || null;
 }
@@ -667,6 +687,35 @@ function inventurAbschliessen() {
   return korrekturen;
 }
 
+/** Bildet POST /api/v1/stock/labels/sheet nach. */
+function etikettenHolen(ziele) {
+  return ziele.map((ziel) => {
+    const bild = DEMO_QR[ziel.id];
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === ziel.id);
+    const ort = ORTE.find((eintrag) => eintrag.id === ziel.id);
+    return {
+      targetType: ziel.targetType,
+      id: ziel.id,
+      label: artikel?.name || ort?.name || 'Ohne Namen',
+      sublabel: artikel?.itemNumber || '',
+      target: bild?.target || '',
+      // Fuer in der Vorschau neu angelegte Artikel gibt es kein vorbereitetes
+      // Bild; in der App kaeme es aus der API.
+      svg: bild?.svg || '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">'
+        + '<rect width="10" height="10" fill="#fff" stroke="#bbb" stroke-width=".3"/>'
+        + '<text x="5" y="5.6" font-size="1.4" text-anchor="middle" fill="#888">QR</text></svg>'
+    };
+  });
+}
+
+function etikettenDrucken(ziele) {
+  const fenster = window.open('', '_blank');
+  if (!fenster) return false;
+  fenster.document.write(etikettBogenHtml(etikettenHolen(ziele)));
+  fenster.document.close();
+  return true;
+}
+
 const optionen = () => ({
   baustellen: BAUSTELLEN,
   baustellePflicht: false,
@@ -760,8 +809,20 @@ function verdrahten() {
 
   wurzel.querySelector('.stock-save')?.addEventListener('click', () => {
     const werte = {};
-    wurzel.querySelectorAll('[name]').forEach((feld) => { werte[feld.name] = feld.value; });
-    werte.barcodes = zustand.entwurf?.barcodes || [];
+    wurzel.querySelectorAll('[name]:not([data-code-index])').forEach((feld) => {
+      werte[feld.name] = feld.value;
+    });
+
+    // Die Codezeilen kommen aus dem Formular und nicht aus dem Entwurf: was
+    // dort steht, hat der Benutzer zuletzt getippt.
+    const codeFelder = [...wurzel.querySelectorAll('[name="code"][data-code-index]')];
+    const packFelder = [...wurzel.querySelectorAll('[name="packQuantity"][data-code-index]')];
+    werte.barcodes = codeFelder.map((feld, index) => ({
+      code: feld.value,
+      packQuantity: packFelder[index]?.value ?? 1,
+      codeType: gtinNormalisieren(feld.value) ? 'gtin' : 'internal',
+      isPrimary: index === 0
+    })).filter((zeile) => zeile.code.trim());
 
     const { entwurf, fehler } = artikelFormularLesen(werte);
     if (fehler) {
@@ -781,7 +842,7 @@ function verdrahten() {
         code: code.code,
         gtin: gtinNormalisieren(code.code),
         pack: code.packQuantity,
-        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+        text: code.codeType === 'gtin' ? 'Herstellercode' : 'Eigener Code'
       }))
     });
 
@@ -846,6 +907,89 @@ function verdrahten() {
   wurzel.querySelector('.stock-inventory-cancel')?.addEventListener('click', () => {
     laufendeInventur = null;
     zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Inventur abgebrochen.' });
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-codes-open')?.addEventListener('click', () => {
+    zustand = {
+      ...zustand,
+      schritt: SCHRITTE.ARTIKEL_CODES,
+      codes: codesVon(zustand.artikel.id),
+      codeEntwurf: null,
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-code-scan')?.addEventListener('click', () => {
+    $('scan-knoepfe').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  wurzel.querySelector('.stock-code-save')?.addEventListener('click', () => {
+    const { nachtrag, fehler } = codeNachtragLesen({
+      code: wurzel.querySelector('.stock-code-input').value,
+      packQuantity: wurzel.querySelector('.stock-code-pack').value,
+      codeType: gtinNormalisieren(wurzel.querySelector('.stock-code-input').value) ? 'gtin' : 'internal'
+    });
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+
+    // Wie in der Datenbank: ein aktiver Code gehoert zu genau einem Artikel.
+    const gesucht = gtinNormalisieren(nachtrag.code) || nachtrag.code.toUpperCase();
+    const belegt = ARTIKEL.some((eintrag) => eintrag.codes.some(
+      (code) => (code.gtin || code.code.toUpperCase()) === gesucht
+    ));
+    if (belegt) {
+      zustand = { ...zustand, fehler: 'Diesen Code trägt bereits ein anderer Artikel.' };
+      zeichnen();
+      return;
+    }
+
+    const artikel = ARTIKEL.find((eintrag) => eintrag.id === zustand.artikel.id);
+    artikel.codes.push({
+      code: nachtrag.code,
+      gtin: gtinNormalisieren(nachtrag.code),
+      pack: nachtrag.packQuantity,
+      text: nachtrag.codeType === 'gtin' ? 'Herstellercode' : 'Eigenes Etikett'
+    });
+    scanKnoepfeZeichnen();
+    zustand = { ...zustand, codes: codesVon(artikel.id), codeEntwurf: null, fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-code-revoke').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      const artikel = ARTIKEL.find((eintrag) => eintrag.id === zustand.artikel.id);
+      const index = Number(knopf.dataset.code.split('-').pop());
+      artikel.codes.splice(index, 1);
+      scanKnoepfeZeichnen();
+      zustand = { ...zustand, codes: codesVon(artikel.id), fehler: null };
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelector('.stock-label-print')?.addEventListener('click', () => {
+    const gedruckt = etikettenDrucken([{ targetType: 'item', id: zustand.artikel.id }]);
+    if (!gedruckt) {
+      zustand = { ...zustand, fehler: 'Der Browser hat das Druckfenster blockiert.' };
+      zeichnen();
+    }
+  });
+
+  wurzel.querySelector('.stock-code-row-add')?.addEventListener('click', () => {
+    const vorhandene = [...wurzel.querySelectorAll('[name="code"]')].map((feld, index) => ({
+      code: feld.value,
+      packQuantity: wurzel.querySelectorAll('[name="packQuantity"]')[index]?.value ?? 1,
+      codeType: 'internal',
+      isPrimary: index === 0
+    }));
+    zustand = {
+      ...zustand,
+      entwurf: { ...zustand.entwurf, barcodes: [...vorhandene, leereCodezeile()] }
+    };
     zeichnen();
   });
 
