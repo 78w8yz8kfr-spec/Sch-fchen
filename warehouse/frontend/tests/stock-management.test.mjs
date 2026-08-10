@@ -21,7 +21,16 @@ import {
   offlineLagerQueueKey,
   ansichtFuer,
   startAnsicht,
-  buchenAnsicht
+  buchenAnsicht,
+  bestandNachOrt,
+  deckungsgrad,
+  nachbestellungZeilen,
+  bestandsmengeAusText,
+  artikelFormularLesen,
+  bestandAnsicht,
+  artikelListeAnsicht,
+  nachbestellungAnsicht,
+  artikelFormularAnsicht
 } from '../stock-management.js';
 
 const REGAL = { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' };
@@ -343,4 +352,178 @@ test('Artikelnamen aus fremder Feder können kein Markup einschleusen', () => {
   assert.ok(!html.includes('<img src=x'));
   assert.ok(!html.includes('<script>'));
   assert.ok(html.includes('&lt;img src=x'));
+});
+
+// ---------------------------------------------------------------------------
+// Bueroansichten
+// ---------------------------------------------------------------------------
+
+const BESTANDSZEILEN = [
+  { itemId: 'a2', itemName: 'NYM-J 3×1,5', itemNumber: 'LAG-0002', unit: 'Meter', locationId: 'ort-0', locationName: 'Materiallager', quantity: 150 },
+  { itemId: 'a1', itemName: 'Schalterdose tief', itemNumber: 'LAG-0001', unit: 'Stück', locationId: 'ort-2', locationName: 'Fach A1', quantity: -12 },
+  { itemId: 'a1', itemName: 'Schalterdose tief', itemNumber: 'LAG-0001', unit: 'Stück', locationId: 'ort-0', locationName: 'Materiallager', quantity: 420 }
+];
+
+test('der Bestand wird nach Lagerplatz gebündelt und alphabetisch sortiert', () => {
+  const orte = bestandNachOrt(BESTANDSZEILEN);
+
+  assert.deepEqual(orte.map((ort) => ort.name), ['Fach A1', 'Materiallager']);
+  assert.deepEqual(
+    orte[1].zeilen.map((zeile) => zeile.itemName),
+    ['NYM-J 3×1,5', 'Schalterdose tief']
+  );
+  assert.deepEqual(bestandNachOrt([]), []);
+});
+
+test('der Deckungsgrad sagt, wie weit ein Artikel unter dem Mindestbestand liegt', () => {
+  assert.equal(deckungsgrad({ totalQuantity: 25, minimumStock: 50 }), 0.5);
+  assert.equal(deckungsgrad({ totalQuantity: 50, minimumStock: 50 }), 1);
+  assert.equal(deckungsgrad({ totalQuantity: -10, minimumStock: 50 }), 0,
+    'Ein Minusbestand ist leer, nicht negativ gedeckt');
+  assert.equal(deckungsgrad({ totalQuantity: 5, minimumStock: 0 }), null);
+  assert.equal(deckungsgrad(null), null);
+});
+
+test('der Nachbestellvorschlag stellt das Dringendste nach oben', () => {
+  const zeilen = nachbestellungZeilen([
+    { id: 'b', name: 'Halb voll', totalQuantity: 25, minimumStock: 50 },
+    { id: 'a', name: 'Leer', totalQuantity: 0, minimumStock: 20 },
+    { id: 'c', name: 'Fast voll', totalQuantity: 45, minimumStock: 50 }
+  ]);
+
+  assert.deepEqual(zeilen.map((zeile) => zeile.id), ['a', 'b', 'c']);
+  assert.equal(zeilen[0].deckung, 0);
+});
+
+test('Stammdatenmengen dürfen null sein, aber kein Unsinn', () => {
+  assert.equal(bestandsmengeAusText('50'), 50);
+  assert.equal(bestandsmengeAusText('0'), 0, 'Null ist ein gültiger Mindestbestand');
+  assert.equal(bestandsmengeAusText('12,5'), 12.5);
+  assert.equal(bestandsmengeAusText(''), null);
+  assert.equal(bestandsmengeAusText(null), null);
+  assert.equal(bestandsmengeAusText('abc'), undefined);
+  assert.equal(bestandsmengeAusText('-5'), undefined);
+});
+
+test('das Artikelformular weist zurück, was die API auch zurückwiese', () => {
+  const gut = artikelFormularLesen({
+    itemNumber: ' lag-0007 ', name: 'Klemme 3-fach', unit: 'Stück',
+    groupKey: 'installation', minimumStock: '100', targetStock: '400',
+    manufacturerNumber: '2273-203',
+    barcodes: [{ code: '4006381333931', codeType: 'gtin', packQuantity: 1, isPrimary: true }]
+  });
+
+  assert.equal(gut.fehler, undefined);
+  assert.equal(gut.entwurf.itemNumber, 'LAG-0007');
+  assert.equal(gut.entwurf.minimumStock, 100);
+  assert.equal(gut.entwurf.manufacturerNumber, '2273-203');
+  assert.equal(gut.entwurf.barcodes.length, 1);
+
+  const felder = { itemNumber: 'X', name: 'Y', unit: 'Stück', groupKey: 'other' };
+  assert.match(artikelFormularLesen({ ...felder, itemNumber: '' }).fehler, /Artikelnummer/);
+  assert.match(artikelFormularLesen({ ...felder, name: '  ' }).fehler, /Bezeichnung/);
+  assert.match(artikelFormularLesen({ ...felder, unit: '' }).fehler, /Einheit/);
+  assert.match(artikelFormularLesen({ ...felder, groupKey: '' }).fehler, /Warengruppe/);
+  assert.match(artikelFormularLesen({ ...felder, minimumStock: 'viel' }).fehler, /Mindestbestand/);
+  assert.match(
+    artikelFormularLesen({ ...felder, minimumStock: '100', targetStock: '50' }).fehler,
+    /Zielbestand/
+  );
+  assert.match(
+    artikelFormularLesen({
+      ...felder,
+      barcodes: [
+        { code: 'A', isPrimary: true, packQuantity: 1 },
+        { code: 'B', isPrimary: true, packQuantity: 1 }
+      ]
+    }).fehler,
+    /Hauptcode/
+  );
+});
+
+test('leere Codezeilen im Formular werden verworfen statt abgelehnt', () => {
+  const { entwurf } = artikelFormularLesen({
+    itemNumber: 'LAG-1', name: 'Test', unit: 'Stück', groupKey: 'other',
+    barcodes: [{ code: '  ' }, { code: 'KAB-1', packQuantity: 5 }]
+  });
+
+  assert.equal(entwurf.barcodes.length, 1);
+  assert.equal(entwurf.barcodes[0].code, 'KAB-1');
+  assert.equal(entwurf.barcodes[0].packQuantity, 5);
+  assert.equal(entwurf.barcodes[0].codeType, 'internal');
+});
+
+test('die Bestandsansicht nennt Lagerplätze und kennzeichnet Minusbestände', () => {
+  const html = bestandAnsicht(BESTANDSZEILEN);
+
+  assert.ok(html.includes('Fach A1'));
+  assert.ok(html.includes('Materiallager'));
+  assert.ok(html.includes('stock-row__amount--unplausibel'), 'Ein Minusbestand muss auffallen');
+  assert.ok(html.includes('-12 Stück'));
+  assert.ok(bestandAnsicht([]).includes('noch nichts gebucht'));
+});
+
+test('die Artikelliste bietet das Anlegen nur der Verwaltung an', () => {
+  const artikel = [{ id: 'a1', name: 'Dose', itemNumber: 'LAG-1', unit: 'Stück', totalQuantity: 10, minimumStock: 50 }];
+
+  assert.ok(!artikelListeAnsicht(artikel, {}).includes('stock-new'));
+  assert.ok(artikelListeAnsicht(artikel, { manage: true }).includes('stock-new'));
+  assert.ok(artikelListeAnsicht(artikel, {}).includes('stock-row__amount--knapp'));
+  assert.ok(artikelListeAnsicht([], { manage: true }).includes('Noch kein Artikel'));
+});
+
+test('der Nachbestellvorschlag zeigt Lieferant und Vorschlagsmenge', () => {
+  const html = nachbestellungAnsicht([
+    { id: 'a', name: 'Dose', unit: 'Stück', totalQuantity: 10, minimumStock: 50, suggestedQuantity: 290, supplierName: 'Sonepar' }
+  ]);
+
+  assert.ok(html.includes('Sonepar'));
+  assert.ok(html.includes('+ 290 Stück'));
+  assert.ok(html.includes('10 Stück von 50'));
+  assert.ok(nachbestellungAnsicht([]).includes('Kein Artikel liegt unter'));
+});
+
+test('das Artikelformular übernimmt den gescannten Code sichtbar', () => {
+  const gruppen = [{ key: 'installation', name: 'Installationsmaterial' }];
+  const entwurf = artikelEntwurfAusScan(
+    { art: 'gtin', wert: '05901234123457', roh: '5901234123457' }, gruppen
+  );
+  const html = artikelFormularAnsicht(entwurf, gruppen);
+
+  assert.ok(html.includes('5901234123457'));
+  assert.ok(html.includes('wird übernommen'));
+  assert.ok(html.includes('selected'));
+  assert.ok(artikelFormularAnsicht({}, [], 'Die Artikelnummer fehlt.').includes('Die Artikelnummer fehlt.'));
+});
+
+test('die Büroansichten hängen am Schritt und haben alle einen Rückweg', () => {
+  const optionen = {
+    bestand: BESTANDSZEILEN,
+    artikel: [{ id: 'a', name: 'Dose', itemNumber: 'L-1', unit: 'Stück', totalQuantity: 1 }],
+    vorschlaege: [],
+    gruppen: [{ key: 'other', name: 'Sonstiges' }]
+  };
+
+  assert.ok(ansichtFuer(lagerZustand({ schritt: SCHRITTE.BESTAND }), {}, optionen).includes('Fach A1'));
+  assert.ok(ansichtFuer(lagerZustand({ schritt: SCHRITTE.ARTIKEL }), {}, optionen).includes('Dose'));
+  assert.ok(ansichtFuer(lagerZustand({ schritt: SCHRITTE.NACHBESTELLUNG }), {}, optionen).includes('Kein Artikel'));
+  assert.ok(ansichtFuer(lagerZustand({ schritt: SCHRITTE.ARTIKEL_NEU }), {}, optionen).includes('Artikel anlegen'));
+
+  for (const schritt of [SCHRITTE.BESTAND, SCHRITTE.ARTIKEL, SCHRITTE.NACHBESTELLUNG, SCHRITTE.ARTIKEL_NEU]) {
+    assert.ok(
+      ansichtFuer(lagerZustand({ schritt }), {}, optionen).includes('stock-home'),
+      `${schritt} hat keinen Rückweg`
+    );
+  }
+});
+
+test('auch die Büroansichten maskieren fremden Text', () => {
+  const html = bestandAnsicht([{
+    itemId: 'x', itemName: '<script>böse</script>', itemNumber: 'L-1',
+    unit: 'Stück', locationId: 'o', locationName: '"><b>Ort</b>', quantity: 1
+  }]);
+
+  assert.ok(!html.includes('<script>'));
+  assert.ok(!html.includes('<b>Ort</b>'));
+  assert.ok(html.includes('&lt;script&gt;'));
 });

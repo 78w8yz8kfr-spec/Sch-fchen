@@ -14,7 +14,14 @@ export const SCHRITTE = Object.freeze({
   START: 'start',
   BUCHEN: 'buchen',
   UNBEKANNT: 'unbekannt',
-  BESTAETIGT: 'bestaetigt'
+  BESTAETIGT: 'bestaetigt',
+  // Die drei Bueroansichten. Sie stehen bewusst neben dem Monteursablauf und
+  // nicht in ihm: wer Artikel pflegt, sitzt am Schreibtisch und sucht, statt
+  // dem naechsten Schritt zu folgen.
+  BESTAND: 'bestand',
+  ARTIKEL: 'artikel',
+  ARTIKEL_NEU: 'artikelNeu',
+  NACHBESTELLUNG: 'nachbestellung'
 });
 
 // Was der Benutzer waehlt, und was daraus in der Datenbank wird. Die
@@ -465,9 +472,243 @@ export function unbekanntAnsicht(zustand, rechte = {}) {
     </div>`;
 }
 
-export function ansichtFuer(zustand, rechte, optionen) {
+// ---------------------------------------------------------------------------
+// Bueroansichten
+// ---------------------------------------------------------------------------
+
+/**
+ * Der Bestand wird nach Lagerplatz gebuendelt, nicht nach Artikel. Die Frage
+ * im Buero lautet "was liegt im Fach A1", wenn jemand danach sucht; die Frage
+ * nach einem einzelnen Artikel beantwortet die Artikelansicht.
+ */
+export function bestandNachOrt(zeilen = []) {
+  const orte = new Map();
+
+  for (const zeile of zeilen) {
+    if (!orte.has(zeile.locationId)) {
+      orte.set(zeile.locationId, { id: zeile.locationId, name: zeile.locationName, zeilen: [] });
+    }
+    orte.get(zeile.locationId).zeilen.push(zeile);
+  }
+
+  return [...orte.values()]
+    .map((ort) => ({
+      ...ort,
+      zeilen: [...ort.zeilen].sort((a, b) => a.itemName.localeCompare(b.itemName, 'de'))
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+/**
+ * Wie weit ist ein Artikel vom Mindestbestand entfernt? Null heisst leer, eins
+ * heisst gerade erreicht. Danach wird der Nachbestellvorschlag sortiert: wer
+ * am weitesten unten liegt, steht oben.
+ */
+export function deckungsgrad(artikel) {
+  if (!artikel?.minimumStock || artikel.minimumStock <= 0) return null;
+  return Math.max(0, artikel.totalQuantity) / artikel.minimumStock;
+}
+
+export function nachbestellungZeilen(vorschlaege = []) {
+  return [...vorschlaege]
+    .map((eintrag) => ({ ...eintrag, deckung: deckungsgrad(eintrag) }))
+    .sort((a, b) => (a.deckung ?? 1) - (b.deckung ?? 1));
+}
+
+/** Mengen im Artikelstamm duerfen null sein — anders als Buchungsmengen. */
+export function bestandsmengeAusText(text) {
+  if (text === undefined || text === null || String(text).trim() === '') return null;
+  const bereinigt = String(text).trim().replace(',', '.');
+  if (!/^\d*\.?\d*$/.test(bereinigt) || bereinigt === '.') return undefined;
+  const wert = Number(bereinigt);
+  if (!Number.isFinite(wert) || wert < 0) return undefined;
+  return Math.round(wert * 1000) / 1000;
+}
+
+/**
+ * Prueft das Artikelformular, bevor es abgeschickt wird.
+ *
+ * Dieselben Regeln stehen in der API und in der Datenbank; hier stehen sie ein
+ * drittes Mal, damit niemand erst nach dem Absenden erfaehrt, dass die
+ * Artikelnummer fehlt. Die Datenbank bleibt die Grenze, das hier ist die
+ * Hoeflichkeit.
+ */
+export function artikelFormularLesen(werte = {}) {
+  const text = (wert) => String(wert ?? '').trim();
+
+  const itemNumber = text(werte.itemNumber).toUpperCase();
+  if (!itemNumber) return { fehler: 'Die Artikelnummer fehlt.' };
+  if (itemNumber.length > 40) return { fehler: 'Die Artikelnummer ist zu lang.' };
+
+  const name = text(werte.name);
+  if (!name) return { fehler: 'Die Bezeichnung fehlt.' };
+  if (name.length > 180) return { fehler: 'Die Bezeichnung ist zu lang.' };
+
+  const unit = text(werte.unit);
+  if (!unit) return { fehler: 'Die Einheit fehlt.' };
+
+  const groupKey = text(werte.groupKey);
+  if (!groupKey) return { fehler: 'Die Warengruppe fehlt.' };
+
+  const minimumStock = bestandsmengeAusText(werte.minimumStock);
+  if (minimumStock === undefined) return { fehler: 'Der Mindestbestand ist keine gültige Menge.' };
+
+  const targetStock = bestandsmengeAusText(werte.targetStock);
+  if (targetStock === undefined) return { fehler: 'Der Zielbestand ist keine gültige Menge.' };
+  if (targetStock !== null && minimumStock !== null && targetStock < minimumStock) {
+    return { fehler: 'Der Zielbestand liegt unter dem Mindestbestand.' };
+  }
+
+  const codes = (werte.barcodes || []).filter((eintrag) => text(eintrag?.code));
+  const barcodes = [];
+  for (const eintrag of codes) {
+    const menge = mengeAusText(eintrag.packQuantity ?? 1);
+    if (menge === null) return { fehler: 'Eine Gebindemenge ist keine gültige Menge.' };
+    barcodes.push({
+      code: text(eintrag.code),
+      codeType: eintrag.codeType === 'gtin' ? 'gtin' : 'internal',
+      packQuantity: menge,
+      isPrimary: eintrag.isPrimary === true
+    });
+  }
+  if (barcodes.filter((eintrag) => eintrag.isPrimary).length > 1) {
+    return { fehler: 'Nur ein Code darf der Hauptcode sein.' };
+  }
+
+  const entwurf = { itemNumber, name, unit, groupKey, barcodes };
+  if (minimumStock !== null) entwurf.minimumStock = minimumStock;
+  if (targetStock !== null) entwurf.targetStock = targetStock;
+  if (text(werte.manufacturer)) entwurf.manufacturer = text(werte.manufacturer);
+  if (text(werte.manufacturerNumber)) entwurf.manufacturerNumber = text(werte.manufacturerNumber);
+
+  return { entwurf };
+}
+
+function kopfzeile(titel) {
+  return `<div class="stock-head">
+    <button class="button button--quiet stock-home stock-back" type="button" aria-label="Zurück">←</button>
+    <h2 class="stock-head__title">${sicher(titel)}</h2>
+  </div>`;
+}
+
+export function bestandAnsicht(zeilen = []) {
+  const orte = bestandNachOrt(zeilen);
+  if (!orte.length) {
+    return `<div class="stock-list">
+      ${kopfzeile('Bestand')}
+      <p class="stock-empty">Für dieses Lager ist noch nichts gebucht.</p>
+    </div>`;
+  }
+
+  return `<div class="stock-list">
+    ${kopfzeile('Bestand')}
+    ${orte.map((ort) => `
+      <section class="stock-group">
+        <h3 class="stock-group__name">${sicher(ort.name)}</h3>
+        <ul class="stock-rows">
+          ${ort.zeilen.map((zeile) => `
+            <li class="stock-row">
+              <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+              <span class="stock-row__number">${sicher(zeile.itemNumber)}</span>
+              <span class="stock-row__amount stock-row__amount--${bestandLage(zeile.quantity)}">
+                ${sicher(bestandText(zeile.quantity, zeile.unit))}
+              </span>
+            </li>`).join('')}
+        </ul>
+      </section>`).join('')}
+  </div>`;
+}
+
+export function artikelListeAnsicht(artikel = [], rechte = {}) {
+  return `<div class="stock-list">
+    ${kopfzeile('Artikel')}
+    ${rechte.manage ? '<button class="button button--action stock-new" type="button">Artikel anlegen</button>' : ''}
+    ${artikel.length
+      ? `<ul class="stock-rows">
+          ${artikel.map((eintrag) => `
+            <li class="stock-row stock-row--tap" data-artikel="${sicher(eintrag.id)}">
+              <span class="stock-row__name">${sicher(eintrag.name)}</span>
+              <span class="stock-row__number">${sicher(eintrag.itemNumber)}</span>
+              <span class="stock-row__amount stock-row__amount--${bestandLage(eintrag.totalQuantity, eintrag.minimumStock)}">
+                ${sicher(bestandText(eintrag.totalQuantity, eintrag.unit))}
+              </span>
+            </li>`).join('')}
+        </ul>`
+      : '<p class="stock-empty">Noch kein Artikel angelegt.</p>'}
+  </div>`;
+}
+
+export function nachbestellungAnsicht(vorschlaege = []) {
+  const zeilen = nachbestellungZeilen(vorschlaege);
+  if (!zeilen.length) {
+    return `<div class="stock-list">
+      ${kopfzeile('Nachbestellung')}
+      <p class="stock-empty">Kein Artikel liegt unter seinem Mindestbestand.</p>
+    </div>`;
+  }
+
+  return `<div class="stock-list">
+    ${kopfzeile('Nachbestellung')}
+    <ul class="stock-rows">
+      ${zeilen.map((eintrag) => `
+        <li class="stock-row stock-row--order">
+          <span class="stock-row__name">${sicher(eintrag.name)}</span>
+          <span class="stock-row__number">
+            ${sicher(bestandText(eintrag.totalQuantity, eintrag.unit))} von ${sicher(mengeAlsText(eintrag.minimumStock))}
+            ${eintrag.supplierName ? ` · ${sicher(eintrag.supplierName)}` : ''}
+          </span>
+          <span class="stock-row__amount stock-row__amount--knapp">
+            + ${sicher(bestandText(eintrag.suggestedQuantity, eintrag.unit))}
+          </span>
+        </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+export function artikelFormularAnsicht(entwurf = {}, gruppen = [], fehler = null) {
+  const code = entwurf.barcodes?.[0];
+
+  return `<div class="stock-form">
+    ${kopfzeile('Artikel anlegen')}
+    ${code
+      ? `<p class="stock-note">Der gescannte Code <strong>${sicher(code.code)}</strong> wird übernommen.</p>`
+      : ''}
+    <label class="stock-field"><span>Artikelnummer</span>
+      <input name="itemNumber" value="${sicher(entwurf.itemNumber || '')}" autocomplete="off" maxlength="40"></label>
+    <label class="stock-field"><span>Bezeichnung</span>
+      <input name="name" value="${sicher(entwurf.name || '')}" autocomplete="off" maxlength="180"></label>
+    <label class="stock-field"><span>Einheit</span>
+      <input name="unit" value="${sicher(entwurf.unit || 'Stück')}" autocomplete="off" maxlength="20"></label>
+    <label class="stock-field"><span>Warengruppe</span>
+      <select name="groupKey">
+        ${gruppen.map((gruppe) => `
+          <option value="${sicher(gruppe.key)}"${gruppe.key === entwurf.groupKey ? ' selected' : ''}>
+            ${sicher(gruppe.name)}
+          </option>`).join('')}
+      </select></label>
+    <label class="stock-field"><span>Herstellernummer (freiwillig)</span>
+      <input name="manufacturerNumber" value="${sicher(entwurf.manufacturerNumber || '')}" autocomplete="off" maxlength="80"></label>
+    <div class="stock-field-pair">
+      <label class="stock-field"><span>Mindestbestand</span>
+        <input name="minimumStock" inputmode="decimal" value="${sicher(entwurf.minimumStock ?? '')}" autocomplete="off"></label>
+      <label class="stock-field"><span>Zielbestand</span>
+        <input name="targetStock" inputmode="decimal" value="${sicher(entwurf.targetStock ?? '')}" autocomplete="off"></label>
+    </div>
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+    <button class="button button--action stock-save" type="button">Anlegen</button>
+    <button class="button button--quiet stock-home" type="button">Abbrechen</button>
+  </div>`;
+}
+
+export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.BESTAND) return bestandAnsicht(optionen.bestand);
+  if (zustand.schritt === SCHRITTE.ARTIKEL) return artikelListeAnsicht(optionen.artikel, rechte);
+  if (zustand.schritt === SCHRITTE.NACHBESTELLUNG) return nachbestellungAnsicht(optionen.vorschlaege);
+  if (zustand.schritt === SCHRITTE.ARTIKEL_NEU) {
+    return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler);
+  }
   return startAnsicht(zustand, rechte);
 }
