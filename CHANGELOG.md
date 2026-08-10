@@ -4,6 +4,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Lager zählt und bestellt.** Eine Inventur friert den Sollbestand beim
+  Start ein — die Zählerin stellt einen Unterschied zu genau diesem Stand fest,
+  und Buchungen währenddessen bleiben echte Bewegungen. Das Mengenfeld bleibt
+  leer, denn ein vorbelegter Sollwert hieße beim Durchtippen „stimmt", und eine
+  Inventur, die sich selbst bestätigt, ist keine. Null ist beim Zählen eine
+  gültige Antwort, leer gelassen keine. Nicht gezählte Zeilen bleiben
+  unangetastet, damit eine abgebrochene Zählung kein halbes Lager ausbucht.
+  Aus dem Nachbestellvorschlag entsteht jetzt eine Bestellung beim hinterlegten
+  Lieferanten, und der Wareneingang baut sie wieder ab — über dasselbe Journal
+  wie jeder andere Zugang, sodass es keinen zweiten Bestand neben dem ersten
+  gibt. Überlieferung ist erlaubt: sie kommt vor, und der Bestand soll die
+  Wirklichkeit zeigen und nicht die Bestellung. Storniert wird nur, solange
+  nichts geliefert ist.
 - **Das Lager lässt sich bedienen.** Der Monteur sieht einen Ablauf statt einer
   Auswahl: Lagerplatz scannen, Artikel scannen, Menge, buchen. Der Lagerplatz
   bleibt dabei über Buchungen hinweg stehen — im Lager wird selten nur ein

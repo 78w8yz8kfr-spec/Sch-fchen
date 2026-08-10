@@ -224,6 +224,21 @@
   .stock-row__amount--weniger { color: var(--schlecht); }
   .stock-row__amount--offen { color: var(--text-dritt); }
 
+  .stock-order__supplier { margin: 0; font-weight: 700; }
+  .stock-order__status {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten);
+  }
+  .stock-row--order-line { grid-template-columns: 1fr 6.5rem; }
+  .stock-order__field { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+  .stock-order__input {
+    width: 100%; font: inherit; font-family: var(--schrift-daten); font-weight: 700;
+    text-align: right; padding: 8px; border-radius: 8px;
+    border: 1px solid var(--rand-stark); background: var(--flaeche); color: var(--text);
+    min-height: 44px; box-sizing: border-box;
+  }
+  .stock-order__input:focus-visible { outline: 3px solid var(--marke); outline-offset: 1px; }
+
   .stock-inventory__where { margin: 0; font-weight: 700; }
   .stock-inventory__progress {
     margin: 0; font-size: .84rem; color: var(--text-zweit);
@@ -518,6 +533,78 @@ function alleVorschlaege() {
   }));
 }
 
+// --- Bestellwesen: bildet /api/v1/stock/orders/* nach --------------------
+const LIEFERANTEN = [{ id: 'lief-1', name: 'Sonepar Deutschland', supplierNumber: 'L-0001' }];
+const BESTELLUNGEN = [];
+let bestellZaehler = 41;
+
+function bestellungAusVorschlag() {
+  const zeilen = alleVorschlaege().map((eintrag, index) => ({
+    id: `pos-${BESTELLUNGEN.length + 1}-${index + 1}`,
+    linePosition: index + 1,
+    itemId: eintrag.id,
+    itemName: eintrag.name,
+    itemNumber: eintrag.itemNumber,
+    unit: eintrag.unit,
+    quantityOrdered: eintrag.suggestedQuantity,
+    quantityReceived: 0,
+    quantityOpen: eintrag.suggestedQuantity
+  }));
+  if (!zeilen.length) return null;
+
+  bestellZaehler += 1;
+  const bestellung = {
+    order: {
+      id: `best-${BESTELLUNGEN.length + 1}`,
+      orderNumber: `B-2026-${String(bestellZaehler).padStart(6, '0')}`,
+      supplierId: 'lief-1',
+      supplierName: LIEFERANTEN[0].name,
+      status: 'draft'
+    },
+    lines: zeilen
+  };
+  BESTELLUNGEN.unshift(bestellung);
+  return bestellung;
+}
+
+function bestellungHolen(id) {
+  return BESTELLUNGEN.find((eintrag) => eintrag.order.id === id) || null;
+}
+
+function offeneBestellungen() {
+  return BESTELLUNGEN
+    .filter((eintrag) => ['ordered', 'partially_received', 'draft'].includes(eintrag.order.status))
+    .map((eintrag) => eintrag.order);
+}
+
+const gebuchteEingaenge = new Set();
+
+function wareneingangBuchen(bestellung, eingang) {
+  for (const zeile of eingang.lines) {
+    if (gebuchteEingaenge.has(zeile.clientOperationId)) continue;
+    gebuchteEingaenge.add(zeile.clientOperationId);
+
+    const position = bestellung.lines.find((eintrag) => eintrag.id === zeile.purchaseOrderItemId);
+    if (!position) continue;
+
+    position.quantityReceived = Math.round((position.quantityReceived + zeile.quantity) * 1000) / 1000;
+    position.quantityOpen = Math.max(0, Math.round((position.quantityOrdered - position.quantityReceived) * 1000) / 1000);
+
+    const schluessel = `${position.itemId}|${eingang.locationId}`;
+    bestand.set(schluessel, Math.round(((bestand.get(schluessel) ?? 0) + zeile.quantity) * 1000) / 1000);
+
+    journal.unshift({
+      vorgangId: zeile.clientOperationId,
+      text: `receipt · ${mengeAlsText(zeile.quantity)} ${position.unit} · ${position.itemName}`,
+      zeit: new Date().toLocaleTimeString('de-DE')
+    });
+  }
+
+  bestellung.order.status = bestellung.lines.every((zeile) => zeile.quantityOpen === 0)
+    ? 'received' : 'partially_received';
+  return bestellung;
+}
+
 // --- Inventur: bildet /api/v1/stock/inventory/* nach ---------------------
 let laufendeInventur = null;
 
@@ -586,6 +673,7 @@ const optionen = () => ({
   bestand: alleBestandszeilen(),
   artikel: alleArtikel(),
   vorschlaege: alleVorschlaege(),
+  bestellungen: offeneBestellungen(),
   gruppen: GRUPPEN
 });
 const rechte = () => ROLLEN[rolle].rechte;
@@ -708,7 +796,8 @@ function verdrahten() {
         bestand: SCHRITTE.BESTAND,
         artikel: SCHRITTE.ARTIKEL,
         nachbestellung: SCHRITTE.NACHBESTELLUNG,
-        inventur: SCHRITTE.INVENTUR
+        inventur: SCHRITTE.INVENTUR,
+        bestellungen: SCHRITTE.BESTELLUNGEN
       };
       zustand = {
         ...zustand,
@@ -760,8 +849,63 @@ function verdrahten() {
     zeichnen();
   });
 
+  wurzel.querySelector('.stock-order-from-reorder')?.addEventListener('click', () => {
+    const bestellung = bestellungAusVorschlag();
+    zustand = bestellung
+      ? { ...zustand, schritt: SCHRITTE.BESTELLUNG, bestellung, eingang: {}, fehler: null }
+      : { ...zustand, fehler: 'Kein Artikel liegt unter seinem Mindestbestand.' };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-send')?.addEventListener('click', () => {
+    zustand.bestellung.order.status = 'ordered';
+    zustand = { ...zustand, eingang: eingangVorbelegen(zustand.bestellung), fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-order__input').forEach((feld) => {
+    feld.addEventListener('input', () => {
+      zustand.eingang = { ...(zustand.eingang || {}), [feld.dataset.position]: feld.value };
+    });
+  });
+
+  wurzel.querySelector('.stock-order-receive')?.addEventListener('click', () => {
+    const { eingang, fehler } = wareneingangBauen(zustand, {});
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+    const bestellung = wareneingangBuchen(zustand.bestellung, eingang);
+    zustand = {
+      ...zustand,
+      bestellung,
+      eingang: eingangVorbelegen(bestellung),
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-cancel')?.addEventListener('click', () => {
+    zustand.bestellung.order.status = 'cancelled';
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Bestellung storniert.' });
+    zeichnen();
+  });
+
   wurzel.querySelectorAll('.stock-row--tap').forEach((zeile) => {
     zeile.addEventListener('click', () => {
+      if (zeile.dataset.bestellung) {
+        const bestellung = bestellungHolen(zeile.dataset.bestellung);
+        zustand = {
+          ...zustand,
+          schritt: SCHRITTE.BESTELLUNG,
+          bestellung,
+          eingang: eingangVorbelegen(bestellung),
+          fehler: null
+        };
+        zeichnen();
+        return;
+      }
       const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.dataset.artikel);
       if (!artikel) return;
       zustand = scanVerarbeiten(zustand, artikelAntwort(artikel, 1));

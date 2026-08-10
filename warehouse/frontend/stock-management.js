@@ -936,9 +936,10 @@ export function eingangVorbelegen(bestellung) {
   return werte;
 }
 
-export function bestellungenAnsicht(bestellungen = [], rechte = {}) {
+export function bestellungenAnsicht(bestellungen = [], rechte = {}, fehler = null) {
   return `<div class="stock-list">
     ${kopfzeile('Bestellungen')}
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
     ${bestellungen.length
       ? `<ul class="stock-rows">
           ${bestellungen.map((eintrag) => `
@@ -1012,7 +1013,9 @@ export function bestellungAnsicht(zustand, rechte = {}) {
 
 export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.INVENTUR) return inventurAnsicht(zustand, rechte);
-  if (zustand.schritt === SCHRITTE.BESTELLUNGEN) return bestellungenAnsicht(optionen.bestellungen, rechte);
+  if (zustand.schritt === SCHRITTE.BESTELLUNGEN) {
+    return bestellungenAnsicht(optionen.bestellungen, rechte, zustand.fehler);
+  }
   if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);

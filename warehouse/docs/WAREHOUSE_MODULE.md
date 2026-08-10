@@ -301,6 +301,8 @@ hat.
 | `GET /levels` | Bestand je Lagerplatz |
 | `GET /reorder` | Nachbestellvorschlag aus Mindest- und Zielbestand |
 | `GET/POST /inventory`, `…/:id`, `…/:id/count`, `…/:id/complete`, `…/:id/cancel` | Inventur starten, zählen, abschließen, abbrechen |
+| `GET/POST /suppliers` | Lieferanten |
+| `GET/POST /orders`, `…/:id`, `…/:id/send`, `…/:id/receive`, `…/:id/cancel` | Bestellung anlegen (auch direkt aus dem Nachbestellvorschlag), bestellen, Wareneingang, stornieren |
 
 Drei Dinge, die dabei bewusst so und nicht anders sind:
 
@@ -335,9 +337,17 @@ gezählte Zeilen bleiben unangetastet — sie auf null zu setzen wäre die
 gefährlichere Annahme, weil eine abgebrochene Zählung dann ein halbes Lager
 ausbuchen würde.
 
-Noch nicht gebaut: Lieferanten und Bestellungen haben ihre Tabellen, aber
-keine Endpunkte. Der Nachbestellvorschlag rechnet bereits und zeigt den
-hinterlegten Lieferanten an; er kann nur noch keine Bestellung erzeugen.
+**Der Wareneingang läuft über dasselbe Journal wie jeder andere Zugang**; die
+Bestellposition bekommt lediglich ihre gelieferte Menge fortgeschrieben. Damit
+gibt es keinen zweiten Bestand neben dem ersten. Überlieferung ist erlaubt und
+kein Fehler — sie kommt vor, und der Bestand soll die Wirklichkeit zeigen und
+nicht die Bestellung. Storniert wird nur, solange nichts geliefert ist; danach
+wäre es eine Lüge über Ware, die im Regal liegt.
+
+Die Idempotenz reicht bis in den Wareneingang, und zwar **je Position**: eine
+halb angekommene Übertragung darf beim zweiten Versuch die bereits gebuchten
+Zeilen nicht doppelt zählen. Wiederholt sich eine Position, bleibt neben dem
+Bestand auch die gelieferte Menge der Bestellposition unverändert.
 
 ## Rollen
 
@@ -426,8 +436,14 @@ Zählung mit Berichtigung, überraschender Fund mit Soll null, Korrektur genau
 der Abweichungen, unangetastete ungezählte Zeilen, Abbruch mit Pflichtgrund,
 Rollen und fremder Mandant.
 
-Noch offen, weil der Code dafür fehlt: Bestellung mit Teillieferung und zwei
-echt gleichzeitige Entnahmen über getrennte Verbindungen.
+Das Bestellwesen ist ebenfalls abgenommen: Lieferant mit eindeutiger Nummer,
+Bestellung aus dem Nachbestellvorschlag, Teillieferung, wiederholter
+Wareneingang mit derselben Vorgangsnummer, Überlieferung, Stornierungsgrenze,
+Rollen und fremder Mandant. Ein Test rechnet zusätzlich nach, dass die
+gelieferte Menge jeder Bestellposition genau der Summe ihrer Journalzeilen
+entspricht.
+
+Noch offen: zwei echt gleichzeitige Entnahmen über getrennte Verbindungen.
 
 Nicht simulierbar bleiben Scanabstand, Etikettenhaftung im Fahrzeug und die
 Lesbarkeit zerknitterter Herstellercodes. Diese Punkte gehören in die Abnahme

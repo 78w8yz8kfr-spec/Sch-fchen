@@ -224,6 +224,21 @@
   .stock-row__amount--weniger { color: var(--schlecht); }
   .stock-row__amount--offen { color: var(--text-dritt); }
 
+  .stock-order__supplier { margin: 0; font-weight: 700; }
+  .stock-order__status {
+    margin: 0; font-size: .84rem; color: var(--text-zweit);
+    font-family: var(--schrift-daten);
+  }
+  .stock-row--order-line { grid-template-columns: 1fr 6.5rem; }
+  .stock-order__field { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+  .stock-order__input {
+    width: 100%; font: inherit; font-family: var(--schrift-daten); font-weight: 700;
+    text-align: right; padding: 8px; border-radius: 8px;
+    border: 1px solid var(--rand-stark); background: var(--flaeche); color: var(--text);
+    min-height: 44px; box-sizing: border-box;
+  }
+  .stock-order__input:focus-visible { outline: 3px solid var(--marke); outline-offset: 1px; }
+
   .stock-inventory__where { margin: 0; font-weight: 700; }
   .stock-inventory__progress {
     margin: 0; font-size: .84rem; color: var(--text-zweit);
@@ -1124,7 +1139,17 @@ const SCHRITTE = Object.freeze({
   ARTIKEL: 'artikel',
   ARTIKEL_NEU: 'artikelNeu',
   NACHBESTELLUNG: 'nachbestellung',
-  INVENTUR: 'inventur'
+  INVENTUR: 'inventur',
+  BESTELLUNGEN: 'bestellungen',
+  BESTELLUNG: 'bestellung'
+});
+
+const BESTELLSTATUS = Object.freeze({
+  draft: 'Entwurf',
+  ordered: 'Bestellt',
+  partially_received: 'Teilweise geliefert',
+  received: 'Vollständig geliefert',
+  cancelled: 'Storniert'
 });
 
 // Was der Benutzer waehlt, und was daraus in der Datenbank wird. Die
@@ -1166,6 +1191,8 @@ function lagerZustand(vorgabe = {}) {
     entwurf: null,
     inventur: null,
     zaehlArtikel: null,
+    bestellung: null,
+    eingang: null,
     hinweis: null,
     fehler: null,
     ...vorgabe
@@ -1462,6 +1489,10 @@ function startAnsicht(zustand, rechte = {}) {
     kacheln.push(`<button class="stock-tile" type="button" data-ziel="nachbestellung">
        <span class="stock-tile__name">Nachbestellung</span>
        <span class="stock-tile__hint">Unter Mindestbestand</span>
+     </button>`);
+    kacheln.push(`<button class="stock-tile" type="button" data-ziel="bestellungen">
+       <span class="stock-tile__name">Bestellungen</span>
+       <span class="stock-tile__hint">Offen und unterwegs</span>
      </button>`);
   }
 
@@ -1958,8 +1989,151 @@ function inventurAnsicht(zustand, rechte = {}) {
   </div>`;
 }
 
+// ---------------------------------------------------------------------------
+// Bestellungen
+// ---------------------------------------------------------------------------
+
+function bestellStatusText(status) {
+  return BESTELLSTATUS[status] || status || '';
+}
+
+function bestellungFortschritt(zeilen = []) {
+  return {
+    positionen: zeilen.length,
+    offen: zeilen.filter((zeile) => zeile.quantityOpen > 0).length,
+    vollstaendig: zeilen.length > 0 && zeilen.every((zeile) => zeile.quantityOpen === 0)
+  };
+}
+
+/**
+ * Baut den Wareneingang aus den eingetragenen Mengen.
+ *
+ * Gebucht wird nur, was tatsaechlich eingetragen wurde — eine leere Zeile
+ * heisst "nicht geliefert" und nicht "null geliefert". Jede Zeile bekommt eine
+ * eigene, aus dem Vorgang abgeleitete Nummer, damit eine wiederholte
+ * Uebertragung Zeile fuer Zeile erkannt wird und nicht nur als Ganzes.
+ */
+function wareneingangBauen(zustand, optionen = {}) {
+  if (!zustand.bestellung) return { fehler: 'Es ist keine Bestellung geöffnet.' };
+  if (!zustand.ort) return { fehler: 'Zuerst den Lagerplatz scannen oder auswählen.' };
+
+  const vorgangId = optionen.vorgangId || neueVorgangId();
+  const eingaben = zustand.eingang || {};
+  const zeilen = [];
+
+  for (const zeile of zustand.bestellung.lines) {
+    const eingabe = eingaben[zeile.id];
+    if (eingabe === undefined || eingabe === null || String(eingabe).trim() === '') continue;
+
+    const menge = mengeAusText(eingabe);
+    if (menge === null) {
+      return { fehler: `Die Menge bei „${zeile.itemName}" ist keine gültige Menge.` };
+    }
+    zeilen.push({
+      purchaseOrderItemId: zeile.id,
+      quantity: menge,
+      clientOperationId: `${vorgangId}-${zeile.linePosition}`
+    });
+  }
+
+  if (!zeilen.length) return { fehler: 'Bitte für mindestens eine Position eine Menge eintragen.' };
+
+  return {
+    vorgangId,
+    eingang: { locationId: zustand.ort.id, sourceType: 'api', lines: zeilen }
+  };
+}
+
+/** Vorbelegung des Wareneingangs: was offen ist, wird als geliefert angeboten. */
+function eingangVorbelegen(bestellung) {
+  const werte = {};
+  for (const zeile of bestellung?.lines || []) {
+    if (zeile.quantityOpen > 0) werte[zeile.id] = mengeAlsText(zeile.quantityOpen);
+  }
+  return werte;
+}
+
+function bestellungenAnsicht(bestellungen = [], rechte = {}, fehler = null) {
+  return `<div class="stock-list">
+    ${kopfzeile('Bestellungen')}
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+    ${bestellungen.length
+      ? `<ul class="stock-rows">
+          ${bestellungen.map((eintrag) => `
+            <li class="stock-row stock-row--tap" data-bestellung="${sicher(eintrag.id)}">
+              <span class="stock-row__name">${sicher(eintrag.supplierName || '')}</span>
+              <span class="stock-row__number">${sicher(eintrag.orderNumber)}</span>
+              <span class="stock-row__amount stock-row__amount--${eintrag.status === 'partially_received' ? 'knapp' : 'offen'}">
+                ${sicher(bestellStatusText(eintrag.status))}
+              </span>
+            </li>`).join('')}
+        </ul>`
+      : '<p class="stock-empty">Keine offene Bestellung.</p>'}
+    ${rechte.manage
+      ? '<button class="button button--quiet stock-order-from-reorder" type="button">Aus dem Nachbestellvorschlag erzeugen</button>'
+      : ''}
+  </div>`;
+}
+
+function bestellungAnsicht(zustand, rechte = {}) {
+  const bestellung = zustand.bestellung;
+  if (!bestellung) return '';
+
+  const fortschritt = bestellungFortschritt(bestellung.lines);
+  const offen = ['ordered', 'partially_received'].includes(bestellung.order.status);
+  const eingaben = zustand.eingang || {};
+
+  return `<div class="stock-list stock-order">
+    ${kopfzeile(bestellung.order.orderNumber)}
+    <p class="stock-order__supplier">${sicher(bestellung.order.supplierName || '')}</p>
+    <p class="stock-order__status">
+      ${sicher(bestellStatusText(bestellung.order.status))} ·
+      ${fortschritt.offen} von ${fortschritt.positionen} Position${fortschritt.positionen === 1 ? '' : 'en'} offen
+    </p>
+
+    ${offen && rechte.manage ? ortLeiste(zustand.ort) : ''}
+
+    <ul class="stock-rows">
+      ${bestellung.lines.map((zeile) => `
+        <li class="stock-row stock-row--order-line">
+          <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+          <span class="stock-row__number">
+            ${sicher(mengeAlsText(zeile.quantityReceived))} von ${sicher(mengeAlsText(zeile.quantityOrdered))} ${sicher(zeile.unit)} geliefert
+          </span>
+          ${offen && rechte.manage
+            ? `<label class="stock-order__field">
+                 <span class="visually-hidden">Geliefert für ${sicher(zeile.itemName)}</span>
+                 <input class="stock-order__input" type="text" inputmode="decimal" autocomplete="off"
+                        data-position="${sicher(zeile.id)}" value="${sicher(eingaben[zeile.id] ?? '')}"
+                        placeholder="0">
+               </label>`
+            : `<span class="stock-row__amount stock-row__amount--${zeile.quantityOpen > 0 ? 'knapp' : 'gut'}">
+                 ${zeile.quantityOpen > 0 ? `noch ${sicher(mengeAlsText(zeile.quantityOpen))}` : 'vollständig'}
+               </span>`}
+        </li>`).join('')}
+    </ul>
+
+    ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+
+    ${bestellung.order.status === 'draft' && rechte.manage
+      ? '<button class="button button--action stock-order-send" type="button">Bestellen</button>'
+      : ''}
+    ${offen && rechte.manage
+      ? '<button class="button button--action stock-order-receive" type="button">Wareneingang buchen</button>'
+      : ''}
+    ${['draft', 'ordered'].includes(bestellung.order.status) && rechte.manage
+      ? '<button class="button button--quiet stock-order-cancel" type="button">Bestellung stornieren</button>'
+      : ''}
+    <button class="button button--quiet stock-home" type="button">Zurück</button>
+  </div>`;
+}
+
 function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.INVENTUR) return inventurAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.BESTELLUNGEN) {
+    return bestellungenAnsicht(optionen.bestellungen, rechte, zustand.fehler);
+  }
+  if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
@@ -2137,6 +2311,78 @@ function alleVorschlaege() {
   }));
 }
 
+// --- Bestellwesen: bildet /api/v1/stock/orders/* nach --------------------
+const LIEFERANTEN = [{ id: 'lief-1', name: 'Sonepar Deutschland', supplierNumber: 'L-0001' }];
+const BESTELLUNGEN = [];
+let bestellZaehler = 41;
+
+function bestellungAusVorschlag() {
+  const zeilen = alleVorschlaege().map((eintrag, index) => ({
+    id: `pos-${BESTELLUNGEN.length + 1}-${index + 1}`,
+    linePosition: index + 1,
+    itemId: eintrag.id,
+    itemName: eintrag.name,
+    itemNumber: eintrag.itemNumber,
+    unit: eintrag.unit,
+    quantityOrdered: eintrag.suggestedQuantity,
+    quantityReceived: 0,
+    quantityOpen: eintrag.suggestedQuantity
+  }));
+  if (!zeilen.length) return null;
+
+  bestellZaehler += 1;
+  const bestellung = {
+    order: {
+      id: `best-${BESTELLUNGEN.length + 1}`,
+      orderNumber: `B-2026-${String(bestellZaehler).padStart(6, '0')}`,
+      supplierId: 'lief-1',
+      supplierName: LIEFERANTEN[0].name,
+      status: 'draft'
+    },
+    lines: zeilen
+  };
+  BESTELLUNGEN.unshift(bestellung);
+  return bestellung;
+}
+
+function bestellungHolen(id) {
+  return BESTELLUNGEN.find((eintrag) => eintrag.order.id === id) || null;
+}
+
+function offeneBestellungen() {
+  return BESTELLUNGEN
+    .filter((eintrag) => ['ordered', 'partially_received', 'draft'].includes(eintrag.order.status))
+    .map((eintrag) => eintrag.order);
+}
+
+const gebuchteEingaenge = new Set();
+
+function wareneingangBuchen(bestellung, eingang) {
+  for (const zeile of eingang.lines) {
+    if (gebuchteEingaenge.has(zeile.clientOperationId)) continue;
+    gebuchteEingaenge.add(zeile.clientOperationId);
+
+    const position = bestellung.lines.find((eintrag) => eintrag.id === zeile.purchaseOrderItemId);
+    if (!position) continue;
+
+    position.quantityReceived = Math.round((position.quantityReceived + zeile.quantity) * 1000) / 1000;
+    position.quantityOpen = Math.max(0, Math.round((position.quantityOrdered - position.quantityReceived) * 1000) / 1000);
+
+    const schluessel = `${position.itemId}|${eingang.locationId}`;
+    bestand.set(schluessel, Math.round(((bestand.get(schluessel) ?? 0) + zeile.quantity) * 1000) / 1000);
+
+    journal.unshift({
+      vorgangId: zeile.clientOperationId,
+      text: `receipt · ${mengeAlsText(zeile.quantity)} ${position.unit} · ${position.itemName}`,
+      zeit: new Date().toLocaleTimeString('de-DE')
+    });
+  }
+
+  bestellung.order.status = bestellung.lines.every((zeile) => zeile.quantityOpen === 0)
+    ? 'received' : 'partially_received';
+  return bestellung;
+}
+
 // --- Inventur: bildet /api/v1/stock/inventory/* nach ---------------------
 let laufendeInventur = null;
 
@@ -2205,6 +2451,7 @@ const optionen = () => ({
   bestand: alleBestandszeilen(),
   artikel: alleArtikel(),
   vorschlaege: alleVorschlaege(),
+  bestellungen: offeneBestellungen(),
   gruppen: GRUPPEN
 });
 const rechte = () => ROLLEN[rolle].rechte;
@@ -2327,7 +2574,8 @@ function verdrahten() {
         bestand: SCHRITTE.BESTAND,
         artikel: SCHRITTE.ARTIKEL,
         nachbestellung: SCHRITTE.NACHBESTELLUNG,
-        inventur: SCHRITTE.INVENTUR
+        inventur: SCHRITTE.INVENTUR,
+        bestellungen: SCHRITTE.BESTELLUNGEN
       };
       zustand = {
         ...zustand,
@@ -2379,8 +2627,63 @@ function verdrahten() {
     zeichnen();
   });
 
+  wurzel.querySelector('.stock-order-from-reorder')?.addEventListener('click', () => {
+    const bestellung = bestellungAusVorschlag();
+    zustand = bestellung
+      ? { ...zustand, schritt: SCHRITTE.BESTELLUNG, bestellung, eingang: {}, fehler: null }
+      : { ...zustand, fehler: 'Kein Artikel liegt unter seinem Mindestbestand.' };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-send')?.addEventListener('click', () => {
+    zustand.bestellung.order.status = 'ordered';
+    zustand = { ...zustand, eingang: eingangVorbelegen(zustand.bestellung), fehler: null };
+    zeichnen();
+  });
+
+  wurzel.querySelectorAll('.stock-order__input').forEach((feld) => {
+    feld.addEventListener('input', () => {
+      zustand.eingang = { ...(zustand.eingang || {}), [feld.dataset.position]: feld.value };
+    });
+  });
+
+  wurzel.querySelector('.stock-order-receive')?.addEventListener('click', () => {
+    const { eingang, fehler } = wareneingangBauen(zustand, {});
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      zeichnen();
+      return;
+    }
+    const bestellung = wareneingangBuchen(zustand.bestellung, eingang);
+    zustand = {
+      ...zustand,
+      bestellung,
+      eingang: eingangVorbelegen(bestellung),
+      fehler: null
+    };
+    zeichnen();
+  });
+
+  wurzel.querySelector('.stock-order-cancel')?.addEventListener('click', () => {
+    zustand.bestellung.order.status = 'cancelled';
+    zustand = lagerZustand({ ort: zustand.ort, hinweis: 'Bestellung storniert.' });
+    zeichnen();
+  });
+
   wurzel.querySelectorAll('.stock-row--tap').forEach((zeile) => {
     zeile.addEventListener('click', () => {
+      if (zeile.dataset.bestellung) {
+        const bestellung = bestellungHolen(zeile.dataset.bestellung);
+        zustand = {
+          ...zustand,
+          schritt: SCHRITTE.BESTELLUNG,
+          bestellung,
+          eingang: eingangVorbelegen(bestellung),
+          fehler: null
+        };
+        zeichnen();
+        return;
+      }
       const artikel = ARTIKEL.find((eintrag) => eintrag.id === zeile.dataset.artikel);
       if (!artikel) return;
       zustand = scanVerarbeiten(zustand, artikelAntwort(artikel, 1));

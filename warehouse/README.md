@@ -60,7 +60,8 @@ der später auch läuft.
 | Bedienoberfläche: Monteursablauf | steht — scannen, Menge, buchen |
 | Bedienoberfläche: Büro | steht — Bestand, Artikelanlage, Nachbestellung |
 | Inventur: API und Bedienung | steht — 13 Abnahmen, 8 Tests, 19 Prüfungen im Browser |
-| Lieferanten, Bestellungen, Wareneingang gegen Bestellung | offen — Tabellen stehen, Endpunkte fehlen |
+| Bestellwesen: API und Bedienung | steht — 15 Abnahmen, 12 Tests, 20 Prüfungen im Browser |
+| Einhängen in app.mjs und Merge | offen |
 | Einpflegen in Schäfchen | offen |
 
 ## Prüfen

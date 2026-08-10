@@ -811,3 +811,13 @@ test('auch Bestellungen maskieren fremden Text', () => {
   assert.ok(!html.includes('<script>'));
   assert.ok(!html.includes('<b>B-1</b>'));
 });
+
+test('ein Hinweis in der Bestellliste wird auch gezeigt', () => {
+  // Ohne diese Zeile passiert beim Tippen sichtbar nichts, und niemand weiß,
+  // warum keine Bestellung entstanden ist.
+  const html = bestellungenAnsicht([], { manage: true }, 'Kein Artikel liegt unter seinem Mindestbestand.');
+  assert.ok(html.includes('Kein Artikel liegt unter'));
+  assert.ok(html.includes('role="alert"'));
+
+  assert.ok(!bestellungenAnsicht([], { manage: true }).includes('role="alert"'));
+});
