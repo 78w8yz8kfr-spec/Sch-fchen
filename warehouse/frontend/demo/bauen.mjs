@@ -7,9 +7,10 @@ const seite = platzhalterErsetzen(
   readFileSync(new URL('vorlage.html', import.meta.url), 'utf8'),
   {
     DECODER: einbetten(new URL('barcode-decoder.mjs', frontend)),
-    SCANNER: einbetten(new URL('barcode-scanner.mjs', frontend))
+    SCANNER: einbetten(new URL('barcode-scanner.mjs', frontend)),
+    LAGER: einbetten(new URL('stock-management.js', frontend))
   }
 );
 
-writeFileSync(new URL('../barcode-testseite.html', import.meta.url), seite);
-console.log('Prüfstand gebaut:', seite.length, 'Zeichen');
+writeFileSync(new URL('../oberflaeche-demo.html', import.meta.url), seite);
+console.log('Demo gebaut:', seite.length, 'Zeichen');

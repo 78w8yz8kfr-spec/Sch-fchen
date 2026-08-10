@@ -1,0 +1,346 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  SCHRITTE,
+  VORGAENGE,
+  lagerZustand,
+  mengeAusText,
+  mengeAlsText,
+  scanVerarbeiten,
+  verfuegbareVorgaenge,
+  darfVorgang,
+  buchungBauen,
+  neueVorgangId,
+  buchungVerarbeiten,
+  bestandLage,
+  bestandText,
+  ortKurz,
+  knappeArtikel,
+  artikelEntwurfAusScan,
+  offlineLagerQueueKey,
+  ansichtFuer,
+  startAnsicht,
+  buchenAnsicht
+} from '../stock-management.js';
+
+const REGAL = { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' };
+const LAGER = { id: 'ort-0', name: 'Materiallager', path: 'Materiallager' };
+const ARTIKEL = {
+  id: 'art-1',
+  itemNumber: 'LAG-0001',
+  name: 'Schalterdose tief',
+  unit: 'Stück',
+  minimumStock: 50
+};
+
+test('eine mit Komma getippte Menge ist eine Menge', () => {
+  assert.equal(mengeAusText('3,5'), 3.5);
+  assert.equal(mengeAusText('3.5'), 3.5);
+  assert.equal(mengeAusText(' 12 '), 12);
+  assert.equal(mengeAusText('0,25'), 0.25);
+  assert.equal(mengeAusText(7), 7);
+});
+
+test('was keine Menge ist, wird nicht stillschweigend zu null', () => {
+  for (const eingabe of ['', '   ', '0', '-3', 'abc', '1,2,3', '.', null, undefined, {}, NaN]) {
+    assert.equal(mengeAusText(eingabe), null, `${JSON.stringify(eingabe)} wurde als Menge akzeptiert`);
+  }
+});
+
+test('Mengen werden mit Komma angezeigt', () => {
+  assert.equal(mengeAlsText(3.5), '3,5');
+  assert.equal(mengeAlsText(12), '12');
+  assert.equal(mengeAlsText(0.125), '0,125');
+});
+
+test('ein gescannter Lagerplatz bleibt gesetzt', () => {
+  const zustand = scanVerarbeiten(lagerZustand(), {
+    found: true, kind: 'location', location: REGAL
+  });
+
+  assert.equal(zustand.ort.id, REGAL.id);
+  assert.equal(zustand.schritt, SCHRITTE.START);
+  assert.match(zustand.hinweis, /Fach A1/);
+});
+
+test('der Kartoncode bucht das Gebinde, nicht ein Stück', () => {
+  const mitOrt = scanVerarbeiten(lagerZustand(), { found: true, kind: 'location', location: REGAL });
+
+  const einzeln = scanVerarbeiten(mitOrt, {
+    found: true, kind: 'item', packQuantity: 1, item: ARTIKEL, levels: []
+  });
+  assert.equal(einzeln.menge, '1');
+  assert.equal(einzeln.gebinde, 1);
+
+  const karton = scanVerarbeiten(mitOrt, {
+    found: true, kind: 'item', packQuantity: 100, item: ARTIKEL, levels: []
+  });
+  assert.equal(karton.menge, '100');
+  assert.equal(karton.gebinde, 100);
+  assert.equal(karton.schritt, SCHRITTE.BUCHEN);
+});
+
+test('der Bestand am gemerkten Ort wird herausgesucht', () => {
+  const mitOrt = scanVerarbeiten(lagerZustand(), { found: true, kind: 'location', location: REGAL });
+  const zustand = scanVerarbeiten(mitOrt, {
+    found: true,
+    kind: 'item',
+    packQuantity: 1,
+    item: ARTIKEL,
+    levels: [
+      { locationId: 'ort-0', quantity: 500 },
+      { locationId: REGAL.id, quantity: 42 }
+    ]
+  });
+
+  assert.equal(zustand.bestandAmOrt, 42, 'Es zählt der Bestand hier, nicht der im Hauptlager');
+});
+
+test('ein unbekannter Code führt zur Neuanlage statt in eine Sackgasse', () => {
+  const zustand = scanVerarbeiten(lagerZustand(), {
+    found: false, kind: 'gtin', code: '5901234123457', normalized: '05901234123457'
+  });
+
+  assert.equal(zustand.schritt, SCHRITTE.UNBEKANNT);
+  assert.equal(zustand.letzterScan.wert, '05901234123457');
+  assert.equal(zustand.letzterScan.roh, '5901234123457');
+});
+
+test('wer was darf, entscheidet die Rolle', () => {
+  const monteur = verfuegbareVorgaenge({}).map((v) => v.schluessel);
+  assert.deepEqual(monteur, ['entnahme', 'rueckgabe']);
+
+  const vorarbeiter = verfuegbareVorgaenge({ transfer: true }).map((v) => v.schluessel);
+  assert.deepEqual(vorarbeiter, ['entnahme', 'rueckgabe', 'umlagerung']);
+
+  const buero = verfuegbareVorgaenge({ transfer: true, manage: true }).map((v) => v.schluessel);
+  assert.deepEqual(buero, Object.keys(VORGAENGE));
+
+  assert.equal(darfVorgang({}, 'umlagerung'), false);
+  assert.equal(darfVorgang({ transfer: true }, 'wareneingang'), false);
+  assert.equal(darfVorgang({ manage: true, transfer: true }, 'verschrottung'), true);
+});
+
+function buchbarerZustand(zusatz = {}) {
+  return lagerZustand({
+    ort: REGAL,
+    artikel: ARTIKEL,
+    menge: '5',
+    schritt: SCHRITTE.BUCHEN,
+    ...zusatz
+  });
+}
+
+test('eine Entnahme bucht vom gemerkten Ort weg', () => {
+  const { buchung, fehler } = buchungBauen(buchbarerZustand(), { vorgangId: 'op-1' });
+
+  assert.equal(fehler, undefined);
+  assert.deepEqual(buchung, {
+    itemId: 'art-1',
+    movementType: 'issue',
+    quantity: 5,
+    sourceType: 'qr_scan',
+    clientOperationId: 'op-1',
+    sourceLocationId: REGAL.id
+  });
+});
+
+test('eine Rückgabe bucht auf den Ort hin', () => {
+  const { buchung } = buchungBauen(buchbarerZustand({ vorgang: 'rueckgabe' }), { vorgangId: 'op-2' });
+  assert.equal(buchung.movementType, 'return');
+  assert.equal(buchung.targetLocationId, REGAL.id);
+  assert.equal(buchung.sourceLocationId, undefined);
+});
+
+test('eine Umlagerung braucht einen anderen Zielort', () => {
+  const ohneZiel = buchungBauen(buchbarerZustand({ vorgang: 'umlagerung' }), {});
+  assert.match(ohneZiel.fehler, /Zielort/);
+
+  const aufSichSelbst = buchungBauen(
+    buchbarerZustand({ vorgang: 'umlagerung', zielOrtId: REGAL.id }), {}
+  );
+  assert.match(aufSichSelbst.fehler, /verschieden/);
+
+  const richtig = buchungBauen(
+    buchbarerZustand({ vorgang: 'umlagerung', zielOrtId: LAGER.id }), { vorgangId: 'op-3' }
+  );
+  assert.equal(richtig.buchung.sourceLocationId, REGAL.id);
+  assert.equal(richtig.buchung.targetLocationId, LAGER.id);
+});
+
+test('ohne Lagerplatz und ohne Menge wird nicht gebucht', () => {
+  assert.match(buchungBauen(buchbarerZustand({ ort: null }), {}).fehler, /Lagerplatz/);
+  assert.match(buchungBauen(buchbarerZustand({ menge: '' }), {}).fehler, /Menge/);
+  assert.match(buchungBauen(buchbarerZustand({ menge: '0' }), {}).fehler, /Menge/);
+  assert.match(buchungBauen(buchbarerZustand({ artikel: null }), {}).fehler, /Artikel/);
+});
+
+test('die Firmenregel zur Baustelle wird vor dem Absenden geprüft', () => {
+  const ohne = buchungBauen(buchbarerZustand(), { baustellePflicht: true });
+  assert.match(ohne.fehler, /Baustelle/);
+
+  const mit = buchungBauen(
+    buchbarerZustand({ baustelleId: 'bau-1' }), { baustellePflicht: true, vorgangId: 'op-4' }
+  );
+  assert.equal(mit.buchung.constructionSiteId, 'bau-1');
+
+  // Eine Baustelle bei einer Rückgabe wäre sinnlos und wird nicht mitgeschickt.
+  const rueckgabe = buchungBauen(
+    buchbarerZustand({ vorgang: 'rueckgabe', baustelleId: 'bau-1' }), { vorgangId: 'op-5' }
+  );
+  assert.equal(rueckgabe.buchung.constructionSiteId, undefined);
+});
+
+test('jede Buchung bekommt eine eigene, wiederverwendbare Vorgangsnummer', () => {
+  const erste = buchungBauen(buchbarerZustand(), {}).buchung.clientOperationId;
+  const zweite = buchungBauen(buchbarerZustand(), {}).buchung.clientOperationId;
+
+  assert.notEqual(erste, zweite, 'Zwei Buchungen dürfen nicht dieselbe Nummer tragen');
+  assert.match(erste, /^stock-/);
+
+  // Dieselbe Nummer erneut mitgeben heißt: derselbe Vorgang, zweiter Versuch.
+  const wiederholt = buchungBauen(buchbarerZustand(), { vorgangId: erste }).buchung;
+  assert.equal(wiederholt.clientOperationId, erste);
+
+  const viele = new Set(Array.from({ length: 200 }, () => neueVorgangId()));
+  assert.equal(viele.size, 200);
+});
+
+test('nach dem Buchen bleibt der Ort stehen und der Artikel geht weg', () => {
+  const vorher = buchbarerZustand();
+  const nachher = buchungVerarbeiten(vorher, {
+    repeated: false,
+    levels: [{ locationId: REGAL.id, quantity: 37 }]
+  });
+
+  assert.equal(nachher.schritt, SCHRITTE.BESTAETIGT);
+  assert.equal(nachher.ort.id, REGAL.id, 'Der Lagerplatz muss für den nächsten Scan stehen bleiben');
+  assert.equal(nachher.artikel, null);
+  assert.equal(nachher.bestaetigung.neuerBestand, 37);
+  assert.equal(nachher.bestaetigung.menge, 5);
+  assert.equal(nachher.bestaetigung.vorgang, 'Entnehmen');
+  assert.equal(nachher.bestaetigung.wiederholt, false);
+});
+
+test('eine bereits gezählte Buchung wird als solche benannt', () => {
+  const nachher = buchungVerarbeiten(buchbarerZustand(), { repeated: true, levels: [] });
+  assert.equal(nachher.bestaetigung.wiederholt, true);
+  assert.equal(nachher.bestaetigung.neuerBestand, null);
+});
+
+test('ein negativer Bestand gilt als unplausibel und nicht als leer', () => {
+  assert.equal(bestandLage(-3), 'unplausibel');
+  assert.equal(bestandLage(0), 'leer');
+  assert.equal(bestandLage(10, 50), 'knapp');
+  assert.equal(bestandLage(80, 50), 'gut');
+  assert.equal(bestandLage(null), 'unbekannt');
+  assert.equal(bestandText(3.5, 'Meter'), '3,5 Meter');
+  assert.equal(bestandText(null), 'unbekannt');
+});
+
+test('ein langer Lagerpfad wird für das Telefon gekürzt', () => {
+  assert.equal(ortKurz(REGAL), '… › Regal A › Fach A1');
+  assert.equal(ortKurz(LAGER), 'Materiallager');
+  assert.equal(ortKurz({ name: 'Werkstatt' }), 'Werkstatt');
+  assert.equal(ortKurz(null), null);
+});
+
+test('knappe Artikel sind die unter ihrem Mindestbestand', () => {
+  const knapp = knappeArtikel([
+    { id: 'a', minimumStock: 50, totalQuantity: 20 },
+    { id: 'b', minimumStock: 50, totalQuantity: 80 },
+    { id: 'c', minimumStock: 0, totalQuantity: 0 },
+    { id: 'd', minimumStock: 10, totalQuantity: -5 }
+  ]);
+  assert.deepEqual(knapp.map((e) => e.id), ['a', 'd']);
+});
+
+test('aus einem unbekannten Code entsteht ein Artikelentwurf mit dem Code', () => {
+  const entwurf = artikelEntwurfAusScan(
+    { art: 'gtin', wert: '05901234123457', roh: '5901234123457' },
+    [{ key: 'installation' }]
+  );
+
+  assert.equal(entwurf.groupKey, 'installation');
+  assert.deepEqual(entwurf.barcodes, [{
+    code: '5901234123457', codeType: 'gtin', packQuantity: 1, isPrimary: true
+  }]);
+
+  const freitext = artikelEntwurfAusScan({ art: 'text', wert: 'KABEL-99', roh: 'kabel-99' }, []);
+  assert.equal(freitext.barcodes[0].codeType, 'internal');
+  assert.equal(freitext.groupKey, 'other');
+});
+
+test('der Offline-Schlüssel trennt Firma und Benutzer', () => {
+  const a = offlineLagerQueueKey({ company: { number: 'F-000001' }, user: { id: 'u1' } });
+  const b = offlineLagerQueueKey({ company: { number: 'F-000002' }, user: { id: 'u1' } });
+  const c = offlineLagerQueueKey({ company: { number: 'F-000001' }, user: { id: 'u2' } });
+
+  assert.equal(new Set([a, b, c]).size, 3);
+  assert.match(offlineLagerQueueKey(null), /unknown:unknown$/);
+});
+
+test('die Ansicht zeigt dem Monteur nur seine Schaltflächen', () => {
+  const zustand = buchbarerZustand();
+
+  const monteur = ansichtFuer(zustand, {}, {});
+  assert.ok(monteur.includes('data-vorgang="entnahme"'));
+  assert.ok(monteur.includes('data-vorgang="rueckgabe"'));
+  assert.ok(!monteur.includes('data-vorgang="umlagerung"'));
+  assert.ok(!monteur.includes('data-vorgang="verschrottung"'));
+
+  const buero = ansichtFuer(zustand, { manage: true, transfer: true }, {});
+  assert.ok(buero.includes('data-vorgang="umlagerung"'));
+  assert.ok(buero.includes('data-vorgang="verschrottung"'));
+});
+
+test('die Startansicht zeigt Verwaltungskacheln nur der Verwaltung', () => {
+  const monteur = startAnsicht(lagerZustand(), {});
+  assert.ok(monteur.includes('data-ziel="bestand"'));
+  assert.ok(!monteur.includes('data-ziel="artikel"'));
+  assert.ok(monteur.includes('Lagerplatz scannen'));
+
+  const buero = startAnsicht(lagerZustand({ ort: REGAL }), { manage: true });
+  assert.ok(buero.includes('data-ziel="artikel"'));
+  assert.ok(buero.includes('data-ziel="nachbestellung"'));
+  assert.ok(buero.includes('Fach A1'));
+});
+
+test('das Gebinde wird beim Buchen genannt, wenn es mehr als eins ist', () => {
+  const einzeln = buchenAnsicht(buchbarerZustand({ gebinde: 1 }), {}, {});
+  assert.ok(!einzeln.includes('Gebinde'));
+
+  const karton = buchenAnsicht(buchbarerZustand({ gebinde: 100 }), {}, {});
+  assert.ok(karton.includes('Gebinde mit 100 Stück'));
+});
+
+test('die Baustellenauswahl erscheint nur mit Baustellen und nennt die Pflicht', () => {
+  const ohne = buchenAnsicht(buchbarerZustand(), {}, {});
+  assert.ok(!ohne.includes('stock-site'));
+
+  const freiwillig = buchenAnsicht(buchbarerZustand(), {}, {
+    baustellen: [{ id: 'b1', name: 'Neubau Schule' }]
+  });
+  assert.ok(freiwillig.includes('(freiwillig)'));
+  assert.ok(freiwillig.includes('Ohne Baustelle'));
+
+  const pflicht = buchenAnsicht(buchbarerZustand(), {}, {
+    baustellen: [{ id: 'b1', name: 'Neubau Schule' }], baustellePflicht: true
+  });
+  assert.ok(!pflicht.includes('(freiwillig)'));
+  assert.ok(pflicht.includes('Bitte wählen'));
+});
+
+test('Artikelnamen aus fremder Feder können kein Markup einschleusen', () => {
+  const boese = {
+    ...ARTIKEL,
+    name: '<img src=x onerror="alert(1)">',
+    itemNumber: '"><script>böse</script>'
+  };
+  const html = buchenAnsicht(buchbarerZustand({ artikel: boese }), {}, {});
+
+  assert.ok(!html.includes('<img src=x'));
+  assert.ok(!html.includes('<script>'));
+  assert.ok(html.includes('&lt;img src=x'));
+});
