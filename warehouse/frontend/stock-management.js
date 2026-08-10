@@ -22,7 +22,17 @@ export const SCHRITTE = Object.freeze({
   ARTIKEL: 'artikel',
   ARTIKEL_NEU: 'artikelNeu',
   NACHBESTELLUNG: 'nachbestellung',
-  INVENTUR: 'inventur'
+  INVENTUR: 'inventur',
+  BESTELLUNGEN: 'bestellungen',
+  BESTELLUNG: 'bestellung'
+});
+
+export const BESTELLSTATUS = Object.freeze({
+  draft: 'Entwurf',
+  ordered: 'Bestellt',
+  partially_received: 'Teilweise geliefert',
+  received: 'Vollständig geliefert',
+  cancelled: 'Storniert'
 });
 
 // Was der Benutzer waehlt, und was daraus in der Datenbank wird. Die
@@ -64,6 +74,8 @@ export function lagerZustand(vorgabe = {}) {
     entwurf: null,
     inventur: null,
     zaehlArtikel: null,
+    bestellung: null,
+    eingang: null,
     hinweis: null,
     fehler: null,
     ...vorgabe
@@ -360,6 +372,10 @@ export function startAnsicht(zustand, rechte = {}) {
     kacheln.push(`<button class="stock-tile" type="button" data-ziel="nachbestellung">
        <span class="stock-tile__name">Nachbestellung</span>
        <span class="stock-tile__hint">Unter Mindestbestand</span>
+     </button>`);
+    kacheln.push(`<button class="stock-tile" type="button" data-ziel="bestellungen">
+       <span class="stock-tile__name">Bestellungen</span>
+       <span class="stock-tile__hint">Offen und unterwegs</span>
      </button>`);
   }
 
@@ -856,8 +872,148 @@ export function inventurAnsicht(zustand, rechte = {}) {
   </div>`;
 }
 
+// ---------------------------------------------------------------------------
+// Bestellungen
+// ---------------------------------------------------------------------------
+
+export function bestellStatusText(status) {
+  return BESTELLSTATUS[status] || status || '';
+}
+
+export function bestellungFortschritt(zeilen = []) {
+  return {
+    positionen: zeilen.length,
+    offen: zeilen.filter((zeile) => zeile.quantityOpen > 0).length,
+    vollstaendig: zeilen.length > 0 && zeilen.every((zeile) => zeile.quantityOpen === 0)
+  };
+}
+
+/**
+ * Baut den Wareneingang aus den eingetragenen Mengen.
+ *
+ * Gebucht wird nur, was tatsaechlich eingetragen wurde — eine leere Zeile
+ * heisst "nicht geliefert" und nicht "null geliefert". Jede Zeile bekommt eine
+ * eigene, aus dem Vorgang abgeleitete Nummer, damit eine wiederholte
+ * Uebertragung Zeile fuer Zeile erkannt wird und nicht nur als Ganzes.
+ */
+export function wareneingangBauen(zustand, optionen = {}) {
+  if (!zustand.bestellung) return { fehler: 'Es ist keine Bestellung geöffnet.' };
+  if (!zustand.ort) return { fehler: 'Zuerst den Lagerplatz scannen oder auswählen.' };
+
+  const vorgangId = optionen.vorgangId || neueVorgangId();
+  const eingaben = zustand.eingang || {};
+  const zeilen = [];
+
+  for (const zeile of zustand.bestellung.lines) {
+    const eingabe = eingaben[zeile.id];
+    if (eingabe === undefined || eingabe === null || String(eingabe).trim() === '') continue;
+
+    const menge = mengeAusText(eingabe);
+    if (menge === null) {
+      return { fehler: `Die Menge bei „${zeile.itemName}" ist keine gültige Menge.` };
+    }
+    zeilen.push({
+      purchaseOrderItemId: zeile.id,
+      quantity: menge,
+      clientOperationId: `${vorgangId}-${zeile.linePosition}`
+    });
+  }
+
+  if (!zeilen.length) return { fehler: 'Bitte für mindestens eine Position eine Menge eintragen.' };
+
+  return {
+    vorgangId,
+    eingang: { locationId: zustand.ort.id, sourceType: 'api', lines: zeilen }
+  };
+}
+
+/** Vorbelegung des Wareneingangs: was offen ist, wird als geliefert angeboten. */
+export function eingangVorbelegen(bestellung) {
+  const werte = {};
+  for (const zeile of bestellung?.lines || []) {
+    if (zeile.quantityOpen > 0) werte[zeile.id] = mengeAlsText(zeile.quantityOpen);
+  }
+  return werte;
+}
+
+export function bestellungenAnsicht(bestellungen = [], rechte = {}) {
+  return `<div class="stock-list">
+    ${kopfzeile('Bestellungen')}
+    ${bestellungen.length
+      ? `<ul class="stock-rows">
+          ${bestellungen.map((eintrag) => `
+            <li class="stock-row stock-row--tap" data-bestellung="${sicher(eintrag.id)}">
+              <span class="stock-row__name">${sicher(eintrag.supplierName || '')}</span>
+              <span class="stock-row__number">${sicher(eintrag.orderNumber)}</span>
+              <span class="stock-row__amount stock-row__amount--${eintrag.status === 'partially_received' ? 'knapp' : 'offen'}">
+                ${sicher(bestellStatusText(eintrag.status))}
+              </span>
+            </li>`).join('')}
+        </ul>`
+      : '<p class="stock-empty">Keine offene Bestellung.</p>'}
+    ${rechte.manage
+      ? '<button class="button button--quiet stock-order-from-reorder" type="button">Aus dem Nachbestellvorschlag erzeugen</button>'
+      : ''}
+  </div>`;
+}
+
+export function bestellungAnsicht(zustand, rechte = {}) {
+  const bestellung = zustand.bestellung;
+  if (!bestellung) return '';
+
+  const fortschritt = bestellungFortschritt(bestellung.lines);
+  const offen = ['ordered', 'partially_received'].includes(bestellung.order.status);
+  const eingaben = zustand.eingang || {};
+
+  return `<div class="stock-list stock-order">
+    ${kopfzeile(bestellung.order.orderNumber)}
+    <p class="stock-order__supplier">${sicher(bestellung.order.supplierName || '')}</p>
+    <p class="stock-order__status">
+      ${sicher(bestellStatusText(bestellung.order.status))} ·
+      ${fortschritt.offen} von ${fortschritt.positionen} Position${fortschritt.positionen === 1 ? '' : 'en'} offen
+    </p>
+
+    ${offen && rechte.manage ? ortLeiste(zustand.ort) : ''}
+
+    <ul class="stock-rows">
+      ${bestellung.lines.map((zeile) => `
+        <li class="stock-row stock-row--order-line">
+          <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+          <span class="stock-row__number">
+            ${sicher(mengeAlsText(zeile.quantityReceived))} von ${sicher(mengeAlsText(zeile.quantityOrdered))} ${sicher(zeile.unit)} geliefert
+          </span>
+          ${offen && rechte.manage
+            ? `<label class="stock-order__field">
+                 <span class="visually-hidden">Geliefert für ${sicher(zeile.itemName)}</span>
+                 <input class="stock-order__input" type="text" inputmode="decimal" autocomplete="off"
+                        data-position="${sicher(zeile.id)}" value="${sicher(eingaben[zeile.id] ?? '')}"
+                        placeholder="0">
+               </label>`
+            : `<span class="stock-row__amount stock-row__amount--${zeile.quantityOpen > 0 ? 'knapp' : 'gut'}">
+                 ${zeile.quantityOpen > 0 ? `noch ${sicher(mengeAlsText(zeile.quantityOpen))}` : 'vollständig'}
+               </span>`}
+        </li>`).join('')}
+    </ul>
+
+    ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+
+    ${bestellung.order.status === 'draft' && rechte.manage
+      ? '<button class="button button--action stock-order-send" type="button">Bestellen</button>'
+      : ''}
+    ${offen && rechte.manage
+      ? '<button class="button button--action stock-order-receive" type="button">Wareneingang buchen</button>'
+      : ''}
+    ${['draft', 'ordered'].includes(bestellung.order.status) && rechte.manage
+      ? '<button class="button button--quiet stock-order-cancel" type="button">Bestellung stornieren</button>'
+      : ''}
+    <button class="button button--quiet stock-home" type="button">Zurück</button>
+  </div>`;
+}
+
 export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.INVENTUR) return inventurAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.BESTELLUNGEN) return bestellungenAnsicht(optionen.bestellungen, rechte);
+  if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);

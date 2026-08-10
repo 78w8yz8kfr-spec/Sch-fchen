@@ -37,7 +37,14 @@ import {
   differenzLage,
   inventurScanVerarbeiten,
   zaehlungBauen,
-  inventurAnsicht
+  inventurAnsicht,
+  BESTELLSTATUS,
+  bestellStatusText,
+  bestellungFortschritt,
+  wareneingangBauen,
+  eingangVorbelegen,
+  bestellungenAnsicht,
+  bestellungAnsicht
 } from '../stock-management.js';
 
 const REGAL = { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' };
@@ -650,4 +657,157 @@ test('die Inventurkachel steht ab Vorarbeiter bereit', () => {
   assert.ok(!startAnsicht(lagerZustand(), {}).includes('data-ziel="inventur"'));
   assert.ok(startAnsicht(lagerZustand(), { transfer: true }).includes('data-ziel="inventur"'));
   assert.ok(startAnsicht(lagerZustand(), { manage: true, transfer: true }).includes('data-ziel="inventur"'));
+});
+
+// ---------------------------------------------------------------------------
+// Bestellungen
+// ---------------------------------------------------------------------------
+
+const BESTELLUNG = {
+  order: {
+    id: 'best-1', orderNumber: 'B-2026-000042', supplierName: 'Sonepar',
+    status: 'ordered', orderedAt: '2026-08-10T08:00:00.000Z'
+  },
+  lines: [
+    { id: 'pos-1', linePosition: 1, itemId: 'art-1', itemName: 'Schalterdose tief', unit: 'Stück', quantityOrdered: 360, quantityReceived: 100, quantityOpen: 260 },
+    { id: 'pos-2', linePosition: 2, itemId: 'art-2', itemName: 'NYM-J 3×1,5', unit: 'Meter', quantityOrdered: 500, quantityReceived: 500, quantityOpen: 0 }
+  ]
+};
+
+test('jeder Bestellstatus hat einen deutschen Namen', () => {
+  assert.equal(bestellStatusText('draft'), 'Entwurf');
+  assert.equal(bestellStatusText('partially_received'), 'Teilweise geliefert');
+  assert.equal(bestellStatusText('received'), 'Vollständig geliefert');
+  assert.equal(Object.keys(BESTELLSTATUS).length, 5);
+  assert.equal(bestellStatusText('unbekannt'), 'unbekannt', 'Nichts wird verschluckt');
+});
+
+test('der Fortschritt zählt offene Positionen', () => {
+  assert.deepEqual(bestellungFortschritt(BESTELLUNG.lines), {
+    positionen: 2, offen: 1, vollstaendig: false
+  });
+  assert.equal(bestellungFortschritt([{ quantityOpen: 0 }]).vollstaendig, true);
+  assert.equal(bestellungFortschritt([]).vollstaendig, false, 'Leer ist nicht vollständig');
+});
+
+test('der Wareneingang bietet an, was offen ist', () => {
+  assert.deepEqual(eingangVorbelegen(BESTELLUNG), { 'pos-1': '260' });
+  assert.deepEqual(eingangVorbelegen(null), {});
+});
+
+function eingangZustand(zusatz = {}) {
+  return lagerZustand({
+    schritt: SCHRITTE.BESTELLUNG,
+    ort: REGAL,
+    bestellung: BESTELLUNG,
+    ...zusatz
+  });
+}
+
+test('gebucht wird nur, was eingetragen wurde', () => {
+  const nurEine = wareneingangBauen(
+    eingangZustand({ eingang: { 'pos-1': '260', 'pos-2': '' } }),
+    { vorgangId: 'we-1' }
+  );
+
+  assert.equal(nurEine.fehler, undefined);
+  assert.equal(nurEine.eingang.locationId, REGAL.id);
+  assert.deepEqual(nurEine.eingang.lines, [
+    { purchaseOrderItemId: 'pos-1', quantity: 260, clientOperationId: 'we-1-1' }
+  ]);
+});
+
+test('jede Position bekommt eine eigene Vorgangsnummer', () => {
+  const beide = wareneingangBauen(
+    eingangZustand({ eingang: { 'pos-1': '100', 'pos-2': '5' } }),
+    { vorgangId: 'we-2' }
+  );
+
+  assert.deepEqual(
+    beide.eingang.lines.map((zeile) => zeile.clientOperationId),
+    ['we-2-1', 'we-2-2'],
+    'Eine wiederholte Übertragung muss Zeile für Zeile erkannt werden'
+  );
+
+  // Ohne übergebene Nummer entsteht jedes Mal eine neue.
+  const a = wareneingangBauen(eingangZustand({ eingang: { 'pos-1': '1' } })).vorgangId;
+  const b = wareneingangBauen(eingangZustand({ eingang: { 'pos-1': '1' } })).vorgangId;
+  assert.notEqual(a, b);
+});
+
+test('ein Wareneingang ohne Menge, Ort oder Bestellung wird abgewiesen', () => {
+  assert.match(wareneingangBauen(eingangZustand({ eingang: {} })).fehler, /mindestens eine Position/);
+  assert.match(wareneingangBauen(eingangZustand({ eingang: { 'pos-1': '   ' } })).fehler, /mindestens eine Position/);
+  assert.match(wareneingangBauen(eingangZustand({ ort: null, eingang: { 'pos-1': '1' } })).fehler, /Lagerplatz/);
+  assert.match(wareneingangBauen(lagerZustand()).fehler, /keine Bestellung/);
+  assert.match(
+    wareneingangBauen(eingangZustand({ eingang: { 'pos-1': 'viel' } })).fehler,
+    /Schalterdose tief/,
+    'Der Fehler nennt die Zeile, um die es geht'
+  );
+});
+
+test('die Bestellliste zeigt Lieferant, Nummer und Stand', () => {
+  const html = bestellungenAnsicht([BESTELLUNG.order], { manage: true });
+
+  assert.ok(html.includes('Sonepar'));
+  assert.ok(html.includes('B-2026-000042'));
+  assert.ok(html.includes('Teilweise geliefert') || html.includes('Bestellt'));
+  assert.ok(html.includes('stock-order-from-reorder'));
+  assert.ok(!bestellungenAnsicht([], {}).includes('stock-order-from-reorder'));
+  assert.ok(bestellungenAnsicht([], {}).includes('Keine offene Bestellung'));
+});
+
+test('nur die Verwaltung sieht die Eingabefelder des Wareneingangs', () => {
+  const zustand = eingangZustand({ eingang: eingangVorbelegen(BESTELLUNG) });
+
+  const buero = bestellungAnsicht(zustand, { manage: true });
+  assert.ok(buero.includes('stock-order__input'));
+  assert.ok(buero.includes('stock-order-receive'));
+  assert.ok(buero.includes('value="260"'));
+  assert.ok(!buero.includes('stock-order-send'), 'Bestellt wird nur ein Entwurf');
+
+  const monteur = bestellungAnsicht(zustand, {});
+  assert.ok(!monteur.includes('stock-order__input'));
+  assert.ok(!monteur.includes('stock-order-receive'));
+  assert.ok(monteur.includes('noch 260'), 'Lesen darf er trotzdem');
+  assert.ok(monteur.includes('vollständig'));
+});
+
+test('ein Entwurf wird bestellt, eine gelieferte Bestellung nicht mehr storniert', () => {
+  const entwurf = eingangZustand({
+    bestellung: { ...BESTELLUNG, order: { ...BESTELLUNG.order, status: 'draft' } }
+  });
+  const entwurfHtml = bestellungAnsicht(entwurf, { manage: true });
+  assert.ok(entwurfHtml.includes('stock-order-send'));
+  assert.ok(entwurfHtml.includes('stock-order-cancel'));
+  assert.ok(!entwurfHtml.includes('stock-order-receive'), 'Ein Entwurf nimmt keine Ware an');
+
+  const teilweise = eingangZustand({
+    bestellung: { ...BESTELLUNG, order: { ...BESTELLUNG.order, status: 'partially_received' } }
+  });
+  const teilweiseHtml = bestellungAnsicht(teilweise, { manage: true });
+  assert.ok(teilweiseHtml.includes('stock-order-receive'));
+  assert.ok(!teilweiseHtml.includes('stock-order-cancel'), 'Gelieferte Ware lässt sich nicht wegstornieren');
+
+  const fertig = eingangZustand({
+    bestellung: { ...BESTELLUNG, order: { ...BESTELLUNG.order, status: 'received' } }
+  });
+  const fertigHtml = bestellungAnsicht(fertig, { manage: true });
+  assert.ok(!fertigHtml.includes('stock-order-receive'));
+  assert.ok(!fertigHtml.includes('stock-order-cancel'));
+});
+
+test('die Bestellkachel steht nur der Verwaltung offen', () => {
+  assert.ok(!startAnsicht(lagerZustand(), { transfer: true }).includes('data-ziel="bestellungen"'));
+  assert.ok(startAnsicht(lagerZustand(), { manage: true }).includes('data-ziel="bestellungen"'));
+});
+
+test('auch Bestellungen maskieren fremden Text', () => {
+  const html = bestellungenAnsicht([{
+    id: 'x', orderNumber: '"><b>B-1</b>', supplierName: '<script>böse</script>', status: 'ordered'
+  }], {});
+
+  assert.ok(!html.includes('<script>'));
+  assert.ok(!html.includes('<b>B-1</b>'));
 });
