@@ -823,6 +823,287 @@ async function reorderSuggestions(client, context) {
   }));
 }
 
+// ---------------------------------------------------------------------------
+// Inventur
+// ---------------------------------------------------------------------------
+
+async function requireTransfer(client, context) {
+  const allowed = await permissions(client, context);
+  if (!allowed.transfer) {
+    throw new InputError("Für die Inventur fehlt die Berechtigung.", 403, "stock_inventory_forbidden");
+  }
+}
+
+function inventoryDto(row) {
+  return {
+    id: row.id,
+    locationId: row.location_id,
+    locationName: row.location_name || null,
+    status: row.status,
+    note: row.note || null,
+    startedAt: new Date(row.started_at).toISOString(),
+    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+    rowVersion: Number(row.row_version || 1)
+  };
+}
+
+async function inventoryDetail(client, context, sessionId) {
+  const session = await client.query(
+    `SELECT sitzung.*, ort.name AS location_name
+     FROM stock_inventory_sessions AS sitzung
+     JOIN storage_locations AS ort
+       ON ort.company_id = sitzung.company_id AND ort.id = sitzung.location_id
+     WHERE sitzung.company_id = $1 AND sitzung.id = $2`,
+    [context.companyId, sessionId]
+  );
+  if (session.rowCount !== 1) {
+    throw new InputError("Diese Inventur wurde nicht gefunden.", 404, "stock_inventory_unknown");
+  }
+
+  const counts = await client.query(
+    `SELECT zaehlung.item_id, zaehlung.expected_quantity, zaehlung.counted_quantity,
+            zaehlung.counted_at, item.item_number, item.name, item.unit
+     FROM stock_inventory_counts AS zaehlung
+     JOIN stock_items AS item
+       ON item.company_id = zaehlung.company_id AND item.id = zaehlung.item_id
+     WHERE zaehlung.company_id = $1 AND zaehlung.session_id = $2
+     ORDER BY item.name`,
+    [context.companyId, sessionId]
+  );
+
+  const lines = counts.rows.map((row) => {
+    const expected = number(row.expected_quantity);
+    const counted = row.counted_quantity === null ? null : number(row.counted_quantity);
+    return {
+      itemId: row.item_id,
+      itemNumber: row.item_number,
+      itemName: row.name,
+      unit: row.unit,
+      expectedQuantity: expected,
+      countedQuantity: counted,
+      difference: counted === null ? null : Math.round((counted - expected) * 1000) / 1000,
+      countedAt: row.counted_at ? new Date(row.counted_at).toISOString() : null
+    };
+  });
+
+  return {
+    session: inventoryDto(session.rows[0]),
+    lines,
+    open: lines.filter((line) => line.countedQuantity === null).length,
+    differences: lines.filter((line) => line.difference !== null && line.difference !== 0).length
+  };
+}
+
+/**
+ * Startet eine Inventur und friert den Sollbestand des Lagerplatzes ein.
+ *
+ * Eingefroren wird bewusst beim Start und nicht beim Abschluss: die Zaehlerin
+ * stellt einen Unterschied zu genau diesem Stand fest. Buchungen, die waehrend
+ * der Zaehlung entstehen, sind echte Bewegungen und bleiben deshalb beim
+ * Abschluss erhalten, statt von der Korrektur ueberschrieben zu werden.
+ */
+async function startInventory(client, context, body) {
+  await requireTransfer(client, context);
+  const locationId = validateId(body.locationId, "Lagerplatz");
+
+  const location = await client.query(
+    "SELECT id FROM storage_locations WHERE company_id = $1 AND id = $2 AND status = 'active'",
+    [context.companyId, locationId]
+  );
+  if (location.rowCount !== 1) {
+    throw new InputError("Diesen Lagerplatz gibt es nicht.", 404, "stock_location_unknown");
+  }
+
+  await client.query("SAVEPOINT inventur");
+  let session;
+  try {
+    session = await client.query(
+      `INSERT INTO stock_inventory_sessions (company_id, location_id, note, started_by_user_id)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [context.companyId, locationId, optionalText(body.note, "Notiz", 2000), context.userId]
+    );
+  } catch (error) {
+    await client.query("ROLLBACK TO SAVEPOINT inventur");
+    if (error?.code === "23505") {
+      throw new InputError(
+        "Für diesen Lagerplatz läuft bereits eine Inventur.",
+        409,
+        "stock_inventory_running"
+      );
+    }
+    mapDatabaseError(error);
+  }
+  await client.query("RELEASE SAVEPOINT inventur");
+
+  const sessionId = session.rows[0].id;
+
+  await client.query(
+    `INSERT INTO stock_inventory_counts (company_id, session_id, item_id, expected_quantity)
+     SELECT bestand.company_id, $2, bestand.item_id, bestand.quantity
+     FROM stock_levels AS bestand
+     WHERE bestand.company_id = $1 AND bestand.location_id = $3 AND bestand.quantity <> 0`,
+    [context.companyId, sessionId, locationId]
+  );
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id)
+     VALUES ($1, 'inventory_session', $2, 'started', $3)`,
+    [context.companyId, sessionId, context.userId]
+  );
+
+  return inventoryDetail(client, context, sessionId);
+}
+
+async function recordCount(client, context, sessionId, body) {
+  await requireTransfer(client, context);
+
+  const session = await client.query(
+    "SELECT status, location_id FROM stock_inventory_sessions WHERE company_id = $1 AND id = $2",
+    [context.companyId, sessionId]
+  );
+  if (session.rowCount !== 1) {
+    throw new InputError("Diese Inventur wurde nicht gefunden.", 404, "stock_inventory_unknown");
+  }
+  if (session.rows[0].status !== "running") {
+    throw new InputError("Diese Inventur ist bereits abgeschlossen.", 409, "stock_inventory_closed");
+  }
+
+  const itemId = validateId(body.itemId, "Artikel");
+  // Null ist beim Zaehlen eine gueltige Antwort: das Fach ist leer.
+  const counted = body.quantity === 0 ? "0.000" : quantity(body.quantity, "Gezählte Menge");
+
+  // Ein Artikel, der beim Start nicht am Platz lag, aber jetzt dort liegt,
+  // gehoert mit Sollbestand null in die Zaehlung — sonst faellt genau der
+  // Fund unter den Tisch, den eine Inventur finden soll.
+  await client.query(
+    `INSERT INTO stock_inventory_counts (
+       company_id, session_id, item_id, expected_quantity,
+       counted_quantity, counted_by_user_id, counted_at
+     ) VALUES ($1, $2, $3, 0, $4, $5, CURRENT_TIMESTAMP)
+     ON CONFLICT (company_id, session_id, item_id) DO UPDATE
+     SET counted_quantity = EXCLUDED.counted_quantity,
+         counted_by_user_id = EXCLUDED.counted_by_user_id,
+         counted_at = EXCLUDED.counted_at,
+         row_version = stock_inventory_counts.row_version + 1`,
+    [context.companyId, sessionId, itemId, counted, context.userId]
+  ).catch(mapDatabaseError);
+
+  return inventoryDetail(client, context, sessionId);
+}
+
+/**
+ * Schliesst die Inventur ab und schreibt die Unterschiede als Korrekturen.
+ *
+ * Nicht gezaehlte Zeilen bleiben unangetastet. Sie auf null zu setzen waere
+ * die gefaehrlichere Annahme: eine abgebrochene Zaehlung wuerde dann ein
+ * halbes Lager ausbuchen.
+ */
+async function completeInventory(client, context, sessionId, body) {
+  await requireManager(client, context);
+
+  const session = await client.query(
+    `SELECT status, location_id FROM stock_inventory_sessions
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, sessionId]
+  );
+  if (session.rowCount !== 1) {
+    throw new InputError("Diese Inventur wurde nicht gefunden.", 404, "stock_inventory_unknown");
+  }
+  if (session.rows[0].status !== "running") {
+    throw new InputError("Diese Inventur ist bereits abgeschlossen.", 409, "stock_inventory_closed");
+  }
+  const locationId = session.rows[0].location_id;
+
+  const differences = await client.query(
+    `SELECT item_id, expected_quantity, counted_quantity
+     FROM stock_inventory_counts
+     WHERE company_id = $1 AND session_id = $2
+       AND counted_quantity IS NOT NULL
+       AND counted_quantity <> expected_quantity`,
+    [context.companyId, sessionId]
+  );
+
+  const reason = optionalText(body?.reason, "Grund", 2000)
+    || `Inventur vom ${new Date().toISOString().slice(0, 10)}`;
+
+  let booked = 0;
+  for (const row of differences.rows) {
+    const difference = Number(row.counted_quantity) - Number(row.expected_quantity);
+    const amount = Math.abs(Math.round(difference * 1000) / 1000).toFixed(3);
+
+    await client.query(
+      `INSERT INTO stock_movements (
+         company_id, item_id, movement_type, quantity,
+         source_location_id, target_location_id, inventory_session_id,
+         actor_user_id, reason, source_type
+       ) VALUES ($1, $2, 'correction', $3, $4, $5, $6, $7, $8, 'inventory')`,
+      [
+        context.companyId, row.item_id, amount,
+        difference < 0 ? locationId : null,
+        difference > 0 ? locationId : null,
+        sessionId, context.userId, reason
+      ]
+    ).catch(mapDatabaseError);
+    booked += 1;
+  }
+
+  await client.query(
+    `UPDATE stock_inventory_sessions
+     SET status = 'completed', completed_by_user_id = $3, completed_at = CURRENT_TIMESTAMP,
+         row_version = row_version + 1
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, sessionId, context.userId]
+  );
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason)
+     VALUES ($1, 'inventory_session', $2, 'completed', $3, $4)`,
+    [context.companyId, sessionId, context.userId, reason]
+  );
+
+  return { ...(await inventoryDetail(client, context, sessionId)), corrections: booked };
+}
+
+async function cancelInventory(client, context, sessionId, body) {
+  await requireTransfer(client, context);
+
+  const reason = optionalText(body?.reason, "Grund", 2000);
+  if (!reason) throw new InputError("Ein Abbruch braucht einen Grund.");
+
+  const updated = await client.query(
+    `UPDATE stock_inventory_sessions
+     SET status = 'cancelled', completed_by_user_id = $3, completed_at = CURRENT_TIMESTAMP,
+         row_version = row_version + 1
+     WHERE company_id = $1 AND id = $2 AND status = 'running'
+     RETURNING id`,
+    [context.companyId, sessionId, context.userId]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError("Diese Inventur läuft nicht mehr.", 409, "stock_inventory_closed");
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason)
+     VALUES ($1, 'inventory_session', $2, 'cancelled', $3, $4)`,
+    [context.companyId, sessionId, context.userId, reason]
+  );
+
+  return inventoryDetail(client, context, sessionId);
+}
+
+async function listInventories(client, context) {
+  const result = await client.query(
+    `SELECT sitzung.*, ort.name AS location_name
+     FROM stock_inventory_sessions AS sitzung
+     JOIN storage_locations AS ort
+       ON ort.company_id = sitzung.company_id AND ort.id = sitzung.location_id
+     WHERE sitzung.company_id = $1 AND sitzung.status = 'running'
+     ORDER BY sitzung.started_at`,
+    [context.companyId]
+  );
+  return result.rows.map(inventoryDto);
+}
+
 export async function handleStockRequest({ request, url, client, context }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
@@ -874,6 +1155,37 @@ export async function handleStockRequest({ request, url, client, context }) {
 
   if (request.method === "GET" && path === "/api/v1/stock/reorder") {
     return { status: 200, body: { suggestions: await reorderSuggestions(client, context) } };
+  }
+
+  if (request.method === "GET" && path === "/api/v1/stock/inventory") {
+    return { status: 200, body: { sessions: await listInventories(client, context) } };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/inventory") {
+    const body = await readJson(request);
+    return { status: 201, body: await startInventory(client, context, body) };
+  }
+
+  const inventoryMatch = /^\/api\/v1\/stock\/inventory\/([^/]+)(?:\/(count|complete|cancel))?$/.exec(path);
+  if (inventoryMatch) {
+    const sessionId = validateId(inventoryMatch[1], "Inventur-ID");
+    const aktion = inventoryMatch[2];
+
+    if (request.method === "GET" && !aktion) {
+      return { status: 200, body: await inventoryDetail(client, context, sessionId) };
+    }
+    if (request.method === "POST" && aktion === "count") {
+      const body = await readJson(request);
+      return { status: 200, body: await recordCount(client, context, sessionId, body) };
+    }
+    if (request.method === "POST" && aktion === "complete") {
+      const body = await readJson(request);
+      return { status: 200, body: await completeInventory(client, context, sessionId, body) };
+    }
+    if (request.method === "POST" && aktion === "cancel") {
+      const body = await readJson(request);
+      return { status: 200, body: await cancelInventory(client, context, sessionId, body) };
+    }
   }
 
   return { status: 404, body: { error: "Diesen Lagerendpunkt gibt es nicht." } };

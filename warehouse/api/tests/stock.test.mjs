@@ -404,3 +404,184 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.equal(status, 404);
   });
 });
+
+integrationTest("Lager: Inventur von der Zählung bis zur Korrektur", async (t) => {
+  const apiPool = createPool(datenbank);
+  const ownerPool = createPool({
+    ...datenbank,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
+  t.after(async () => {
+    await apiPool.end();
+    await ownerPool.end();
+  });
+
+  const kennung = String(Date.now()).slice(-5);
+  const companyId = await firmaAnlegen(ownerPool, `${kennung}I`);
+  const buero = await mitarbeiterAnlegen(ownerPool, companyId, `INV-B-${kennung}`, "office");
+  const vorarbeiter = await mitarbeiterAnlegen(ownerPool, companyId, `INV-V-${kennung}`, "foreman");
+  const monteur = await mitarbeiterAnlegen(ownerPool, companyId, `INV-M-${kennung}`, "installer");
+
+  const kontext = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/contexts");
+  const lager = kontext.body.context.locations.find((ort) => ort.name === "Materiallager");
+
+  // Zwei Artikel mit Anfangsbestand, damit es etwas zu zählen gibt.
+  const angelegt = [];
+  for (const [nummer, name, menge] of [["INV-1", "Zählartikel A", 100], ["INV-2", "Zählartikel B", 40]]) {
+    const artikel = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `${nummer}-${kennung}`, name, groupKey: "other", unit: "Stück"
+    });
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: artikel.body.item.id, movementType: "opening", quantity: menge,
+      targetLocationId: lager.id, sourceType: "import"
+    });
+    angelegt.push(artikel.body.item.id);
+  }
+  const [artikelA, artikelB] = angelegt;
+
+  let inventurId = null;
+
+  await t.test("der Monteur darf keine Inventur starten", async () => {
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/inventory",
+      { locationId: lager.id }, "stock_inventory_forbidden");
+  });
+
+  await t.test("der Vorarbeiter startet und bekommt den eingefrorenen Sollbestand", async () => {
+    const { status, body } = await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/inventory", {
+      locationId: lager.id
+    });
+
+    assert.equal(status, 201);
+    assert.equal(body.session.status, "running");
+    assert.equal(body.lines.length, 2);
+    assert.equal(body.open, 2, "Vor der Zählung ist alles offen");
+    assert.equal(body.differences, 0);
+    assert.equal(body.lines.find((zeile) => zeile.itemId === artikelA).expectedQuantity, 100);
+    inventurId = body.session.id;
+  });
+
+  await t.test("für denselben Lagerplatz läuft nur eine Inventur", async () => {
+    await erwarteFehler(apiPool, vorarbeiter, "POST", "/api/v1/stock/inventory",
+      { locationId: lager.id }, "stock_inventory_running");
+  });
+
+  await t.test("gezählt wird auch, was gar nicht dort liegen sollte", async () => {
+    // A: 3 Stück weniger als gedacht.
+    const nachA = await aufrufen(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${inventurId}/count`, { itemId: artikelA, quantity: 97 });
+    assert.equal(nachA.body.lines.find((z) => z.itemId === artikelA).difference, -3);
+    assert.equal(nachA.body.open, 1);
+
+    // B: genau so viele wie gedacht.
+    const nachB = await aufrufen(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${inventurId}/count`, { itemId: artikelB, quantity: 40 });
+    assert.equal(nachB.body.lines.find((z) => z.itemId === artikelB).difference, 0);
+    assert.equal(nachB.body.open, 0);
+    assert.equal(nachB.body.differences, 1, "Nur A weicht ab");
+
+    // Ein dritter Artikel taucht überraschend am Platz auf.
+    const fund = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `INV-3-${kennung}`, name: "Überraschungsfund", groupKey: "other", unit: "Stück"
+    });
+    const nachFund = await aufrufen(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${inventurId}/count`, { itemId: fund.body.item.id, quantity: 12 });
+
+    const zeile = nachFund.body.lines.find((z) => z.itemId === fund.body.item.id);
+    assert.equal(zeile.expectedQuantity, 0, "Was nicht dort sein sollte, hat Soll null");
+    assert.equal(zeile.difference, 12);
+  });
+
+  await t.test("eine Zählung lässt sich berichtigen, solange die Inventur läuft", async () => {
+    const berichtigt = await aufrufen(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${inventurId}/count`, { itemId: artikelA, quantity: 98 });
+    assert.equal(berichtigt.body.lines.find((z) => z.itemId === artikelA).difference, -2);
+  });
+
+  await t.test("der Vorarbeiter darf nicht abschließen", async () => {
+    await erwarteFehler(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${inventurId}/complete`, {}, "stock_manage_forbidden");
+  });
+
+  await t.test("der Abschluss schreibt genau die Unterschiede als Korrektur", async () => {
+    const { body } = await aufrufen(apiPool, buero, "POST",
+      `/api/v1/stock/inventory/${inventurId}/complete`, { reason: "Jahresinventur" });
+
+    assert.equal(body.session.status, "completed");
+    assert.equal(body.corrections, 2, "A um zwei zu wenig, der Fund um zwölf zu viel");
+
+    const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelA}`);
+    assert.equal(
+      bestand.body.levels.find((zeile) => zeile.locationId === lager.id).quantity,
+      98,
+      "Nach der Korrektur steht der gezählte Bestand"
+    );
+
+    const unveraendert = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelB}`);
+    assert.equal(
+      unveraendert.body.levels.find((zeile) => zeile.locationId === lager.id).quantity,
+      40,
+      "Ohne Abweichung entsteht keine Buchung"
+    );
+
+    const korrektur = bestand.body.movements.find((zug) => zug.movementType === "correction");
+    assert.equal(korrektur.sourceType, "inventory");
+    assert.equal(korrektur.reason, "Jahresinventur");
+  });
+
+  await t.test("eine abgeschlossene Inventur nimmt nichts mehr an", async () => {
+    await erwarteFehler(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${inventurId}/count`,
+      { itemId: artikelA, quantity: 5 }, "stock_inventory_closed");
+    await erwarteFehler(apiPool, buero, "POST",
+      `/api/v1/stock/inventory/${inventurId}/complete`, {}, "stock_inventory_closed");
+  });
+
+  await t.test("nicht gezählte Zeilen werden nicht ausgebucht", async () => {
+    const neu = await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/inventory", {
+      locationId: lager.id
+    });
+    const zweite = neu.body.session.id;
+
+    // Nichts zählen und trotzdem abschließen.
+    const abschluss = await aufrufen(apiPool, buero, "POST",
+      `/api/v1/stock/inventory/${zweite}/complete`, {});
+    assert.equal(abschluss.body.corrections, 0);
+
+    const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelA}`);
+    assert.equal(
+      bestand.body.levels.find((zeile) => zeile.locationId === lager.id).quantity,
+      98,
+      "Eine abgebrochene Zählung darf kein Lager leeren"
+    );
+  });
+
+  await t.test("ein Abbruch braucht einen Grund und beendet die Inventur", async () => {
+    const neu = await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/inventory", {
+      locationId: lager.id
+    });
+    const dritte = neu.body.session.id;
+
+    await erwarteFehler(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${dritte}/cancel`, {}, "invalid_request");
+
+    const abgebrochen = await aufrufen(apiPool, vorarbeiter, "POST",
+      `/api/v1/stock/inventory/${dritte}/cancel`, { reason: "Regal nicht zugänglich" });
+    assert.equal(abgebrochen.body.session.status, "cancelled");
+
+    const laufende = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/inventory");
+    assert.equal(
+      laufende.body.sessions.filter((sitzung) => sitzung.id === dritte).length,
+      0,
+      "Eine abgebrochene Inventur läuft nicht mehr"
+    );
+  });
+
+  await t.test("eine fremde Firma sieht die Inventur nicht", async () => {
+    const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}J`);
+    const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `INV-F-${kennung}`, "office");
+
+    await erwarteFehler(apiPool, fremder, "GET", `/api/v1/stock/inventory/${inventurId}`,
+      undefined, "stock_inventory_unknown");
+  });
+});
