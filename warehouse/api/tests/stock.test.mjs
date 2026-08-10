@@ -797,3 +797,170 @@ integrationTest("Lager: Bestellung vom Vorschlag bis zur Teillieferung", async (
       { supplierId: lieferantId, fromReorder: true }, "stock_supplier_unknown");
   });
 });
+
+integrationTest("Lager: Codes nachtragen, zurücknehmen und Etiketten drucken", async (t) => {
+  const apiPool = createPool(datenbank);
+  const ownerPool = createPool({
+    ...datenbank,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
+  t.after(async () => {
+    await apiPool.end();
+    await ownerPool.end();
+  });
+
+  const kennung = String(Date.now()).slice(-5);
+  const companyId = await firmaAnlegen(ownerPool, `${kennung}D`);
+  const buero = await mitarbeiterAnlegen(ownerPool, companyId, `COD-B-${kennung}`, "office");
+  const monteur = await mitarbeiterAnlegen(ownerPool, companyId, `COD-M-${kennung}`, "installer");
+
+  // Ein Artikel ganz ohne Code — der Fall, den es vorher nicht gab.
+  const ohneCode = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+    itemNumber: `COD-1-${kennung}`, name: "Handangelegt ohne Code", groupKey: "other", unit: "Stück"
+  });
+  const artikelId = ohneCode.body.item.id;
+  const zweiter = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+    itemNumber: `COD-2-${kennung}`, name: "Zweiter Artikel", groupKey: "other", unit: "Stück"
+  });
+  const zweiterId = zweiter.body.item.id;
+
+  await t.test("ein handangelegter Artikel darf ohne Code entstehen", async () => {
+    assert.equal(ohneCode.status, 201);
+    assert.deepEqual(ohneCode.body.barcodes, [], "Ohne Herstellercode gibt es eben keinen");
+  });
+
+  await t.test("der Monteur trägt keine Codes nach", async () => {
+    await erwarteFehler(apiPool, monteur, "POST", `/api/v1/stock/items/${artikelId}/barcodes`,
+      { code: "4006381333931", codeType: "gtin" }, "stock_manage_forbidden");
+  });
+
+  await t.test("das Büro trägt Einzel- und Kartoncode nach", async () => {
+    const einzeln = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/items/${artikelId}/barcodes`, {
+      code: "4006381333931", codeType: "gtin", isPrimary: true
+    });
+    assert.equal(einzeln.status, 201);
+    assert.equal(einzeln.body.barcodes.length, 1);
+    assert.equal(einzeln.body.barcodes[0].normalized, "04006381333931");
+
+    const karton = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/items/${artikelId}/barcodes`, {
+      code: "96385074", codeType: "gtin", packQuantity: 100
+    });
+    assert.equal(karton.body.barcodes.length, 2);
+
+    const scan = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/scan", { code: "96385074" });
+    assert.equal(scan.body.scan.found, true);
+    assert.equal(scan.body.scan.packQuantity, 100, "Der nachgetragene Kartoncode bucht hundert");
+    assert.equal(scan.body.scan.item.id, artikelId);
+  });
+
+  await t.test("ein neuer Hauptcode löst den bisherigen ab", async () => {
+    const vorher = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+    assert.equal(vorher.body.barcodes.filter((code) => code.isPrimary).length, 1);
+
+    const nachher = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/items/${artikelId}/barcodes`, {
+      code: `EIGEN-${kennung}`, isPrimary: true
+    });
+    const haupt = nachher.body.barcodes.filter((code) => code.isPrimary);
+    assert.equal(haupt.length, 1, "Es gibt genau einen Hauptcode");
+    assert.equal(haupt[0].code, `EIGEN-${kennung}`);
+  });
+
+  await t.test("eine ungültige GTIN wird auch beim Nachtragen abgewiesen", async () => {
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/items/${artikelId}/barcodes`,
+      { code: "4006381333930", codeType: "gtin" }, "stock_invalid_gtin");
+  });
+
+  await t.test("derselbe Code gehört nur zu einem Artikel", async () => {
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/items/${zweiterId}/barcodes`,
+      { code: "4006381333931", codeType: "gtin" }, "stock_duplicate");
+  });
+
+  await t.test("ein vertippter Code wird mit Grund zurückgenommen", async () => {
+    const detail = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+    const falsch = detail.body.barcodes.find((code) => code.code === "4006381333931");
+
+    await erwarteFehler(apiPool, buero, "POST",
+      `/api/v1/stock/items/${artikelId}/barcodes/${falsch.id}/revoke`, {}, "invalid_request");
+
+    const { body } = await aufrufen(apiPool, buero, "POST",
+      `/api/v1/stock/items/${artikelId}/barcodes/${falsch.id}/revoke`, { reason: "Vertippt" });
+    assert.equal(body.barcodes.filter((code) => code.code === "4006381333931").length, 0);
+
+    const scan = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/scan", { code: "4006381333931" });
+    assert.equal(scan.body.scan.found, false, "Ein zurückgenommener Code findet nichts mehr");
+  });
+
+  await t.test("nach der Rücknahme gehört der Code dem richtigen Artikel", async () => {
+    const { body } = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/items/${zweiterId}/barcodes`, {
+      code: "4006381333931", codeType: "gtin"
+    });
+    assert.equal(body.barcodes.length, 1);
+
+    const scan = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/scan", { code: "4006381333931" });
+    assert.equal(scan.body.scan.item.id, zweiterId);
+  });
+
+  await t.test("ein fremder Code lässt sich nicht zurücknehmen", async () => {
+    const detail = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${zweiterId}`);
+    await erwarteFehler(apiPool, buero, "POST",
+      `/api/v1/stock/items/${artikelId}/barcodes/${detail.body.barcodes[0].id}/revoke`,
+      { reason: "Versuch" }, "stock_barcode_unknown");
+  });
+
+  await t.test("für einen Artikel ohne Herstellercode entsteht ein eigenes Etikett", async () => {
+    const nackt = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `COD-3-${kennung}`, name: "Kabeltrommel ohne Aufdruck", groupKey: "other", unit: "Meter"
+    });
+
+    const { status, body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/labels/sheet", {
+      targets: [{ targetType: "item", id: nackt.body.item.id }]
+    });
+
+    assert.equal(status, 200);
+    assert.equal(body.labels.length, 1);
+    assert.equal(body.labels[0].label, "Kabeltrommel ohne Aufdruck");
+    assert.equal(body.labels[0].sublabel, `COD-3-${kennung}`);
+    assert.match(body.labels[0].svg, /^<svg/, "Es kommt ein Bild und keine Beschreibung");
+    assert.match(body.labels[0].target, /lager=[0-9a-f-]{36}/);
+    assert.equal(body.labels[0].generation, 1);
+
+    // Der Nachdruck darf die schon geklebten Aufkleber nicht entwerten.
+    const nachdruck = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/labels/sheet", {
+      targets: [{ targetType: "item", id: nackt.body.item.id }]
+    });
+    assert.equal(nachdruck.body.labels[0].target, body.labels[0].target);
+
+    // Und der gedruckte Code findet den Artikel.
+    const token = new URL(body.labels[0].target).searchParams.get("lager");
+    const scan = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/scan", { code: token });
+    assert.equal(scan.body.scan.found, true);
+    assert.equal(scan.body.scan.item.id, nackt.body.item.id);
+  });
+
+  await t.test("ein Bogen nimmt Artikel und Lagerplätze gemischt auf", async () => {
+    const kontext = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/contexts");
+    const lager = kontext.body.context.locations.find((ort) => ort.name === "Materiallager");
+
+    const { body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/labels/sheet", {
+      targets: [
+        { targetType: "item", id: artikelId },
+        { targetType: "location", id: lager.id }
+      ]
+    });
+
+    assert.equal(body.labels.length, 2);
+    assert.equal(body.labels[1].label, "Materiallager");
+    assert.equal(body.labels[1].targetType, "location");
+  });
+
+  await t.test("ein leerer oder überlanger Bogen wird abgewiesen", async () => {
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/labels/sheet",
+      { targets: [] }, "invalid_request");
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/labels/sheet",
+      { targets: Array.from({ length: 121 }, () => ({ targetType: "item", id: artikelId })) },
+      "invalid_request");
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/labels/sheet",
+      { targets: [{ targetType: "item", id: artikelId }] }, "stock_manage_forbidden");
+  });
+});

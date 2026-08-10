@@ -8,6 +8,9 @@ backups/*
 *.backup
 
 node_modules/
+# Der externe Lagerordner leiht sich die Abhaengigkeiten der API per
+# Symlink; nach dem Einpflegen entfaellt er.
+warehouse/node_modules
 dist/
 coverage/
 .cache/

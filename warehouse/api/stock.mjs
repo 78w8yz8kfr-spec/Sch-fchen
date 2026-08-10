@@ -11,6 +11,7 @@
 // bekommt dieselbe Antwort, damit niemand ueber die Fehlermeldung erfaehrt, ob
 // es den Artikel anderswo gibt.
 
+import { toString as qrToString } from "qrcode";
 import { InputError, readJson, validateId } from "../../api/src/validation.mjs";
 import { loadCompanyModules } from "../../api/src/company-modules.mjs";
 
@@ -316,7 +317,7 @@ async function itemDetail(client, context, itemId) {
     client.query(
       `SELECT id, code_raw, code_normalized, code_type, pack_quantity, is_primary
        FROM stock_item_barcodes
-       WHERE company_id = $1 AND item_id = $2
+       WHERE company_id = $1 AND item_id = $2 AND status = 'active'
        ORDER BY is_primary DESC, created_at`,
       [context.companyId, itemId]
     ),
@@ -475,6 +476,155 @@ async function createLocation(client, context, body) {
 }
 
 /**
+ * Traegt einem vorhandenen Artikel einen weiteren Code nach.
+ *
+ * Der Fall ist der Alltag und nicht die Ausnahme: die Einzelpackung ist beim
+ * Anlegen dabei, der Kartoncode mit Gebindemenge kommt erst, wenn die erste
+ * Palette geliefert wird.
+ */
+async function addBarcode(client, context, itemId, body) {
+  await requireManager(client, context);
+
+  const item = await client.query(
+    "SELECT id FROM stock_items WHERE company_id = $1 AND id = $2",
+    [context.companyId, itemId]
+  );
+  if (item.rowCount !== 1) {
+    throw new InputError("Dieser Artikel wurde nicht gefunden.", 404, "stock_item_unknown");
+  }
+
+  const [code] = readBarcodes({ barcodes: [body] });
+  if (!code) throw new InputError("Der Code fehlt.");
+
+  if (code.isPrimary) {
+    // Es gibt hoechstens einen Hauptcode; der bisherige tritt zurueck, statt
+    // dass der neue am eindeutigen Index scheitert.
+    await client.query(
+      `UPDATE stock_item_barcodes SET is_primary = FALSE
+       WHERE company_id = $1 AND item_id = $2 AND is_primary AND status = 'active'`,
+      [context.companyId, itemId]
+    );
+  }
+
+  await client.query(
+    `INSERT INTO stock_item_barcodes (
+       company_id, item_id, code_raw, code_normalized, code_type,
+       pack_quantity, is_primary, created_by_user_id
+     ) VALUES ($1, $2, $3, $3, $4, $5, $6, $7)`,
+    [
+      context.companyId, itemId, code.code, code.codeType,
+      code.packQuantity, code.isPrimary, context.userId
+    ]
+  ).catch(mapDatabaseError);
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, new_state)
+     VALUES ($1, 'stock_item_barcode', $2, 'added', $3, $4::JSONB)`,
+    [context.companyId, itemId, context.userId, JSON.stringify({ code: code.code })]
+  );
+
+  return itemDetail(client, context, itemId);
+}
+
+/** Nimmt einen Code zurueck. Geloescht wird nichts; er findet nur nichts mehr. */
+async function revokeBarcode(client, context, itemId, codeId, body) {
+  await requireManager(client, context);
+
+  const reason = optionalText(body?.reason, "Grund", 2000);
+  if (!reason) throw new InputError("Ein Code wird nur mit Begründung zurückgenommen.");
+
+  const updated = await client.query(
+    `UPDATE stock_item_barcodes
+     SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP,
+         revoked_by_user_id = $4, revoke_reason = $5
+     WHERE company_id = $1 AND id = $2 AND item_id = $3 AND status = 'active'
+     RETURNING code_raw`,
+    [context.companyId, codeId, itemId, context.userId, reason]
+  ).catch(mapDatabaseError);
+
+  if (updated.rowCount !== 1) {
+    throw new InputError("Dieser Code gehört nicht zu diesem Artikel.", 404, "stock_barcode_unknown");
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason, old_state)
+     VALUES ($1, 'stock_item_barcode', $2, 'revoked', $3, $4, $5::JSONB)`,
+    [
+      context.companyId, itemId, context.userId, reason,
+      JSON.stringify({ code: updated.rows[0].code_raw })
+    ]
+  );
+
+  return itemDetail(client, context, itemId);
+}
+
+/**
+ * Baut die QR-Bilder fuer einen Etikettenbogen.
+ *
+ * Wer keinen Herstellercode hat, braucht ein eigenes Etikett — sonst ist der
+ * Artikel nie scannbar, und das ganze Modul haengt am Scannen. Fehlt der Token
+ * noch, entsteht er hier; ein vorhandener wird wiederverwendet, damit ein
+ * Nachdruck nicht die schon geklebten Aufkleber entwertet.
+ *
+ * Geliefert werden nur die Bilder. Den Bogen setzt das Frontend zusammen, wie
+ * beim Geraetemodul: A4, zehn Spalten, zwoelf Reihen, 18 mal 18 Millimeter.
+ */
+async function labelSheet(client, context, body, allowedOrigin) {
+  await requireManager(client, context);
+
+  const ziele = Array.isArray(body?.targets) ? body.targets : [];
+  if (!ziele.length || ziele.length > 120) {
+    throw new InputError("Bitte 1 bis 120 Etiketten für den Druckbogen wählen.");
+  }
+
+  const labels = [];
+  for (const ziel of ziele) {
+    const targetType = ziel?.targetType === "location" ? "location" : "item";
+    const id = validateId(ziel?.id, targetType === "item" ? "Artikel" : "Lagerplatz");
+
+    const etikett = await issueLabel(client, context, {
+      targetType,
+      itemId: targetType === "item" ? id : undefined,
+      locationId: targetType === "location" ? id : undefined
+    });
+
+    const beschriftung = targetType === "item"
+      ? await client.query(
+        "SELECT name, item_number AS nummer FROM stock_items WHERE company_id = $1 AND id = $2",
+        [context.companyId, id]
+      )
+      : await client.query(
+        "SELECT name, '' AS nummer FROM storage_locations WHERE company_id = $1 AND id = $2",
+        [context.companyId, id]
+      );
+    if (beschriftung.rowCount !== 1) {
+      throw new InputError("Dieses Etikettenziel wurde nicht gefunden.", 404, "stock_label_target_unknown");
+    }
+
+    const adresse = new URL("/", allowedOrigin || "https://example.invalid/");
+    adresse.searchParams.set("lager", etikett.token);
+
+    labels.push({
+      targetType,
+      id,
+      label: beschriftung.rows[0].name,
+      sublabel: beschriftung.rows[0].nummer || "",
+      target: adresse.toString(),
+      generation: etikett.generation,
+      svg: await qrToString(adresse.toString(), {
+        type: "svg",
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 480,
+        color: { dark: "#111111ff", light: "#ffffffff" }
+      })
+    });
+  }
+
+  return labels;
+}
+
+/**
  * Gibt ein eigenes Etikett aus.
  *
  * Ein erneuter Druck liest denselben Token wieder; nur `replace` widerruft ihn
@@ -593,7 +743,7 @@ async function scan(client, context, body) {
   const barcode = await client.query(
     `SELECT item_id, pack_quantity, code_type
      FROM stock_item_barcodes
-     WHERE company_id = $1 AND code_normalized = $2`,
+     WHERE company_id = $1 AND code_normalized = $2 AND status = 'active'`,
     [context.companyId, lookup]
   );
 
@@ -1485,7 +1635,7 @@ async function listInventories(client, context) {
   return result.rows.map(inventoryDto);
 }
 
-export async function handleStockRequest({ request, url, client, context }) {
+export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
 
@@ -1513,6 +1663,23 @@ export async function handleStockRequest({ request, url, client, context }) {
   if (request.method === "POST" && path === "/api/v1/stock/locations") {
     const body = await readJson(request);
     return { status: 201, body: { location: await createLocation(client, context, body) } };
+  }
+
+  const barcodeMatch = /^\/api\/v1\/stock\/items\/([^/]+)\/barcodes(?:\/([^/]+)\/revoke)?$/.exec(path);
+  if (request.method === "POST" && barcodeMatch) {
+    const itemId = validateId(barcodeMatch[1], "Artikel-ID");
+    const body = await readJson(request);
+
+    if (barcodeMatch[2]) {
+      const codeId = validateId(barcodeMatch[2], "Code-ID");
+      return { status: 200, body: await revokeBarcode(client, context, itemId, codeId, body) };
+    }
+    return { status: 201, body: await addBarcode(client, context, itemId, body) };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/labels/sheet") {
+    const body = await readJson(request, 100_000);
+    return { status: 200, body: { labels: await labelSheet(client, context, body, allowedOrigin) } };
   }
 
   if (request.method === "POST" && path === "/api/v1/stock/labels") {

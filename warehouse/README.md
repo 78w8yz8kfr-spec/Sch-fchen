@@ -92,8 +92,14 @@ Firma je Lauf selbst mit und ist wiederholbar:
 
 ```bash
 npm --prefix api ci --ignore-scripts
+ln -sfn ../api/node_modules warehouse/node_modules
 API_INTEGRATION_TEST=true node --test warehouse/api/tests/stock.test.mjs
 ```
+
+Der Symlink ist nötig, weil `stock.mjs` hier außerhalb von `api/` liegt und
+Node die Abhängigkeiten der API sonst nicht findet. Die Importe stehen
+absichtlich so, wie sie nach dem Einpflegen richtig sind — dann entfällt der
+Symlink ersatzlos.
 
 Ohne `API_INTEGRATION_TEST=true` überspringt er sich selbst, wie die übrigen
 Integrationstests des Projekts auch.
