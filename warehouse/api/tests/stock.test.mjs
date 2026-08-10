@@ -585,3 +585,215 @@ integrationTest("Lager: Inventur von der Zählung bis zur Korrektur", async (t) 
       undefined, "stock_inventory_unknown");
   });
 });
+
+integrationTest("Lager: Bestellung vom Vorschlag bis zur Teillieferung", async (t) => {
+  const apiPool = createPool(datenbank);
+  const ownerPool = createPool({
+    ...datenbank,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
+  t.after(async () => {
+    await apiPool.end();
+    await ownerPool.end();
+  });
+
+  const kennung = String(Date.now()).slice(-5);
+  const companyId = await firmaAnlegen(ownerPool, `${kennung}B`);
+  const buero = await mitarbeiterAnlegen(ownerPool, companyId, `BST-B-${kennung}`, "office");
+  const monteur = await mitarbeiterAnlegen(ownerPool, companyId, `BST-M-${kennung}`, "installer");
+
+  const kontext = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/contexts");
+  const lager = kontext.body.context.locations.find((ort) => ort.name === "Materiallager");
+
+  let lieferantId = null;
+  let artikelKnapp = null;
+  let artikelVoll = null;
+  let bestellId = null;
+
+  await t.test("der Monteur darf keinen Lieferanten anlegen", async () => {
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/suppliers",
+      { supplierNumber: "L-1", name: "Verboten" }, "stock_manage_forbidden");
+  });
+
+  await t.test("das Büro legt einen Lieferanten an", async () => {
+    const { status, body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/suppliers", {
+      supplierNumber: ` l-${kennung} `, name: "Sonepar Deutschland", customerNumber: "K-4711",
+      email: "Bestellung@Sonepar.example"
+    });
+
+    assert.equal(status, 201);
+    assert.equal(body.supplier.supplierNumber, `L-${kennung}`);
+    assert.equal(body.supplier.email, "bestellung@sonepar.example", "Die Adresse wird vereinheitlicht");
+    lieferantId = body.supplier.id;
+
+    const liste = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/suppliers");
+    assert.equal(liste.body.suppliers.filter((eintrag) => eintrag.id === lieferantId).length, 1);
+  });
+
+  await t.test("dieselbe Lieferantennummer gibt es nur einmal", async () => {
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/suppliers",
+      { supplierNumber: `L-${kennung}`, name: "Noch einmal" }, "stock_duplicate");
+  });
+
+  await t.test("zwei Artikel, einer davon unter dem Mindestbestand", async () => {
+    const knapp = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `BST-1-${kennung}`, name: "Knapper Artikel", groupKey: "other", unit: "Stück",
+      minimumStock: 100, targetStock: 400, defaultSupplierId: lieferantId
+    });
+    artikelKnapp = knapp.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: artikelKnapp, movementType: "opening", quantity: 40,
+      targetLocationId: lager.id, sourceType: "import"
+    });
+
+    const voll = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `BST-2-${kennung}`, name: "Voller Artikel", groupKey: "other", unit: "Stück",
+      minimumStock: 10, targetStock: 50, defaultSupplierId: lieferantId
+    });
+    artikelVoll = voll.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: artikelVoll, movementType: "opening", quantity: 40,
+      targetLocationId: lager.id, sourceType: "import"
+    });
+
+    const vorschlag = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/reorder");
+    const eintrag = vorschlag.body.suggestions.find((zeile) => zeile.id === artikelKnapp);
+    assert.ok(eintrag, "Der knappe Artikel fehlt im Vorschlag");
+    assert.equal(eintrag.suggestedQuantity, 360, "Aufgefüllt wird bis zum Zielbestand");
+    assert.equal(eintrag.supplierName, "Sonepar Deutschland");
+    assert.equal(
+      vorschlag.body.suggestions.filter((zeile) => zeile.id === artikelVoll).length,
+      0,
+      "Der volle Artikel gehört nicht in den Vorschlag"
+    );
+  });
+
+  await t.test("aus dem Vorschlag entsteht eine Bestellung", async () => {
+    const { status, body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/orders", {
+      supplierId: lieferantId, fromReorder: true
+    });
+
+    assert.equal(status, 201);
+    assert.equal(body.order.status, "draft");
+    assert.equal(body.order.supplierName, "Sonepar Deutschland");
+    assert.match(body.order.orderNumber, /^B-\d{4}-/);
+    assert.equal(body.lines.length, 1, "Nur der knappe Artikel gehört hinein");
+    assert.equal(body.lines[0].itemId, artikelKnapp);
+    assert.equal(body.lines[0].quantityOrdered, 360);
+    assert.equal(body.lines[0].quantityOpen, 360);
+    bestellId = body.order.id;
+  });
+
+  await t.test("ein Entwurf nimmt noch keine Ware an", async () => {
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/receive`,
+      { locationId: lager.id, lines: [{ purchaseOrderItemId: bestellId, quantity: 1 }] },
+      "stock_order_closed");
+  });
+
+  await t.test("bestellt wird einmal", async () => {
+    const { body } = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/send`);
+    assert.equal(body.order.status, "ordered");
+    assert.ok(body.order.orderedAt);
+
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/send`,
+      undefined, "stock_order_not_draft");
+  });
+
+  await t.test("eine Teillieferung lässt die Bestellung offen", async () => {
+    const detail = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/orders/${bestellId}`);
+    const position = detail.body.lines[0].id;
+
+    const { body } = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/receive`, {
+      locationId: lager.id,
+      lines: [{ purchaseOrderItemId: position, quantity: 100, clientOperationId: `WE-${kennung}-1` }]
+    });
+
+    assert.equal(body.order.status, "partially_received");
+    assert.equal(body.lines[0].quantityReceived, 100);
+    assert.equal(body.lines[0].quantityOpen, 260);
+
+    const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelKnapp}`);
+    assert.equal(
+      bestand.body.levels.find((zeile) => zeile.locationId === lager.id).quantity,
+      140,
+      "Der Wareneingang landet im Bestand"
+    );
+    const zugang = bestand.body.movements.find((zug) => zug.movementType === "receipt");
+    assert.ok(zugang, "Der Wareneingang steht im Journal");
+  });
+
+  await t.test("derselbe Wareneingang zählt nur einmal", async () => {
+    const detail = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/orders/${bestellId}`);
+    const position = detail.body.lines[0].id;
+
+    const { body } = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/receive`, {
+      locationId: lager.id,
+      lines: [{ purchaseOrderItemId: position, quantity: 100, clientOperationId: `WE-${kennung}-1` }]
+    });
+
+    assert.equal(body.booked[0].repeated, true);
+    assert.equal(body.lines[0].quantityReceived, 100, "Die gelieferte Menge darf sich nicht verdoppeln");
+
+    const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelKnapp}`);
+    assert.equal(bestand.body.levels.find((zeile) => zeile.locationId === lager.id).quantity, 140);
+  });
+
+  await t.test("eine angefangene Lieferung lässt sich nicht mehr stornieren", async () => {
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/cancel`,
+      { reason: "Doch nicht" }, "stock_order_not_cancellable");
+  });
+
+  await t.test("Überlieferung ist erlaubt und schließt die Bestellung", async () => {
+    const detail = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/orders/${bestellId}`);
+    const position = detail.body.lines[0].id;
+
+    const { body } = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/receive`, {
+      locationId: lager.id,
+      lines: [{ purchaseOrderItemId: position, quantity: 300, clientOperationId: `WE-${kennung}-2` }]
+    });
+
+    assert.equal(body.order.status, "received");
+    assert.equal(body.lines[0].quantityReceived, 400, "Vierhundert geliefert bei dreihundertsechzig bestellt");
+    assert.equal(body.lines[0].quantityOpen, 0);
+
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/receive`,
+      { locationId: lager.id, lines: [{ purchaseOrderItemId: position, quantity: 1 }] },
+      "stock_order_closed");
+  });
+
+  await t.test("eine Bestellung ohne Bedarf wird nicht erfunden", async () => {
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/orders",
+      { supplierId: lieferantId, fromReorder: true }, "stock_reorder_empty");
+  });
+
+  await t.test("ein Entwurf lässt sich mit Grund stornieren", async () => {
+    const entwurf = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/orders", {
+      supplierId: lieferantId,
+      lines: [{ itemId: artikelVoll, quantity: 25, unitPrice: 1.5, supplierItemNumber: "SON-123" }]
+    });
+    const id = entwurf.body.order.id;
+    assert.equal(entwurf.body.lines[0].unitPrice, 1.5);
+    assert.equal(entwurf.body.lines[0].supplierItemNumber, "SON-123");
+
+    await erwarteFehler(apiPool, buero, "POST", `/api/v1/stock/orders/${id}/cancel`,
+      {}, "invalid_request");
+
+    const storniert = await aufrufen(apiPool, buero, "POST", `/api/v1/stock/orders/${id}/cancel`,
+      { reason: "Falscher Lieferant" });
+    assert.equal(storniert.body.order.status, "cancelled");
+
+    const offene = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/orders?offen=ja");
+    assert.equal(offene.body.orders.filter((eintrag) => eintrag.id === id).length, 0);
+  });
+
+  await t.test("eine fremde Firma sieht die Bestellung nicht", async () => {
+    const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}C`);
+    const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `BST-F-${kennung}`, "office");
+
+    await erwarteFehler(apiPool, fremder, "GET", `/api/v1/stock/orders/${bestellId}`,
+      undefined, "stock_order_unknown");
+    await erwarteFehler(apiPool, fremder, "POST", "/api/v1/stock/orders",
+      { supplierId: lieferantId, fromReorder: true }, "stock_supplier_unknown");
+  });
+});

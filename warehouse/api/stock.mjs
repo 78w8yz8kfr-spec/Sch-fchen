@@ -824,6 +824,387 @@ async function reorderSuggestions(client, context) {
 }
 
 // ---------------------------------------------------------------------------
+// Lieferanten und Bestellungen
+// ---------------------------------------------------------------------------
+
+const ORDER_OPEN = ["ordered", "partially_received"];
+
+function supplierDto(row) {
+  return {
+    id: row.id,
+    supplierNumber: row.supplier_number,
+    name: row.name,
+    customerNumber: row.customer_number || null,
+    contactName: row.contact_name || null,
+    email: row.email || null,
+    phone: row.phone || null,
+    status: row.status,
+    rowVersion: Number(row.row_version || 1)
+  };
+}
+
+function orderDto(row) {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name || null,
+    status: row.status,
+    orderedAt: row.ordered_at ? new Date(row.ordered_at).toISOString() : null,
+    expectedAt: row.expected_at ? new Date(row.expected_at).toISOString().slice(0, 10) : null,
+    note: row.note || null,
+    rowVersion: Number(row.row_version || 1)
+  };
+}
+
+async function listSuppliers(client, context) {
+  const result = await client.query(
+    `SELECT * FROM suppliers WHERE company_id = $1 AND status = 'active' ORDER BY name`,
+    [context.companyId]
+  );
+  return result.rows.map(supplierDto);
+}
+
+async function createSupplier(client, context, body) {
+  await requireManager(client, context);
+
+  const inserted = await client.query(
+    `INSERT INTO suppliers (
+       company_id, supplier_number, name, customer_number, contact_name,
+       email, phone, note, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+     RETURNING *`,
+    [
+      context.companyId,
+      requiredText(body.supplierNumber, "Lieferantennummer", 40),
+      requiredText(body.name, "Name", 160),
+      optionalText(body.customerNumber, "Unsere Kundennummer", 60),
+      optionalText(body.contactName, "Ansprechpartner", 120),
+      optionalText(body.email, "E-Mail", 180),
+      optionalText(body.phone, "Telefon", 40),
+      optionalText(body.note, "Notiz", 2000),
+      context.userId
+    ]
+  ).catch(mapDatabaseError);
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id)
+     VALUES ($1, 'supplier', $2, 'created', $3)`,
+    [context.companyId, inserted.rows[0].id, context.userId]
+  );
+
+  return supplierDto(inserted.rows[0]);
+}
+
+async function orderDetail(client, context, orderId) {
+  const order = await client.query(
+    `SELECT bestellung.*, lieferant.name AS supplier_name
+     FROM purchase_orders AS bestellung
+     JOIN suppliers AS lieferant
+       ON lieferant.company_id = bestellung.company_id AND lieferant.id = bestellung.supplier_id
+     WHERE bestellung.company_id = $1 AND bestellung.id = $2`,
+    [context.companyId, orderId]
+  );
+  if (order.rowCount !== 1) {
+    throw new InputError("Diese Bestellung wurde nicht gefunden.", 404, "stock_order_unknown");
+  }
+
+  const lines = await client.query(
+    `SELECT position.*, item.name, item.item_number, item.unit
+     FROM purchase_order_items AS position
+     JOIN stock_items AS item
+       ON item.company_id = position.company_id AND item.id = position.item_id
+     WHERE position.company_id = $1 AND position.purchase_order_id = $2
+     ORDER BY position.line_position`,
+    [context.companyId, orderId]
+  );
+
+  return {
+    order: orderDto(order.rows[0]),
+    lines: lines.rows.map((row) => {
+      const ordered = number(row.quantity_ordered);
+      const received = number(row.quantity_received);
+      return {
+        id: row.id,
+        itemId: row.item_id,
+        itemName: row.name,
+        itemNumber: row.item_number,
+        unit: row.unit,
+        linePosition: Number(row.line_position),
+        quantityOrdered: ordered,
+        quantityReceived: received,
+        quantityOpen: Math.max(0, Math.round((ordered - received) * 1000) / 1000),
+        supplierItemNumber: row.supplier_item_number || null,
+        unitPrice: number(row.unit_price)
+      };
+    })
+  };
+}
+
+function readOrderLines(body) {
+  if (!Array.isArray(body.lines) || !body.lines.length) {
+    throw new InputError("Eine Bestellung braucht mindestens eine Position.");
+  }
+  if (body.lines.length > 200) throw new InputError("Eine Bestellung fasst höchstens 200 Positionen.");
+
+  return body.lines.map((eintrag, index) => ({
+    itemId: validateId(eintrag?.itemId, `Artikel in Position ${index + 1}`),
+    quantity: quantity(eintrag?.quantity, `Menge in Position ${index + 1}`),
+    supplierItemNumber: optionalText(eintrag?.supplierItemNumber, "Lieferanten-Artikelnummer", 80),
+    unitPrice: eintrag?.unitPrice === undefined || eintrag?.unitPrice === null
+      ? null
+      : Number(eintrag.unitPrice).toFixed(4)
+  }));
+}
+
+/**
+ * Legt eine Bestellung an — entweder mit uebergebenen Positionen oder direkt
+ * aus dem Nachbestellvorschlag des Lieferanten. Der Vorschlag ist eine
+ * Rechnung; hier wird er zum ersten Mal zu etwas Festem.
+ */
+async function createOrder(client, context, body) {
+  await requireManager(client, context);
+
+  const supplierId = validateId(body.supplierId, "Lieferant");
+  const supplier = await client.query(
+    "SELECT id FROM suppliers WHERE company_id = $1 AND id = $2 AND status = 'active'",
+    [context.companyId, supplierId]
+  );
+  if (supplier.rowCount !== 1) {
+    throw new InputError("Diesen Lieferanten gibt es nicht.", 404, "stock_supplier_unknown");
+  }
+
+  let lines;
+  if (body.fromReorder === true) {
+    const vorschlaege = await reorderSuggestions(client, context);
+    lines = vorschlaege
+      .filter((eintrag) => eintrag.supplierId === supplierId && eintrag.suggestedQuantity > 0)
+      .map((eintrag) => ({
+        itemId: eintrag.id,
+        quantity: eintrag.suggestedQuantity.toFixed(3),
+        supplierItemNumber: null,
+        unitPrice: null
+      }));
+    if (!lines.length) {
+      throw new InputError(
+        "Für diesen Lieferanten liegt nichts unter dem Mindestbestand.",
+        409,
+        "stock_reorder_empty"
+      );
+    }
+  } else {
+    lines = readOrderLines(body);
+  }
+
+  const jahr = new Date().getFullYear();
+  const orderNumber = optionalText(body.orderNumber, "Bestellnummer", 40)
+    || `B-${jahr}-${String(Date.now()).slice(-6)}`;
+
+  const inserted = await client.query(
+    `INSERT INTO purchase_orders (
+       company_id, order_number, supplier_id, expected_at, note,
+       created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4::DATE, $5, $6, $6)
+     RETURNING id`,
+    [
+      context.companyId, orderNumber, supplierId,
+      optionalText(body.expectedAt, "Liefertermin", 10),
+      optionalText(body.note, "Notiz", 2000),
+      context.userId
+    ]
+  ).catch(mapDatabaseError);
+
+  const orderId = inserted.rows[0].id;
+
+  let position = 0;
+  for (const zeile of lines) {
+    position += 1;
+    await client.query(
+      `INSERT INTO purchase_order_items (
+         company_id, purchase_order_id, item_id, line_position,
+         quantity_ordered, supplier_item_number, unit_price
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        context.companyId, orderId, zeile.itemId, position,
+        zeile.quantity, zeile.supplierItemNumber, zeile.unitPrice
+      ]
+    ).catch(mapDatabaseError);
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id)
+     VALUES ($1, 'purchase_order', $2, 'created', $3)`,
+    [context.companyId, orderId, context.userId]
+  );
+
+  return orderDetail(client, context, orderId);
+}
+
+async function sendOrder(client, context, orderId) {
+  await requireManager(client, context);
+
+  const updated = await client.query(
+    `UPDATE purchase_orders
+     SET status = 'ordered', ordered_at = CURRENT_TIMESTAMP, changed_by_user_id = $3,
+         row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2 AND status = 'draft'
+     RETURNING id`,
+    [context.companyId, orderId, context.userId]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError("Nur ein Entwurf lässt sich bestellen.", 409, "stock_order_not_draft");
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id)
+     VALUES ($1, 'purchase_order', $2, 'ordered', $3)`,
+    [context.companyId, orderId, context.userId]
+  );
+
+  return orderDetail(client, context, orderId);
+}
+
+/**
+ * Bucht einen Wareneingang gegen die Bestellung.
+ *
+ * Die Buchung laeuft ueber dasselbe Journal wie jeder andere Zugang; die
+ * Bestellposition bekommt lediglich ihre gelieferte Menge fortgeschrieben.
+ * Eine Ueberlieferung ist erlaubt und kein Fehler — sie kommt vor, und der
+ * Bestand soll die Wirklichkeit zeigen, nicht die Bestellung.
+ */
+async function receiveOrder(client, context, orderId, body) {
+  await requireManager(client, context);
+
+  const order = await client.query(
+    "SELECT status FROM purchase_orders WHERE company_id = $1 AND id = $2 FOR UPDATE",
+    [context.companyId, orderId]
+  );
+  if (order.rowCount !== 1) {
+    throw new InputError("Diese Bestellung wurde nicht gefunden.", 404, "stock_order_unknown");
+  }
+  if (!ORDER_OPEN.includes(order.rows[0].status)) {
+    throw new InputError(
+      "Diese Bestellung nimmt keinen Wareneingang mehr an.",
+      409,
+      "stock_order_closed"
+    );
+  }
+
+  const locationId = validateId(body.locationId, "Lagerplatz");
+  if (!Array.isArray(body.lines) || !body.lines.length) {
+    throw new InputError("Ein Wareneingang braucht mindestens eine Position.");
+  }
+
+  const gebucht = [];
+  for (const [index, eintrag] of body.lines.entries()) {
+    const positionId = validateId(eintrag?.purchaseOrderItemId, `Position ${index + 1}`);
+    const menge = quantity(eintrag?.quantity, `Menge in Position ${index + 1}`);
+
+    const position = await client.query(
+      `SELECT item_id FROM purchase_order_items
+       WHERE company_id = $1 AND id = $2 AND purchase_order_id = $3`,
+      [context.companyId, positionId, orderId]
+    );
+    if (position.rowCount !== 1) {
+      throw new InputError("Diese Bestellposition gehört nicht zu dieser Bestellung.", 400, "stock_order_line_unknown");
+    }
+
+    const buchung = await bookMovement(client, context, {
+      itemId: position.rows[0].item_id,
+      movementType: "receipt",
+      quantity: Number(menge),
+      targetLocationId: locationId,
+      purchaseOrderItemId: positionId,
+      sourceType: optionalText(body.sourceType, "Herkunft", 30) || "api",
+      clientOperationId: eintrag?.clientOperationId
+    });
+
+    if (!buchung.repeated) {
+      await client.query(
+        `UPDATE purchase_order_items
+         SET quantity_received = quantity_received + $3,
+             row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE company_id = $1 AND id = $2`,
+        [context.companyId, positionId, menge]
+      );
+    }
+    gebucht.push({ purchaseOrderItemId: positionId, repeated: buchung.repeated });
+  }
+
+  // Vollstaendig ist eine Bestellung, wenn keine Position mehr offen ist.
+  const offen = await client.query(
+    `SELECT COUNT(*)::INT AS anzahl FROM purchase_order_items
+     WHERE company_id = $1 AND purchase_order_id = $2 AND quantity_received < quantity_ordered`,
+    [context.companyId, orderId]
+  );
+  const neuerStatus = offen.rows[0].anzahl === 0 ? "received" : "partially_received";
+
+  await client.query(
+    `UPDATE purchase_orders
+     SET status = $3, changed_by_user_id = $4, row_version = row_version + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, orderId, neuerStatus, context.userId]
+  );
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id)
+     VALUES ($1, 'purchase_order', $2, $3, $4)`,
+    [context.companyId, orderId, `received_${neuerStatus}`, context.userId]
+  );
+
+  return { ...(await orderDetail(client, context, orderId)), booked: gebucht };
+}
+
+async function cancelOrder(client, context, orderId, body) {
+  await requireManager(client, context);
+
+  const reason = optionalText(body?.reason, "Grund", 2000);
+  if (!reason) throw new InputError("Eine Stornierung braucht einen Grund.");
+
+  const updated = await client.query(
+    `UPDATE purchase_orders
+     SET status = 'cancelled', changed_by_user_id = $3, row_version = row_version + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2 AND status IN ('draft', 'ordered')
+     RETURNING id`,
+    [context.companyId, orderId, context.userId]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Eine schon teilweise gelieferte Bestellung lässt sich nicht stornieren.",
+      409,
+      "stock_order_not_cancellable"
+    );
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason)
+     VALUES ($1, 'purchase_order', $2, 'cancelled', $3, $4)`,
+    [context.companyId, orderId, context.userId, reason]
+  );
+
+  return orderDetail(client, context, orderId);
+}
+
+async function listOrders(client, context, url) {
+  const nurOffene = url.searchParams.get("offen") === "ja";
+
+  const result = await client.query(
+    `SELECT bestellung.*, lieferant.name AS supplier_name
+     FROM purchase_orders AS bestellung
+     JOIN suppliers AS lieferant
+       ON lieferant.company_id = bestellung.company_id AND lieferant.id = bestellung.supplier_id
+     WHERE bestellung.company_id = $1
+       AND (NOT $2::BOOLEAN OR bestellung.status = ANY($3::VARCHAR[]))
+     ORDER BY bestellung.created_at DESC
+     LIMIT 200`,
+    [context.companyId, nurOffene, ORDER_OPEN]
+  );
+  return result.rows.map(orderDto);
+}
+
+// ---------------------------------------------------------------------------
 // Inventur
 // ---------------------------------------------------------------------------
 
@@ -1155,6 +1536,45 @@ export async function handleStockRequest({ request, url, client, context }) {
 
   if (request.method === "GET" && path === "/api/v1/stock/reorder") {
     return { status: 200, body: { suggestions: await reorderSuggestions(client, context) } };
+  }
+
+  if (request.method === "GET" && path === "/api/v1/stock/suppliers") {
+    return { status: 200, body: { suppliers: await listSuppliers(client, context) } };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/suppliers") {
+    const body = await readJson(request);
+    return { status: 201, body: { supplier: await createSupplier(client, context, body) } };
+  }
+
+  if (request.method === "GET" && path === "/api/v1/stock/orders") {
+    return { status: 200, body: { orders: await listOrders(client, context, url) } };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/orders") {
+    const body = await readJson(request);
+    return { status: 201, body: await createOrder(client, context, body) };
+  }
+
+  const orderMatch = /^\/api\/v1\/stock\/orders\/([^/]+)(?:\/(send|receive|cancel))?$/.exec(path);
+  if (orderMatch) {
+    const orderId = validateId(orderMatch[1], "Bestell-ID");
+    const aktion = orderMatch[2];
+
+    if (request.method === "GET" && !aktion) {
+      return { status: 200, body: await orderDetail(client, context, orderId) };
+    }
+    if (request.method === "POST" && aktion === "send") {
+      return { status: 200, body: await sendOrder(client, context, orderId) };
+    }
+    if (request.method === "POST" && aktion === "receive") {
+      const body = await readJson(request);
+      return { status: 200, body: await receiveOrder(client, context, orderId, body) };
+    }
+    if (request.method === "POST" && aktion === "cancel") {
+      const body = await readJson(request);
+      return { status: 200, body: await cancelOrder(client, context, orderId, body) };
+    }
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/inventory") {
