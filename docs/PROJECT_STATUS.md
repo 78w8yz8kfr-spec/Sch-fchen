@@ -1,7 +1,13 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.21
+Technischer Stand: V0.44.22
+
+- Schnelle Rückgabe aus dem Baustellenbestand ohne Scanner, je Zeile eine
+  eigene Buchung mit eigener Vorgangsnummer; Storno als Gegenbuchung
+  (Migration 126, eindeutiger Index statt Sperre, weil das Journal für die
+  API-Rolle nur lesbar und anfügbar ist); Historie mit Filtern und Belegkette;
+  PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
 

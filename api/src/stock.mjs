@@ -2657,11 +2657,205 @@ async function siteMaterialOverview(client, context, siteId) {
   for (const row of reservierungen.rows) zeile(row).reservedForSite = number(row.menge);
   for (const row of bestellt.rows) zeile(row).orderedOpen = number(row.menge);
 
+  // Der Lagerort der Baustelle. Er ist eindeutig - eine Baustelle hat genau
+  // einen aktiven - und die Rueckgabe braucht ihn als Quelle, ohne dass der
+  // Monteur ihn scannen muss.
+  const ort = await client.query(
+    `SELECT id, name FROM storage_locations
+     WHERE company_id = $1 AND construction_site_id = $2 AND status = 'active'`,
+    [context.companyId, siteId]
+  );
+
   return {
-    constructionSite: { id: baustelle.rows[0].id, name: baustelle.rows[0].name },
+    constructionSite: {
+      id: baustelle.rows[0].id,
+      name: baustelle.rows[0].name,
+      locationId: ort.rows[0]?.id || null,
+      locationName: ort.rows[0]?.name || null
+    },
     items: [...zeilen.values()].sort((links, rechts) => links.itemName.localeCompare(rechts.itemName, "de")),
     deliveryNotes: scheine.rows.map(deliveryNoteDto)
   };
+}
+
+/**
+ * Eine Buchung zuruecknehmen.
+ *
+ * Nicht durch Loeschen, sondern durch eine Gegenbuchung: das Journal bleibt
+ * vollstaendig, und wer spaeter fragt, sieht beides - den Fehler und seine
+ * Korrektur. Eine geloeschte Zeile haette dieselbe Zahl ergeben und die
+ * Geschichte verloren.
+ *
+ * Zweimal stornieren geht nicht. Sonst waere aus einem Vertipper eine
+ * Buchungsschleife geworden, und der Bestand haette sich mit jedem Klick
+ * weiter von der Wirklichkeit entfernt.
+ */
+async function reverseMovement(client, context, movementId, body) {
+  const reason = optionalText(body?.reason, "Grund", 2000);
+  if (!reason) throw new InputError("Eine Stornierung braucht einen Grund.");
+
+  // Ohne `FOR UPDATE`: das Journal ist fuer die API-Rolle nur lesbar und
+  // anfuegbar, und genau deshalb kann niemand eine gebuchte Zeile still
+  // veraendern. Dass es zu einer Buchung nur eine Gegenbuchung gibt, sichert
+  // der eindeutige Index aus Migration 126 - auch bei zwei gleichzeitigen
+  // Klicks, was eine Sperre hier gar nicht koennte.
+  const original = await client.query(
+    "SELECT * FROM stock_movements WHERE company_id = $1 AND id = $2",
+    [context.companyId, movementId]
+  );
+  if (original.rowCount !== 1) {
+    throw new InputError("Diese Buchung wurde nicht gefunden.", 404, "stock_movement_unknown");
+  }
+  const zeile = original.rows[0];
+
+  // Geprueft wird gegen die *urspruengliche* Buchungsart, nicht gegen die
+  // Korrektur, die dabei entsteht. Wer entnehmen darf, darf seinen eigenen
+  // Vertipper zuruecknehmen - dafuer erst das Buero holen zu muessen, waere
+  // der sichere Weg zu einer zweiten, falschen Buchung "zum Ausgleich".
+  await requireMovementPermission(client, context, zeile.movement_type);
+
+  const schon = await client.query(
+    "SELECT id FROM stock_movements WHERE company_id = $1 AND reverses_movement_id = $2",
+    [context.companyId, movementId]
+  );
+  if (schon.rowCount > 0) {
+    throw new InputError(
+      "Diese Buchung wurde bereits storniert.",
+      409,
+      "stock_movement_already_reversed"
+    );
+  }
+  if (zeile.reverses_movement_id) {
+    throw new InputError(
+      "Eine Gegenbuchung wird nicht noch einmal storniert.",
+      409,
+      "stock_movement_is_reversal"
+    );
+  }
+
+  // Die Gegenbuchung dreht die Richtung um. Die Art bleibt dieselbe, wo das
+  // geht; wo eine Art nur eine Richtung kennt - Entnahme, Zugang - wird die
+  // Gegenrichtung als Korrektur gebucht, damit die Bedingungen der Tabelle
+  // halten und im Journal nicht plötzlich ein Wareneingang steht, den es nie
+  // gab.
+  const umgedreht = zeile.movement_type === "transfer"
+    ? {
+      typ: "transfer",
+      quelle: zeile.target_location_id,
+      ziel: zeile.source_location_id
+    }
+    : {
+      typ: "correction",
+      quelle: zeile.target_location_id,
+      ziel: zeile.source_location_id
+    };
+
+  const gegen = await client.query(
+    `INSERT INTO stock_movements (
+       company_id, item_id, movement_type, quantity, source_location_id,
+       target_location_id, construction_site_id, reverses_movement_id,
+       actor_user_id, reason, source_type
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'api')
+     RETURNING *`,
+    [
+      context.companyId, zeile.item_id, umgedreht.typ, zeile.quantity,
+      umgedreht.quelle, umgedreht.ziel, zeile.construction_site_id,
+      movementId, context.userId, reason
+    ]
+  ).catch((fehler) => {
+    // Zwei gleichzeitige Klicks: der zweite laeuft in den eindeutigen Index.
+    if (fehler?.code === "23505") {
+      throw new InputError(
+        "Diese Buchung wurde bereits storniert.",
+        409,
+        "stock_movement_already_reversed"
+      );
+    }
+    return mapDatabaseError(fehler);
+  });
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason)
+     VALUES ($1, 'stock_movement', $2, 'reversed', $3, $4)`,
+    [context.companyId, movementId, context.userId, reason]
+  );
+
+  return { movement: movementDto(gegen.rows[0]), reversedId: movementId };
+}
+
+/**
+ * Die Historie eines Artikels, eines Ortes, einer Baustelle.
+ *
+ * Ohne Filter waere sie unbrauchbar: ein Betrieb bucht am Tag hunderte Zeilen,
+ * und gesucht wird immer nach einer bestimmten Frage - wo ist die Rolle
+ * geblieben, wer hat das gebucht, was ist im August auf diese Baustelle
+ * gegangen.
+ */
+async function listMovements(client, context, url) {
+  const result = await client.query(
+    `SELECT bewegung.*, artikel.item_number, artikel.name AS item_name, artikel.unit,
+            quelle.name AS source_name, ziel.name AS target_name,
+            baustelle.name AS site_name,
+            person.first_name || ' ' || person.last_name AS actor_name,
+            schein.delivery_note_number, bestellung.order_number
+     FROM stock_movements AS bewegung
+     JOIN stock_items AS artikel
+       ON artikel.company_id = bewegung.company_id AND artikel.id = bewegung.item_id
+     JOIN users AS person
+       ON person.company_id = bewegung.company_id AND person.id = bewegung.actor_user_id
+     LEFT JOIN storage_locations AS quelle
+       ON quelle.company_id = bewegung.company_id AND quelle.id = bewegung.source_location_id
+     LEFT JOIN storage_locations AS ziel
+       ON ziel.company_id = bewegung.company_id AND ziel.id = bewegung.target_location_id
+     LEFT JOIN construction_sites AS baustelle
+       ON baustelle.company_id = bewegung.company_id AND baustelle.id = bewegung.construction_site_id
+     LEFT JOIN delivery_note_items AS position
+       ON position.company_id = bewegung.company_id AND position.id = bewegung.delivery_note_item_id
+     LEFT JOIN delivery_notes AS schein
+       ON schein.company_id = position.company_id AND schein.id = position.delivery_note_id
+     LEFT JOIN purchase_order_items AS bestellposition
+       ON bestellposition.company_id = bewegung.company_id
+      AND bestellposition.id = bewegung.purchase_order_item_id
+     LEFT JOIN purchase_orders AS bestellung
+       ON bestellung.company_id = bestellposition.company_id
+      AND bestellung.id = bestellposition.purchase_order_id
+     WHERE bewegung.company_id = $1
+       AND ($2::UUID IS NULL OR bewegung.item_id = $2::UUID)
+       AND ($3::UUID IS NULL OR bewegung.construction_site_id = $3::UUID)
+       AND ($4::UUID IS NULL OR bewegung.source_location_id = $4::UUID
+            OR bewegung.target_location_id = $4::UUID)
+       AND ($5::UUID IS NULL OR bewegung.actor_user_id = $5::UUID)
+       AND ($6::TEXT IS NULL OR bewegung.movement_type = $6::TEXT)
+       AND ($7::DATE IS NULL OR bewegung.occurred_at >= $7::DATE)
+       AND ($8::DATE IS NULL OR bewegung.occurred_at < ($8::DATE + 1))
+     ORDER BY bewegung.occurred_at DESC
+     LIMIT 300`,
+    [
+      context.companyId,
+      optionalId(url.searchParams.get("artikel"), "Artikel"),
+      optionalId(url.searchParams.get("baustelle"), "Baustelle"),
+      optionalId(url.searchParams.get("ort"), "Lagerplatz"),
+      optionalId(url.searchParams.get("mitarbeiter"), "Mitarbeiter"),
+      optionalText(url.searchParams.get("art"), "Buchungsart", 20),
+      optionalText(url.searchParams.get("von"), "Von", 10),
+      optionalText(url.searchParams.get("bis"), "Bis", 10)
+    ]
+  );
+
+  return result.rows.map((row) => ({
+    ...movementDto(row),
+    itemNumber: row.item_number,
+    itemName: row.item_name,
+    unit: row.unit,
+    sourceLocationName: row.source_name || null,
+    targetLocationName: row.target_name || null,
+    constructionSiteName: row.site_name || null,
+    actorName: row.actor_name,
+    // Die Belegkette in beide Richtungen: von der Buchung zum Papier.
+    deliveryNoteNumber: row.delivery_note_number || null,
+    orderNumber: row.order_number || null,
+    reversesMovementId: row.reverses_movement_id || null
+  }));
 }
 
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
@@ -2776,6 +2970,19 @@ export async function handleStockRequest({ request, url, client, context, allowe
     if (request.method === "POST" && deliveryMatch[2] === "cancel") {
       return { status: 200, body: await cancelDeliveryNote(client, context, noteId, await readJson(request)) };
     }
+  }
+
+  if (request.method === "GET" && path === "/api/v1/stock/movements") {
+    return { status: 200, body: { movements: await listMovements(client, context, url) } };
+  }
+
+  const reverseMatch = /^\/api\/v1\/stock\/movements\/([^/]+)\/reverse$/.exec(path);
+  if (request.method === "POST" && reverseMatch) {
+    const movementId = validateId(reverseMatch[1], "Buchungs-ID");
+    return {
+      status: 201,
+      body: await reverseMovement(client, context, movementId, await readJson(request))
+    };
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/levels") {

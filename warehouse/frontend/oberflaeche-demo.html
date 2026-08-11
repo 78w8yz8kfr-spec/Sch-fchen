@@ -1166,6 +1166,7 @@ const SCHRITTE = Object.freeze({
   BESTELLUNG: 'bestellung',
   LIEFERSCHEINE: 'lieferscheine',
   LIEFERSCHEIN: 'lieferschein',
+  RUECKGABE: 'rueckgabe',
   ARTIKEL_CODES: 'artikelCodes',
   ARTIKEL_AENDERN: 'artikelAendern',
   ORTE: 'orte'
@@ -1319,6 +1320,8 @@ function lagerZustand(vorgabe = {}) {
     inventur: null,
     // Der geoeffnete Lieferschein samt Positionen und Bestellabgleich.
     lieferschein: null,
+    // Die Baustellenübersicht für die schnelle Rückgabe.
+    rueckgabe: null,
     zaehlArtikel: null,
     bestellung: null,
     eingang: null,
@@ -1843,13 +1846,24 @@ function wartendZeile(wartend = 0) {
   </p>`;
 }
 
-function startAnsicht(zustand, rechte = {}) {
+function startAnsicht(zustand, rechte = {}, optionen = {}) {
   const kacheln = [
     `<button class="stock-tile stock-tile--stock" type="button" data-ziel="bestand">
        <span class="stock-tile__name">Bestand</span>
        <span class="stock-tile__hint">Was liegt wo</span>
      </button>`
   ];
+
+  // Die Rueckgabe steht ganz oben und nicht im Buerobereich: sie ist der Weg,
+  // den der Monteur abends geht, und sie erscheint nur, wenn er heute
+  // ueberhaupt auf einer Baustelle ist. Eine Kachel, die zu nichts fuehrt,
+  // waere schlimmer als keine.
+  if (optionen.eigeneBaustelleId) {
+    kacheln.push(`<button class="stock-tile stock-tile--return" type="button" data-ziel="rueckgabe">
+       <span class="stock-tile__name">Zurückgeben</span>
+       <span class="stock-tile__hint">Restmaterial von der Baustelle</span>
+     </button>`);
+  }
 
   if (rechte.transfer) {
     kacheln.push(`<button class="stock-tile" type="button" data-ziel="inventur">
@@ -2754,7 +2768,7 @@ function etikettZelle(etikett = {}) {
  */
 function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.21`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.22`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -2997,6 +3011,13 @@ function ansichtFuer(zustand, rechte, optionen = {}) {
     return bestellungenAnsicht(optionen.bestellungen, rechte, zustand.fehler);
   }
   if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.RUECKGABE) {
+    return rueckgabeAnsicht(
+      zustand.rueckgabe, zustand.entwurf || {},
+      (optionen.orte || []).filter((ort) => ort.locationType !== 'construction_site'),
+      zustand.fehler
+    );
+  }
   if (zustand.schritt === SCHRITTE.LIEFERSCHEINE) {
     return lieferscheineAnsicht(optionen.lieferscheine, zustand.fehler);
   }
@@ -3023,7 +3044,7 @@ function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.ARTIKEL_AENDERN) {
     return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler, true);
   }
-  return startAnsicht(zustand, rechte);
+  return startAnsicht(zustand, rechte, optionen);
 }
 
 
@@ -3221,6 +3242,100 @@ function lieferscheinFormularAnsicht(entwurf = {}, optionen = {}, fehler = null)
     <button class="button button--action" type="submit">Als Entwurf speichern</button>
     <button class="button button--quiet stock-cancel" type="button">Abbrechen</button>
   </form>`;
+}
+
+
+/**
+ * Die schnelle Rueckgabe von der Baustelle.
+ *
+ * Der Weg ueber den Scanner ist hier der falsche: was zurueckgeht, liegt in
+ * einer Kiste im Transporter, oft ohne lesbaren Code, und der Monteur weiss
+ * genau, was er dabei hat. Deshalb zeigt Schaefchen, was auf der Baustelle
+ * gebucht ist, und er traegt nur die Rueckgabemenge ein - leere Felder heissen
+ * "nichts davon".
+ *
+ * Vorbelegt wird bewusst nichts. Eine vorgeschlagene Menge waere eine
+ * Behauptung darueber, was uebrig ist, und die stimmt nie.
+ */
+function rueckgabeAnsicht(uebersicht, entwurf = {}, ziele = [], fehler = null) {
+  const zeilen = (uebersicht?.items || []).filter((zeile) => zeile.onSite > 0);
+
+  return `<div class="stock-list stock-return">
+    ${kopfzeile('Material zurückgeben')}
+    <p class="stock-order__supplier">${sicher(uebersicht?.constructionSite?.name || '')}</p>
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+
+    ${zeilen.length
+      ? `<ul class="stock-rows">
+          ${zeilen.map((zeile) => `
+            <li class="stock-row stock-row--return" data-artikel="${sicher(zeile.itemId)}">
+              <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+              <span class="stock-row__number">
+                auf der Baustelle: ${sicher(mengeAlsText(zeile.onSite))} ${sicher(zeile.unit)}
+              </span>
+              <input class="stock-return__input" type="text" inputmode="decimal"
+                     data-artikel="${sicher(zeile.itemId)}"
+                     aria-label="Rückgabemenge ${sicher(zeile.itemName)}"
+                     value="${sicher(entwurf[zeile.itemId] || '')}" placeholder="0">
+            </li>`).join('')}
+        </ul>
+
+        <label class="stock-field">
+          <span>Wohin</span>
+          <select class="stock-return__target">
+            ${ziele.map((ort) => `
+              <option value="${sicher(ort.id)}"${ort.id === entwurf.zielOrtId ? ' selected' : ''}>
+                ${sicher(ort.path || ort.name)}
+              </option>`).join('')}
+          </select>
+        </label>
+
+        <button class="button button--action stock-return-book" type="button">Zurückbuchen</button>`
+      : '<p class="stock-empty">Auf dieser Baustelle ist nichts gebucht.</p>'}
+
+    <button class="button button--quiet stock-home" type="button">Abbrechen</button>
+  </div>`;
+}
+
+/**
+ * Aus den eingetippten Mengen werden Buchungen.
+ *
+ * Je Artikel eine eigene Umlagerung mit eigener Vorgangsnummer: faellt eine
+ * durch, stehen die anderen trotzdem. Eine Sammelbuchung waere bequemer und
+ * haette bei einem einzigen Fehler alles verworfen - im Funkloch der
+ * Normalfall.
+ */
+function rueckgabeBuchungen(uebersicht, entwurf = {}, zielOrtId) {
+  const quelle = uebersicht?.constructionSite?.locationId;
+  if (!quelle) return { fehler: 'Für diese Baustelle gibt es keinen Lagerplatz.' };
+  if (!zielOrtId) return { fehler: 'Bitte wählen, wohin das Material zurückgeht.' };
+  if (zielOrtId === quelle) return { fehler: 'Quelle und Ziel müssen verschieden sein.' };
+
+  const buchungen = [];
+  for (const zeile of uebersicht.items || []) {
+    const menge = mengeAusText(entwurf[zeile.itemId]);
+    if (menge === null) continue;
+    if (menge > zeile.onSite) {
+      return {
+        fehler: `Von ${zeile.itemName} sind nur ${mengeAlsText(zeile.onSite)} ${zeile.unit} auf der Baustelle.`
+      };
+    }
+    buchungen.push({
+      itemId: zeile.itemId,
+      movementType: 'transfer',
+      quantity: menge,
+      sourceLocationId: quelle,
+      targetLocationId: zielOrtId,
+      constructionSiteId: uebersicht.constructionSite.id,
+      sourceType: 'qr_scan',
+      clientOperationId: neueVorgangId()
+    });
+  }
+
+  if (!buchungen.length) {
+    return { fehler: 'Bitte mindestens eine Menge eintragen.' };
+  }
+  return { buchungen };
 }
 
 

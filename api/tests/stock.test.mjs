@@ -936,6 +936,92 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.equal(lagerzeile.freeQuantity, 80, "Ohne Reservierung ist alles frei");
   });
 
+  await t.test("Storno ist eine Gegenbuchung, kein Löschen", async () => {
+    const rolle = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `STO-${kennung}`, name: "Kabeltrommel", groupKey: "cable", unit: "Meter"
+    });
+    const rolleId = rolle.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: rolleId, movementType: "opening", quantity: 300, targetLocationId: lager.id
+    });
+
+    // Vertippt: 100 statt 10 entnommen.
+    const vertippt = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: rolleId, movementType: "issue", quantity: 100, sourceLocationId: lager.id
+    });
+    assert.equal(vertippt.body.levels.find((e) => e.locationId === lager.id).quantity, 200);
+
+    const storniert = await aufrufen(
+      apiPool, monteur, "POST", `/api/v1/stock/movements/${vertippt.body.movement.id}/reverse`,
+      { reason: "Menge vertippt" }
+    );
+    assert.equal(storniert.status, 201, JSON.stringify(storniert.body));
+
+    // Der Bestand steht wieder bei 300 - über eine zweite Buchung, nicht durch
+    // Löschen der ersten.
+    const stand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${rolleId}`);
+    assert.equal(stand.body.levels.find((e) => e.locationId === lager.id).quantity, 300);
+
+    const journal = await ownerPool.query(
+      "SELECT COUNT(*)::INT AS anzahl FROM stock_movements WHERE company_id = $1 AND item_id = $2",
+      [companyId, rolleId]
+    );
+    assert.equal(journal.rows[0].anzahl, 3, "Anfang, Fehlbuchung und Gegenbuchung stehen alle drei da");
+
+    // Zweimal stornieren wäre eine Buchungsschleife.
+    await erwarteFehler(
+      apiPool, monteur, "POST", `/api/v1/stock/movements/${vertippt.body.movement.id}/reverse`,
+      { reason: "Nochmal" }, "stock_movement_already_reversed"
+    );
+    // Eine Gegenbuchung ist eine Korrektur; die darf nur das Büro anfassen -
+    // und auch dort wird sie nicht noch einmal gedreht.
+    await erwarteFehler(
+      apiPool, buero, "POST", `/api/v1/stock/movements/${storniert.body.movement.id}/reverse`,
+      { reason: "Und zurück" }, "stock_movement_is_reversal"
+    );
+    // Ohne Grund gar nicht.
+    await erwarteFehler(
+      apiPool, monteur, "POST", `/api/v1/stock/movements/${vertippt.body.movement.id}/reverse`,
+      {}, "invalid_request"
+    );
+  });
+
+  await t.test("die Historie lässt sich filtern und trägt die Belege", async () => {
+    const alle = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/movements");
+    assert.equal(alle.status, 200);
+    assert.ok(alle.body.movements.length > 0);
+
+    const erste = alle.body.movements[0];
+    assert.ok(erste.actorName, "Wer gebucht hat, gehört in die Historie");
+    assert.ok(erste.itemName, "Und was");
+
+    // Nach Artikel filtern.
+    const einArtikel = await aufrufen(
+      apiPool, buero, "GET", `/api/v1/stock/movements?artikel=${erste.itemId}`
+    );
+    assert.ok(
+      einArtikel.body.movements.every((zeile) => zeile.itemId === erste.itemId),
+      "Der Artikelfilter lässt Fremdes durch"
+    );
+
+    // Nach Buchungsart.
+    const nurZugaenge = await aufrufen(apiPool, buero, "GET", "/api/v1/stock/movements?art=opening");
+    assert.ok(
+      nurZugaenge.body.movements.every((zeile) => zeile.movementType === "opening"),
+      "Der Artfilter lässt Fremdes durch"
+    );
+
+    // Ein Zeitraum in der Zukunft ist leer - und nicht etwa alles.
+    const morgen = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const zukunft = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/movements?von=${morgen}`);
+    assert.deepEqual(zukunft.body.movements, []);
+
+    // Eine Buchung aus einem Lieferschein nennt ihn.
+    const ausLieferschein = alle.body.movements.find((zeile) => zeile.deliveryNoteNumber);
+    assert.ok(ausLieferschein, "Die Belegkette fehlt in der Historie");
+    assert.ok(ausLieferschein.orderNumber, "Und die Bestellung dahinter auch");
+  });
+
   await t.test("eine fremde Firma sieht nichts davon", async () => {
     const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}X`);
     const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `LAG-F-${kennung}`, "office");

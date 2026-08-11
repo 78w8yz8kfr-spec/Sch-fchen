@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Restmaterial zurückgeben, ohne zu scannen (Fassung 0.44.22).** Was abends
+  zurückgeht, liegt in einer Kiste im Transporter, oft ohne lesbaren Code — und
+  der Monteur weiß genau, was er dabei hat. Er sieht jetzt, was auf seiner
+  Baustelle gebucht ist, und trägt nur die Rückgabemenge ein; leere Felder
+  heißen „nichts davon". Vorbelegt wird bewusst nichts: eine vorgeschlagene
+  Menge wäre eine Behauptung darüber, was übrig ist, und die stimmt nie. Je
+  Zeile entsteht eine eigene Buchung mit eigener Vorgangsnummer — fällt eine
+  durch, stehen die anderen trotzdem, und was ohne Netz scheitert, geht in die
+  Warteschlange. **Fehlbuchungen werden gegengebucht statt gelöscht:** das
+  Journal bleibt vollständig, und wer später fragt, sieht den Fehler und seine
+  Korrektur. Wer entnehmen darf, darf seinen eigenen Vertipper zurücknehmen —
+  dafür erst das Büro zu holen wäre der sichere Weg zu einer zweiten, falschen
+  Buchung „zum Ausgleich". Zweimal stornieren geht nicht. Und die **Historie**
+  lässt sich nach Artikel, Ort, Baustelle, Mitarbeiter, Buchungsart und
+  Zeitraum filtern und nennt zu jeder Buchung den Lieferschein und die
+  Bestellung, aus denen sie stammt.
 - **Das Material der Baustelle, frei verfügbar und ein ehrlicher
   Bestellvorschlag (Fassung 0.44.21).** In der Baustellenakte steht jetzt über
   der Bedarfsliste, was das Lager zu dieser Baustelle sagt: was dort liegt, was
