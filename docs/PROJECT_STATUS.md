@@ -1,8 +1,11 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.22
+Technischer Stand: V0.44.23
 
+- Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
+  Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
+  `schaefchen-online-v105`
 - Schnelle Rückgabe aus dem Baustellenbestand ohne Scanner, je Zeile eine
   eigene Buchung mit eigener Vorgangsnummer; Storno als Gegenbuchung
   (Migration 126, eindeutiger Index statt Sperre, weil das Journal für die

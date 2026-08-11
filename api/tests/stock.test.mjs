@@ -1022,6 +1022,77 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.ok(ausLieferschein.orderNumber, "Und die Bestellung dahinter auch");
   });
 
+  await t.test("der Monteur bringt Restmaterial zurück, disponiert aber nicht um", async () => {
+    // Die Rückgabe ist technisch eine Umlagerung, und die ist sonst
+    // Vorarbeitersache. Sie dem Monteur zu verbieten hieße, dass das
+    // Restmaterial abends im Transporter bleibt und der Bestand still falsch
+    // wird - deshalb diese eine Ausnahme, und nur diese.
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Rueckkunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Rueckprojekt ${kennung}`]
+    );
+    const baustellen = [];
+    for (const name of ["Rueck A", "Rueck B"]) {
+      const eintrag = await ownerPool.query(
+        `INSERT INTO construction_sites (company_id, project_id, name, status)
+         VALUES ($1, $2, $3, 'active') RETURNING id`,
+        [companyId, projekt.rows[0].id, `${name} ${kennung}`]
+      );
+      const ort = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+        name: `${name} ${kennung}`,
+        locationType: "construction_site",
+        constructionSiteId: eintrag.rows[0].id
+      });
+      baustellen.push({ siteId: eintrag.rows[0].id, locationId: ort.body.location.id });
+    }
+
+    const rest = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `RUE-${kennung}`, name: "Restrolle", groupKey: "cable", unit: "Meter"
+    });
+    const restId = rest.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: restId, movementType: "receipt", quantity: 200,
+      targetLocationId: baustellen[0].locationId, constructionSiteId: baustellen[0].siteId
+    });
+
+    // Von der Baustelle ins Lager: darf er.
+    const zurueck = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: restId, movementType: "transfer", quantity: 80,
+      sourceLocationId: baustellen[0].locationId, targetLocationId: lager.id,
+      constructionSiteId: baustellen[0].siteId
+    });
+    assert.equal(zurueck.status, 201, JSON.stringify(zurueck.body));
+    assert.equal(
+      zurueck.body.levels.find((e) => e.locationId === baustellen[0].locationId).quantity, 120
+    );
+
+    // Von Baustelle zu Baustelle: darf er nicht. Das ist eine Umdisposition
+    // und gehört dem, der plant.
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: restId, movementType: "transfer", quantity: 10,
+      sourceLocationId: baustellen[0].locationId, targetLocationId: baustellen[1].locationId
+    }, "stock_movement_forbidden");
+
+    // Und aus dem Lager auf die Baustelle auch nicht - das ist eine Ausgabe.
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: restId, movementType: "transfer", quantity: 10,
+      sourceLocationId: lager.id, targetLocationId: baustellen[0].locationId
+    }, "stock_movement_forbidden");
+
+    // Der Vorarbeiter darf beides weiterhin.
+    const umdisponiert = await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/movements", {
+      itemId: restId, movementType: "transfer", quantity: 10,
+      sourceLocationId: baustellen[0].locationId, targetLocationId: baustellen[1].locationId
+    });
+    assert.equal(umdisponiert.status, 201);
+  });
+
   await t.test("eine fremde Firma sieht nichts davon", async () => {
     const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}X`);
     const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `LAG-F-${kennung}`, "office");

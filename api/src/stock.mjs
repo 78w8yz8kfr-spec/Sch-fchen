@@ -147,7 +147,31 @@ async function permissions(client, context) {
   };
 }
 
-async function requireMovementPermission(client, context, movementType) {
+/** Die Arten zweier Lagerplaetze, in derselben Reihenfolge wie gefragt. */
+async function ortsarten(client, context, ids) {
+  const gesucht = ids.filter(Boolean);
+  if (!gesucht.length) return {};
+  const result = await client.query(
+    "SELECT id, location_type FROM storage_locations WHERE company_id = $1 AND id = ANY($2::UUID[])",
+    [context.companyId, gesucht]
+  );
+  return Object.fromEntries(result.rows.map((row) => [row.id, row.location_type]));
+}
+
+/**
+ * Darf dieser Benutzer so buchen?
+ *
+ * Die Buchungsart allein reicht nicht. Eine Umlagerung ist Vorarbeitersache -
+ * ausser es ist die Rueckgabe von der Baustelle ins Lager. Die macht der
+ * Monteur abends, und ihm dafuer den Vorarbeiter zu holen hiesse, dass das
+ * Restmaterial im Transporter bleibt und der Bestand still falsch wird.
+ *
+ * Das ist keine Aufweichung: entnehmen und zurueckgeben darf er ohnehin
+ * einzeln. Ihm die eine Buchung zu verbieten, die beides zusammenfasst, waere
+ * nur unbequem und nicht sicherer. Von Baustelle zu Baustelle bleibt gesperrt
+ * - das ist eine Umdisposition und gehoert dem, der plant.
+ */
+async function requireMovementPermission(client, context, movementType, kontext = {}) {
   const level = MOVEMENT_TYPES.get(movementType);
   if (!level) throw new InputError("Diese Buchungsart gibt es nicht.", 400, "stock_movement_type_unknown");
   if (level === "alle") return;
@@ -156,7 +180,17 @@ async function requireMovementPermission(client, context, movementType) {
   if (level === "vorarbeiter" && allowed.transfer) return;
   if (level === "verwaltung" && allowed.manage) return;
 
+  if (movementType === "transfer" && istRueckgabeVonBaustelle(kontext)) return;
+
   throw new InputError("Für diese Buchung fehlt die Berechtigung.", 403, "stock_movement_forbidden");
+}
+
+function istRueckgabeVonBaustelle({ quelleArt, zielArt } = {}) {
+  // Ausdruecklich beide Arten und nicht die Reihenfolge einer Abfrage: welche
+  // Zeile zuerst kommt, entscheidet sonst die Datenbank, und aus einer
+  // Rueckgabe waere unversehens eine Auslieferung geworden.
+  if (!quelleArt || !zielArt) return false;
+  return quelleArt === "construction_site" && zielArt !== "construction_site";
 }
 
 function itemDto(row) {
@@ -1085,7 +1119,9 @@ async function verfuegbarkeitPruefen(client, context, { itemId, sourceLocationId
 
 async function bookMovement(client, context, body) {
   const movementType = requiredText(body.movementType, "Buchungsart", 20);
-  await requireMovementPermission(client, context, movementType);
+  if (!MOVEMENT_TYPES.has(movementType)) {
+    throw new InputError("Diese Buchungsart gibt es nicht.", 400, "stock_movement_type_unknown");
+  }
 
   const clientOperationId = optionalText(body.clientOperationId, "Vorgangsnummer", 80);
 
@@ -1109,6 +1145,14 @@ async function bookMovement(client, context, body) {
   const constructionSiteId = optionalId(body.constructionSiteId, "Baustelle");
   const reason = optionalText(body.reason, "Grund", 2000);
   const sourceType = optionalText(body.sourceType, "Herkunft", 30) || "api";
+
+  // Die Rechte haengen nicht nur an der Buchungsart, sondern auch daran, wohin
+  // gebucht wird. Deshalb erst jetzt, wo Quelle und Ziel bekannt sind.
+  const ortsart = await ortsarten(client, context, [sourceLocationId, targetLocationId]);
+  await requireMovementPermission(client, context, movementType, {
+    quelleArt: sourceLocationId ? ortsart[sourceLocationId] : null,
+    zielArt: targetLocationId ? ortsart[targetLocationId] : null
+  });
 
   if (!SOURCE_TYPES.has(sourceType)) throw new InputError("Diese Herkunft gibt es nicht.");
   if (["scrap", "correction"].includes(movementType) && !reason) {
