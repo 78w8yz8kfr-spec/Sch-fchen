@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Etikettenbogen hat endlich einen Knopf (Fassung 0.44.14).** Drucken
+  ließ sich nur ein einzelnes Etikett, und dafür musste man drei Ebenen tief:
+  Artikel, Artikel antippen, „Codes und Etikett". Ein Bogen für 64 Etiketten,
+  den niemand füllen kann, ist kein Bogen. Die Artikelliste hat jetzt ein
+  Kästchen je Zeile, „Alle auswählen" und einen Knopf, der sagt, wie viele
+  gedruckt werden — ohne Auswahl ist er abgeschaltet, denn ein Knopf, der einen
+  leeren Bogen erzeugt, wäre eine Falle. Über 120 sagt er das, bevor die
+  Schnittstelle ablehnt. Die Lagerplätze gehen in einem Rutsch: die beschriftet
+  man ohnehin alle auf einmal.
 - **Die Bezeichnung steht neben dem Code (Fassung 0.44.14).** Sie stand quer
   darüber und kostete damit eine ganze Zeile Höhe für etwas, das daneben Platz
   hat: „NYM-J 5x1,5mm2" braucht keine eigene Etage. Jetzt links der Code,

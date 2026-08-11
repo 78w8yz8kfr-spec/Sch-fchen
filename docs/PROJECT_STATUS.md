@@ -18,6 +18,8 @@ Technischer Stand: V0.44.14
 - Lageretiketten im Format der Herstelleraufkleber: 48 × 17 mm, links der Code,
   rechts daneben Bezeichnung, Artikelnummer und Herstellernummer; 64 Etiketten
   je A4-Seite; PWA-Speicher `schaefchen-online-v96`
+- Etikettenbogen aus der Artikelliste heraus: Kästchen je Zeile, „Alle
+  auswählen", Knopf mit Anzahl; Lagerplätze in einem Rutsch
 - Druckbogen von Lager und Geräten kommen wieder formatiert an: die Stile
   liegen als eigene Dateien bei, statt als eingebetteter Block an
   `style-src 'self'` zu scheitern; das Geräte-Einzeletikett trägt wieder Name

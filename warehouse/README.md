@@ -111,6 +111,10 @@ daneben alles zum Lesen:
 └────────────────────────────────┘
 ```
 
+Gedruckt wird aus der Artikelliste: ein Kästchen je Zeile, „Alle auswählen",
+und ein Knopf, der sagt, wie viele es werden. Lagerplätze gehen in einem
+Rutsch — die beschriftet man ohnehin alle auf einmal.
+
 Die Bezeichnung stand zuerst quer darüber. Das kostete eine ganze Zeile Höhe
 für etwas, das neben dem Code Platz hat: „NYM-J 5x1,5mm2" braucht keine eigene
 Etage. Nebeneinander wurde das Etikett ein Drittel flacher.

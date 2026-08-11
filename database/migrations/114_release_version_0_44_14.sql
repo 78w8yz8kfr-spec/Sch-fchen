@@ -12,6 +12,16 @@
 -- Etiketten statt 44. Der Code bleibt bei zwoelf Millimetern - an seiner
 -- Groesse haengt, ob die Kamera ihn liest, und die Grenze war schon erreicht.
 --
+-- Ausserdem gab es keinen Weg zum Etikettenbogen. Drucken liess sich nur ein
+-- einzelnes Etikett, und dafuer musste man drei Ebenen tief: Artikel, Artikel
+-- antippen, "Codes und Etikett". Ein Bogen fuer 64 Etiketten, den niemand
+-- fuellen kann, ist kein Bogen. Die Artikelliste bekommt deshalb ein Kaestchen
+-- je Zeile, "Alle auswaehlen" und einen Knopf, der sagt, wie viele gedruckt
+-- werden. Ohne Auswahl ist er abgeschaltet - ein Knopf, der einen leeren Bogen
+-- erzeugt, waere eine Falle. Ueber 120 sagt er es, bevor die Schnittstelle
+-- ablehnt. Die Lagerplaetze gehen in einem Rutsch: die beschriftet man
+-- ohnehin alle auf einmal.
+--
 -- Dazu eine Kleinigkeit fuer die Ansicht am Telefon: der Druckbogen bekommt
 -- eine feste Fensterbreite in Hoehe der A4-Seite. Ohne sie zeigte ein Telefon
 -- eine vergroesserte Ecke des Bogens, und niemand konnte beurteilen, was da
@@ -30,7 +40,7 @@ INSERT INTO application_versions (
     known_issues, database_migrations, rollout_percent, mandatory_update
 ) VALUES (
     '0.44.14', 'superseded', CURRENT_TIMESTAMP,
-    'Auf dem Lageretikett steht die Bezeichnung neben dem Code statt darüber; das Etikett wird dadurch ein Drittel flacher und es passen 64 statt 44 auf eine Seite.',
+    'Auf dem Lageretikett steht die Bezeichnung neben dem Code statt darüber; es passen 64 statt 44 auf eine Seite. Aus der Artikelliste lassen sich mehrere Etiketten auf einmal drucken, Lagerplätze in einem Rutsch.',
     '[]'::JSONB,
     '["114"]'::JSONB, 100, FALSE
 )

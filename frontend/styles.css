@@ -9465,6 +9465,17 @@ body.hat-fassungshinweis {
 }
 .stock-done__pack { margin: 0; font-size: .88rem; color: var(--ui-text-secondary); }
 
+/* Ein Kästchen je Zeile für den Etikettenbogen. Es liegt links vor dem Namen,
+   weil dort die Reihe beginnt und der Daumen ohnehin hinwandert. */
+.stock-pick { grid-row: 1 / span 2; grid-column: 0; display: grid; place-items: center; padding-right: 2px; }
+.stock-pick__box { width: 20px; height: 20px; accent-color: var(--ui-brand); }
+.stock-row:has(.stock-pick) { grid-template-columns: auto 1fr auto; }
+.stock-row:has(.stock-pick) .stock-row__name { grid-column: 2; }
+.stock-row:has(.stock-pick) .stock-row__number { grid-column: 2; }
+.stock-row:has(.stock-pick) .stock-row__amount { grid-column: 3; }
+
+.stock-sheet { display: grid; gap: 8px; }
+
 .stock-search { margin: 0; }
 .stock-search__input {
   font: inherit; font-size: 1rem; color: var(--ui-text); background: var(--ui-surface);

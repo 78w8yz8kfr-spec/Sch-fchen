@@ -107,6 +107,10 @@ export function lagerZustand(vorgabe = {}) {
     // gegen null mal stimmen und mal nicht.
     entwurf: null,
     suche: '',
+    // Welche Artikel oder Lagerplaetze fuer den Etikettenbogen angehakt sind.
+    // Eine Liste von Kennungen, keine Menge: der Zustand wird kopiert, und ein
+    // Set haette das nicht ueberlebt.
+    druckwahl: [],
     inventur: null,
     zaehlArtikel: null,
     bestellung: null,
@@ -880,7 +884,7 @@ function kopfzeile(titel) {
  * vollen Pfad, damit sich "Fach A1" von "Fach A1" im anderen Regal
  * unterscheiden laesst.
  */
-export function orteAnsicht(orte = [], aktiv = null) {
+export function orteAnsicht(orte = [], aktiv = null, rechte = {}) {
   if (!orte.length) {
     return `<div class="stock-list">
       ${kopfzeile('Lagerplatz')}
@@ -899,6 +903,15 @@ export function orteAnsicht(orte = [], aktiv = null) {
           ${ort.id === aktiv ? '<span class="stock-row__amount">gewählt</span>' : ''}
         </li>`).join('')}
     </ul>
+    ${rechte.manage
+      ? `<div class="stock-sheet">
+           <button class="button button--secondary stock-sheet-locations" type="button">
+             ${orte.length === 1
+               ? 'Etikett für den Lagerplatz drucken'
+               : `Etiketten für alle ${sicher(String(orte.length))} Lagerplätze drucken`}
+           </button>
+         </div>`
+      : ''}
   </div>`;
 }
 
@@ -930,7 +943,33 @@ export function bestandAnsicht(zeilen = []) {
   </div>`;
 }
 
-export function artikelListeAnsicht(artikel = [], rechte = {}, suche = '') {
+/**
+ * Die Schaltflaeche fuer den Etikettenbogen.
+ *
+ * Sie sagt, wie viele gedruckt werden, und ist ohne Auswahl abgeschaltet - ein
+ * Knopf, der einen leeren Bogen erzeugt, waere eine Falle. Ueber 120 Etiketten
+ * nimmt die Schnittstelle nicht an; das steht dran, bevor jemand 300 anhakt
+ * und eine Fehlermeldung bekommt.
+ */
+export function druckKnopf(anzahl, was = 'Etiketten') {
+  if (!anzahl) {
+    return `<button class="button button--secondary stock-sheet-print" type="button" disabled>
+      ${sicher(was)} drucken
+    </button>`;
+  }
+  if (anzahl > ETIKETT_BOGEN.maxEtiketten) {
+    return `<button class="button button--secondary stock-sheet-print" type="button" disabled>
+      ${sicher(String(anzahl))} ausgewählt — höchstens ${ETIKETT_BOGEN.maxEtiketten} je Bogen
+    </button>`;
+  }
+  return `<button class="button button--action stock-sheet-print" type="button">
+    ${sicher(String(anzahl))} ${anzahl === 1 ? 'Etikett' : 'Etiketten'} drucken
+  </button>`;
+}
+
+export function artikelListeAnsicht(artikel = [], rechte = {}, suche = '', wahl = []) {
+  const gewaehlt = new Set(wahl);
+
   return `<div class="stock-list">
     ${kopfzeile('Artikel')}
     ${rechte.manage ? '<button class="button button--action stock-new" type="button">Artikel anlegen</button>' : ''}
@@ -942,14 +981,29 @@ export function artikelListeAnsicht(artikel = [], rechte = {}, suche = '') {
     ${artikel.length
       ? `<ul class="stock-rows">
           ${artikel.map((eintrag) => `
-            <li class="stock-row stock-row--tap" data-artikel="${sicher(eintrag.id)}">
+            <li class="stock-row stock-row--tap${gewaehlt.has(eintrag.id) ? ' stock-row--gewaehlt' : ''}"
+                data-artikel="${sicher(eintrag.id)}">
+              ${rechte.manage
+                ? `<label class="stock-pick" title="Für den Etikettenbogen">
+                     <input type="checkbox" class="stock-pick__box" data-wahl="${sicher(eintrag.id)}"
+                            ${gewaehlt.has(eintrag.id) ? 'checked' : ''}>
+                   </label>`
+                : ''}
               <span class="stock-row__name">${sicher(eintrag.name)}</span>
               <span class="stock-row__number">${sicher(eintrag.itemNumber)}</span>
               <span class="stock-row__amount stock-row__amount--${bestandLage(eintrag.totalQuantity, eintrag.minimumStock)}">
                 ${sicher(bestandText(eintrag.totalQuantity, eintrag.unit))}
               </span>
             </li>`).join('')}
-        </ul>`
+        </ul>
+        ${rechte.manage
+          ? `<div class="stock-sheet">
+               <button class="button button--quiet stock-sheet-all" type="button">
+                 ${gewaehlt.size === artikel.length ? 'Auswahl aufheben' : 'Alle auswählen'}
+               </button>
+               ${druckKnopf(gewaehlt.size)}
+             </div>`
+          : ''}`
       : `<p class="stock-empty">${suche
           ? 'Kein Artikel passt zu dieser Suche.'
           : 'Noch kein Artikel angelegt.'}</p>`}
@@ -1573,9 +1627,11 @@ export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BESTAND) return bestandAnsicht(optionen.bestand);
-  if (zustand.schritt === SCHRITTE.ORTE) return orteAnsicht(optionen.orte, zustand.ort?.id || null);
+  if (zustand.schritt === SCHRITTE.ORTE) {
+    return orteAnsicht(optionen.orte, zustand.ort?.id || null, rechte);
+  }
   if (zustand.schritt === SCHRITTE.ARTIKEL) {
-    return artikelListeAnsicht(optionen.artikel, rechte, zustand.suche);
+    return artikelListeAnsicht(optionen.artikel, rechte, zustand.suche, zustand.druckwahl);
   }
   if (zustand.schritt === SCHRITTE.NACHBESTELLUNG) return nachbestellungAnsicht(optionen.vorschlaege);
   if (zustand.schritt === SCHRITTE.ARTIKEL_NEU) {
