@@ -1008,6 +1008,81 @@ function mapDatabaseError(error) {
   throw error;
 }
 
+/**
+ * Reicht das, was frei verfuegbar ist?
+ *
+ * Frei ist der physische Bestand minus dem, was fuer *andere* zurueckgelegt
+ * wurde. Die eigene Reservierung zaehlt nicht dagegen, sondern wird durch die
+ * Entnahme abgebaut - erst der Rest muss frei sein.
+ *
+ * Der physische Bestand selbst wird hier nicht geprueft: darum kuemmert sich
+ * die Datenbank je nach Firmenregel. Hier geht es nur um die Frage, wem das
+ * Material gehoert.
+ */
+async function verfuegbarkeitPruefen(client, context, { itemId, sourceLocationId, amount, constructionSiteId }) {
+  const offene = await client.query(
+    `SELECT reservierung.id, reservierung.construction_site_id,
+            reservierung.quantity - reservierung.quantity_fulfilled AS offen,
+            baustelle.name AS site_name
+     FROM stock_reservations AS reservierung
+     LEFT JOIN construction_sites AS baustelle
+       ON baustelle.company_id = reservierung.company_id
+      AND baustelle.id = reservierung.construction_site_id
+     WHERE reservierung.company_id = $1
+       AND reservierung.item_id = $2
+       AND reservierung.location_id = $3
+       AND reservierung.status = 'open'
+     ORDER BY reservierung.needed_on NULLS LAST, reservierung.created_at
+     FOR UPDATE OF reservierung`,
+    [context.companyId, itemId, sourceLocationId]
+  );
+  if (!offene.rowCount) return;
+
+  const eigene = offene.rows.filter(
+    (zeile) => constructionSiteId && zeile.construction_site_id === constructionSiteId
+  );
+  const fremde = offene.rows.filter(
+    (zeile) => !constructionSiteId || zeile.construction_site_id !== constructionSiteId
+  );
+
+  const bestand = await client.query(
+    "SELECT quantity FROM stock_levels WHERE company_id = $1 AND item_id = $2 AND location_id = $3",
+    [context.companyId, itemId, sourceLocationId]
+  );
+  const physisch = number(bestand.rows[0]?.quantity ?? 0);
+  const fuerAndere = fremde.reduce((summe, zeile) => summe + number(zeile.offen), 0);
+  const frei = Math.round((physisch - fuerAndere) * 1000) / 1000;
+
+  if (frei < amount) {
+    const namen = [...new Set(fremde.map((zeile) => zeile.site_name).filter(Boolean))];
+    throw new InputError(
+      namen.length
+        ? `Frei verfügbar sind nur ${frei}. Der Rest ist reserviert für ${namen.join(", ")}.`
+        : `Frei verfügbar sind nur ${frei}; der Rest ist reserviert.`,
+      409,
+      "stock_reserved_for_others"
+    );
+  }
+
+  // Die eigene Reservierung abbauen, aelteste zuerst. Was darueber hinausgeht,
+  // war ohnehin frei und braucht keine Reservierung.
+  let rest = amount;
+  for (const zeile of eigene) {
+    if (rest <= 0) break;
+    const abbau = Math.min(rest, number(zeile.offen));
+    if (abbau <= 0) continue;
+    await client.query(
+      `UPDATE stock_reservations
+       SET quantity_fulfilled = quantity_fulfilled + $3,
+           status = CASE WHEN quantity_fulfilled + $3 >= quantity THEN 'fulfilled' ELSE status END,
+           changed_by_user_id = $4
+       WHERE company_id = $1 AND id = $2`,
+      [context.companyId, zeile.id, abbau, context.userId]
+    );
+    rest = Math.round((rest - abbau) * 1000) / 1000;
+  }
+}
+
 async function bookMovement(client, context, body) {
   const movementType = requiredText(body.movementType, "Buchungsart", 20);
   await requireMovementPermission(client, context, movementType);
@@ -1079,6 +1154,16 @@ async function bookMovement(client, context, body) {
   }
   if (movementType === "correction" && Boolean(sourceLocationId) === Boolean(targetLocationId)) {
     throw new InputError("Eine Korrektur bucht in genau eine Richtung.");
+  }
+
+  // Reservierungen gehen vom Bestand ab: was fuer eine Baustelle zurueckgelegt
+  // ist, kann kein anderer mitnehmen. Wer fuer genau diese Baustelle holt,
+  // baut seine eigene Reservierung ab, statt an ihr zu scheitern - sonst
+  // stuende jede Reservierung sich selbst im Weg.
+  if (sourceLocationId && ["issue", "transfer", "scrap", "consumed"].includes(movementType)) {
+    await verfuegbarkeitPruefen(client, context, {
+      itemId, sourceLocationId, amount, constructionSiteId
+    });
   }
 
   await client.query("SAVEPOINT lagerbuchung");
@@ -2276,6 +2361,149 @@ async function cancelDeliveryNote(client, context, noteId, body) {
   return deliveryNoteDetail(client, context, noteId);
 }
 
+// ---------------------------------------------------------------------------
+// Reservierungen
+// ---------------------------------------------------------------------------
+
+function reservierungDto(row) {
+  const menge = number(row.quantity);
+  const geholt = number(row.quantity_fulfilled);
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    itemNumber: row.item_number || null,
+    itemName: row.item_name || null,
+    unit: row.unit || null,
+    locationId: row.location_id,
+    locationName: row.location_name || null,
+    constructionSiteId: row.construction_site_id || null,
+    constructionSiteName: row.site_name || null,
+    quantity: menge,
+    quantityFulfilled: geholt,
+    quantityOpen: Math.round((menge - geholt) * 1000) / 1000,
+    neededOn: row.needed_on ? new Date(row.needed_on).toISOString().slice(0, 10) : null,
+    status: row.status,
+    note: row.note || null,
+    releaseReason: row.release_reason || null,
+    rowVersion: Number(row.row_version || 1)
+  };
+}
+
+async function listReservations(client, context, url) {
+  const siteId = optionalId(url.searchParams.get("baustelle"), "Baustelle");
+  const itemId = optionalId(url.searchParams.get("artikel"), "Artikel");
+  const nurOffene = url.searchParams.get("offen") !== "nein";
+
+  const result = await client.query(
+    `SELECT reservierung.*, artikel.item_number, artikel.name AS item_name, artikel.unit,
+            ort.name AS location_name, baustelle.name AS site_name
+     FROM stock_reservations AS reservierung
+     JOIN stock_items AS artikel
+       ON artikel.company_id = reservierung.company_id AND artikel.id = reservierung.item_id
+     JOIN storage_locations AS ort
+       ON ort.company_id = reservierung.company_id AND ort.id = reservierung.location_id
+     LEFT JOIN construction_sites AS baustelle
+       ON baustelle.company_id = reservierung.company_id
+      AND baustelle.id = reservierung.construction_site_id
+     WHERE reservierung.company_id = $1
+       AND (NOT $2::BOOLEAN OR reservierung.status = 'open')
+       AND ($3::UUID IS NULL OR reservierung.construction_site_id = $3::UUID)
+       AND ($4::UUID IS NULL OR reservierung.item_id = $4::UUID)
+     ORDER BY reservierung.needed_on NULLS LAST, reservierung.created_at DESC
+     LIMIT 300`,
+    [context.companyId, nurOffene, siteId, itemId]
+  );
+  return result.rows.map(reservierungDto);
+}
+
+/**
+ * Zurueckgelegt wird nur, was auch da ist.
+ *
+ * Mehr zu reservieren, als frei verfuegbar ist, waere ein Versprechen auf
+ * Material, das ein anderer schon hat - und es faellt erst auf, wenn beide
+ * davorstehen.
+ */
+async function createReservation(client, context, body) {
+  await requireMovementPermission(client, context, "transfer");
+
+  const itemId = validateId(body.itemId, "Artikel");
+  const locationId = validateId(body.locationId, "Lagerplatz");
+  const amount = quantity(body.quantity);
+
+  const verfuegbar = await client.query(
+    `SELECT COALESCE(sicht.free_quantity, 0) AS frei
+     FROM (SELECT 1) AS eins
+     LEFT JOIN stock_availability AS sicht
+       ON sicht.company_id = $1 AND sicht.item_id = $2 AND sicht.location_id = $3`,
+    [context.companyId, itemId, locationId]
+  );
+  const frei = number(verfuegbar.rows[0]?.frei ?? 0);
+  if (frei < amount) {
+    throw new InputError(
+      `Frei verfügbar sind nur ${frei}. Mehr lässt sich nicht zurücklegen.`,
+      409,
+      "stock_reservation_exceeds_free"
+    );
+  }
+
+  const inserted = await client.query(
+    `INSERT INTO stock_reservations (
+       company_id, item_id, location_id, construction_site_id, project_id,
+       quantity, needed_on, note, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7::DATE, $8, $9, $9)
+     RETURNING id`,
+    [
+      context.companyId, itemId, locationId,
+      optionalId(body.constructionSiteId, "Baustelle"),
+      optionalId(body.projectId, "Projekt"),
+      amount,
+      optionalText(body.neededOn, "Benötigt am", 10),
+      optionalText(body.note, "Notiz", 2000),
+      context.userId
+    ]
+  ).catch(mapDatabaseError);
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, new_state)
+     VALUES ($1, 'stock_reservation', $2, 'created', $3, $4::JSONB)`,
+    [context.companyId, inserted.rows[0].id, context.userId, JSON.stringify({ quantity: amount })]
+  );
+
+  const alle = await listReservations(client, context, new URL("http://intern/?offen=nein"));
+  return { reservation: alle.find((eintrag) => eintrag.id === inserted.rows[0].id) || null };
+}
+
+async function releaseReservation(client, context, reservationId, body) {
+  await requireMovementPermission(client, context, "transfer");
+
+  const reason = optionalText(body?.reason, "Grund", 2000);
+  if (!reason) throw new InputError("Eine Reservierung wird nur mit Grund aufgehoben.");
+
+  const updated = await client.query(
+    `UPDATE stock_reservations
+     SET status = 'released', release_reason = $3, changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2 AND status = 'open'
+     RETURNING id`,
+    [context.companyId, reservationId, reason, context.userId]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Nur eine offene Reservierung lässt sich aufheben.",
+      409,
+      "stock_reservation_closed"
+    );
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason)
+     VALUES ($1, 'stock_reservation', $2, 'released', $3, $4)`,
+    [context.companyId, reservationId, context.userId, reason]
+  );
+
+  const alle = await listReservations(client, context, new URL("http://intern/?offen=nein"));
+  return { reservation: alle.find((eintrag) => eintrag.id === reservationId) || null };
+}
+
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
@@ -2341,6 +2569,24 @@ export async function handleStockRequest({ request, url, client, context, allowe
   if (request.method === "POST" && path === "/api/v1/stock/movements") {
     const body = await readJson(request);
     return { status: 201, body: await bookMovement(client, context, body) };
+  }
+
+  if (request.method === "GET" && path === "/api/v1/stock/reservations") {
+    return { status: 200, body: { reservations: await listReservations(client, context, url) } };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/reservations") {
+    const body = await readJson(request);
+    return { status: 201, body: await createReservation(client, context, body) };
+  }
+
+  const reservationMatch = /^\/api\/v1\/stock\/reservations\/([^/]+)\/release$/.exec(path);
+  if (request.method === "POST" && reservationMatch) {
+    const reservationId = validateId(reservationMatch[1], "Reservierungs-ID");
+    return {
+      status: 200,
+      body: await releaseReservation(client, context, reservationId, await readJson(request))
+    };
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/delivery-notes") {

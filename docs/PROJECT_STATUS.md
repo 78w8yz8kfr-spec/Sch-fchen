@@ -1,10 +1,14 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.19
+Technischer Stand: V0.44.20
 
 ## Abgeschlossen
 
+- Reservierungen (Migration 123): frei verfügbar = physisch minus reserviert,
+  Sicht `stock_availability`; die eigene Baustelle baut ihre Reservierung beim
+  Holen ab, Dritte werden mit Nennung der Baustelle abgewiesen; Aufheben nur
+  mit Grund; Meldebestand am Artikel; PWA-Speicher `schaefchen-online-v102`
 - Lieferscheine als Beleg mit Positionen (Migration 121): Entwurf und Buchen
   getrennt, Bewegungen aus dem Beleg, Abgleich mit der Bestellung samt Teil-
   und Überlieferung, Direktlieferung ohne Umweg über das Hauptlager, Verweis
