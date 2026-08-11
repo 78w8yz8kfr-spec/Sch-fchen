@@ -523,6 +523,70 @@ export function bestandText(menge, einheit) {
   return `${mengeAlsText(menge)} ${einheit || ''}`.trim();
 }
 
+/**
+ * Was das Lager zu einer Zeile der Baustellen-Materialliste sagt.
+ *
+ * Die Liste der Baustelle beantwortet "was brauchen wir hier", das Lager "wie
+ * viel liegt wo". Erst die Verknuepfung beider erlaubt die Frage, die auf der
+ * Baustelle wirklich gestellt wird: reicht das, was wir haben?
+ *
+ * Drei Faelle, und der erste ist der wichtigste:
+ *
+ *   * Ohne Artikel gibt es keine Aussage. Nicht "nichts da" - das waere
+ *     gelogen. Eine Kernbohrung hat keinen Lagerbestand und braucht keinen.
+ *   * Passen die Einheiten nicht zusammen ("Meter" am Eintrag, "Rolle" am
+ *     Artikel), wird der Bestand gezeigt, aber nicht verrechnet. 120 Rollen
+ *     sind nicht 120 Meter, und eine falsche Rechnung waere schlimmer als
+ *     keine: danach bestellt jemand nicht, was fehlt.
+ *   * Sonst wird verglichen und die Fehlmenge genannt.
+ */
+export function materialBestand(eintrag) {
+  if (!eintrag?.stockItemId) return { lage: 'ohne-artikel' };
+
+  const bestand = Number(eintrag.stockQuantity ?? 0);
+  const gebraucht = Number(eintrag.quantity ?? 0);
+  const einheit = eintrag.stockUnit || eintrag.unit || '';
+  const vergleichbar = String(eintrag.stockUnit || '').trim().toLowerCase()
+    === String(eintrag.unit || '').trim().toLowerCase();
+
+  const grund = {
+    artikelnummer: eintrag.stockItemNumber || null,
+    bestand,
+    einheit
+  };
+
+  if (!vergleichbar) {
+    return { ...grund, lage: 'einheiten-verschieden' };
+  }
+  if (bestand >= gebraucht) {
+    return { ...grund, lage: 'reicht', fehlt: 0 };
+  }
+  return {
+    ...grund,
+    lage: bestand <= 0 ? 'nichts-da' : 'reicht-nicht',
+    fehlt: Math.round((gebraucht - bestand) * 1000) / 1000
+  };
+}
+
+/** Ein Satz aus `materialBestand`, so wie er an der Baustellenzeile steht. */
+export function materialBestandText(eintrag) {
+  const lage = materialBestand(eintrag);
+  const menge = (wert) => `${mengeAlsText(wert)} ${lage.einheit}`.trim();
+
+  switch (lage.lage) {
+    case 'ohne-artikel':
+      return null;
+    case 'einheiten-verschieden':
+      return `Lager: ${menge(lage.bestand)} — andere Einheit, bitte selbst prüfen`;
+    case 'reicht':
+      return `Auf Lager: ${menge(lage.bestand)}`;
+    case 'nichts-da':
+      return `Nicht auf Lager — es fehlen ${menge(lage.fehlt)}`;
+    default:
+      return `Auf Lager: ${menge(lage.bestand)} — es fehlen ${menge(lage.fehlt)}`;
+  }
+}
+
 /** Kurzform eines Lagerpfads: im Kopf der Ansicht ist wenig Platz, und
  *  "Materiallager › Regal A › Fach A1" ist auf dem Telefon zu lang. */
 export function ortKurz(ort) {
@@ -1518,7 +1582,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.16`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.17`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den

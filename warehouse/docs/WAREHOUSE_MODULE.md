@@ -27,8 +27,29 @@ sie braucht eine Mengenbuchung statt einer Besitzübergabe.
 
 `site_material_entries` bleibt als **Bedarfsliste** bestehen (`planned`,
 `ordered`). Der tatsächliche Verbrauch wandert in die Lagerbuchungen; die
-Baustellenansicht liest ihn künftig von dort. Es entstehen keine zwei
+Baustellenansicht liest ihn von dort. Es entstehen keine zwei
 Materialbestände.
+
+Seit Migration 117 zeigt eine Zeile der Bedarfsliste freiwillig auf einen
+Lagerartikel (`stock_item_id`). Damit beantwortet die Liste die Frage, die auf
+der Baustelle wirklich gestellt wird: reicht das, was wir haben? Der Bestand
+wird beim Lesen aus dem Journal gerechnet und nicht am Eintrag gespeichert —
+sonst gäbe es doch zwei Bestände, und der zweite wäre der falsche.
+
+Drei Fälle gehen bewusst verschieden aus:
+
+* **Ohne Artikel** steht keine Aussage da. „Kein Bestand" wäre an einer
+  Kernbohrung schlicht falsch.
+* **Verschiedene Einheiten** — „Meter" am Eintrag, „Rolle" am Artikel — zeigen
+  den Bestand, verrechnen ihn aber nicht. 120 Rollen sind nicht 120 Meter, und
+  eine falsche Rechnung wäre schlimmer als keine: danach bestellt niemand, was
+  fehlt. Beim Wählen eines Artikels übernimmt das Formular deshalb dessen
+  Einheit.
+* **Gleiche Einheit** wird verglichen, und die Fehlmenge steht dabei.
+
+Bezeichnung und Einheit bleiben trotz Verknüpfung am Eintrag stehen: die Zeile
+ist ein Beleg dafür, was an diesem Tag geplant wurde, und eine spätere
+Umbenennung im Lager darf alte Baustellenakten nicht rücklings ändern.
 
 ## Fachlicher Ablauf
 

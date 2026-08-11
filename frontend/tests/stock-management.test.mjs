@@ -11,6 +11,8 @@ import {
   verfuegbareVorgaenge,
   darfVorgang,
   buchungBauen,
+  materialBestand,
+  materialBestandText,
   baustellenListe,
   baustelleNochWaehlbar,
   neueVorgangId,
@@ -1564,4 +1566,57 @@ test('der Weg zum Ändern steht nur der Verwaltung offen', () => {
   const zustand = lagerZustand({ schritt: SCHRITTE.BUCHEN, ort: REGAL, artikel: ARTIKEL });
   assert.ok(!buchenAnsicht(zustand, {}, {}).includes('stock-item-edit'));
   assert.ok(buchenAnsicht(zustand, { manage: true }, {}).includes('stock-item-edit'));
+});
+
+
+test('das Lager sagt zur Materialzeile der Baustelle nur, was es weiß', () => {
+  // Ohne verknüpften Artikel gibt es keine Aussage. "Nicht auf Lager" wäre an
+  // einer Kernbohrung schlicht falsch.
+  const ohne = { itemName: 'Kernbohrung 82 mm', quantity: 3, unit: 'Stück' };
+  assert.equal(materialBestand(ohne).lage, 'ohne-artikel');
+  assert.equal(materialBestandText(ohne), null);
+
+  const reicht = {
+    quantity: 300, unit: 'Meter',
+    stockItemId: 'a1', stockItemNumber: 'LAG-0001', stockUnit: 'Meter', stockQuantity: 420
+  };
+  assert.equal(materialBestand(reicht).lage, 'reicht');
+  assert.equal(materialBestandText(reicht), 'Auf Lager: 420 Meter');
+
+  const knapp = { ...reicht, stockQuantity: 120 };
+  assert.deepEqual(
+    { lage: materialBestand(knapp).lage, fehlt: materialBestand(knapp).fehlt },
+    { lage: 'reicht-nicht', fehlt: 180 }
+  );
+  assert.equal(materialBestandText(knapp), 'Auf Lager: 120 Meter — es fehlen 180 Meter');
+
+  const leer = { ...reicht, stockQuantity: 0 };
+  assert.equal(materialBestand(leer).lage, 'nichts-da');
+  assert.equal(materialBestandText(leer), 'Nicht auf Lager — es fehlen 300 Meter');
+});
+
+test('verschiedene Einheiten werden gezeigt, aber nicht verrechnet', () => {
+  // 120 Rollen sind nicht 120 Meter. Eine falsche Rechnung wäre schlimmer als
+  // keine: danach bestellt jemand nicht, was fehlt.
+  const eintrag = {
+    quantity: 300, unit: 'Meter',
+    stockItemId: 'a1', stockItemNumber: 'LAG-0001', stockUnit: 'Rolle', stockQuantity: 120
+  };
+  const lage = materialBestand(eintrag);
+  assert.equal(lage.lage, 'einheiten-verschieden');
+  assert.equal(lage.fehlt, undefined, 'Ohne gemeinsame Einheit gibt es keine Fehlmenge');
+  assert.match(materialBestandText(eintrag), /andere Einheit, bitte selbst prüfen/);
+});
+
+test('ein negativer Bestand deckt nichts', () => {
+  // Unter null heißt: es wurde mehr entnommen, als das System kannte. Für die
+  // Baustelle ist das nichts, und die Fehlmenge ist der volle Bedarf plus das
+  // Loch - hier zählt nur, dass sie nicht kleiner wird als der Bedarf.
+  const eintrag = {
+    quantity: 50, unit: 'Stück',
+    stockItemId: 'a1', stockUnit: 'Stück', stockQuantity: -10
+  };
+  const lage = materialBestand(eintrag);
+  assert.equal(lage.lage, 'nichts-da');
+  assert.equal(lage.fehlt, 60);
 });

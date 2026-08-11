@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.16";
-import { serverIsNewer } from "./core/versions.js?v=0.44.16";
+} from "./core/work-time.js?v=0.44.17";
+import { serverIsNewer } from "./core/versions.js?v=0.44.17";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.16";
+} from "./core/sync-queue.js?v=0.44.17";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.16";
+} from "./core/permissions.js?v=0.44.17";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,10 +40,11 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.16";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.16";
-import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.16";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
+} from "./core/state-store.js?v=0.44.17";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.17";
+import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.17";
+import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.17";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.17";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -194,6 +195,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     employeeSiteMaterials: document.querySelector("#employee-site-materials"),
     employeeSiteMaterialAdd: document.querySelector("#employee-site-material-add"),
     employeeSiteMaterialForm: document.querySelector("#employee-site-material-form"),
+    employeeSiteMaterialItem: document.querySelector("#employee-site-material-item"),
+    employeeSiteMaterialItemLabel: document.querySelector("#employee-site-material-item-label"),
     employeeSiteMaterialName: document.querySelector("#employee-site-material-name"),
     employeeSiteMaterialQuantity: document.querySelector("#employee-site-material-quantity"),
     employeeSiteMaterialUnit: document.querySelector("#employee-site-material-unit"),
@@ -734,6 +737,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     siteDashboardMaterials: document.querySelector("#site-dashboard-materials"),
     siteMaterialAdd: document.querySelector("#site-material-add"),
     siteMaterialForm: document.querySelector("#site-material-form"),
+    siteMaterialItem: document.querySelector("#site-material-item"),
+    siteMaterialItemLabel: document.querySelector("#site-material-item-label"),
     siteMaterialName: document.querySelector("#site-material-name"),
     siteMaterialQuantity: document.querySelector("#site-material-quantity"),
     siteMaterialUnit: document.querySelector("#site-material-unit"),
@@ -1351,7 +1356,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.16",
+          "X-Schaefchen-Version": "0.44.17",
           ...options.headers
         }
       });
@@ -1386,7 +1391,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.16`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.17`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1408,7 +1413,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.16" }
+        headers: { "X-Schaefchen-Version": "0.44.17" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1455,7 +1460,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.16 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.17 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2478,6 +2483,20 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     });
   }
 
+  // Die Lagerzeile unter einem Materialeintrag. Sie steht in beiden Ansichten
+  // gleich - im Buero und auf dem Telefon -, weil beide dieselbe Frage haben:
+  // reicht das, was wir haben? Ohne verknuepften Artikel bleibt sie weg; eine
+  // Zeile "kein Bestand" waere an einer Kernbohrung schlicht falsch.
+  function appendMaterialStockLine(parent, material) {
+    const satz = materialBestandText(material);
+    if (!satz) return;
+    const lage = materialBestand(material);
+    const zeile = document.createElement("span");
+    zeile.className = `site-material-stock site-material-stock--${lage.lage}`;
+    zeile.textContent = lage.artikelnummer ? `${satz} (${lage.artikelnummer})` : satz;
+    parent.append(zeile);
+  }
+
   function renderSiteMaterials(siteId) {
     const materials = (adminState?.siteMaterials || []).filter((material) => (
       material.constructionSiteId === siteId && material.status !== "archived"
@@ -2504,6 +2523,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
       heading.append(title, badge);
       meta.textContent = [`${material.quantity} ${material.unit}`, material.note].filter(Boolean).join(" · ");
       content.append(heading, meta);
+      appendMaterialStockLine(content, material);
       item.className = "site-module-item";
       item.append(content);
       if (nextStatus[material.status]) {
@@ -2817,7 +2837,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.16";
+  const EIGENE_FASSUNG = "0.44.17";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2856,7 +2876,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.16". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.17". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -3846,6 +3866,87 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     delete elements.siteNoteForm.dataset.clientNoteId;
     elements.siteNoteForm.hidden = true;
     elements.siteNoteMessage.textContent = "";
+  }
+
+  // Die Artikelliste fuers Verknuepfen.
+  //
+  // Sie kommt aus dem Lager und wird einmal je Sitzung geholt, wenn zum ersten
+  // Mal ein Materialformular aufgeht. Frueher zu laden waere Arbeit fuer alle,
+  // die nie Material eintragen; jedesmal neu zu laden waere Arbeit auf einem
+  // Telefon, das ohnehin am Netz haengt.
+  let lagerartikelListe = null;
+
+  async function lagerartikelLaden() {
+    if (!moduleEnabled("warehouse")) return [];
+    if (lagerartikelListe) return lagerartikelListe;
+    try {
+      const antwort = await requestJson("./api/v1/stock/items");
+      lagerartikelListe = antwort.items || [];
+    } catch {
+      // Ohne Liste bleibt das Feld weg. Material laesst sich weiterhin als
+      // freie Zeile eintragen - das ist der Weg, den es seit jeher gibt.
+      lagerartikelListe = [];
+    }
+    return lagerartikelListe;
+  }
+
+  /**
+   * Fuellt einen Artikelwaehler und blendet ihn ein.
+   *
+   * Ohne Lagermodul und ohne Artikel bleibt er verborgen: ein leeres
+   * Auswahlfeld ist eine Frage, auf die es keine Antwort gibt.
+   */
+  async function artikelwahlVorbereiten(select, label, nameFeld, einheitFeld) {
+    select.hidden = true;
+    label.hidden = true;
+    const artikel = await lagerartikelLaden();
+    if (!artikel.length) return;
+
+    select.replaceChildren();
+    const leer = document.createElement("option");
+    leer.value = "";
+    leer.textContent = "Ohne Lagerartikel";
+    select.append(leer);
+    artikel.forEach((eintrag) => {
+      const option = document.createElement("option");
+      option.value = eintrag.id;
+      option.textContent = `${eintrag.name} (${eintrag.itemNumber})`;
+      option.dataset.name = eintrag.name;
+      option.dataset.unit = eintrag.unit;
+      select.append(option);
+    });
+    select.hidden = false;
+    label.hidden = false;
+
+    // Bezeichnung und Einheit uebernehmen. Die Einheit ist der eigentliche
+    // Grund: nur wenn sie mit der des Artikels uebereinstimmt, laesst sich der
+    // Bestand ueberhaupt gegen die gebrauchte Menge rechnen. Beide bleiben
+    // aenderbar - die Zeile der Baustelle darf genauer sein als der Stammsatz.
+    select.onchange = () => {
+      const gewaehlt = select.selectedOptions[0];
+      if (!gewaehlt?.value) return;
+      nameFeld.value = gewaehlt.dataset.name || "";
+      const einheit = gewaehlt.dataset.unit || "";
+      if (einheitFeld.tagName !== "SELECT") {
+        einheitFeld.value = einheit;
+        return;
+      }
+
+      // Die Auswahl im Buero kennt fuenf feste Einheiten. Ein Artikel darf
+      // aber jede tragen, und "Meter" ist nicht "m": stand sie nicht in der
+      // Liste, blieb stillschweigend die alte stehen - und weil sich zwei
+      // verschiedene Einheiten nicht verrechnen lassen, sagte die Zeile
+      // danach nur noch "bitte selbst pruefen". Fehlt sie, kommt sie dazu.
+      let passend = [...einheitFeld.options]
+        .find((option) => option.value.toLowerCase() === einheit.toLowerCase());
+      if (!passend && einheit) {
+        passend = document.createElement("option");
+        passend.value = einheit;
+        passend.textContent = einheit;
+        einheitFeld.append(passend);
+      }
+      if (passend) einheitFeld.value = passend.value;
+    };
   }
 
   function resetSiteMaterialForm() {
@@ -6832,7 +6933,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.16" }
+        headers: { "X-Schaefchen-Version": "0.44.17" }
       });
       if (response.ok) {
         await cache.put(
@@ -6920,6 +7021,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
       material.note
     ].filter(Boolean).join(" \u00b7 ");
     content.append(title, meta);
+    appendMaterialStockLine(content, material);
     actions.className = "employee-site-task-actions";
     badge.textContent = materialStatusLabel(material.status);
     actions.append(badge);
@@ -7436,7 +7538,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
             quantity: Number(elements.employeeSiteMaterialQuantity.value),
             unit: elements.employeeSiteMaterialUnit.value,
             status: elements.employeeSiteMaterialStatus.value,
-            note: elements.employeeSiteMaterialNote.value
+            note: elements.employeeSiteMaterialNote.value,
+            stockItemId: elements.employeeSiteMaterialItem.value || null
           })
         }
       );
@@ -11973,6 +12076,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     resetSiteMaterialForm();
     elements.siteMaterialForm.hidden = false;
     elements.siteMaterialName.focus({ preventScroll: true });
+    void artikelwahlVorbereiten(
+      elements.siteMaterialItem, elements.siteMaterialItemLabel,
+      elements.siteMaterialName, elements.siteMaterialUnit
+    );
   });
   elements.siteMaterialCancel.addEventListener("click", resetSiteMaterialForm);
   elements.siteMaterialForm.addEventListener("submit", async (event) => {
@@ -11991,7 +12098,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
           quantity: Number(elements.siteMaterialQuantity.value),
           unit: elements.siteMaterialUnit.value,
           status: elements.siteMaterialStatus.value,
-          note: elements.siteMaterialNote.value
+          note: elements.siteMaterialNote.value,
+          stockItemId: elements.siteMaterialItem.value || null
         })
       });
       resetSiteMaterialForm();
@@ -13205,6 +13313,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.16";
     resetEmployeeSiteMaterialForm();
     elements.employeeSiteMaterialForm.hidden = false;
     elements.employeeSiteMaterialName.focus({ preventScroll: true });
+    void artikelwahlVorbereiten(
+      elements.employeeSiteMaterialItem, elements.employeeSiteMaterialItemLabel,
+      elements.employeeSiteMaterialName, elements.employeeSiteMaterialUnit
+    );
   });
   elements.employeeSiteMaterialCancel.addEventListener("click", resetEmployeeSiteMaterialForm);
   elements.employeeSiteMaterialForm.addEventListener("submit", (event) => {

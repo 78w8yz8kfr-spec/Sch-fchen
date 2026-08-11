@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.16">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.16">
-    <script type="module" src="./app.js?v=0.44.16"></script>
-    <script src="./version.js?v=0.44.16" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.17">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.17">
+    <script type="module" src="./app.js?v=0.44.17"></script>
+    <script src="./version.js?v=0.44.17" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.16</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.17</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -578,6 +578,12 @@
                   Material eintragen
                 </button>
                 <form id="employee-site-material-form" class="site-module-form" novalidate hidden>
+                  <label for="employee-site-material-item" id="employee-site-material-item-label" hidden>
+                    Lagerartikel <span>(optional)</span>
+                  </label>
+                  <select id="employee-site-material-item" hidden>
+                    <option value="">Ohne Lagerartikel</option>
+                  </select>
                   <label for="employee-site-material-name">Bezeichnung</label>
                   <input id="employee-site-material-name" maxlength="180" required
                          placeholder="z. B. NYM-J 3x1,5">
@@ -2009,6 +2015,12 @@
                 <div class="site-work-module">
                   <button id="site-material-add" class="button button--primary" type="button">Material hinzufügen</button>
                   <form id="site-material-form" class="site-module-form" novalidate hidden>
+                    <label for="site-material-item" id="site-material-item-label" hidden>
+                      Lagerartikel <span>(optional)</span>
+                    </label>
+                    <select id="site-material-item" hidden>
+                      <option value="">Ohne Lagerartikel</option>
+                    </select>
                     <label for="site-material-name">Material</label>
                     <input id="site-material-name" maxlength="180" required placeholder="z. B. NYM-J 3x1,5">
                     <div class="setup-grid">

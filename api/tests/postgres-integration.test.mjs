@@ -5545,6 +5545,152 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     );
   });
 
+  await t.test("Baustellenmaterial zeigt auf einen Lagerartikel und dessen Bestand", async () => {
+    // Die Liste der Baustelle beantwortet "was brauchen wir hier", das Lager
+    // "wie viel liegt wo". Bisher wussten die beiden nichts voneinander:
+    // dieselbe Ware stand zweimal im System, und niemand konnte sagen, ob das
+    // eine das andere deckt.
+    const lagerFreischalten = async () => {
+      const antwort = await fetch(
+        `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/warehouse`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Cookie: platformCookie },
+          body: JSON.stringify({
+            status: "permanent",
+            includedInPlan: true,
+            separatelyBilled: false,
+            featureScope: {},
+            reason: "Lager im Integrationstest freischalten"
+          })
+        }
+      );
+      assert.equal(antwort.status, 200, await antwort.clone().text());
+    };
+    await lagerFreischalten();
+
+    const artikelAnlegen = await fetch(`${baseUrl}/api/v1/stock/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        itemNumber: `BAU-${suffix}`,
+        name: "Mantelleitung 5x1,5",
+        groupKey: "cable",
+        unit: "Meter"
+      })
+    });
+    assert.equal(artikelAnlegen.status, 201, await artikelAnlegen.clone().text());
+    const artikel = (await artikelAnlegen.json()).item;
+
+    const kontext = await fetch(`${baseUrl}/api/v1/stock/contexts`, {
+      headers: { Cookie: plannerCookie }
+    });
+    const lagerort = (await kontext.json()).context.locations
+      .find((ort) => ort.name === "Materiallager");
+    await fetch(`${baseUrl}/api/v1/stock/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        itemId: artikel.id, movementType: "opening", quantity: 120,
+        targetLocationId: lagerort.id
+      })
+    });
+
+    // 300 gebraucht, 120 im Regal: die Zeile muss die Unterdeckung zeigen.
+    const angelegt = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        constructionSiteId: structuredSite.id,
+        itemName: "Mantelleitung 5x1,5",
+        quantity: 300,
+        unit: "Meter",
+        status: "planned",
+        stockItemId: artikel.id
+      })
+    });
+    assert.equal(angelegt.status, 201, await angelegt.clone().text());
+    const eintrag = (await angelegt.json()).siteMaterial;
+    assert.equal(eintrag.stockItemId, artikel.id);
+    assert.equal(eintrag.stockItemNumber, artikel.itemNumber);
+    assert.equal(eintrag.stockUnit, "Meter");
+    assert.equal(eintrag.stockQuantity, 120);
+
+    // Eine Zeile ohne Artikel bleibt möglich und behauptet keinen Bestand.
+    const frei = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        constructionSiteId: structuredSite.id,
+        itemName: "Kernbohrung 82 mm",
+        quantity: 3,
+        unit: "Stück",
+        status: "planned"
+      })
+    });
+    const ohneArtikel = (await frei.json()).siteMaterial;
+    assert.equal(ohneArtikel.stockItemId, null);
+    assert.equal(
+      ohneArtikel.stockQuantity, null,
+      "Ohne Artikel darf kein Bestand behauptet werden - auch keine Null"
+    );
+
+    // Ein erfundener Artikel wird abgewiesen, und zwar mit einem Satz.
+    const erfunden = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        constructionSiteId: structuredSite.id,
+        itemName: "Erfunden",
+        quantity: 1,
+        unit: "Stück",
+        status: "planned",
+        stockItemId: randomUUID()
+      })
+    });
+    assert.equal(erfunden.status, 404, await erfunden.clone().text());
+
+    // Der Stand lässt sich weiterschalten, ohne die Verknüpfung zu verlieren.
+    const weiter = await fetch(
+      `${baseUrl}/api/v1/admin/site-materials/${eintrag.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ status: "ordered", rowVersion: eintrag.rowVersion })
+      }
+    );
+    assert.equal(weiter.status, 200, await weiter.clone().text());
+    const geschaltet = (await weiter.json()).siteMaterial;
+    assert.equal(geschaltet.status, "ordered");
+    assert.equal(
+      geschaltet.stockItemId, artikel.id,
+      "Das Weiterschalten des Stands darf die Verknüpfung nicht löschen"
+    );
+
+    // Und sie lässt sich ausdrücklich lösen.
+    const geloest = await fetch(
+      `${baseUrl}/api/v1/admin/site-materials/${eintrag.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          status: "ordered", rowVersion: geschaltet.rowVersion, stockItemId: null
+        })
+      }
+    );
+    assert.equal((await geloest.json()).siteMaterial.stockItemId, null);
+
+    // Auch die Baustellenakte auf dem Telefon trägt den Bestand.
+    const akte = await fetch(
+      `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
+      { headers: { Cookie: foremanCookie } }
+    );
+    const ausDerAkte = (await akte.json()).dashboard.materials
+      .find((material) => material.itemName === "Kernbohrung 82 mm");
+    assert.ok(ausDerAkte, "Die Zeile ohne Artikel fehlt in der Akte");
+    assert.equal(ausDerAkte.stockQuantity, null);
+  });
+
   await t.test("Material: der Schalter sperrt auch die Schnittstelle", async () => {
     // Ein abgeschalteter Bereich wird nicht nur ausgeblendet, sondern gesperrt.
     // Sonst bliebe er ueber die Schnittstelle bedienbar und der Schalter waere

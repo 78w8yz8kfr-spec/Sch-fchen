@@ -1,10 +1,14 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.16
+Technischer Stand: V0.44.17
 
 ## Abgeschlossen
 
+- Materialliste der Baustelle mit dem Lagerartikel verknüpft (Migration 117):
+  je Zeile freiwillig ein Artikel, darunter der Bestand aus dem Journal mit
+  Fehlmenge. Ohne Artikel keine Aussage, bei verschiedenen Einheiten kein
+  Vergleich; PWA-Speicher `schaefchen-online-v99`
 - Material auf eine Baustelle entnehmen und von dort ins Lager zurückgeben:
   beide Richtungen tragen die Baustelle im Journal. Zur Wahl stehen die
   laufenden Baustellen des Betriebs — die eigenen aus dem Tagesplan oben, der

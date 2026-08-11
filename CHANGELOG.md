@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Material der Baustelle kennt jetzt das Lager (Fassung 0.44.17).**
+  Bisher standen dieselben Dinge zweimal im System: an der Baustelle eine
+  Freitextzeile — „Mantelleitung 5x1,5", 300, Meter —, im Lager ein Artikel mit
+  Bestand, und beide wussten nichts voneinander. Wer die Liste ansah, konnte
+  nicht sagen, ob das Zeug im Regal liegt; wer ins Lager ging, wusste nicht,
+  wofür es gebraucht wird. Eine Materialzeile lässt sich jetzt mit einem
+  Lagerartikel verknüpfen und trägt darunter den Satz aus dem Lager: „Auf
+  Lager: 420 Meter" oder „Auf Lager: 120 Meter — es fehlen 180 Meter". Der
+  Bestand wird nicht zusätzlich gespeichert, sondern beim Lesen aus dem Journal
+  gerechnet; es gibt weiterhin genau einen Materialbestand. Ohne Artikel steht
+  dort nichts — „kein Bestand" wäre an einer Kernbohrung schlicht falsch. Sind
+  die Einheiten verschieden, wird der Bestand gezeigt, aber nicht verrechnet:
+  120 Rollen sind nicht 120 Meter, und eine falsche Rechnung wäre schlimmer als
+  keine. Beim Wählen eines Artikels übernimmt das Formular deshalb dessen
+  Bezeichnung und Einheit. Die Liste läuft weiterhin ohne das Lagermodul; dann
+  bleibt das Auswahlfeld weg und alles ist wie bisher.
 - **Material geht auf die Baustelle und kommt von dort zurück (Fassung
   0.44.16).** Beides war bisher nur halb da. Die Entnahme konnte eine Baustelle
   tragen, die Rückgabe nicht: im Journal stand dann eine Entnahme auf die

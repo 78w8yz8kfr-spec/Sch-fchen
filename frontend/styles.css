@@ -4843,6 +4843,15 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+/* Was das Lager zu einer Materialzeile sagt. Die Farbe traegt die Aussage
+   nicht allein - der Satz daneben nennt die Fehlmenge -, sie macht sie nur
+   im Vorbeigehen sichtbar. */
+.site-material-stock { font-weight: 600; }
+.site-material-stock--reicht { color: var(--ui-success, #1a7f37); }
+.site-material-stock--reicht-nicht,
+.site-material-stock--nichts-da { color: var(--ui-danger, #b3261e); }
+.site-material-stock--einheiten-verschieden { color: var(--muted); }
+
 .site-module-item__badges {
   display: inline-flex;
   flex-wrap: wrap;

@@ -64,6 +64,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Etiketten einzeln oder in Auswahl drucken | steht (Fassung 0.44.15) |
 | Artikel nachträglich ändern | steht (Fassung 0.44.15) |
 | Entnahme auf eine Baustelle, Rückgabe von dort | steht (Fassung 0.44.16) |
+| Baustellenmaterial mit Lagerartikel verknüpft, Bestand und Fehlmenge | steht (Fassung 0.44.17, Migration 117) |
 | Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
 
 ## Prüfen
