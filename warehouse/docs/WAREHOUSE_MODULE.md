@@ -112,7 +112,11 @@ sich lesen lässt, ohne es zu scannen, hilft genau dann, wenn die Kamera einmal
 nicht mitspielt.
 
 Daraus folgt das Format: 48 × 25 mm quer statt des Quadrats aus dem
-Gerätemodul, vier Spalten und elf Reihen auf A4, 15 mm je Code. Der
+Gerätemodul, vier Spalten und elf Reihen auf A4, 12 mm je Code — das sind bei
+33 × 33 Modulen und zwei Modulen Ruhezone rund 0,32 mm je Modul, die Grenze für
+das Lesen aus der Hand. Möglich ist sie nur, weil die Adresse im Code in
+Großbuchstaben steht und der QR-Code dadurch in den alphanumerischen Modus
+wechselt: 33 statt 37 Module für dieselbe Angabe. Der
 Gerätebogen bleibt bei seinen 120 kleinen Quadraten — dort steht nur eine
 Inventarnummer, hier eine Bezeichnung, die man auch lesen können soll. Über 44
 Etiketten hinaus wird geblättert statt abgeschnitten.

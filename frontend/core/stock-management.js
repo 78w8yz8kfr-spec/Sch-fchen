@@ -1226,7 +1226,14 @@ export const ETIKETT_BOGEN = Object.freeze({
   zelleBreiteMm: 48,
   zelleHoeheMm: 25,
   spaltMm: 0.5,
-  qrGroesseMm: 15
+  // Zwoelf Millimeter, nicht mehr.
+  //
+  // Die Grenze setzt nicht der Geschmack, sondern die Kamera: der gedruckte
+  // Code ist 33 mal 33 Module gross (Ruhezone eingerechnet 37), macht bei
+  // 12 mm rund 0,32 Millimeter je Modul. Darunter wird das Lesen aus der Hand
+  // unzuverlaessig. Moeglich sind die 12 mm ueberhaupt nur, weil die Adresse
+  // im Code in Grossbuchstaben steht und dadurch vier Module weniger braucht.
+  qrGroesseMm: 12
 });
 
 /** Wie viele Etiketten auf eine Seite gehen; darueber hinaus wird geblaettert. */

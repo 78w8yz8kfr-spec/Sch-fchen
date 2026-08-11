@@ -740,8 +740,18 @@ async function labelSheet(client, context, body, allowedOrigin) {
       throw new InputError("Dieses Etikettenziel wurde nicht gefunden.", 404, "stock_label_target_unknown");
     }
 
+    // Grossbuchstaben: darin packt ein QR-Code die Adresse dichter, weil er in
+    // den alphanumerischen Modus wechseln kann. Aus 37 werden 33 Module, und
+    // derselbe Code passt bei gleicher Lesbarkeit auf weniger Flaeche.
+    //
+    // Erlaubt ist das, weil Schema und Host ohnehin gleichgueltig gegenueber
+    // der Schreibweise sind und den Abfrageteil nur unsere eigene App liest -
+    // sie nimmt `lager` wie `LAGER`. Die Kennung ist hexadezimal, also
+    // unveraendert gueltig; PostgreSQL vergleicht UUIDs ohne Ruecksicht auf
+    // Gross- und Kleinschreibung.
     const adresse = new URL("/", allowedOrigin || "https://example.invalid/");
     adresse.searchParams.set("lager", etikett.token);
+    const gedruckt = adresse.toString().toUpperCase();
 
     labels.push({
       targetType,
@@ -751,9 +761,9 @@ async function labelSheet(client, context, body, allowedOrigin) {
         ? (orte.find((ort) => ort.id === id)?.path || "")
         : (beschriftung.rows[0].nummer || ""),
       extra: beschriftung.rows[0].zusatz || null,
-      target: adresse.toString(),
+      target: gedruckt,
       generation: etikett.generation,
-      svg: await qrToString(adresse.toString(), {
+      svg: await qrToString(gedruckt, {
         type: "svg",
         errorCorrectionLevel: "M",
         margin: 2,

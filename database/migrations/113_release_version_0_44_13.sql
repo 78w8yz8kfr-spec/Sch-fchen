@@ -18,9 +18,22 @@
 -- Materiallager und in der Werkstatt.
 --
 -- Daraus folgt das Format: 48 mal 25 Millimeter quer, vier Spalten und elf
--- Reihen auf A4, 15 Millimeter je Code. Ueber 44 Etiketten hinaus wird
--- geblaettert statt abgeschnitten. Der Geraetebogen bleibt unveraendert bei
--- seinen 120 kleinen Quadraten.
+-- Reihen auf A4. Ueber 44 Etiketten hinaus wird geblaettert statt
+-- abgeschnitten. Der Geraetebogen bleibt unveraendert bei seinen 120 kleinen
+-- Quadraten.
+--
+-- Der Code darauf misst zwoelf Millimeter. Wie klein er sein darf, entscheidet
+-- nicht der Geschmack, sondern die Kamera: bei 33 mal 33 Modulen und einer
+-- Ruhezone von zwei Modulen ringsum sind das rund 0,32 Millimeter je Modul.
+-- Darunter wird das Lesen aus der Hand unzuverlaessig.
+--
+-- Moeglich sind die zwoelf Millimeter erst dadurch, dass die Adresse im Code
+-- in Grossbuchstaben steht: so wechselt der QR-Code in den alphanumerischen
+-- Modus und braucht 33 statt 37 Module fuer dieselbe Angabe. Erlaubt ist das,
+-- weil Schema und Host ohnehin gleichgueltig gegenueber der Schreibweise sind
+-- und den Abfrageteil nur die eigene App liest; sie nimmt seither `lager` wie
+-- `LAGER`. Aeltere, kleingeschriebene Etiketten bleiben damit gueltig - sie
+-- kleben schon im Regal.
 --
 -- Die Bezeichnung bekommt genau zwei Zeilen mit fester Hoehe. Ein langer Name
 -- darf den Code nicht aus dem Etikett schieben, und eine dritte, halb

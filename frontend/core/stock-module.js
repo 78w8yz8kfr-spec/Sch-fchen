@@ -36,6 +36,7 @@ import {
 } from "./stock-management.js?v=0.44.13";
 import {
   erkennungWaehlen,
+  etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
@@ -968,7 +969,7 @@ export function createStockModule({
    */
   async function handleDeepLink() {
     if (tiefenlinkErledigt || !enabled) return;
-    const kennung = new URLSearchParams(fenster.location.search).get("lager");
+    const kennung = etikettAusAdresse(new URL(fenster.location.href));
     if (!kennung) return;
     tiefenlinkErledigt = true;
 
@@ -977,7 +978,9 @@ export function createStockModule({
     await scanAufloesen(kennung);
 
     const adresse = new URL(fenster.location.href);
-    adresse.searchParams.delete("lager");
+    for (const schluessel of [...adresse.searchParams.keys()]) {
+      if (schluessel.toLowerCase() === "lager") adresse.searchParams.delete(schluessel);
+    }
     fenster.history.replaceState({}, "", adresse);
   }
 

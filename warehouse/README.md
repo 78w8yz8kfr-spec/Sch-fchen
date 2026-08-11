@@ -116,6 +116,13 @@ Beim Lagerplatz steht statt der Artikelnummer der ganze Pfad — „Fach A1" gib
 es im Materiallager und in der Werkstatt. Ein Etikett, das sich lesen lässt,
 ohne es zu scannen, hilft genau dann, wenn die Kamera einmal nicht mitspielt.
 
+Der Code misst 12 mm. Kleiner geht nicht ohne Verlust: bei 33 × 33 Modulen und
+zwei Modulen Ruhezone sind das 0,32 mm je Modul, und darunter wird das Lesen
+aus der Hand unzuverlässig. Die 12 mm sind überhaupt nur möglich, weil die
+Adresse im Code in Großbuchstaben steht — dann wechselt der QR-Code in den
+alphanumerischen Modus und braucht 33 statt 37 Module. Wer den Code weiter
+verkleinern will, muss zuerst den Inhalt kürzen, nicht das Bild.
+
 ## Was offen ist
 
 Das **Kamera-Livebild** läuft am Gerät. Im In-App-Browser mancher Anwendungen

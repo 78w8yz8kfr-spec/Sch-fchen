@@ -19,6 +19,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   Etiketten hinaus wird geblättert statt abgeschnitten. Ein langer Name bekommt
   genau zwei Zeilen und wird danach abgeschnitten, statt den Code aus dem
   Etikett zu schieben. Der Gerätebogen bleibt bei seinen 120 kleinen Quadraten.
+  Der Code selbst misst zwölf Millimeter — wie klein er sein darf, entscheidet
+  nicht der Geschmack, sondern die Kamera: das sind rund 0,32 Millimeter je
+  Modul, und darunter wird das Lesen aus der Hand unzuverlässig. Möglich ist das
+  erst dadurch, dass die Adresse im Code in Großbuchstaben steht; so braucht der
+  QR-Code 33 statt 37 Module für dieselbe Angabe. Ältere, kleingeschriebene
+  Etiketten bleiben gültig — sie kleben schon im Regal.
 - **Druckbogen kommen wieder formatiert an.** Beim Umbau der Lageretiketten
   fiel ein Fehler auf, den es schon vorher gab: Schäfchen läuft unter
   `style-src 'self'`, das Druckfenster erbt diese Regel, und ein eingebetteter
