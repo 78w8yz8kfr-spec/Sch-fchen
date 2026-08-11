@@ -88,6 +88,10 @@ export function lagerZustand(vorgabe = {}) {
     ort: null,
     artikel: null,
     bestandAmOrt: null,
+    // In welcher Einheit gerade getippt wird: 'einzeln' oder 'gebinde'.
+    // Gebucht wird immer in der Einheit des Artikels; die Umrechnung passiert
+    // erst in `buchungBauen`, damit im Journal genau eine Wahrheit steht.
+    einheit: 'einzeln',
     gebinde: 1,
     menge: '1',
     baustelleId: null,
@@ -145,6 +149,63 @@ export function mengeAlsText(menge) {
 }
 
 /**
+ * Welche Einheiten stehen fuer diesen Artikel zur Wahl?
+ *
+ * Immer das Einzelstueck - eine einzelne Dose aus dem Karton zu nehmen ist der
+ * Alltag und darf nie versperrt sein. Dazu das Gebinde, wenn es eines gibt.
+ *
+ * Woher das Gebinde kommt, hat eine Rangfolge: Wer gerade einen Kartoncode
+ * gescannt hat, haelt diesen Karton in der Hand - dessen Menge zaehlt, auch
+ * wenn am Artikel ein anderes Gebinde steht. Sonst gilt das Gebinde des
+ * Artikels. Angeboten werden bewusst hoechstens zwei Einheiten; drei Knoepfe
+ * vor dem Regal sind einer zu viel.
+ */
+export function einheitenFuer(artikel, gebindeAusScan = 1) {
+  const einzeln = {
+    schluessel: 'einzeln',
+    name: artikel?.unit || 'Stück',
+    faktor: 1
+  };
+
+  const ausScan = Number(gebindeAusScan) > 1 ? Number(gebindeAusScan) : null;
+  const ausArtikel = Number(artikel?.packSize) > 1 ? Number(artikel.packSize) : null;
+  const faktor = ausScan || ausArtikel;
+  if (!faktor) return [einzeln];
+
+  // Der Name gehoert nur dann zum Gebinde des Artikels, wenn auch dessen
+  // Stueckzahl gilt. Ein gescannter Zehnerpack heisst nicht "Karton", nur
+  // weil am Artikel ein Karton steht.
+  const name = faktor === ausArtikel && artikel?.packName ? artikel.packName : 'Gebinde';
+
+  return [einzeln, { schluessel: 'gebinde', name, faktor }];
+}
+
+/** Der Umrechnungsfaktor der gerade gewaehlten Einheit. */
+export function faktorFuer(zustand) {
+  const einheiten = einheitenFuer(zustand.artikel, zustand.gebinde);
+  const gewaehlt = einheiten.find((eintrag) => eintrag.schluessel === zustand.einheit);
+  return gewaehlt ? gewaehlt.faktor : 1;
+}
+
+/**
+ * Was gerade getippt wurde, in den Worten des Monteurs: "2 Karton".
+ *
+ * Leer, solange in Einzelstuecken gebucht wird — dort sagt die Menge mit ihrer
+ * Einheit schon alles, und "5 Stück (5 Stück)" waere Geschwaetz.
+ */
+export function gebindeText(zustand) {
+  const faktor = faktorFuer(zustand);
+  if (faktor <= 1) return null;
+
+  const einheiten = einheitenFuer(zustand.artikel, zustand.gebinde);
+  const gewaehlt = einheiten.find((eintrag) => eintrag.schluessel === zustand.einheit);
+  const menge = mengeAusText(zustand.menge);
+  if (menge === null) return null;
+
+  return `${mengeAlsText(menge)} ${gewaehlt.name}`;
+}
+
+/**
  * Verarbeitet die Antwort des Scan-Endpunkts.
  *
  * Der Ortskontext ist der Kniff, der die Bedienung kurz macht: einmal das
@@ -174,6 +235,12 @@ export function scanVerarbeiten(zustand, antwort) {
     const gebinde = Number(antwort.packQuantity) > 0 ? Number(antwort.packQuantity) : 1;
     const bestand = (antwort.levels || []).find((zeile) => zeile.locationId === zustand.ort?.id);
 
+    // Wer den Kartoncode scannt, meint den Karton: dann steht die Einheit auf
+    // Gebinde und die Menge auf eins. Ein Griff auf "Einzeln" holt trotzdem
+    // die einzelne Dose heraus - der Karton in der Hand ist kein Zwang.
+    const einheiten = einheitenFuer(antwort.item, gebinde);
+    const gebindeGewaehlt = gebinde > 1 && einheiten.length > 1;
+
     return {
       ...zustand,
       schritt: SCHRITTE.BUCHEN,
@@ -181,8 +248,9 @@ export function scanVerarbeiten(zustand, antwort) {
       bestandAmOrt: bestand ? bestand.quantity : (zustand.ort ? 0 : null),
       // Aus dem Zwischenspeicher: die Zahl stimmte, als zuletzt Netz da war.
       bestandVeraltet: Boolean(antwort.offline),
+      einheit: gebindeGewaehlt ? 'gebinde' : 'einzeln',
       gebinde,
-      menge: mengeAlsText(gebinde),
+      menge: '1',
       bestaetigung: null,
       hinweis: null,
       fehler: null
@@ -232,8 +300,14 @@ export function buchungBauen(zustand, optionen = {}) {
   if (!vorgang) return { fehler: 'Diesen Vorgang gibt es nicht.' };
   if (!zustand.artikel) return { fehler: 'Es ist kein Artikel gewählt.' };
 
-  const menge = mengeAusText(zustand.menge);
-  if (menge === null) return { fehler: 'Bitte eine Menge größer als null eingeben.' };
+  const getippt = mengeAusText(zustand.menge);
+  if (getippt === null) return { fehler: 'Bitte eine Menge größer als null eingeben.' };
+
+  // Hier und nur hier wird aus "zwei Kartons" die Zahl, die ins Journal geht.
+  // Der Bestand kennt ausschliesslich die Einheit des Artikels; ein zweiter
+  // Bestand in Gebinden koennte davon abweichen, und niemand wuesste, welcher
+  // stimmt.
+  const menge = Math.round(getippt * faktorFuer(zustand) * 1000) / 1000;
 
   if (!zustand.ort) {
     return { fehler: 'Zuerst den Lagerplatz scannen oder auswählen.' };
@@ -333,8 +407,11 @@ export function buchungVerarbeiten(zustand, antwort) {
     schritt: SCHRITTE.BESTAETIGT,
     bestaetigung: {
       artikelName: zustand.artikel?.name || '',
-      menge: mengeAusText(zustand.menge),
+      menge: Math.round((mengeAusText(zustand.menge) ?? 0) * faktorFuer(zustand) * 1000) / 1000,
       einheit: zustand.artikel?.unit || '',
+      // Was der Monteur getippt hat, in seinen Worten: "2 Karton". Steht
+      // neben der gebuchten Menge, damit beides zusammenpasst.
+      gewaehlt: gebindeText(zustand),
       vorgang: VORGAENGE[zustand.vorgang]?.name || '',
       neuerBestand: offline ? null : (bestand ? bestand.quantity : null),
       wiederholt: Boolean(antwort?.repeated),
@@ -342,6 +419,7 @@ export function buchungVerarbeiten(zustand, antwort) {
     },
     artikel: null,
     bestandAmOrt: null,
+    einheit: 'einzeln',
     gebinde: 1,
     menge: '1',
     fehler: null
@@ -487,6 +565,14 @@ export function startAnsicht(zustand, rechte = {}) {
     </div>`;
 }
 
+/** Was aus der getippten Menge im Bestand wird — in der Einheit des Artikels. */
+export function gebuchteMengeText(zustand) {
+  const getippt = mengeAusText(zustand.menge);
+  if (getippt === null) return bestandText(0, zustand.artikel?.unit);
+  const menge = Math.round(getippt * faktorFuer(zustand) * 1000) / 1000;
+  return bestandText(menge, zustand.artikel?.unit);
+}
+
 export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
   const artikel = zustand.artikel;
   if (!artikel) return '';
@@ -494,8 +580,23 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
   const vorgaenge = verfuegbareVorgaenge(rechte);
   const lage = bestandLage(zustand.bestandAmOrt, artikel.minimumStock);
 
-  const gebindeHinweis = zustand.gebinde > 1
-    ? `<p class="stock-pack">Gescannt wurde ein Gebinde mit ${sicher(mengeAlsText(zustand.gebinde))} ${sicher(artikel.unit)}.</p>`
+  const einheiten = einheitenFuer(artikel, zustand.gebinde);
+  const faktor = faktorFuer(zustand);
+
+  // Die Wahl steht ueber der Menge, nicht darunter: erst entscheidet man, wovon
+  // man spricht, dann wie viel davon.
+  const einheitenWahl = einheiten.length > 1
+    ? `<div class="stock-units" role="group" aria-label="Einheit">
+        ${einheiten.map((eintrag) => `
+          <button class="stock-unit${eintrag.schluessel === zustand.einheit ? ' stock-unit--aktiv' : ''}"
+                  type="button" data-einheit="${sicher(eintrag.schluessel)}"
+                  aria-pressed="${eintrag.schluessel === zustand.einheit ? 'true' : 'false'}">
+            <span class="stock-unit__name">${sicher(eintrag.name)}</span>
+            ${eintrag.faktor > 1
+              ? `<span class="stock-unit__hint">${sicher(mengeAlsText(eintrag.faktor))} ${sicher(artikel.unit)}</span>`
+              : '<span class="stock-unit__hint">einzeln</span>'}
+          </button>`).join('')}
+      </div>`
     : '';
 
   return `
@@ -516,7 +617,7 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
           : ''}
       </div>
 
-      ${gebindeHinweis}
+      ${einheitenWahl}
 
       <div class="stock-amount">
         <button class="button button--secondary stock-amount__step" type="button" data-schritt="-1" aria-label="Menge verringern">−</button>
@@ -525,9 +626,10 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
           <input class="stock-amount__input" type="text" inputmode="decimal"
                  autocomplete="off" value="${sicher(zustand.menge)}">
         </label>
-        <span class="stock-amount__unit">${sicher(artikel.unit)}</span>
+        <span class="stock-amount__unit">${sicher(einheiten.find((eintrag) => eintrag.schluessel === zustand.einheit)?.name || artikel.unit)}</span>
         <button class="button button--secondary stock-amount__step" type="button" data-schritt="1" aria-label="Menge erhöhen">+</button>
       </div>
+      ${faktor > 1 ? `<p class="stock-pack-sum">Das sind ${sicher(gebuchteMengeText(zustand))}.</p>` : ''}
 
       ${baustellenFeld(zustand, optionen)}
 
@@ -573,6 +675,7 @@ export function bestaetigungAnsicht(zustand) {
     <div class="stock-done">
       <p class="stock-done__mark" aria-hidden="true">✓</p>
       <h2 class="stock-done__title">${sicher(b.vorgang)}: ${sicher(mengeAlsText(b.menge))} ${sicher(b.einheit)}</h2>
+      ${b.gewaehlt ? `<p class="stock-done__pack">${sicher(b.gewaehlt)}</p>` : ''}
       <p class="stock-done__item">${sicher(b.artikelName)}</p>
       ${b.neuerBestand !== null
         ? `<p class="stock-done__stock">Neuer Bestand hier: ${sicher(bestandText(b.neuerBestand, b.einheit))}</p>`
@@ -676,6 +779,29 @@ export function bestandsmengeAusText(text) {
  * Artikelnummer fehlt. Die Datenbank bleibt die Grenze, das hier ist die
  * Hoeflichkeit.
  */
+function gebindeAusFormular(werte) {
+  const name = String(werte.packName ?? '').trim();
+  const groesse = bestandsmengeAusText(werte.packSize);
+
+  if (groesse === undefined) {
+    return { pack: {}, packFehler: 'Die Stückzahl im Gebinde ist keine gültige Menge.' };
+  }
+  if (groesse === null && !name) return { pack: { size: null, name: null } };
+  if (groesse === null) {
+    return { pack: {}, packFehler: 'Zum Gebinde fehlt die Stückzahl.' };
+  }
+  if (!name) {
+    return { pack: {}, packFehler: 'Das Gebinde braucht einen Namen — Karton, Rolle, Bund.' };
+  }
+  if (groesse <= 1) {
+    return {
+      pack: {},
+      packFehler: 'Ein Gebinde enthält mehr als ein Stück; sonst ist es das Stück selbst.'
+    };
+  }
+  return { pack: { size: groesse, name } };
+}
+
 export function artikelFormularLesen(werte = {}) {
   const text = (wert) => String(wert ?? '').trim();
 
@@ -702,6 +828,11 @@ export function artikelFormularLesen(werte = {}) {
     return { fehler: 'Der Zielbestand liegt unter dem Mindestbestand.' };
   }
 
+  // Dieselben drei Regeln wie in der Schnittstelle und in der Datenbank. Sie
+  // hier zu wiederholen ist kein Zufall: der Monteur soll den Fehler sehen,
+  // bevor das Formular weggeschickt wird.
+  const { pack, packFehler } = gebindeAusFormular(werte);
+
   const codes = (werte.barcodes || []).filter((eintrag) => text(eintrag?.code));
   const barcodes = [];
   for (const eintrag of codes) {
@@ -721,6 +852,11 @@ export function artikelFormularLesen(werte = {}) {
   const entwurf = { itemNumber, name, unit, groupKey, barcodes };
   if (minimumStock !== null) entwurf.minimumStock = minimumStock;
   if (targetStock !== null) entwurf.targetStock = targetStock;
+  if (packFehler) return { fehler: packFehler };
+  if (pack.size !== null) {
+    entwurf.packSize = pack.size;
+    entwurf.packName = pack.name;
+  }
   if (text(werte.manufacturer)) entwurf.manufacturer = text(werte.manufacturer);
   if (text(werte.manufacturerNumber)) entwurf.manufacturerNumber = text(werte.manufacturerNumber);
 
@@ -879,6 +1015,18 @@ export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
       <label class="stock-field"><span>Zielbestand</span>
         <input name="targetStock" inputmode="decimal" value="${sicher(daten.targetStock ?? '')}" autocomplete="off"></label>
     </div>
+    <div class="stock-field-pair">
+      <label class="stock-field"><span>Gebinde heißt (freiwillig)</span>
+        <input name="packName" value="${sicher(daten.packName || '')}" autocomplete="off" maxlength="40"
+               placeholder="Karton, Rolle, Bund"></label>
+      <label class="stock-field"><span>Stück im Gebinde</span>
+        <input name="packSize" inputmode="decimal" value="${sicher(daten.packSize ?? '')}" autocomplete="off"
+               placeholder="z. B. 100"></label>
+    </div>
+    <p class="stock-hint">
+      Mit Gebinde lässt sich beim Buchen zwischen ganzen Gebinden und einzelnen
+      Stücken umschalten. Der Bestand zählt immer in ${sicher(daten.unit || 'Stück')}.
+    </p>
     ${codeFelder(daten)}
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
     <button class="button button--action stock-save" type="button">Anlegen</button>

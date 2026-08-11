@@ -520,13 +520,25 @@ export function createStockModule({
 
     const feld = wurzel.querySelector(".stock-amount__input");
     feld?.addEventListener("input", () => { zustand.menge = feld.value; });
+    // Ein Schritt ist eins in der gewaehlten Einheit: ein Stueck oder ein
+    // Karton. Frueher sprang die Menge in Hunderterschritten, weil sie immer in
+    // Stueck gezaehlt wurde - und eine einzelne Dose war nur durch Tippen zu
+    // bekommen.
     auf(".stock-amount__step", "click", (ereignis) => {
       const jetzt = mengeAusText(zustand.menge) ?? 0;
-      const schritt = Number(ereignis.currentTarget.dataset.schritt)
-        * (zustand.gebinde > 1 ? zustand.gebinde : 1);
+      const schritt = Number(ereignis.currentTarget.dataset.schritt);
       const neu = Math.max(0, Math.round((jetzt + schritt) * 1000) / 1000);
       zustand.menge = neu > 0 ? mengeAlsText(neu) : "";
       if (feld) feld.value = zustand.menge;
+      render();
+    });
+
+    // Umschalten zwischen Gebinde und Einzelstueck. Die Menge bleibt stehen:
+    // wer "2" getippt hat und auf Einzeln wechselt, meint zwei Stueck - nicht
+    // zweihundert. Umrechnen waere hier die falsche Freundlichkeit.
+    auf(".stock-unit", "click", (ereignis) => {
+      zustand = { ...zustand, einheit: ereignis.currentTarget.dataset.einheit, fehler: null };
+      render();
     });
 
     auf(".stock-site__select", "change", (ereignis) => {

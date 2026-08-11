@@ -57,6 +57,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Einhängen in `app.mjs` und Navigation | steht (Fassung 0.44.11) |
 | Bedienung ohne Netz: Scanspeicher, Warteschlange, Nachtrag | steht (Fassung 0.44.12) |
 | Etikettenlink, Lagerplatzauswahl, Artikelsuche | steht (Fassung 0.44.12) |
+| Gebinde am Artikel, Einzelentnahme daraus | steht (Fassung 0.44.12, Migration 111) |
 | Freigabe je Firma über die Plattform | steht — Modulschlüssel `warehouse` |
 | Rolle „Lagerist“, von der Firma vergeben | steht |
 | Kamera-Livebild im In-App-Browser | offen, siehe unten |

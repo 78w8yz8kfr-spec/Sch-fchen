@@ -393,7 +393,7 @@ const ORTE = [
 const ARTIKEL = [
   {
     id: 'art-1', itemNumber: 'LAG-0001', name: 'Schalterdose tief', unit: 'Stück',
-    minimumStock: 50, targetStock: 300,
+    minimumStock: 50, targetStock: 300, packSize: 100, packName: 'Karton',
     codes: [
       { code: '4006381333931', gtin: '04006381333931', pack: 1, text: 'Einzelpackung' },
       { code: '96385074', gtin: '00000096385074', pack: 100, text: 'Karton mit 100' }
@@ -401,7 +401,7 @@ const ARTIKEL = [
   },
   {
     id: 'art-2', itemNumber: 'LAG-0002', name: 'NYM-J 3×1,5', unit: 'Meter',
-    minimumStock: 200, targetStock: 1000,
+    minimumStock: 200, targetStock: 1000, packSize: 50, packName: 'Rolle',
     codes: [{ code: 'KABEL-TROMMEL-01', gtin: null, pack: 1, text: 'Eigenes Etikett' }]
   },
   {
@@ -445,6 +445,7 @@ function artikelAntwort(artikel, pack) {
     item: {
       id: artikel.id, itemNumber: artikel.itemNumber, name: artikel.name,
       unit: artikel.unit, minimumStock: artikel.minimumStock, targetStock: artikel.targetStock,
+      packSize: artikel.packSize ?? null, packName: artikel.packName ?? null,
       totalQuantity: ORTE.reduce((summe, ort) => summe + (bestand.get(`${artikel.id}|${ort.id}`) ?? 0), 0)
     },
     levels: bestandVon(artikel.id)
@@ -529,6 +530,7 @@ function alleArtikel() {
   return ARTIKEL.map((artikel) => ({
     id: artikel.id, itemNumber: artikel.itemNumber, name: artikel.name, unit: artikel.unit,
     minimumStock: artikel.minimumStock, targetStock: artikel.targetStock,
+    packSize: artikel.packSize ?? null, packName: artikel.packName ?? null,
     totalQuantity: ORTE.reduce((summe, ort) => summe + (bestand.get(`${artikel.id}|${ort.id}`) ?? 0), 0)
   }));
 }
@@ -764,10 +766,16 @@ function verdrahten() {
   wurzel.querySelectorAll('.stock-amount__step').forEach((knopf) => {
     knopf.addEventListener('click', () => {
       const jetzt = mengeAusText(zustand.menge) ?? 0;
-      const schritt = Number(knopf.dataset.schritt) * (zustand.gebinde > 1 ? zustand.gebinde : 1);
-      const neu = Math.max(0, Math.round((jetzt + schritt) * 1000) / 1000);
+      const neu = Math.max(0, Math.round((jetzt + Number(knopf.dataset.schritt)) * 1000) / 1000);
       zustand.menge = neu > 0 ? mengeAlsText(neu) : '';
-      feld.value = zustand.menge;
+      zeichnen();
+    });
+  });
+
+  wurzel.querySelectorAll('.stock-unit').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      zustand = { ...zustand, einheit: knopf.dataset.einheit, fehler: null };
+      zeichnen();
     });
   });
 

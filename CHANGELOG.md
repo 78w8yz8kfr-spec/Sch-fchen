@@ -23,6 +23,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   sonst hielte es jeden weiteren Nachtrag auf. Die Inventur bleibt bewusst
   außen vor: sie zählt gegen einen Sollbestand vom Server, und gegen einen
   veralteten zu zählen erzeugt Korrekturen, die nichts richtigstellen.
+- **Artikel haben Gebinde, und einzelne Stücke gehen trotzdem raus.** Bisher
+  stand die Gebindemenge nur am Code: wer den Karton scannte, buchte hundert
+  Stück, und das war es. Es gab das Gebinde also nur, wenn der Hersteller einen
+  eigenen Code auf den Karton gedruckt hat — eine Rolle Kabel, ein Bund
+  Klemmen, alles was der Betrieb selbst zu Gebinden macht, ließ sich nicht
+  abbilden. Jetzt steht die Stückzahl am Artikel, mit Namen: Karton, Rolle,
+  Bund. Beim Buchen steht die Wahl über der Menge — „Karton (100 Stück)" oder
+  „Stück einzeln" —, und die Plusschaltfläche zählt in der gewählten Einheit
+  statt in Hundertern; eine einzelne Dose aus dem gescannten Karton ist damit
+  ein Griff und kein Überschreiben der Menge mehr. Wer einen Zehnerpack scannt,
+  bekommt den Zehnerpack angeboten und nicht den Karton des Artikels: in der
+  Hand zählt, was in der Hand ist. Der Bestand bleibt dabei in der Einheit des
+  Artikels — das Gebinde ist eine Art, über die Menge zu sprechen, kein zweiter
+  Bestand daneben, der davon abweichen könnte. Artikel, die es vorher schon
+  gab, bekommen ihr Gebinde nachträglich; dabei ändert sich kein einziger
+  gebuchter Bestand.
 - **Drei Dinge, die im Lageralltag gefehlt haben.** Ein gedrucktes Etikett, mit
   der Kamera des Telefons gescannt, führt jetzt in der App zum Artikel; vorher
   öffnete sich Schäfchen und tat nichts — das Etikett war ein Bild ohne

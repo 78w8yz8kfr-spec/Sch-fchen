@@ -9445,6 +9445,26 @@ body.hat-fassungshinweis {
 .stock-row--gewaehlt { border-color: var(--ui-brand); background: var(--ui-brand-soft); }
 .stock-row--gewaehlt .stock-row__amount { color: var(--ui-brand); font-size: .78rem; }
 
+/* Gebinde oder Einzelstück: die Wahl steht über der Menge, weil erst
+   feststeht, wovon man spricht, und dann wie viel davon. */
+.stock-units { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stock-unit {
+  appearance: none; font: inherit; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 2px; min-height: 52px;
+  padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--ui-border-strong); background: var(--ui-surface); color: var(--ui-text);
+}
+.stock-unit--aktiv { border-color: var(--ui-brand); background: var(--ui-brand-soft); }
+.stock-unit:focus-visible { outline: 3px solid var(--ui-brand); outline-offset: 2px; }
+.stock-unit__name { font-weight: 700; font-size: .92rem; }
+.stock-unit__hint { font-size: .74rem; color: var(--ui-text-tertiary); font-variant-numeric: tabular-nums; }
+
+.stock-pack-sum {
+  margin: 0; font-size: .84rem; font-weight: 600; color: var(--ui-text-secondary);
+  font-variant-numeric: tabular-nums; text-align: center;
+}
+.stock-done__pack { margin: 0; font-size: .88rem; color: var(--ui-text-secondary); }
+
 .stock-search { margin: 0; }
 .stock-search__input {
   font: inherit; font-size: 1rem; color: var(--ui-text); background: var(--ui-surface);

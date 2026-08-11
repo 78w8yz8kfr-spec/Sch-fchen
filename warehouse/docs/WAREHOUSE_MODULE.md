@@ -303,6 +303,7 @@ hat.
 | `GET /contexts` | Warengruppen, Lagerplätze als Baum mit lesbarem Pfad, Firmenregeln, eigene Rechte |
 | `GET /items`, `GET /items/:id` | Artikelliste mit Bestandssumme; Einzelansicht mit Beständen, Codes und den letzten fünfzig Buchungen |
 | `POST /items` | Artikel anlegen, mitsamt beliebig vielen Codes und Gebindemengen |
+| `PATCH /items/:id` | Artikel ändern — vor allem, um ein Gebinde nachzutragen. Nur was mitgeschickt wird, ändert sich; `rowVersion` ist Pflicht. Die Einheit bleibt außen vor: sie zu ändern würde jeden gebuchten Bestand still umdeuten |
 | `POST /locations` | Regal oder Fach anlegen |
 | `POST /labels` | eigenes Etikett ausgeben; Nachdruck liest denselben Token, `replace` widerruft mit Pflichtgrund |
 | `POST /scan` | Code auflösen: Etikett, GTIN oder Freitext |
@@ -374,6 +375,39 @@ HttpOnly-Sitzungscookie. Ein Code aus dem Frontend wird immer erst innerhalb
 des Sitzungsmandanten aufgelöst; unbekannte, widerrufene und fremdmandantige
 Codes liefern dieselbe Antwort, damit niemand über die Fehlermeldung erfährt,
 ob es den Artikel anderswo gibt.
+
+## Gebinde
+
+Ein Artikel kann ein Gebinde haben: `pack_size` sagt, wie viele Einheiten darin
+stecken, `pack_name` wie es im Betrieb heißt — Karton, Rolle, Bund, Palette.
+Beides gehört zusammen und wird von der Datenbank erzwungen; eine Stückzahl
+ohne Namen wäre ein Gebinde, das niemand ansprechen kann, ein Name ohne
+Stückzahl sagt nichts darüber, wie viel drin ist. `pack_size` muss größer als
+eins sein: ein Gebinde mit einem Stück ist kein Gebinde, sondern das Stück.
+
+**Der Bestand zählt ausschließlich in der Einheit des Artikels.** Das ist die
+wichtigste Festlegung: das Gebinde ist eine Art, über die Menge zu sprechen,
+kein zweiter Bestand daneben. Sonst hätte ein Lager zwei Zahlen, die
+auseinanderlaufen können, und niemand wüsste, welche stimmt. Umgerechnet wird
+an genau einer Stelle — `buchungBauen` in `stock-management.js` —, und was ins
+Journal geht, ist immer die Zahl in `unit`.
+
+Beim Buchen steht die Wahl über der Menge. Angeboten werden höchstens zwei
+Einheiten, denn drei Knöpfe vor dem Regal sind einer zu viel:
+
+| Lage | angeboten |
+| --- | --- |
+| Artikel ohne Gebinde, Einzelcode gescannt | nur Einzelstück |
+| Artikel mit Gebinde | Einzelstück und das Gebinde des Artikels |
+| Gebindecode gescannt | Einzelstück und **dieses** Gebinde, vorgewählt |
+
+Ein gescannter Gebindecode schlägt dabei das Gebinde des Artikels: Wer einen
+Zehnerpack in der Hand hält, hält einen Zehnerpack, auch wenn am Artikel ein
+Hunderterkarton steht. Er heißt dann „Gebinde" und nicht „Karton" — der Name
+gehört nur dann zum Artikel, wenn auch dessen Stückzahl gilt.
+
+Das Einzelstück ist immer erreichbar. Eine einzelne Dose aus dem Karton zu
+nehmen ist der Alltag und darf nie versperrt sein.
 
 ## Freigabe, Rolle und Einbau
 

@@ -1014,4 +1014,96 @@ integrationTest("Lager: Codes nachtragen, zurücknehmen und Etiketten drucken", 
     await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/labels/sheet",
       { targets: [{ targetType: "item", id: artikelId }] }, "stock_manage_forbidden");
   });
+
+  // -------------------------------------------------------------------------
+  // Gebinde
+  // -------------------------------------------------------------------------
+
+  await t.test("ein Artikel bekommt sein Gebinde", async () => {
+    const { status, body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `GEB-${kennung}`,
+      name: "Klemmen im Bund",
+      groupKey: "other",
+      unit: "Stück",
+      packName: "Bund",
+      packSize: 25
+    });
+
+    assert.equal(status, 201);
+    assert.equal(body.item.packSize, 25);
+    assert.equal(body.item.packName, "Bund");
+    // Der Bestand bleibt in der Einheit des Artikels; das Gebinde ist eine Art,
+    // darüber zu sprechen, kein zweiter Bestand.
+    assert.equal(body.item.unit, "Stück");
+    assert.equal(body.item.totalQuantity, 0);
+  });
+
+  await t.test("die drei Halbheiten eines Gebindes werden abgewiesen", async () => {
+    const grund = { name: "Halbes Gebinde", groupKey: "other", unit: "Stück" };
+
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/items",
+      { ...grund, itemNumber: `GEB-A-${kennung}`, packSize: 10 }, "stock_pack_name_missing");
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/items",
+      { ...grund, itemNumber: `GEB-B-${kennung}`, packName: "Karton" }, "stock_pack_size_missing");
+    // Ein Gebinde mit einem Stück ist kein Gebinde, sondern das Stück.
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/items",
+      { ...grund, itemNumber: `GEB-C-${kennung}`, packName: "Karton", packSize: 1 },
+      "stock_pack_size_too_small");
+  });
+
+  await t.test("ein vorhandener Artikel bekommt sein Gebinde nachträglich", async () => {
+    const vorher = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+    assert.equal(vorher.body.item.packSize, null, "Vorher hatte er keines");
+
+    const { status, body } = await aufrufen(
+      apiPool, buero, "PATCH", `/api/v1/stock/items/${artikelId}`,
+      { packName: "Karton", packSize: 100, rowVersion: vorher.body.item.rowVersion }
+    );
+
+    assert.equal(status, 200);
+    assert.equal(body.item.packSize, 100);
+    assert.equal(body.item.packName, "Karton");
+    // Was nicht mitgeschickt wurde, bleibt stehen: wer das Gebinde einträgt,
+    // soll dabei nicht den Mindestbestand verlieren.
+    assert.equal(body.item.minimumStock, vorher.body.item.minimumStock);
+    assert.equal(body.item.name, vorher.body.item.name);
+    assert.ok(body.item.rowVersion > vorher.body.item.rowVersion);
+  });
+
+  await t.test("zwei gleichzeitige Änderungen überschreiben sich nicht", async () => {
+    const stand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+    const veraltet = stand.body.item.rowVersion - 1;
+
+    await erwarteFehler(apiPool, buero, "PATCH", `/api/v1/stock/items/${artikelId}`,
+      { packName: "Palette", packSize: 500, rowVersion: veraltet },
+      "stock_item_row_version_conflict");
+
+    // Der Stand von eben geht durch, und das Gebinde lässt sich auch wieder
+    // entfernen.
+    const entfernt = await aufrufen(
+      apiPool, buero, "PATCH", `/api/v1/stock/items/${artikelId}`,
+      { packName: "", packSize: "", rowVersion: stand.body.item.rowVersion }
+    );
+    assert.equal(entfernt.body.item.packSize, null);
+    assert.equal(entfernt.body.item.packName, null);
+  });
+
+  await t.test("der Monteur ändert keine Artikel", async () => {
+    const stand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+    await erwarteFehler(apiPool, monteur, "PATCH", `/api/v1/stock/items/${artikelId}`,
+      { packName: "Karton", packSize: 100, rowVersion: stand.body.item.rowVersion },
+      "stock_manage_forbidden");
+  });
+
+  await t.test("das Gebinde ändert nichts am gebuchten Bestand", async () => {
+    // Die eigentliche Zusicherung des Gebindes: es ist eine Sprechweise, keine
+    // zweite Zahl. Wer es einträgt, verschiebt keinen einzigen Bestand.
+    const vorher = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+    await aufrufen(apiPool, buero, "PATCH", `/api/v1/stock/items/${artikelId}`,
+      { packName: "Karton", packSize: 100, rowVersion: vorher.body.item.rowVersion });
+    const nachher = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${artikelId}`);
+
+    assert.equal(nachher.body.item.totalQuantity, vorher.body.item.totalQuantity);
+    assert.deepEqual(nachher.body.levels, vorher.body.levels);
+  });
 });

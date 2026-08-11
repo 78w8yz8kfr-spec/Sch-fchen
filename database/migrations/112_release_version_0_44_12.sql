@@ -1,6 +1,7 @@
 -- Fassung 0.44.12 als Produktionsstand eintragen.
 --
--- Inhalt dieser Fassung: das Lager funktioniert ohne Netz.
+-- Inhalt dieser Fassung: das Lager funktioniert ohne Netz, und Artikel bekommen
+-- Gebinde, aus denen sich auch einzelne Stuecke entnehmen lassen.
 --
 -- Ein Lager liegt im Keller, und auf der Baustelle steht der Monteur hinterm
 -- Rohbau. Genau dort war das Lager bisher nicht zu gebrauchen: der Scan lief
@@ -26,6 +27,23 @@
 -- vom Server, und gegen einen veralteten zu zaehlen erzeugt Korrekturen, die
 -- nichts richtigstellen, sondern etwas kaputtmachen.
 --
+-- Zweitens bekommt der Artikel sein Gebinde (Migration 111). Bisher stand die
+-- Gebindemenge nur am Code: wer den Karton scannte, buchte hundert Stueck, und
+-- das war es. Es gab das Gebinde also nur, wenn der Hersteller einen eigenen
+-- Code auf den Karton gedruckt hat - eine Rolle Kabel, ein Bund Klemmen, alles
+-- was der Betrieb selbst zu Gebinden macht, liess sich nicht abbilden. Jetzt
+-- steht die Stueckzahl am Artikel, mit Namen: Karton, Rolle, Bund.
+--
+-- Und aus jedem Gebinde laesst sich ein einzelnes Stueck entnehmen. Beim Buchen
+-- steht die Wahl ueber der Menge - "Karton (100 Stück)" oder "Stück einzeln" -,
+-- und die Plusschaltflaeche zaehlt in der gewaehlten Einheit statt in
+-- Hundertern. Der Bestand bleibt dabei in der Einheit des Artikels: das Gebinde
+-- ist eine Art, ueber die Menge zu sprechen, kein zweiter Bestand daneben.
+-- Sonst haette ein Lager zwei Zahlen, die auseinanderlaufen koennen.
+--
+-- Artikel, die es vorher schon gab, bekommen ihr Gebinde ueber den neuen
+-- Endpunkt PATCH /api/v1/stock/items/:id nachtraeglich.
+--
 -- Dazu drei Dinge, die im Alltag gefehlt haben:
 --
 -- 1. Ein gedrucktes Etikett, mit der Kamera des Telefons gescannt, fuehrt jetzt
@@ -38,8 +56,8 @@
 -- 3. Die Artikelliste hat ein Suchfeld. Die Schnittstelle konnte es laengst,
 --    die Oberflaeche fragte nur nie danach.
 --
--- Keine Datenbankaenderung: das Datenmodell trug den Offline-Fall von Anfang
--- an, es wurde nur nie benutzt.
+-- Der Offline-Teil brauchte keine Datenbankaenderung: das Datenmodell trug den
+-- Fall von Anfang an, es wurde nur nie benutzt.
 --
 -- Zu dieser Fassung gehoeren ein neuer Speichername des Dienst-Workers
 -- (schaefchen-online-v94) und neue Fassungsangaben an allen Dateien.
@@ -51,9 +69,9 @@ INSERT INTO application_versions (
     known_issues, database_migrations, rollout_percent, mandatory_update
 ) VALUES (
     '0.44.12', 'superseded', CURRENT_TIMESTAMP,
-    'Das Lager funktioniert ohne Netz: gescannte Artikel bleiben auf dem Gerät, Buchungen werden nachgetragen. Dazu Etikettenlinks, Lagerplatzauswahl und Artikelsuche.',
+    'Das Lager funktioniert ohne Netz: gescannte Artikel bleiben auf dem Gerät, Buchungen werden nachgetragen. Artikel bekommen Gebinde, aus denen sich auch einzelne Stücke entnehmen lassen. Dazu Etikettenlinks, Lagerplatzauswahl und Artikelsuche.',
     '[]'::JSONB,
-    '["111"]'::JSONB, 100, FALSE
+    '["111", "112"]'::JSONB, 100, FALSE
 )
 ON CONFLICT (version) DO NOTHING;
 

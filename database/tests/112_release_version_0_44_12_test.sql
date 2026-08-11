@@ -1,4 +1,4 @@
-\echo 'Teste Migration 111_release_version_0_44_12.sql ...'
+\echo 'Teste Migration 112_release_version_0_44_12.sql ...'
 
 DO $$
 DECLARE
@@ -20,8 +20,8 @@ BEGIN
     IF stand IS NULL OR stand NOT IN ('production', 'superseded') THEN
         RAISE EXCEPTION 'Die Fassung 0.44.12 fehlt oder besitzt einen ungültigen Status';
     END IF;
-    IF NOT migrationen @> '["111"]'::JSONB THEN
-        RAISE EXCEPTION 'Die Fassung 0.44.12 nennt Migration 111 nicht';
+    IF NOT migrationen @> '["111", "112"]'::JSONB THEN
+        RAISE EXCEPTION 'Die Fassung 0.44.12 nennt ihre Migrationen nicht vollständig';
     END IF;
 
     SELECT release_status INTO vorgaenger
@@ -46,12 +46,21 @@ BEGIN
         RAISE EXCEPTION 'Die Fassung 0.44.12 ist nicht vollständig ausgerollt';
     END IF;
 
-    -- Die Fassung bringt keine Datenbankänderung mit. Stünde hier eine, wäre
-    -- die Beschreibung der Migration falsch und jemand suchte sie vergeblich.
-    IF (SELECT jsonb_array_length(migrationen)) <> 1 THEN
+    -- Genau die zwei: das Gebinde am Artikel und dieser Fassungseintrag. Stünde
+    -- hier eine dritte, wäre die Beschreibung falsch und jemand suchte sie
+    -- vergeblich.
+    IF (SELECT jsonb_array_length(migrationen)) <> 2 THEN
         RAISE EXCEPTION 'Die Fassung 0.44.12 nennt mehr Migrationen, als sie mitbringt';
+    END IF;
+
+    -- Das Gebinde muss wirklich in der Datenbank stehen, nicht nur im Text.
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_items' AND column_name = 'pack_size'
+    ) THEN
+        RAISE EXCEPTION 'Die Fassung nennt das Gebinde, die Spalte fehlt aber';
     END IF;
 END;
 $$;
 
-\echo 'Migration 111_release_version_0_44_12.sql ist fachlich abgenommen.'
+\echo 'Migration 112_release_version_0_44_12.sql ist fachlich abgenommen.'
