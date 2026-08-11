@@ -14,7 +14,7 @@
 import { toString as qrToString } from "qrcode";
 import { InputError, readJson, validateId } from "../../api/src/validation.mjs";
 import { loadCompanyModules } from "../../api/src/company-modules.mjs";
-import { belegAuslesen } from "./ocr.mjs";
+import { belegAuslesen, einheitNormal } from "./ocr.mjs";
 
 export const STOCK_MODULE_KEY = "warehouse";
 
@@ -3122,12 +3122,107 @@ async function orderForSiteMaterial(client, context, entryId, body) {
 }
 
 /**
+ * Erkannte Artikelnummern im eigenen Stamm suchen.
+ *
+ * Gesucht wird ueber drei Wege, weil ein Lieferant die Nummer druckt, die er
+ * fuehrt: die eigene Artikelnummer, die Herstellernummer und die hinterlegten
+ * Codes. Zusaetzlich wird ohne Trennzeichen verglichen - "1055-04" und
+ * "105504" sind derselbe Artikel, und welche Schreibweise auf dem Papier
+ * steht, entscheidet der Lieferant.
+ *
+ * Trifft eine Nummer auf mehrere Artikel, wird sie NICHT zugeordnet. Ein
+ * Vorschlag, der zwischen zwei Artikeln raet, ist schlimmer als keiner: er
+ * sieht genauso aus wie ein richtiger.
+ */
+async function artikelZuCodes(client, context, codes) {
+  const treffer = new Map();
+  const gesucht = [...new Set(codes.map((code) => code.toUpperCase()))].filter(Boolean);
+  if (!gesucht.length) return treffer;
+
+  // Die Suche laeuft ueber die gelesenen Nummern und nicht ueber den ganzen
+  // Stamm: so steht in jeder Zeile, WELCHE gelesene Nummer den Artikel
+  // gefunden hat. Ohne das muesste die Zuordnung hinterher geraten werden -
+  // eine GTIN steht normalisiert in der Datenbank ("04006381333931") und
+  // ungepolstert auf dem Papier ("4006381333931").
+  const gefunden = await client.query(
+    `SELECT eingabe.code AS suchbegriff,
+            artikel.id, artikel.item_number, artikel.name, artikel.unit
+     FROM unnest($2::TEXT[]) AS eingabe (code)
+     JOIN stock_items artikel
+       ON artikel.company_id = $1 AND artikel.status = 'active'
+      AND (
+        UPPER(artikel.item_number) = eingabe.code
+        OR UPPER(artikel.manufacturer_number) = eingabe.code
+        OR REGEXP_REPLACE(UPPER(artikel.item_number), '[^A-Z0-9]', '', 'g')
+           = REGEXP_REPLACE(eingabe.code, '[^A-Z0-9]', '', 'g')
+        OR REGEXP_REPLACE(UPPER(COALESCE(artikel.manufacturer_number, '')), '[^A-Z0-9]', '', 'g')
+           = REGEXP_REPLACE(eingabe.code, '[^A-Z0-9]', '', 'g')
+        OR EXISTS (
+          SELECT 1 FROM stock_item_barcodes code
+          WHERE code.company_id = artikel.company_id AND code.item_id = artikel.id
+            AND code.status = 'active'
+            AND code.code_normalized IN (
+              eingabe.code, COALESCE(stock_normalize_gtin(eingabe.code), eingabe.code)
+            )
+        )
+      )`,
+    [context.companyId, gesucht]
+  ).catch(mapDatabaseError);
+
+  for (const zeile of gefunden.rows) {
+    const bisher = treffer.get(zeile.suchbegriff);
+    // Zweiter Artikel unter derselben Nummer: die Nummer taugt nicht mehr zum
+    // Zuordnen. Ein Vorschlag, der zwischen zweien raet, sieht genauso aus wie
+    // ein richtiger.
+    if (bisher === undefined) treffer.set(zeile.suchbegriff, zeile);
+    else if (bisher && bisher.id !== zeile.id) treffer.set(zeile.suchbegriff, null);
+  }
+  return treffer;
+}
+
+/**
+ * Aus gelesenen Zeilen werden Vorschlaege.
+ *
+ * Ohne Artikel bleibt die Zeile stehen, aber ohne Zuordnung: sichtbar, damit
+ * niemand sie uebersieht, und ohne Artikelnummer, damit sie nicht aus
+ * Versehen mitgebucht wird.
+ *
+ * Die Einheit wird verglichen und nicht umgerechnet. "500 m" auf dem Papier
+ * und "Ring" im Stamm koennen ein Ring sein oder fuenfhundert - das weiss nur,
+ * wer die Ware sieht. Ein automatischer Faktor waere geraten.
+ */
+export async function positionenZuordnen(client, context, positionen = []) {
+  const stamm = await artikelZuCodes(client, context, positionen.map((zeile) => zeile.code));
+
+  return positionen.map((zeile) => {
+    const artikel = stamm.get(zeile.code.toUpperCase()) || null;
+    return {
+      line: zeile.line,
+      text: zeile.text,
+      code: zeile.code,
+      quantity: zeile.quantity,
+      unit: zeile.unit,
+      stockItemId: artikel ? artikel.id : null,
+      stockItemNumber: artikel ? artikel.item_number : null,
+      stockItemName: artikel ? artikel.name : null,
+      stockUnit: artikel ? artikel.unit : null,
+      unitMatches: artikel ? einheitNormal(zeile.unit) === einheitNormal(artikel.unit) : false
+    };
+  });
+}
+
+/**
  * Einen fotografierten Lieferschein auslesen.
  *
- * Erkannt wird der Kopf des Belegs - Nummer und Datum -, und der gelesene Text
- * kommt vollstaendig mit zurueck. Die Positionen tippt weiterhin ein Mensch:
- * eine falsch erkannte Menge saehe aus wie eine Eingabe, wuerde gebucht und
- * fiele erst bei der Inventur auf.
+ * Erkannt wird der Kopf des Belegs - Nummer und Datum - sowie die Positionen,
+ * und der gelesene Text kommt vollstaendig mit zurueck.
+ *
+ * Eine Position wird nur vorgeschlagen, wenn ihre Artikelnummer im eigenen
+ * Stamm existiert. Damit entscheidet nicht die Erkennung, sondern der
+ * Abgleich: aus einer falsch gelesenen Nummer wird kein Artikel, weil es
+ * diesen Artikel nicht gibt. Gebucht wird davon nichts - der Vorschlag steht
+ * in denselben Feldern, die sonst getippt werden, und geht denselben Weg
+ * ueber Entwurf und Buchung.
  *
  * Gespeichert wird hier nichts. Das Bild geht durch die Erkennung und ist
  * danach weg; wer es aufheben will, legt es als Dokument ab - dort, wo alle
@@ -3151,8 +3246,9 @@ async function scanDeliveryNote(client, context, body) {
     throw new InputError("Das Bild ist zu groß. Bitte mit geringerer Auflösung fotografieren.");
   }
 
+  let gelesen;
   try {
-    return await belegAuslesen(bild);
+    gelesen = await belegAuslesen(bild);
   } catch (fehler) {
     // Fehlt Tesseract oder bricht es ab, scheitert diese eine Anfrage - und
     // nicht der Wareneingang. Erfasst wird dann von Hand wie bisher.
@@ -3162,6 +3258,11 @@ async function scanDeliveryNote(client, context, body) {
       "stock_ocr_unavailable"
     );
   }
+
+  return {
+    ...gelesen,
+    positions: await positionenZuordnen(client, context, gelesen.positions)
+  };
 }
 
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {

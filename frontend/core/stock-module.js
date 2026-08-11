@@ -31,6 +31,7 @@ import {
   leereCodezeile,
   offlineLagerQueueKey,
   ortSpeicherKey,
+  positionenUebernehmen,
   scanSpeicherKey,
   scanSpeicherStutzen,
   warteschlangeEintrag,
@@ -39,14 +40,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.26";
+} from "./stock-management.js?v=0.44.27";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.26";
+} from "./barcode-scanner.mjs?v=0.44.27";
 
 const html = `
   <div class="stock-module">
@@ -797,6 +798,7 @@ export function createStockModule({
       deliveredOn: wert("deliveredOn"),
       targetLocationId: wert("targetLocationId"),
       erkannt: zustand.entwurf?.erkannt || null,
+      erkanntePositionen: zustand.entwurf?.erkanntePositionen || [],
       zeilen: [...formular.querySelectorAll(".stock-delivery-line")].map((zeile) => ({
         itemId: zeile.querySelector('[name="itemId"]')?.value || "",
         quantity: zeile.querySelector('[name="quantity"]')?.value || ""
@@ -831,12 +833,16 @@ export function createStockModule({
   }
 
   /**
-   * Nummer und Datum aus einem Foto uebernehmen.
+   * Nummer, Datum und Positionen aus einem Foto uebernehmen.
    *
    * Uebernommen wird nur, was leer ist: wer schon getippt hat, soll seine
    * Eingabe nicht von der Erkennung ueberschrieben bekommen. Der gelesene Text
    * bleibt daneben stehen - wer sieht, was das Programm gelesen hat, versteht
    * sofort, warum ein Feld leer blieb.
+   *
+   * Die gelesenen Positionen stehen vollstaendig ueber dem Formular, auch die
+   * ohne Artikel. Gerade sie sind wichtig: wer nur die Treffer sieht, haelt
+   * eine halb gelesene Lieferung fuer eine vollstaendige.
    */
   async function lieferscheinFotoLesen(datei) {
     const bisher = lieferscheinFormularLesen();
@@ -851,15 +857,19 @@ export function createStockModule({
         leser.readAsDataURL(datei);
       });
       const erkannt = await senden("/delivery-notes/scan", { image: bild });
+      const vorschlaege = erkannt.positions || [];
+      const uebernommen = vorschlaege.filter((zeile) => zeile.stockItemId).length;
       zustand = {
         ...zustand,
         entwurf: {
           ...bisher,
           deliveryNoteNumber: bisher.deliveryNoteNumber || erkannt.deliveryNoteNumber || "",
           deliveredOn: bisher.deliveredOn || erkannt.deliveredOn || "",
-          erkannt: erkannt.text
+          zeilen: positionenUebernehmen(bisher.zeilen, vorschlaege),
+          erkannt: erkannt.text,
+          erkanntePositionen: vorschlaege
         },
-        fehler: erkannt.deliveryNoteNumber || erkannt.deliveredOn
+        fehler: erkannt.deliveryNoteNumber || erkannt.deliveredOn || uebernommen
           ? null
           : "Auf dem Bild war nichts sicher zu lesen. Bitte gerade und scharf fotografieren — oder von Hand eintragen."
       };

@@ -15,7 +15,9 @@ import {
   rueckgabeAnsicht,
   rueckgabeBuchungen,
   lieferscheinAnsicht,
+  erkanntePositionenAnsicht,
   lieferscheinFormularAnsicht,
+  positionenUebernehmen,
   materialBestand,
   materialBestandText,
   baustellenListe,
@@ -1709,6 +1711,64 @@ test('das Erfassungsformular erklärt die Direktlieferung', () => {
   assert.match(formular, /nicht über das Hauptlager/);
   assert.match(formular, /Als Entwurf speichern/);
   assert.ok(formular.includes('value="2026-08-11"'));
+});
+
+test('gelesene Positionen füllen leere Zeilen und überschreiben getippte nicht', () => {
+  const vorschlaege = [
+    { code: '1055-04', quantity: 100, unit: 'Stk', stockItemId: 'a1', unitMatches: true },
+    { code: 'NYM3X15', quantity: 500, unit: 'm', stockItemId: 'a2', unitMatches: true }
+  ];
+
+  // Das leere Startformular wird gefüllt.
+  assert.deepEqual(
+    positionenUebernehmen([{ itemId: '', quantity: '' }], vorschlaege),
+    [{ itemId: 'a1', quantity: '100' }, { itemId: 'a2', quantity: '500' }]
+  );
+
+  // Getipptes bleibt stehen, der Rest hängt sich an.
+  assert.deepEqual(
+    positionenUebernehmen([{ itemId: 'a9', quantity: '7' }], vorschlaege),
+    [{ itemId: 'a9', quantity: '7' }, { itemId: 'a1', quantity: '100' }, { itemId: 'a2', quantity: '500' }]
+  );
+});
+
+test('ein zweites Foto verdoppelt die Mengen nicht', () => {
+  // Wer verwackelt fotografiert hat und es noch einmal versucht, darf nicht
+  // die doppelte Lieferung im Bestand stehen haben.
+  const vorschlaege = [{ code: '1055-04', quantity: 100, unit: 'Stk', stockItemId: 'a1', unitMatches: true }];
+  const einmal = positionenUebernehmen([{ itemId: '', quantity: '' }], vorschlaege);
+  assert.deepEqual(positionenUebernehmen(einmal, vorschlaege), einmal);
+});
+
+test('ohne zugeordneten Artikel entsteht keine Formularzeile', () => {
+  // Eine Zeile mit Menge und ohne Artikel ließe sich nicht speichern und
+  // sähe trotzdem aus wie erfasst.
+  const leer = positionenUebernehmen(
+    [{ itemId: '', quantity: '' }],
+    [{ code: 'XYZ-99', quantity: 12, unit: 'Stk', stockItemId: null, unitMatches: false }]
+  );
+  assert.deepEqual(leer, [{ itemId: '', quantity: '' }]);
+});
+
+test('die gelesenen Positionen zeigen auch, was nicht zugeordnet wurde', () => {
+  const ansicht = erkanntePositionenAnsicht([
+    { code: '1055-04', text: '1 1055-04 Schalterdose tief 100 Stk', quantity: 100, unit: 'Stk',
+      stockItemId: 'a1', stockItemName: 'Schalterdose tief', stockUnit: 'Stk', unitMatches: true },
+    { code: 'NYM3X15', text: '2 NYM3X15 NYM-) 3x1,5 Ring 500m', quantity: 500, unit: 'm',
+      stockItemId: 'a2', stockItemName: 'NYM-J 3x1,5', stockUnit: 'Ring', unitMatches: false },
+    { code: 'XYZ-99', text: '3 XYZ-99 Unbekannt 12 Stk', quantity: 12, unit: 'Stk',
+      stockItemId: null, stockItemName: null, stockUnit: null, unitMatches: false }
+  ]);
+
+  assert.match(ansicht, /übernommen/);
+  // Eine andere Einheit heißt nicht "falsch", sondern "nachsehen": 500 Meter
+  // können ein Ring sein oder fünfhundert.
+  assert.match(ansicht, /Einheit prüfen: Ring/);
+  assert.match(ansicht, /kein Artikel dazu/);
+  assert.match(ansicht, /XYZ-99/, 'Die nicht gefundene Nummer steht da, damit man sie nachschlagen kann');
+  assert.match(ansicht, /Vorgeschlagen, nicht gebucht/);
+
+  assert.equal(erkanntePositionenAnsicht([]), '', 'Ohne Foto keine leere Überschrift');
 });
 
 
