@@ -1,10 +1,14 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.17
+Technischer Stand: V0.44.18
 
 ## Abgeschlossen
 
+- Fundament der Materialkette (Migration 119): Fahrzeuge, Retouren- und
+  Sperrlager als Lagerorte; Buchungsart „Verbaut" bucht Material mit Pflicht
+  zur Baustelle aus dem Baustellenbestand aus; Bestellungen tragen Lieferziel,
+  Projekt und Baustelle; PWA-Speicher `schaefchen-online-v100`
 - Materialliste der Baustelle mit dem Lagerartikel verknüpft (Migration 117):
   je Zeile freiwillig ein Artikel, darunter der Bestand aus dem Journal mit
   Fehlmenge. Ohne Artikel keine Aussage, bei verschiedenen Einheiten kein

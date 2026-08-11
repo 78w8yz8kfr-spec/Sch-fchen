@@ -44,6 +44,10 @@ export const BESTELLSTATUS = Object.freeze({
 export const VORGAENGE = Object.freeze({
   entnahme: { movementType: 'issue', ort: 'quelle', name: 'Entnehmen', recht: 'alle' },
   rueckgabe: { movementType: 'return', ort: 'ziel', name: 'Zurückgeben', recht: 'alle' },
+  // "Auf der Baustelle" und "verbaut" sind zwei verschiedene Dinge, und die
+  // Verwechslung ist der haeufigste Fehler in der Materialabrechnung. Wer
+  // verbaut hat, weiss es zuerst - deshalb darf er es auch buchen.
+  verbaut: { movementType: 'consumed', ort: 'quelle', name: 'Verbaut', recht: 'alle' },
   umlagerung: { movementType: 'transfer', ort: 'beides', name: 'Umlagern', recht: 'transfer' },
   wareneingang: { movementType: 'receipt', ort: 'ziel', name: 'Wareneingang', recht: 'verwaltung' },
   anfangsbestand: { movementType: 'opening', ort: 'ziel', name: 'Anfangsbestand', recht: 'verwaltung' },
@@ -53,7 +57,7 @@ export const VORGAENGE = Object.freeze({
 // Nur diese beiden Vorgaenge tragen eine Baustelle. Eine Umlagerung geht von
 // Lager zu Lager, ein Wareneingang kommt vom Lieferanten, und Verschrottung
 // und Anfangsbestand gehen keine Baustelle etwas an.
-export const BAUSTELLE_BUCHBAR = new Set(['issue', 'return']);
+export const BAUSTELLE_BUCHBAR = new Set(['issue', 'return', 'consumed']);
 
 export function offlineLagerQueueKey(session) {
   return `schaefchen-stock-queue-v1:${session?.company?.number || 'unknown'}:${session?.user?.id || 'unknown'}`;
@@ -384,6 +388,11 @@ export function buchungBauen(zustand, optionen = {}) {
   }
   if (vorgang.movementType === 'issue' && optionen.baustellePflicht && !zustand.baustelleId) {
     return { fehler: 'Diese Firma verlangt bei einer Entnahme die Baustelle.' };
+  }
+  // Verbaut ohne Baustelle waere keine Aussage: verbraucht wurde es dann
+  // zwar, aber niemand koennte sagen, wofuer.
+  if (vorgang.movementType === 'consumed' && !zustand.baustelleId) {
+    return { fehler: 'Verbautes Material gehört zu einer Baustelle. Bitte die Baustelle wählen.' };
   }
 
   const buchung = {
@@ -1582,7 +1591,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.17`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.18`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den

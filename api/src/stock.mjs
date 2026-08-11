@@ -34,6 +34,9 @@ const TRANSFER_ROLES = new Set([...MANAGER_ROLES, "foreman"]);
 const MOVEMENT_TYPES = new Map([
   ["issue", "alle"],
   ["return", "alle"],
+  // Verbaut meldet, wer verbaut hat. Das ist der Monteur auf der Baustelle,
+  // nicht das Buero - und niemand sonst weiss es frueher.
+  ["consumed", "alle"],
   ["transfer", "vorarbeiter"],
   ["opening", "verwaltung"],
   ["receipt", "verwaltung"],
@@ -42,7 +45,19 @@ const MOVEMENT_TYPES = new Map([
 ]);
 
 const SOURCE_TYPES = new Set(["api", "qr_scan", "offline_sync", "import"]);
-const LOCATION_TYPES = new Set(["warehouse", "workshop", "construction_site", "other"]);
+// Ein Fahrzeug ist der haeufigste Lagerort im Betrieb, und Retoure und
+// Sperrbestand sind fachlich eigene Orte: was zum Lieferanten zurueck soll
+// oder beschaedigt ist, darf im normalen Bestand nicht mitgezaehlt werden.
+const LOCATION_TYPES = new Set([
+  "warehouse", "workshop", "construction_site", "vehicle",
+  "returns", "blocked", "other"
+]);
+// Diese beiden Arten haengen an einem anderen Datensatz und tragen ihren
+// Namen nicht selbst.
+const LOCATION_TARGET_FIELD = new Map([
+  ["construction_site", "constructionSiteId"],
+  ["vehicle", "vehicleId"]
+]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function requiredText(value, label, maximum = 200, minimum = 1) {
@@ -174,6 +189,7 @@ function locationDto(row) {
     locationType: row.location_type,
     parentLocationId: row.parent_location_id || null,
     constructionSiteId: row.construction_site_id || null,
+    vehicleId: row.vehicle_id || null,
     depth: Number(row.depth || 1),
     path: row.path || row.name,
     status: row.status
@@ -610,15 +626,32 @@ async function createLocation(client, context, body) {
     throw new InputError("Diese Lagerplatzart gibt es nicht.");
   }
 
+  const constructionSiteId = optionalId(body.constructionSiteId, "Baustelle");
+  const vehicleId = optionalId(body.vehicleId, "Fahrzeug");
+
+  // Die Datenbank faengt das ebenfalls ab, aber als Constraint. Wer einen Ort
+  // anlegt, soll lesen, was fehlt.
+  const pflichtfeld = LOCATION_TARGET_FIELD.get(locationType);
+  if (pflichtfeld === "constructionSiteId" && !constructionSiteId) {
+    throw new InputError("Ein Baustellenlager braucht die Baustelle.");
+  }
+  if (pflichtfeld === "vehicleId" && !vehicleId) {
+    throw new InputError("Ein Fahrzeuglager braucht das Fahrzeug.");
+  }
+  if (!pflichtfeld && (constructionSiteId || vehicleId)) {
+    throw new InputError("Nur ein Baustellen- oder Fahrzeuglager zeigt auf Baustelle oder Fahrzeug.");
+  }
+
   const inserted = await client.query(
     `INSERT INTO storage_locations (
-       company_id, name, location_type, parent_location_id, construction_site_id, note
-     ) VALUES ($1, $2, $3, $4, $5, $6)
+       company_id, name, location_type, parent_location_id,
+       construction_site_id, vehicle_id, note
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
     [
       context.companyId, name, locationType,
       optionalId(body.parentLocationId, "Übergeordneter Lagerplatz"),
-      optionalId(body.constructionSiteId, "Baustelle"),
+      constructionSiteId, vehicleId,
       optionalText(body.note, "Notiz", 2000)
     ]
   ).catch(mapDatabaseError);
@@ -1019,7 +1052,17 @@ async function bookMovement(client, context, body) {
   // Der Rest der Ortslogik steht als CHECK in der Datenbank. Hier wird nur
   // uebersetzt, damit der Monteur einen Satz statt einer Constraint sieht.
   const needsTarget = ["opening", "receipt", "return"].includes(movementType);
-  const needsSource = ["issue", "scrap"].includes(movementType);
+  const needsSource = ["issue", "scrap", "consumed"].includes(movementType);
+
+  // Verbaut wird auf einer Baustelle, nirgends sonst. Ohne diese Angabe
+  // liesse sich Material verbrauchen, ohne dass jemand sagen koennte, wofuer.
+  if (movementType === "consumed" && !constructionSiteId) {
+    throw new InputError(
+      "Verbautes Material gehört zu einer Baustelle.",
+      400,
+      "stock_site_required"
+    );
+  }
   if (needsTarget && (!targetLocationId || sourceLocationId)) {
     throw new InputError("Ein Zugang braucht genau einen Zielort.");
   }

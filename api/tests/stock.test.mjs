@@ -489,6 +489,103 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.equal(Number(verbraucht.rows[0].menge), 4, "Auf der Baustelle blieben vier Meter");
   });
 
+  await t.test("Fahrzeug und Baustelle sind Lagerorte, verbaut bucht aus", async () => {
+    // Der Transporter ist der häufigste Lagerort im Betrieb: morgens beladen,
+    // abends halb leer, und bisher wusste niemand, was drin liegt.
+    const fahrzeug = await ownerPool.query(
+      `INSERT INTO vehicles (company_id, licence_plate, label, vehicle_type, required_licence_class)
+       VALUES ($1, $2, 'Transporter Max', 'van', 'B') RETURNING id`,
+      [companyId, `TST-MW ${kennung}`]
+    );
+
+    const fahrzeugort = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: "Transporter Max", locationType: "vehicle", vehicleId: fahrzeug.rows[0].id
+    });
+    assert.equal(fahrzeugort.status, 201, JSON.stringify(fahrzeugort.body));
+    assert.equal(fahrzeugort.body.location.vehicleId, fahrzeug.rows[0].id);
+
+    // Ein Fahrzeuglager ohne Fahrzeug ist kein Ort, sondern ein Tippfehler.
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: "Fahrzeug ohne Fahrzeug", locationType: "vehicle"
+    }, "invalid_request");
+
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Verbaukunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Verbauprojekt ${kennung}`]
+    );
+    const baustelle = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Verbaubaustelle ${kennung}`]
+    );
+    const baustellenort = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: `Verbaubaustelle ${kennung}`,
+      locationType: "construction_site",
+      constructionSiteId: baustelle.rows[0].id
+    });
+    assert.equal(baustellenort.status, 201);
+
+    const kabel = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `VERB-${kennung}`, name: "NYM-J 3x1,5",
+      groupKey: "cable", unit: "Meter"
+    });
+    const kabelId = kabel.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "opening", quantity: 1000, targetLocationId: lager.id
+    });
+
+    // Lager -> Fahrzeug -> Baustelle: die Kette, die jeden Morgen läuft.
+    await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "transfer", quantity: 200,
+      sourceLocationId: lager.id, targetLocationId: fahrzeugort.body.location.id
+    });
+    const aufBaustelle = await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "transfer", quantity: 120,
+      sourceLocationId: fahrzeugort.body.location.id,
+      targetLocationId: baustellenort.body.location.id,
+      constructionSiteId: baustelle.rows[0].id
+    });
+    assert.equal(
+      aufBaustelle.body.levels.find((e) => e.locationId === fahrzeugort.body.location.id).quantity,
+      80,
+      "Im Fahrzeug müssen 80 Meter bleiben"
+    );
+
+    // Verbaut: der Monteur darf es, und es braucht die Baustelle.
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "consumed", quantity: 10,
+      sourceLocationId: baustellenort.body.location.id
+    }, "stock_site_required");
+
+    const verbaut = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "consumed", quantity: 95,
+      sourceLocationId: baustellenort.body.location.id,
+      constructionSiteId: baustelle.rows[0].id
+    });
+    assert.equal(verbaut.status, 201);
+    assert.equal(
+      verbaut.body.levels.find((e) => e.locationId === baustellenort.body.location.id).quantity,
+      25,
+      "Auf der Baustelle bleiben 25 Meter, der Rest ist verbaut"
+    );
+
+    // Was verbaut wurde, steht als eigene Bewegungsart im Journal - nicht als
+    // Entnahme, die man später mit einer Rückgabe verwechseln könnte.
+    const journal = await ownerPool.query(
+      `SELECT movement_type, quantity FROM stock_movements
+       WHERE company_id = $1 AND item_id = $2 AND movement_type = 'consumed'`,
+      [companyId, kabelId]
+    );
+    assert.equal(journal.rowCount, 1);
+    assert.equal(Number(journal.rows[0].quantity), 95);
+  });
+
   await t.test("Bestandsliste und Nachbestellvorschlag rechnen aus dem Journal", async () => {
     const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/levels?ort=${lager.id}`);
     assert.equal(bestand.status, 200);
