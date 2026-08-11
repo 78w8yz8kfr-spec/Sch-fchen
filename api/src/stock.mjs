@@ -14,6 +14,7 @@
 import { toString as qrToString } from "qrcode";
 import { InputError, readJson, validateId } from "../../api/src/validation.mjs";
 import { loadCompanyModules } from "../../api/src/company-modules.mjs";
+import { belegAuslesen } from "./ocr.mjs";
 
 export const STOCK_MODULE_KEY = "warehouse";
 
@@ -3120,6 +3121,49 @@ async function orderForSiteMaterial(client, context, entryId, body) {
   };
 }
 
+/**
+ * Einen fotografierten Lieferschein auslesen.
+ *
+ * Erkannt wird der Kopf des Belegs - Nummer und Datum -, und der gelesene Text
+ * kommt vollstaendig mit zurueck. Die Positionen tippt weiterhin ein Mensch:
+ * eine falsch erkannte Menge saehe aus wie eine Eingabe, wuerde gebucht und
+ * fiele erst bei der Inventur auf.
+ *
+ * Gespeichert wird hier nichts. Das Bild geht durch die Erkennung und ist
+ * danach weg; wer es aufheben will, legt es als Dokument ab - dort, wo alle
+ * anderen Belege auch liegen.
+ */
+async function scanDeliveryNote(client, context, body) {
+  await requireManager(client, context);
+
+  const roh = requiredText(body?.image, "Bild", 12_000_000, 100);
+  const inhalt = roh.includes(",") && roh.startsWith("data:") ? roh.slice(roh.indexOf(",") + 1) : roh;
+  let bild;
+  try {
+    bild = Buffer.from(inhalt, "base64");
+  } catch {
+    throw new InputError("Das Bild konnte nicht gelesen werden.");
+  }
+  if (bild.length < 1000) {
+    throw new InputError("Das Bild ist zu klein für eine Erkennung.");
+  }
+  if (bild.length > 8_000_000) {
+    throw new InputError("Das Bild ist zu groß. Bitte mit geringerer Auflösung fotografieren.");
+  }
+
+  try {
+    return await belegAuslesen(bild);
+  } catch (fehler) {
+    // Fehlt Tesseract oder bricht es ab, scheitert diese eine Anfrage - und
+    // nicht der Wareneingang. Erfasst wird dann von Hand wie bisher.
+    throw new InputError(
+      `Die Texterkennung hat nicht funktioniert: ${fehler.message}`,
+      503,
+      "stock_ocr_unavailable"
+    );
+  }
+}
+
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
@@ -3221,6 +3265,11 @@ export async function handleStockRequest({ request, url, client, context, allowe
       status: 200,
       body: await releaseReservation(client, context, reservationId, await readJson(request))
     };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/delivery-notes/scan") {
+    const body = await readJson(request, 12_000_000);
+    return { status: 200, body: await scanDeliveryNote(client, context, body) };
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/delivery-notes") {

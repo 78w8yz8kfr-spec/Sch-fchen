@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Ein Foto des Lieferscheins füllt Nummer und Datum aus (Fassung 0.44.26).**
+  Erkannt wird mit Tesseract, das jetzt im Auslieferungsimage mitliegt — kein
+  Dienst im Netz, denn ein Lieferschein nennt Lieferant, Mengen und Preise.
+  Gelesen wird der Kopf des Belegs; die Positionen tippt weiterhin ein Mensch.
+  Das ist keine Sparsamkeit: in den Proben las die Erkennung auf einem geraden,
+  scharfen Bild Nummer und Datum fehlerfrei, machte in derselben Aufnahme aber
+  aus „NYM-J" ein „NYM-)". Eine falsch erkannte Menge sähe aus wie eine
+  Eingabe, würde gebucht und fiele erst bei der Inventur auf — eine falsch
+  erkannte Nummer fällt sofort auf, weil sie neben dem Papier steht. Auf einem
+  schiefen Foto liest die Erkennung die Beschriftung noch richtig und die
+  Nummer daneben schon falsch; deshalb wird eine gelesene Nummer verworfen,
+  wenn sie zu wenige Ziffern hat oder sich als Datum liest, und die Felder
+  werden nur vorgeschlagen. Der erkannte Text steht vollständig daneben — wer
+  sieht, was das Programm gelesen hat, versteht sofort, warum ein Feld leer
+  blieb. Übernommen wird nur, was leer ist; wer schon getippt hat, bekommt
+  seine Eingabe nicht überschrieben. Gespeichert wird beim Lesen nichts.
 - **Die Zeiten der Mitarbeiter haben einen eigenen Bereich (Fassung
   0.44.25).** Sie lagen in „Meine Woche" unter dem Reiter „Anträge & Prüfung" —
   drei Ebenen tief, in einer Ansicht, die ihrem Namen nach die eigene Woche

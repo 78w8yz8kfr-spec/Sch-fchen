@@ -1646,7 +1646,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.25`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.26`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -2067,6 +2067,21 @@ export function lieferscheinFormularAnsicht(entwurf = {}, optionen = {}, fehler 
           </option>`).join('')}
       </select>
     </label>
+
+    <label class="stock-field stock-field--photo">
+      <span>Foto des Lieferscheins</span>
+      <input class="stock-delivery-photo" type="file" accept="image/*" capture="environment">
+      <span class="stock-field__hint">
+        Liest Nummer und Datum aus dem Bild. Die Positionen bleiben Handarbeit —
+        eine falsch erkannte Menge sähe aus wie eine Eingabe.
+      </span>
+    </label>
+    ${entwurf.erkannt
+      ? `<details class="stock-ocr">
+           <summary>Erkannter Text</summary>
+           <pre class="stock-ocr__text">${sicher(entwurf.erkannt)}</pre>
+         </details>`
+      : ''}
 
     <label class="stock-field">
       <span>Lieferscheinnummer</span>

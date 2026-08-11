@@ -1,6 +1,11 @@
 FROM node:24-alpine
 
-RUN apk add --no-cache postgresql-client
+# Der PostgreSQL-Client fuehrt beim Start die Migrationen aus. Tesseract liest
+# fotografierte Lieferscheine - im eigenen Haus und nicht bei einem Dienst im
+# Netz, denn ein Lieferschein nennt Lieferant, Mengen und Preise. Das deutsche
+# Sprachpaket ist Pflicht: ohne es liest die Erkennung "Lieferschein-Nr." als
+# englisches Wortgebilde und findet die Beschriftung nicht.
+RUN apk add --no-cache postgresql-client tesseract-ocr tesseract-ocr-data-deu
 
 WORKDIR /app
 
