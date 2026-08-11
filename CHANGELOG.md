@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Reservierungen gehen vom Bestand ab (Fassung 0.44.20).** Ohne sie
+  beantwortet das Lager nur „wie viel liegt hier". Die Frage, an der der
+  Betrieb hängt, ist eine andere: wie viel davon kann ich mitnehmen? Wer am
+  Montag 100 Steckdosen für die Schule zurücklegt und am Dienstag feststellt,
+  dass ein Kollege sie für eine andere Baustelle geholt hat, steht mit einem
+  leeren Karton da — und der Bestand war die ganze Zeit „richtig". Frei
+  verfügbar ist jetzt der physische Bestand minus dem Reservierten: 100
+  im Regal, 40 für die Schule und 20 fürs Rathaus zurückgelegt, 40 frei. Der
+  physische Bestand ändert sich dabei nicht, die Ware liegt weiter da — sie ist
+  nur nicht mehr für jeden. Wer für seine eigene Baustelle holt, baut dabei die
+  eigene Reservierung ab, statt an ihr zu scheitern; sonst stünde jede
+  Reservierung sich selbst im Weg. Ein Dritter kommt nur an das Freie und liest
+  im Klartext, für welche Baustelle der Rest liegt. Aufgehoben wird nur mit
+  Grund. Dazu neu: der Meldebestand zwischen Mindest- und Zielbestand, damit
+  nachbestellt wird, bevor der Mindestbestand unterschritten ist.
 - **Lieferscheine sind Belege, keine Bilder mehr (Fassung 0.44.19).** Bisher
   landete ein Lieferschein im Dokumentenmodul: ein Foto oder ein PDF, ablegbar
   und wiederfindbar, aber ohne Positionen. Was tatsächlich geliefert wurde,

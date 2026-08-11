@@ -750,6 +750,113 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
       undefined, "stock_manage_forbidden");
   });
 
+  await t.test("Reservierung geht vom Bestand ab und blockiert andere", async () => {
+    // Der Fall aus der Aufgabenstellung: 100 im Lager, 40 für A, 20 für B.
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Reskunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Resprojekt ${kennung}`]
+    );
+    const baustelleA = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Schule ${kennung}`]
+    );
+    const baustelleB = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Rathaus ${kennung}`]
+    );
+
+    const dose = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `RES-${kennung}`, name: "Jung Steckdose 1520 WW",
+      groupKey: "switches", unit: "Stück"
+    });
+    const doseId = dose.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: doseId, movementType: "opening", quantity: 100, targetLocationId: lager.id
+    });
+
+    const fuerA = await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/reservations", {
+      itemId: doseId, locationId: lager.id,
+      constructionSiteId: baustelleA.rows[0].id, quantity: 40
+    });
+    assert.equal(fuerA.status, 201, JSON.stringify(fuerA.body));
+    await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/reservations", {
+      itemId: doseId, locationId: lager.id,
+      constructionSiteId: baustelleB.rows[0].id, quantity: 20
+    });
+
+    // Physisch 100, reserviert 60, frei 40.
+    const sicht = await ownerPool.query(
+      `SELECT physical_quantity, reserved_quantity, free_quantity FROM stock_availability
+       WHERE company_id = $1 AND item_id = $2 AND location_id = $3`,
+      [companyId, doseId, lager.id]
+    );
+    assert.deepEqual(
+      {
+        physisch: Number(sicht.rows[0].physical_quantity),
+        reserviert: Number(sicht.rows[0].reserved_quantity),
+        frei: Number(sicht.rows[0].free_quantity)
+      },
+      { physisch: 100, reserviert: 60, frei: 40 }
+    );
+
+    // Mehr zurücklegen als frei ist, wäre ein Versprechen auf fremdes Material.
+    await erwarteFehler(apiPool, vorarbeiter, "POST", "/api/v1/stock/reservations", {
+      itemId: doseId, locationId: lager.id, quantity: 50
+    }, "stock_reservation_exceeds_free");
+
+    // Ein Dritter kommt nur an die freien 40 - und erfährt, für wen der Rest
+    // liegt. Genau das ist der Sinn: nicht der leere Karton am Dienstag.
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: doseId, movementType: "issue", quantity: 45, sourceLocationId: lager.id
+    }, "stock_reserved_for_others");
+
+    const frei = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: doseId, movementType: "issue", quantity: 40, sourceLocationId: lager.id
+    });
+    assert.equal(frei.status, 201, "Die freien 40 muss jeder holen dürfen");
+
+    // Wer für Baustelle A holt, baut deren Reservierung ab, statt an ihr zu
+    // scheitern - sonst stünde jede Reservierung sich selbst im Weg.
+    const fuerBaustelleA = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: doseId, movementType: "issue", quantity: 25,
+      sourceLocationId: lager.id, constructionSiteId: baustelleA.rows[0].id
+    });
+    assert.equal(fuerBaustelleA.status, 201, JSON.stringify(fuerBaustelleA.body));
+
+    const offen = await aufrufen(
+      apiPool, buero, "GET", `/api/v1/stock/reservations?artikel=${doseId}`
+    );
+    const restA = offen.body.reservations.find(
+      (eintrag) => eintrag.constructionSiteId === baustelleA.rows[0].id
+    );
+    assert.equal(restA.quantityFulfilled, 25);
+    assert.equal(restA.quantityOpen, 15, "Von 40 sind 25 geholt, 15 bleiben zurückgelegt");
+
+    // Aufheben braucht einen Grund und geht nur einmal.
+    const aufgehoben = await aufrufen(
+      apiPool, vorarbeiter, "POST", `/api/v1/stock/reservations/${restA.id}/release`,
+      { reason: "Baustelle verschoben" }
+    );
+    assert.equal(aufgehoben.body.reservation.status, "released");
+    await erwarteFehler(
+      apiPool, vorarbeiter, "POST", `/api/v1/stock/reservations/${restA.id}/release`,
+      { reason: "Nochmal" }, "stock_reservation_closed"
+    );
+
+    // Ein Monteur legt nichts zurück - das ist Sache des Vorarbeiters.
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/reservations", {
+      itemId: doseId, locationId: lager.id, quantity: 1
+    }, "stock_movement_forbidden");
+  });
+
   await t.test("Bestandsliste und Nachbestellvorschlag rechnen aus dem Journal", async () => {
     const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/levels?ort=${lager.id}`);
     assert.equal(bestand.status, 200);

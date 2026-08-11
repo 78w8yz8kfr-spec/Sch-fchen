@@ -67,7 +67,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Baustellenmaterial mit Lagerartikel verknüpft, Bestand und Fehlmenge | steht (Fassung 0.44.17, Migration 117) |
 | Fahrzeug-, Retouren- und Sperrlager; Buchung „Verbaut"; Lieferziel der Bestellung | steht (Fassung 0.44.18, Migration 119) |
 | Lieferscheine als strukturierter Beleg | steht (Fassung 0.44.19, Migration 121) |
-| Reservierungen und frei verfügbarer Bestand | offen — Stufe 3 |
+| Reservierungen und frei verfügbarer Bestand | steht (Fassung 0.44.20, Migration 123) |
 | Baustellenbereich Material (Bestand, verbaut, Kosten) | offen — Stufe 4 |
 | Einkaufspreise und Lieferantenartikelnummern | offen — Stufe 5 |
 | Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
