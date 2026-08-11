@@ -60,7 +60,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Gebinde am Artikel, Einzelentnahme daraus | steht (Fassung 0.44.12, Migration 111) |
 | Freigabe je Firma über die Plattform | steht — Modulschlüssel `warehouse` |
 | Rolle „Lagerist“, von der Firma vergeben | steht |
-| Etiketten im Format der Herstelleraufkleber | steht (Fassung 0.44.13) |
+| Etiketten im Format der Herstelleraufkleber | steht (Fassung 0.44.14) |
 | Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
 
 ## Prüfen
@@ -99,18 +99,21 @@ Nachtrag aufzuhalten.
 
 ## Das Etikett
 
-48 × 25 mm, vier Spalten und elf Reihen auf A4. Oben die Bezeichnung über zwei
-Zeilen, darunter links der Code und rechts daneben die Nummern:
+48 × 17 mm, vier Spalten und sechzehn Reihen auf A4. Links der Code, rechts
+daneben alles zum Lesen:
 
 ```
 ┌────────────────────────────────┐
-│ Schalterdose tief              │
-│ ┌──────┐                       │
+│ ┌──────┐  Schalterdose tief    │
 │ │ ▪▪▫▪ │  Art.-Nr.: LAG-0001   │
 │ │ ▫▪▪▫ │  Kaiser 1055-04       │
 │ └──────┘                       │
 └────────────────────────────────┘
 ```
+
+Die Bezeichnung stand zuerst quer darüber. Das kostete eine ganze Zeile Höhe
+für etwas, das neben dem Code Platz hat: „NYM-J 5x1,5mm2" braucht keine eigene
+Etage. Nebeneinander wurde das Etikett ein Drittel flacher.
 
 Beim Lagerplatz steht statt der Artikelnummer der ganze Pfad — „Fach A1" gibt
 es im Materiallager und in der Werkstatt. Ein Etikett, das sich lesen lässt,

@@ -1206,25 +1206,27 @@ export function inventurAnsicht(zustand, rechte = {}) {
 // Codes und Etiketten
 // ---------------------------------------------------------------------------
 
-// Das Lageretikett folgt dem, was im Betrieb ohnehin auf den Kartons klebt:
-// oben die Bezeichnung, darunter links der Code und rechts daneben die
-// Nummern. Wer das von Hilti oder Kaiser kennt, muss beim eigenen Etikett
-// nicht umlernen - und ein Etikett, das man lesen kann, ohne es zu scannen,
-// hilft genau dann, wenn die Kamera nicht mitspielt.
+// Das Lageretikett steht in einer Zeile: links der Code, rechts daneben alles,
+// was man lesen soll - Bezeichnung, Artikelnummer, Herstellernummer. Ein
+// Etikett, das man lesen kann, ohne es zu scannen, hilft genau dann, wenn die
+// Kamera nicht mitspielt.
 //
-// Deshalb quer statt quadratisch: 48 mal 25 Millimeter, vier Spalten und elf
-// Reihen auf A4. Der Geraetebogen bleibt bei seinen 120 kleinen Quadraten -
-// dort steht nur eine Inventarnummer, hier eine Bezeichnung, die man auch
-// lesen koennen soll.
+// Die Bezeichnung stand zuerst quer darueber. Das kostete eine ganze Zeile Hoehe
+// fuer etwas, das neben dem Code Platz hat: "NYM-J 5x1,5mm2" braucht keine
+// eigene Etage. Nebeneinander wird das Etikett ein Drittel flacher, und aus elf
+// Reihen auf A4 werden sechzehn.
+//
+// Der Geraetebogen bleibt bei seinen 120 kleinen Quadraten - dort steht nur eine
+// Inventarnummer.
 export const ETIKETT_BOGEN = Object.freeze({
   maxEtiketten: 120,
   spalten: 4,
-  reihen: 11,
+  reihen: 16,
   seiteBreiteMm: 210,
   seiteHoeheMm: 297,
   seitenrandMm: 5,
   zelleBreiteMm: 48,
-  zelleHoeheMm: 25,
+  zelleHoeheMm: 17,
   spaltMm: 0.5,
   // Zwoelf Millimeter, nicht mehr.
   //
@@ -1249,25 +1251,24 @@ export function etikettBogenStile() {
     body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#000}
     .sheet{display:grid;grid-template-columns:repeat(${b.spalten},${b.zelleBreiteMm}mm);grid-auto-rows:${b.zelleHoeheMm}mm;gap:${b.spaltMm}mm;width:${breite}mm;align-content:start}
     .label{
-      display:grid;grid-template-rows:5.3mm 1fr;gap:.6mm;
+      display:grid;grid-template-columns:${b.qrGroesseMm}mm 1fr;gap:1.8mm;align-items:center;
       overflow:hidden;border:.15mm solid #999;border-radius:1.5mm;
       padding:1.2mm 1.5mm;break-inside:avoid;page-break-inside:avoid;background:#fff;
     }
-    /* Die Bezeichnung steht oben und bekommt genau zwei Zeilen. Die Hoehe ist
-       fest: ein langer Name darf den Code nicht aus dem Etikett schieben, und
-       eine dritte, halb abgeschnittene Zeile sieht nach Fehler aus. */
+    .label__qr{display:grid;place-items:center;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm}
+    .label svg{display:block;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm}
+    .label__text{display:grid;gap:.4mm;min-width:0}
+    /* Die Bezeichnung bekommt genau zwei Zeilen mit fester Hoehe. Ein langer
+       Name darf die Nummern nicht aus dem Etikett schieben, und eine dritte,
+       halb abgeschnittene Zeile sieht nach Fehler aus. */
     .label__name{
-      margin:0;height:5.3mm;font-size:6.5pt;line-height:2.65mm;font-weight:700;
+      margin:0;max-height:5.3mm;font-size:6.5pt;line-height:2.65mm;font-weight:700;
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
       overflow:hidden;word-break:break-word;
     }
-    .label__body{display:grid;grid-template-columns:${b.qrGroesseMm}mm 1fr;gap:1.5mm;align-items:center;min-width:0;min-height:0}
-    .label__qr{display:grid;place-items:center;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm}
-    .label svg{display:block;width:${b.qrGroesseMm}mm;height:${b.qrGroesseMm}mm}
-    .label__text{display:grid;gap:.5mm;min-width:0}
     .label__text span{
       display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-      font-size:5.5pt;line-height:1.2;font-variant-numeric:tabular-nums;
+      font-size:5.5pt;line-height:1.25;font-variant-numeric:tabular-nums;
     }
     .label__text .label__number{font-size:6pt;font-weight:600}
     .label__text .label__extra{color:#333}
@@ -1284,9 +1285,8 @@ export function etikettBogenStile() {
  * und wird maskiert.
  */
 /**
- * Ein einzelnes Etikett nach dem Vorbild der Herstelleraufkleber.
+ * Ein einzelnes Etikett: links der Code, rechts alles zum Lesen.
  *
- * Oben die Bezeichnung, darunter links der Code, rechts daneben die Nummern.
  * Die Artikelnummer traegt ihr "Art.-Nr." mit, damit die Zahl auf dem Karton
  * nicht ratlos macht; Lagerplaetze bekommen stattdessen ihren Pfad.
  */
@@ -1302,10 +1302,10 @@ export function etikettZelle(etikett = {}) {
 
   return `
     <div class="label">
-      <p class="label__name">${sicher(etikett.label || '')}</p>
-      <div class="label__body">
-        <div class="label__qr">${etikett.svg || ''}</div>
-        <div class="label__text">${nummer}${zusatz}</div>
+      <div class="label__qr">${etikett.svg || ''}</div>
+      <div class="label__text">
+        <p class="label__name">${sicher(etikett.label || '')}</p>
+        ${nummer}${zusatz}
       </div>
     </div>`;
 }
@@ -1325,10 +1325,15 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.13`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.14`;
 
+  // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
+  // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
+  // Bildschirm und man sieht, was gedruckt wird. Auf den Druck hat es keinen
+  // Einfluss - dafuer gilt @page.
   return `<!doctype html>
 <html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=794">
 <title>Lageretiketten</title>
 <link rel="stylesheet" href="${sicher(stile)}">
 </head><body><div class="sheet">${zellen}</div></body></html>`;

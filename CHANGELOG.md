@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Bezeichnung steht neben dem Code (Fassung 0.44.14).** Sie stand quer
+  darüber und kostete damit eine ganze Zeile Höhe für etwas, das daneben Platz
+  hat: „NYM-J 5x1,5mm2" braucht keine eigene Etage. Jetzt links der Code,
+  rechts daneben alles zum Lesen — Bezeichnung, Artikelnummer,
+  Herstellernummer. Das Etikett wird dadurch ein Drittel flacher, 48 × 17 statt
+  48 × 25 mm, und auf eine A4-Seite passen 64 statt 44. Der Code bleibt bei
+  zwölf Millimetern; an seiner Größe hängt, ob die Kamera ihn liest, und die
+  Grenze war schon erreicht. Der Druckbogen bekommt außerdem eine feste
+  Fensterbreite in Höhe der A4-Seite: am Telefon war bisher eine vergrößerte
+  Ecke zu sehen, und niemand konnte beurteilen, was gleich aus dem Drucker
+  kommt.
 - **Selbst gedruckte Lageretiketten sehen aus wie Herstelleraufkleber
   (Fassung 0.44.13).** Bisher war es ein Quadrat aus dem Gerätemodul: Code und
   darunter zwei winzige Zeilen. Für eine Inventarnummer reicht das, für einen

@@ -103,23 +103,25 @@ Zielverweis, weil Lagerplatz- und Artikeletikett dieselbe Ausgabe, dieselbe
 Rotation und denselben Widerruf brauchen; zwei fast gleiche Tabellen wären
 doppelter Code ohne fachlichen Gewinn.
 
-Das eigene Etikett folgt dem, was im Betrieb ohnehin auf den Kartons klebt:
-oben die Bezeichnung über zwei Zeilen, darunter links der Code und rechts
-daneben die Nummern — beim Artikel „Art.-Nr." und darunter Hersteller samt
-Herstellernummer, beim Lagerplatz der ganze Pfad. Wer solche Aufkleber von
-Hilti oder Kaiser kennt, muss beim eigenen nicht umlernen, und ein Etikett, das
-sich lesen lässt, ohne es zu scannen, hilft genau dann, wenn die Kamera einmal
-nicht mitspielt.
+Das eigene Etikett steht in einer Zeile: links der Code, rechts daneben alles,
+was man lesen soll — die Bezeichnung, darunter „Art.-Nr." und der Hersteller
+samt seiner Nummer; beim Lagerplatz statt der Nummer der ganze Pfad. Ein
+Etikett, das sich lesen lässt, ohne es zu scannen, hilft genau dann, wenn die
+Kamera einmal nicht mitspielt.
 
-Daraus folgt das Format: 48 × 25 mm quer statt des Quadrats aus dem
-Gerätemodul, vier Spalten und elf Reihen auf A4, 12 mm je Code — das sind bei
-33 × 33 Modulen und zwei Modulen Ruhezone rund 0,32 mm je Modul, die Grenze für
-das Lesen aus der Hand. Möglich ist sie nur, weil die Adresse im Code in
+Die Bezeichnung stand zuerst quer darüber. Das kostete eine ganze Zeile Höhe
+für etwas, das neben dem Code Platz hat: „NYM-J 5x1,5mm2" braucht keine eigene
+Etage. Nebeneinander wurde das Etikett ein Drittel flacher.
+
+Daraus folgt das Format: 48 × 17 mm quer statt des Quadrats aus dem
+Gerätemodul, vier Spalten und sechzehn Reihen auf A4, 12 mm je Code — das sind
+bei 33 × 33 Modulen und zwei Modulen Ruhezone rund 0,32 mm je Modul, die Grenze
+für das Lesen aus der Hand. Möglich ist sie nur, weil die Adresse im Code in
 Großbuchstaben steht und der QR-Code dadurch in den alphanumerischen Modus
-wechselt: 33 statt 37 Module für dieselbe Angabe. Der
-Gerätebogen bleibt bei seinen 120 kleinen Quadraten — dort steht nur eine
-Inventarnummer, hier eine Bezeichnung, die man auch lesen können soll. Über 44
-Etiketten hinaus wird geblättert statt abgeschnitten.
+wechselt: 33 statt 37 Module für dieselbe Angabe. Der Gerätebogen bleibt bei
+seinen 120 kleinen Quadraten — dort steht nur eine Inventarnummer, hier eine
+Bezeichnung, die man auch lesen können soll. Über 64 Etiketten hinaus wird
+geblättert statt abgeschnitten.
 
 **Ein Artikel ohne Herstellercode ist der Normalfall, nicht die Ausnahme** —
 Kabeltrommel, Schüttgut, eigene Konfektion. Er wird von Hand angelegt und
