@@ -4,6 +4,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Rückgabe darf der Monteur jetzt auch wirklich buchen (Fassung
+  0.44.23).** Die Funktion aus 0.44.22 war für ihn gebaut und für ihn gesperrt:
+  eine Rückgabe ist technisch eine Umlagerung, und Umlagern ist
+  Vorarbeitersache — er bekam beim Buchen „Für diese Buchung fehlt die
+  Berechtigung". Aufgefallen ist das erst beim Durchklicken mit einem echten
+  Monteurszugang; kein Testlauf hätte es gezeigt, weil alle Abnahmen bis dahin
+  aus dem Büro gebucht haben. Erlaubt ist genau ein Fall: von einem
+  Baustellenplatz auf einen Platz, der keine Baustelle ist. Das ist keine
+  Aufweichung, sondern die Beseitigung einer Inkonsequenz — entnehmen und
+  zurückgeben darf er ohnehin einzeln, und die eine Buchung zu verbieten, die
+  beides zusammenfasst, wäre nur unbequem und nicht sicherer gewesen. Von
+  Baustelle zu Baustelle bleibt gesperrt: das ist eine Umdisposition und gehört
+  dem, der plant.
 - **Restmaterial zurückgeben, ohne zu scannen (Fassung 0.44.22).** Was abends
   zurückgeht, liegt in einer Kiste im Transporter, oft ohne lesbaren Code — und
   der Monteur weiß genau, was er dabei hat. Er sieht jetzt, was auf seiner
