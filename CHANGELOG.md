@@ -4,6 +4,35 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Lager funktioniert ohne Netz (Fassung 0.44.12).** Ein Lager liegt im
+  Keller, und auf der Baustelle steht der Monteur hinterm Rohbau — genau dort
+  war es bisher nicht zu gebrauchen: der Scan lief über den Server, also
+  scheiterte schon der erste Schritt, und eine Buchung ohne Verbindung war
+  verloren. Jetzt merkt sich das Gerät, was es schon einmal gescannt hat. Wer
+  denselben Artikel zum zweiten Mal vor die Kamera hält, kommt auch ohne Netz
+  zur Buchung; der Bestand daneben trägt den Hinweis, dass er vom letzten Scan
+  mit Verbindung stammt — geraten wird nichts, denn nach einer erfundenen Zahl
+  richtet sich im Lager jemand. Ein Code, den dieses Gerät noch nie gesehen
+  hat, sagt genau das, statt „Der Server ist nicht erreichbar", was im Keller
+  ohnehin klar ist. Die Buchung selbst wartet auf dem Gerät und wird
+  nachgetragen, sobald wieder Empfang da ist — auch nach einem Neustart der
+  App. Gefahrlos ist das nur, weil jede Buchung ihre Vorgangsnummer schon beim
+  Tippen bekommt: zweimal geschickt zählt sie einmal. Die Startseite sagt, wie
+  viele noch warten. Was der Server ablehnt, fällt aus der Schlange und wird
+  mit Menge und Artikel gemeldet, damit es sich von Hand nachholen lässt —
+  sonst hielte es jeden weiteren Nachtrag auf. Die Inventur bleibt bewusst
+  außen vor: sie zählt gegen einen Sollbestand vom Server, und gegen einen
+  veralteten zu zählen erzeugt Korrekturen, die nichts richtigstellen.
+- **Drei Dinge, die im Lageralltag gefehlt haben.** Ein gedrucktes Etikett, mit
+  der Kamera des Telefons gescannt, führt jetzt in der App zum Artikel; vorher
+  öffnete sich Schäfchen und tat nichts — das Etikett war ein Bild ohne
+  Wirkung. Der Lagerplatz lässt sich aus einer Liste wählen, mit vollem Pfad,
+  damit sich „Fach A1" im Materiallager von „Fach A1" in der Werkstatt
+  unterscheiden lässt; die bisherige Schaltfläche schaltete reihum weiter, was
+  bei drei Plätzen erträglich und bei dreißig eine Zumutung ist. Der zuletzt
+  gewählte Platz überlebt jetzt auch das Schließen der App. Und die
+  Artikelliste hat ein Suchfeld — die Schnittstelle konnte es längst, die
+  Oberfläche fragte nur nie danach.
 - **Das Lager ist in der App angekommen (Fassung 0.44.11).** Bisher lag es
   vollständig, geprüft und unausgeliefert im Ordner `warehouse/`. Jetzt laufen
   seine Migrationen im regulären Ablauf mit (107 bis 109), die Endpunkte hängen

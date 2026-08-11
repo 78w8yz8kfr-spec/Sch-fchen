@@ -55,6 +55,8 @@ erfundenen Hintergrund statt gegen die echte API.
 | API `/api/v1/stock/*` | vollständig — 58 Abnahmen gegen eine echte Datenbank |
 | Bedienoberfläche | Monteursablauf, Büroansichten, Inventur, Bestellwesen, Codes und Etikettendruck |
 | Einhängen in `app.mjs` und Navigation | steht (Fassung 0.44.11) |
+| Bedienung ohne Netz: Scanspeicher, Warteschlange, Nachtrag | steht (Fassung 0.44.12) |
+| Etikettenlink, Lagerplatzauswahl, Artikelsuche | steht (Fassung 0.44.12) |
 | Freigabe je Firma über die Plattform | steht — Modulschlüssel `warehouse` |
 | Rolle „Lagerist“, von der Firma vergeben | steht |
 | Kamera-Livebild im In-App-Browser | offen, siehe unten |
@@ -73,6 +75,25 @@ Die API-Abnahme braucht `API_INTEGRATION_TEST=true` und die `POSTGRES_*`- sowie
 `API_DB_*`-Variablen; ohne sie überspringt sie sich selbst wie die übrigen
 Integrationstests des Projekts. Sie bringt ihre Firma je Lauf selbst mit und
 ist wiederholbar.
+
+## Ohne Netz
+
+Der Keller hat kein Netz, und die Baustelle hinterm Rohbau auch nicht. Das
+Lager arbeitet dort weiter, aber nicht unbegrenzt:
+
+| | ohne Netz |
+| --- | --- |
+| Code scannen | nur, was dieses Gerät schon einmal mit Verbindung gescannt hat |
+| Bestand daneben | die zuletzt bekannte Zahl, ausdrücklich als solche gekennzeichnet |
+| Buchen | ja; die Buchung wartet auf dem Gerät und wird nachgetragen |
+| Artikel anlegen, Codes, Etiketten | nein |
+| Inventur | nein — sie zählt gegen einen Sollbestand vom Server |
+| Bestellwesen | nein |
+
+Der Nachtrag ist nur deshalb gefahrlos, weil `clientOperationId` schon beim
+Tippen vergeben wird: dieselbe Buchung zweimal geschickt zählt einmal. Was der
+Server ablehnt, fällt aus der Schlange und wird gemeldet, statt jeden weiteren
+Nachtrag aufzuhalten.
 
 ## Was offen ist
 

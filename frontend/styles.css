@@ -9440,6 +9440,19 @@ body.hat-fassungshinweis {
 
 .stock-empty { margin: 0; color: var(--ui-text-tertiary); font-size: .9rem; }
 
+/* Der gewählte Lagerplatz muss in der Liste ins Auge fallen: wer dreißig
+   Plätze durchsieht, soll nicht raten, wo er gerade steht. */
+.stock-row--gewaehlt { border-color: var(--ui-brand); background: var(--ui-brand-soft); }
+.stock-row--gewaehlt .stock-row__amount { color: var(--ui-brand); font-size: .78rem; }
+
+.stock-search { margin: 0; }
+.stock-search__input {
+  font: inherit; font-size: 1rem; color: var(--ui-text); background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong); border-radius: 8px; padding: 10px;
+  min-height: 46px; box-sizing: border-box; width: 100%;
+}
+.stock-search__input:focus-visible { outline: 3px solid var(--ui-brand); outline-offset: 1px; }
+
 .stock-row__amount--mehr { color: var(--ui-warning); }
 .stock-row__amount--weniger { color: var(--ui-danger); }
 .stock-row__amount--offen { color: var(--ui-text-tertiary); }

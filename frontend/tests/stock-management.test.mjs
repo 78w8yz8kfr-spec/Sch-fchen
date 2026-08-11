@@ -19,6 +19,14 @@ import {
   knappeArtikel,
   artikelEntwurfAusScan,
   offlineLagerQueueKey,
+  wartendZeile,
+  bestaetigungAnsicht,
+  orteAnsicht,
+  scanSpeicherStutzen,
+  scanSpeicherKey,
+  buchenAnsicht as buchenAnsichtOffline,
+  warteschlangeEintrag,
+  buchungBleibtInWarteschlange,
   ansichtFuer,
   startAnsicht,
   buchenAnsicht,
@@ -947,4 +955,198 @@ test('zur Codeansicht kommt nur die Verwaltung', () => {
     ansichtFuer(lagerZustand({ schritt: SCHRITTE.ARTIKEL_CODES, artikel: ARTIKEL, codes: [] }), { manage: true }, optionen)
       .includes('Codes und Etikett')
   );
+});
+
+// ---------------------------------------------------------------------------
+// Ohne Netz
+// ---------------------------------------------------------------------------
+
+test('ohne Netz gebucht: die Bestaetigung nennt keinen Bestand, den niemand kennt', () => {
+  const zustand = lagerZustand({
+    schritt: SCHRITTE.BUCHEN, ort: REGAL, artikel: ARTIKEL, menge: '5', vorgang: 'entnahme'
+  });
+
+  const nachher = buchungVerarbeiten(zustand, { offline: true });
+  assert.equal(nachher.schritt, SCHRITTE.BESTAETIGT);
+  assert.equal(nachher.bestaetigung.offline, true);
+  assert.equal(nachher.bestaetigung.neuerBestand, null, 'Geraten wird nicht');
+  assert.equal(nachher.bestaetigung.menge, 5);
+
+  const html = bestaetigungAnsicht(nachher);
+  assert.ok(html.includes('Ohne Verbindung gebucht'));
+  assert.ok(html.includes('nachgetragen'));
+  assert.ok(!html.includes('Neuer Bestand hier'));
+});
+
+test('mit Netz bleibt die Bestaetigung, wie sie war', () => {
+  const zustand = lagerZustand({
+    schritt: SCHRITTE.BUCHEN, ort: REGAL, artikel: ARTIKEL, menge: '5', vorgang: 'entnahme'
+  });
+
+  const nachher = buchungVerarbeiten(zustand, {
+    levels: [{ locationId: REGAL.id, quantity: 95 }]
+  });
+  assert.equal(nachher.bestaetigung.offline, false);
+  assert.equal(nachher.bestaetigung.neuerBestand, 95);
+  assert.ok(bestaetigungAnsicht(nachher).includes('Neuer Bestand hier'));
+  assert.ok(!bestaetigungAnsicht(nachher).includes('Ohne Verbindung'));
+});
+
+test('wartende Buchungen stehen auf der Startseite, nicht in einer Ecke', () => {
+  assert.equal(wartendZeile(0), '', 'Ohne Wartende steht dort nichts');
+  assert.ok(wartendZeile(1).includes('Eine Buchung wartet'));
+  assert.ok(wartendZeile(1).includes('wird'), 'Einzahl');
+  assert.ok(wartendZeile(3).includes('3 Buchungen warten'));
+  assert.ok(wartendZeile(3).includes('werden'), 'Mehrzahl');
+
+  const start = startAnsicht(lagerZustand({ ort: REGAL, wartend: 2 }), {});
+  assert.ok(start.includes('2 Buchungen warten'));
+  assert.ok(!startAnsicht(lagerZustand({ ort: REGAL }), {}).includes('warten'));
+});
+
+test('der Zustand kennt die Zahl der Wartenden von Anfang an', () => {
+  // Ein Schluessel, der je nach Weg auftaucht und verschwindet, laesst
+  // Vergleiche gegen null mal stimmen und mal nicht.
+  assert.equal(lagerZustand().wartend, 0);
+  assert.equal(lagerZustand({ wartend: 4 }).wartend, 4);
+});
+
+test('ein wartender Eintrag sagt, was gebucht werden sollte', () => {
+  const zustand = lagerZustand({
+    ort: REGAL, artikel: ARTIKEL, menge: '2,5', vorgang: 'entnahme'
+  });
+  const { buchung } = buchungBauen(zustand, {});
+  const eintrag = warteschlangeEintrag(zustand, buchung, new Date('2026-08-10T09:00:00Z'));
+
+  assert.equal(eintrag.buchung.clientOperationId, buchung.clientOperationId,
+    'Dieselbe Vorgangsnummer — daran haengt, dass sie nur einmal zaehlt');
+  assert.equal(eintrag.beschreibung, `2,5 ${ARTIKEL.unit} ${ARTIKEL.name}`);
+  assert.equal(eintrag.vorgang, 'Entnehmen');
+  assert.equal(eintrag.gestellt, '2026-08-10T09:00:00.000Z');
+});
+
+test('ein Eintrag ohne Angaben bleibt trotzdem lesbar', () => {
+  const eintrag = warteschlangeEintrag(lagerZustand({ menge: '' }), { itemId: 'x' });
+  assert.equal(eintrag.beschreibung, 'Buchung ohne Angaben');
+
+  // Ein Artikel ohne lesbare Menge nennt wenigstens den Artikel.
+  const nurArtikel = warteschlangeEintrag(lagerZustand({ menge: '', artikel: ARTIKEL }), {});
+  assert.equal(nurArtikel.beschreibung, `${ARTIKEL.unit} ${ARTIKEL.name}`);
+});
+
+test('nur das Netz laesst eine Buchung in der Schlange', () => {
+  const netz = new Error('Der Server ist momentan nicht erreichbar.');
+  netz.network = true;
+  assert.equal(buchungBleibtInWarteschlange(netz), true);
+
+  // Wer das Recht nicht hat, hat es beim naechsten Versuch auch nicht: die
+  // Buchung faellt heraus, statt jeden Nachtrag danach aufzuhalten.
+  const abgelehnt = new Error('Für diese Buchung fehlt die Berechtigung.');
+  abgelehnt.code = 'stock_movement_forbidden';
+  assert.equal(buchungBleibtInWarteschlange(abgelehnt), false);
+  assert.equal(buchungBleibtInWarteschlange(null), false);
+});
+
+// ---------------------------------------------------------------------------
+// Lagerplatz waehlen und Artikel suchen
+// ---------------------------------------------------------------------------
+
+const ORTE = [
+  { id: 'ort-0', name: 'Materiallager', path: 'Materiallager' },
+  { id: 'ort-1', name: 'Fach A1', path: 'Materiallager › Regal A › Fach A1' },
+  { id: 'ort-2', name: 'Fach A1', path: 'Werkstatt › Regal A › Fach A1' }
+];
+
+test('die Ortsauswahl zeigt den vollen Pfad und markiert den aktuellen', () => {
+  const html = orteAnsicht(ORTE, 'ort-1');
+
+  // Zwei Plaetze heissen "Fach A1". Ohne den Pfad waeren sie nicht zu
+  // unterscheiden, und es wuerde ins falsche Regal gebucht.
+  assert.ok(html.includes('Materiallager › Regal A › Fach A1'));
+  assert.ok(html.includes('Werkstatt › Regal A › Fach A1'));
+  assert.ok(html.includes('data-ort="ort-1"'));
+  assert.ok(html.includes('stock-row--gewaehlt'));
+  assert.equal((html.match(/gewählt</g) || []).length, 1, 'Genau einer ist gewaehlt');
+});
+
+test('ohne Lagerplatz sagt die Auswahl das, statt leer zu bleiben', () => {
+  assert.ok(orteAnsicht([]).includes('kein Lagerplatz angelegt'));
+});
+
+test('die Artikelliste hat ein Suchfeld, das den Begriff behaelt', () => {
+  const html = artikelListeAnsicht([], { manage: true }, 'dose');
+  assert.ok(html.includes('stock-search__input'));
+  assert.ok(html.includes('value="dose"'));
+  assert.ok(html.includes('Kein Artikel passt zu dieser Suche.'));
+
+  // Ohne Suche liest sich die leere Liste anders: dann ist wirklich nichts da.
+  assert.ok(artikelListeAnsicht([], {}, '').includes('Noch kein Artikel angelegt.'));
+});
+
+test('der Suchbegriff wird beim Anzeigen mitgegeben und maskiert', () => {
+  const zustand = lagerZustand({ schritt: SCHRITTE.ARTIKEL, suche: '<script>' });
+  const html = ansichtFuer(zustand, { manage: true }, { artikel: [] });
+  assert.ok(!html.includes('<script>'));
+  assert.ok(html.includes('&lt;script&gt;'));
+});
+
+test('die Ortsauswahl haengt am Schritt und kennt den gewaehlten Ort', () => {
+  const zustand = lagerZustand({ schritt: SCHRITTE.ORTE, ort: ORTE[2] });
+  const html = ansichtFuer(zustand, {}, { orte: ORTE });
+  assert.ok(html.includes('data-ort="ort-2"'));
+  assert.ok(html.includes('stock-row--gewaehlt'));
+});
+
+// ---------------------------------------------------------------------------
+// Der Zwischenspeicher der Scans
+// ---------------------------------------------------------------------------
+
+test('der Scanspeicher wirft das Aelteste weg, nicht das Naechstbeste', () => {
+  const speicher = {};
+  for (let i = 0; i < 10; i += 1) {
+    speicher[`code-${i}`] = { scan: { found: true }, gesehen: `2026-08-${String(i + 1).padStart(2, '0')}T08:00:00.000Z` };
+  }
+
+  const gestutzt = scanSpeicherStutzen(speicher, 3);
+  assert.deepEqual(Object.keys(gestutzt).sort(), ['code-7', 'code-8', 'code-9'],
+    'Die drei zuletzt gesehenen bleiben');
+});
+
+test('der Scanspeicher haengt an Firma und Mensch', () => {
+  const a = scanSpeicherKey({ company: { number: 'F-000001' }, user: { id: 'u1' } });
+  const b = scanSpeicherKey({ company: { number: 'F-000002' }, user: { id: 'u1' } });
+  assert.notEqual(a, b, 'Zwei Firmen teilen sich keinen Speicher');
+  assert.match(scanSpeicherKey(null), /unknown:unknown$/);
+});
+
+test('ein Artikel aus dem Zwischenspeicher sagt, dass er von vorhin stammt', () => {
+  const zustand = lagerZustand({ ort: REGAL });
+  const ausSpeicher = scanVerarbeiten(zustand, {
+    found: true, kind: 'item', packQuantity: 1, item: ARTIKEL,
+    levels: [{ locationId: REGAL.id, quantity: 40 }],
+    offline: true
+  });
+
+  assert.equal(ausSpeicher.bestandVeraltet, true);
+  assert.equal(ausSpeicher.bestandAmOrt, 40, 'Die letzte bekannte Zahl bleibt stehen');
+  const html = buchenAnsichtOffline(ausSpeicher, {}, {});
+  assert.ok(html.includes('Ohne Netz'));
+  assert.ok(html.includes('vom letzten Scan mit'));
+  assert.ok(html.includes('40'), 'Die Zahl wird nicht verschwiegen, nur eingeordnet');
+
+  // Mit Netz steht dort kein Hinweis.
+  const frisch = scanVerarbeiten(zustand, {
+    found: true, kind: 'item', packQuantity: 1, item: ARTIKEL,
+    levels: [{ locationId: REGAL.id, quantity: 40 }]
+  });
+  assert.equal(frisch.bestandVeraltet, false);
+  assert.ok(!buchenAnsichtOffline(frisch, {}, {}).includes('Ohne Netz'));
+});
+
+test('ein gescannter Lagerplatz ist nie veraltet - ein Ort ist keine Menge', () => {
+  const vorher = lagerZustand({ bestandVeraltet: true });
+  const nachher = scanVerarbeiten(vorher, {
+    found: true, kind: 'location', location: REGAL, offline: true
+  });
+  assert.equal(nachher.bestandVeraltet, false);
 });
