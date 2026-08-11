@@ -20,6 +20,7 @@ import {
   baustellenSpeicherKey,
   buchungBauen,
   buchungBleibtInWarteschlange,
+  lieferscheinFormularAnsicht,
   buchungVerarbeiten,
   codeNachtragLesen,
   eingangVorbelegen,
@@ -37,14 +38,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.18";
+} from "./stock-management.js?v=0.44.19";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.18";
+} from "./barcode-scanner.mjs?v=0.44.19";
 
 const html = `
   <div class="stock-module">
@@ -126,6 +127,8 @@ export function createStockModule({
   let artikel = [];
   let vorschlaege = [];
   let bestellungen = [];
+  let lieferscheine = [];
+  let lieferanten = [];
   let scanZiel = "buchen";
   let tiefenlinkErledigt = false;
   let sucheGeplant = null;
@@ -144,6 +147,8 @@ export function createStockModule({
     artikel,
     vorschlaege,
     bestellungen,
+    lieferscheine,
+    lieferanten,
     orte: kontext.locations || [],
     gruppen: kontext.groups || []
   });
@@ -348,6 +353,8 @@ export function createStockModule({
       vorschlaege = (await laden("/reorder")).suggestions;
     } else if (schritt === SCHRITTE.BESTELLUNGEN) {
       bestellungen = (await laden("/orders")).orders;
+    } else if (schritt === SCHRITTE.LIEFERSCHEINE) {
+      lieferscheine = (await laden("/delivery-notes")).deliveryNotes;
     } else if (schritt === SCHRITTE.INVENTUR) {
       const offen = (await laden("/inventory")).sessions
         .find((sitzung) => sitzung.status === "open" && sitzung.locationId === zustand.ort?.id);
@@ -595,7 +602,8 @@ export function createStockModule({
         artikel: SCHRITTE.ARTIKEL,
         nachbestellung: SCHRITTE.NACHBESTELLUNG,
         inventur: SCHRITTE.INVENTUR,
-        bestellungen: SCHRITTE.BESTELLUNGEN
+        bestellungen: SCHRITTE.BESTELLUNGEN,
+        lieferscheine: SCHRITTE.LIEFERSCHEINE
       };
       void zeigen(ziele[ereignis.currentTarget.dataset.ziel] || SCHRITTE.START);
     });
@@ -660,6 +668,25 @@ export function createStockModule({
     auf(".stock-order-receive", "click", () => void wareneingangBuchen());
     auf(".stock-order-cancel", "click", () => void bestellungStornieren());
 
+    auf(".stock-delivery-new", "click", () => void lieferscheinFormular());
+    auf(".stock-delivery-add-line", "click", () => {
+      // Getipptes bleibt stehen: die Zeile kommt zu dem dazu, was im Formular
+      // schon steht, statt es beim Neuzeichnen zu verlieren.
+      const bisher = lieferscheinFormularLesen();
+      zustand = {
+        ...zustand,
+        entwurf: { ...bisher, zeilen: [...bisher.zeilen, { itemId: "", quantity: "" }] }
+      };
+      render();
+    });
+    auf(".stock-delivery-book", "click", () => void lieferscheinBuchen());
+    auf(".stock-delivery-cancel", "click", () => void lieferscheinStornieren());
+    const lieferscheinFormularElement = wurzel.querySelector(".stock-delivery-form");
+    lieferscheinFormularElement?.addEventListener("submit", (ereignis) => {
+      ereignis.preventDefault();
+      void lieferscheinSpeichern();
+    });
+
     // Das Kaestchen waehlt fuers Etikett, der Rest der Zeile oeffnet den
     // Artikel. Ohne diese Trennung koennte man nichts anhaken, ohne
     // wegzuspringen.
@@ -697,6 +724,7 @@ export function createStockModule({
       const zeile = ereignis.currentTarget;
       if (zeile.dataset.ort) return ortUebernehmen(zeile.dataset.ort);
       if (zeile.dataset.bestellung) return void bestellungOeffnen(zeile.dataset.bestellung);
+      if (zeile.dataset.lieferschein) return void lieferscheinOeffnen(zeile.dataset.lieferschein);
       if (zeile.dataset.artikel) return void artikelOeffnen(zeile.dataset.artikel);
       return undefined;
     });
@@ -732,6 +760,129 @@ export function createStockModule({
       fehler: null
     };
     render();
+  }
+
+  // -------------------------------------------------------------------------
+  // Lieferscheine
+  // -------------------------------------------------------------------------
+
+  function lieferscheinFormularLesen() {
+    // `elements.view` und nicht `wurzel`: das steht nur in `verdrahten()` und
+    // waere hier eine stille Ausnahme mitten im Speichern.
+    const formular = elements.view.querySelector(".stock-delivery-form");
+    if (!formular) return zustand.entwurf || { zeilen: [] };
+    const wert = (name) => formular.querySelector(`[name="${name}"]`)?.value?.trim() || "";
+    return {
+      supplierId: wert("supplierId"),
+      deliveryNoteNumber: wert("deliveryNoteNumber"),
+      deliveredOn: wert("deliveredOn"),
+      targetLocationId: wert("targetLocationId"),
+      zeilen: [...formular.querySelectorAll(".stock-delivery-line")].map((zeile) => ({
+        itemId: zeile.querySelector('[name="itemId"]')?.value || "",
+        quantity: zeile.querySelector('[name="quantity"]')?.value || ""
+      }))
+    };
+  }
+
+  async function lieferscheinFormular() {
+    try {
+      // Lieferanten und Artikel kommen erst hier: wer nur Bestaende ansieht,
+      // soll sie nicht bei jedem Oeffnen des Lagers mitladen.
+      const [lieferantenAntwort, artikelAntwort] = await Promise.all([
+        laden("/suppliers"),
+        laden("/items")
+      ]);
+      lieferanten = lieferantenAntwort.suppliers;
+      artikel = artikelAntwort.items;
+      zustand = {
+        ...zustand,
+        schritt: SCHRITTE.LIEFERSCHEIN,
+        lieferschein: null,
+        entwurf: {
+          deliveredOn: new Date().toISOString().slice(0, 10),
+          zeilen: [{ itemId: "", quantity: "" }]
+        },
+        fehler: null
+      };
+      render();
+    } catch (fehler) {
+      melden(fehler);
+    }
+  }
+
+  async function lieferscheinSpeichern() {
+    const entwurf = lieferscheinFormularLesen();
+    const positionen = entwurf.zeilen
+      .filter((zeile) => zeile.itemId && mengeAusText(zeile.quantity) !== null)
+      .map((zeile) => ({ itemId: zeile.itemId, quantity: mengeAusText(zeile.quantity) }));
+
+    if (!positionen.length) {
+      zustand = { ...zustand, entwurf, fehler: "Ein Lieferschein braucht mindestens eine Position mit Menge." };
+      render();
+      return;
+    }
+
+    try {
+      const antwort = await senden("/delivery-notes", {
+        supplierId: entwurf.supplierId,
+        deliveryNoteNumber: entwurf.deliveryNoteNumber,
+        deliveredOn: entwurf.deliveredOn,
+        targetLocationId: entwurf.targetLocationId,
+        items: positionen
+      });
+      zustand = {
+        ...zustand, schritt: SCHRITTE.LIEFERSCHEIN, entwurf: null,
+        lieferschein: antwort, fehler: null
+      };
+      showToast("Lieferschein als Entwurf gespeichert.");
+      render();
+    } catch (fehler) {
+      zustand = { ...zustand, entwurf, fehler: fehler.message };
+      render();
+    }
+  }
+
+  async function lieferscheinOeffnen(id) {
+    try {
+      const antwort = await laden(`/delivery-notes/${encodeURIComponent(id)}`);
+      zustand = {
+        ...zustand, schritt: SCHRITTE.LIEFERSCHEIN, entwurf: null,
+        lieferschein: antwort, fehler: null
+      };
+      render();
+    } catch (fehler) {
+      melden(fehler);
+    }
+  }
+
+  async function lieferscheinBuchen() {
+    const id = zustand.lieferschein?.deliveryNote?.id;
+    if (!id) return;
+    try {
+      const antwort = await senden(`/delivery-notes/${encodeURIComponent(id)}/book`, {});
+      zustand = { ...zustand, lieferschein: antwort, fehler: null };
+      showToast("Lieferschein gebucht, der Bestand ist aktualisiert.");
+      render();
+    } catch (fehler) {
+      zustand = { ...zustand, fehler: fehler.message };
+      render();
+    }
+  }
+
+  async function lieferscheinStornieren() {
+    const id = zustand.lieferschein?.deliveryNote?.id;
+    if (!id) return;
+    const grund = fenster.prompt("Warum wird der Lieferschein storniert?");
+    if (!grund) return;
+    try {
+      const antwort = await senden(`/delivery-notes/${encodeURIComponent(id)}/cancel`, { reason: grund });
+      zustand = { ...zustand, lieferschein: antwort, fehler: null };
+      showToast("Lieferschein storniert.");
+      render();
+    } catch (fehler) {
+      zustand = { ...zustand, fehler: fehler.message };
+      render();
+    }
   }
 
   async function buchen(vorgang) {
