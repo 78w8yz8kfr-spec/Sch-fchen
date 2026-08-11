@@ -8,7 +8,8 @@ import {
   scanDeuten,
   nativeErkennungErzeugen,
   erkennungWaehlen,
-  scanSchleifeStarten
+  scanSchleifeStarten,
+  etikettAusAdresse
 } from '../core/barcode-scanner.mjs';
 
 // Die Werte stammen aus dem SQL-Abnahmetest der Migration 200. Frontend und
@@ -250,4 +251,21 @@ test('gestoppt wird gestoppt', async () => {
 
   while (warteschlange.length) await warteschlange.shift()();
   assert.deepEqual(treffer, [], 'Nach dem Stoppen darf nichts mehr gebucht werden');
+});
+
+test('die Etikettenkennung wird gross wie klein geschrieben gefunden', () => {
+  // Gedruckte Etiketten tragen die Adresse in Grossbuchstaben: so packt der
+  // QR-Code sie dichter und wird kleiner. Ältere Etiketten sind kleingeschrieben
+  // und müssen gültig bleiben — sie kleben schon im Regal.
+  const kennung = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+  const klein = scanDeuten(`https://app.example/?lager=${kennung}`);
+  const gross = scanDeuten(`HTTPS://APP.EXAMPLE/?LAGER=${kennung.toUpperCase()}`);
+
+  assert.equal(klein.art, gross.art);
+  assert.equal(klein.wert, kennung);
+  assert.equal(gross.wert, kennung, 'Die Kennung kommt immer klein zurück');
+
+  assert.equal(etikettAusAdresse(new URL(`https://a.b/?LaGeR=${kennung}`)), kennung);
+  assert.equal(etikettAusAdresse(new URL('https://a.b/?anderes=1')), null);
+  assert.equal(etikettAusAdresse(new URL('https://a.b/?lager=')), null, 'Leer ist keine Kennung');
 });

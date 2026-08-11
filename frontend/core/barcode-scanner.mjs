@@ -58,14 +58,29 @@ export function gtinNormalisieren(rohcode) {
  * Die Zuordnung entspricht dem, was der Trigger
  * `stock_item_barcodes_before_write` beim Speichern tut.
  */
+/**
+ * Holt die Etikettenkennung aus einer Adresse — gleich, wie sie geschrieben ist.
+ *
+ * Gedruckte Etiketten tragen die Adresse in Grossbuchstaben: so packt der
+ * QR-Code sie dichter und wird bei gleicher Lesbarkeit kleiner. Schema und Host
+ * sind ohnehin gleichgueltig gegenueber der Schreibweise, der Abfrageteil nicht
+ * - deshalb wird hier ausdruecklich beides angenommen. Aeltere Etiketten mit
+ * kleingeschriebenem `lager=` bleiben damit gueltig.
+ */
+export function etikettAusAdresse(adresse) {
+  for (const [schluessel, wert] of adresse.searchParams) {
+    if (schluessel.toLowerCase() === 'lager' && wert) return wert;
+  }
+  return null;
+}
+
 export function scanDeuten(rohwert, { basis = 'https://example.invalid/' } = {}) {
   const text = String(rohwert ?? '').trim();
   if (!text) return null;
 
   let etikett = text;
   try {
-    const ausAdresse = new URL(text, basis).searchParams.get('lager');
-    if (ausAdresse) etikett = ausAdresse;
+    etikett = etikettAusAdresse(new URL(text, basis)) || etikett;
   } catch {
     // Kein gueltiger Verweis, also ein reiner Wert.
   }

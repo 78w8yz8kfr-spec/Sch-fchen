@@ -704,6 +704,12 @@ async function labelSheet(client, context, body, allowedOrigin) {
     throw new InputError("Bitte 1 bis 120 Etiketten für den Druckbogen wählen.");
   }
 
+  // Der Pfad eines Lagerplatzes entsteht aus seinen Eltern; einmal geladen
+  // reicht fuer den ganzen Bogen.
+  const orte = ziele.some((ziel) => ziel?.targetType === "location")
+    ? await loadLocations(client, context)
+    : [];
+
   const labels = [];
   for (const ziel of ziele) {
     const targetType = ziel?.targetType === "location" ? "location" : "item";
@@ -715,30 +721,49 @@ async function labelSheet(client, context, body, allowedOrigin) {
       locationId: targetType === "location" ? id : undefined
     });
 
+    // Was auf dem Etikett steht: Bezeichnung, Nummer und eine dritte Zeile,
+    // die im Regal weiterhilft. Beim Artikel ist das die Herstellernummer -
+    // danach sucht, wer nachbestellt. Beim Lagerplatz der Pfad, damit sich
+    // "Fach A1" im Materiallager von "Fach A1" in der Werkstatt unterscheidet.
     const beschriftung = targetType === "item"
       ? await client.query(
-        "SELECT name, item_number AS nummer FROM stock_items WHERE company_id = $1 AND id = $2",
+        `SELECT name, item_number AS nummer,
+                NULLIF(TRIM(CONCAT_WS(' ', manufacturer, manufacturer_number)), '') AS zusatz
+         FROM stock_items WHERE company_id = $1 AND id = $2`,
         [context.companyId, id]
       )
       : await client.query(
-        "SELECT name, '' AS nummer FROM storage_locations WHERE company_id = $1 AND id = $2",
+        "SELECT name, '' AS nummer, NULL AS zusatz FROM storage_locations WHERE company_id = $1 AND id = $2",
         [context.companyId, id]
       );
     if (beschriftung.rowCount !== 1) {
       throw new InputError("Dieses Etikettenziel wurde nicht gefunden.", 404, "stock_label_target_unknown");
     }
 
+    // Grossbuchstaben: darin packt ein QR-Code die Adresse dichter, weil er in
+    // den alphanumerischen Modus wechseln kann. Aus 37 werden 33 Module, und
+    // derselbe Code passt bei gleicher Lesbarkeit auf weniger Flaeche.
+    //
+    // Erlaubt ist das, weil Schema und Host ohnehin gleichgueltig gegenueber
+    // der Schreibweise sind und den Abfrageteil nur unsere eigene App liest -
+    // sie nimmt `lager` wie `LAGER`. Die Kennung ist hexadezimal, also
+    // unveraendert gueltig; PostgreSQL vergleicht UUIDs ohne Ruecksicht auf
+    // Gross- und Kleinschreibung.
     const adresse = new URL("/", allowedOrigin || "https://example.invalid/");
     adresse.searchParams.set("lager", etikett.token);
+    const gedruckt = adresse.toString().toUpperCase();
 
     labels.push({
       targetType,
       id,
       label: beschriftung.rows[0].name,
-      sublabel: beschriftung.rows[0].nummer || "",
-      target: adresse.toString(),
+      sublabel: targetType === "location"
+        ? (orte.find((ort) => ort.id === id)?.path || "")
+        : (beschriftung.rows[0].nummer || ""),
+      extra: beschriftung.rows[0].zusatz || null,
+      target: gedruckt,
       generation: etikett.generation,
-      svg: await qrToString(adresse.toString(), {
+      svg: await qrToString(gedruckt, {
         type: "svg",
         errorCorrectionLevel: "M",
         margin: 2,

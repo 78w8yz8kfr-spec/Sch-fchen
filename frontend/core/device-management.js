@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.12";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.13";
 let qrScannerLibraryPromise = null;
 
 export const DEVICE_QR_SHEET_LAYOUT = Object.freeze({
@@ -1933,13 +1933,40 @@ export function createDeviceModule({
     elements.qrDialog.showModal();
   }
 
+  // Stile und Beschriftung kommen nicht mehr aus dem Dokument selbst: die App
+  // laeuft unter `style-src 'self'` und `script-src 'self'`, und das
+  // Druckfenster erbt beides. Eingebettete Stile kamen ohne eine einzige Regel
+  // an, das eingebettete Skript lief nie - gedruckt wurde ein riesiges Bild
+  // ohne Namen und ohne Nummer. Die Datei von der eigenen Herkunft ist erlaubt,
+  // und der Text wird vom Opener aus gesetzt.
+  function druckseite(popup, titel, stildatei) {
+    popup.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">`
+      + `<title>${titel}</title>`
+      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.13">`
+      + `</head><body></body></html>`);
+  }
+
   function printQr(device) {
     const popup = window.open("", "_blank");
     if (!popup) return showToast("Bitte Pop-ups für den Etikettendruck erlauben.");
-    popup.opener = null;
-    const image = `./api/v1/admin/devices/${encodeURIComponent(device.id)}/qr`;
-    popup.document.write(`<!doctype html><html lang="de"><head><title>Schäfchen Geräteetikett</title><style>body{font:16px system-ui;text-align:center;padding:24px}.label{display:inline-grid;gap:8px;border:1px solid #bbb;border-radius:12px;padding:16px;width:260px}img{width:220px;height:220px;margin:auto}strong{font-size:18px}@media print{body{padding:0}.label{border:1px solid #000}}</style></head><body><div class="label"><img src="${image}"><strong></strong><span></span></div><script>document.querySelector('strong').textContent=${JSON.stringify(device.name)};document.querySelector('span').textContent=${JSON.stringify(device.inventoryNumber)};window.onload=()=>window.print();<\/script></body></html>`);
+    druckseite(popup, "Schäfchen Geräteetikett", "print-devices.css");
+    popup.document.body.className = "single";
+
+    const label = popup.document.createElement("div");
+    label.className = "label";
+    const bild = popup.document.createElement("img");
+    bild.src = `${window.location.origin}/api/v1/admin/devices/${encodeURIComponent(device.id)}/qr`;
+    const name = popup.document.createElement("strong");
+    name.textContent = device.name;
+    const nummer = popup.document.createElement("span");
+    nummer.textContent = device.inventoryNumber;
+    label.append(bild, name, nummer);
+    popup.document.body.append(label);
+
     popup.document.close();
+    // Erst drucken, wenn das Bild da ist - sonst bleibt das Etikett leer.
+    bild.addEventListener("load", () => popup.print());
+    return undefined;
   }
 
   async function printSheet() {
@@ -1951,8 +1978,10 @@ export function createDeviceModule({
         method: "POST", body: JSON.stringify({ deviceIds: [...printSelection] })
       });
       if (!popup) return showToast("Bitte Pop-ups für den Druckbogen erlauben.");
-      popup.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Schäfchen QR-Druckbogen</title><style>${deviceQrSheetStyles()}</style></head><body><main class="sheet"></main></body></html>`);
-      const sheet = popup.document.querySelector(".sheet");
+      druckseite(popup, "Schäfchen QR-Druckbogen", "print-devices.css");
+      const sheet = popup.document.createElement("main");
+      sheet.className = "sheet";
+      popup.document.body.append(sheet);
       body.labels.forEach((label) => {
         const article = popup.document.createElement("article"); article.className = "label";
         const qr = popup.document.createElement("div"); qr.className = "label__qr"; qr.innerHTML = label.svg;

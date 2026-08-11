@@ -4,6 +4,37 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Selbst gedruckte Lageretiketten sehen aus wie Herstelleraufkleber
+  (Fassung 0.44.13).** Bisher war es ein Quadrat aus dem Gerätemodul: Code und
+  darunter zwei winzige Zeilen. Für eine Inventarnummer reicht das, für einen
+  Artikel nicht — wer im Regal steht, will die Bezeichnung lesen können, ohne
+  zu scannen, und genau dann, wenn die Kamera einmal nicht mitspielt, ist das
+  der Unterschied zwischen „Schalterdose tief" und einem schwarzen Quadrat.
+  Jetzt steht oben die Bezeichnung über zwei Zeilen, darunter links der Code
+  und rechts daneben die Nummern: beim Artikel „Art.-Nr." und darunter der
+  Hersteller samt seiner Nummer, denn danach sucht, wer nachbestellt. Beim
+  Lagerplatz steht statt der Artikelnummer der ganze Pfad — „Fach A1" gibt es
+  im Materiallager und in der Werkstatt. Das Format ist entsprechend quer
+  statt quadratisch: 48 × 25 mm, vier Spalten und elf Reihen auf A4; über 44
+  Etiketten hinaus wird geblättert statt abgeschnitten. Ein langer Name bekommt
+  genau zwei Zeilen und wird danach abgeschnitten, statt den Code aus dem
+  Etikett zu schieben. Der Gerätebogen bleibt bei seinen 120 kleinen Quadraten.
+  Der Code selbst misst zwölf Millimeter — wie klein er sein darf, entscheidet
+  nicht der Geschmack, sondern die Kamera: das sind rund 0,32 Millimeter je
+  Modul, und darunter wird das Lesen aus der Hand unzuverlässig. Möglich ist das
+  erst dadurch, dass die Adresse im Code in Großbuchstaben steht; so braucht der
+  QR-Code 33 statt 37 Module für dieselbe Angabe. Ältere, kleingeschriebene
+  Etiketten bleiben gültig — sie kleben schon im Regal.
+- **Druckbogen kommen wieder formatiert an.** Beim Umbau der Lageretiketten
+  fiel ein Fehler auf, den es schon vorher gab: Schäfchen läuft unter
+  `style-src 'self'`, das Druckfenster erbt diese Regel, und ein eingebetteter
+  Stilblock wird davon verworfen — ohne Fehlermeldung, nur mit einer Notiz in
+  der Browserkonsole. Gedruckt wurde eine Liste riesiger Codes über ganze
+  Seiten statt eines Bogens. Dasselbe traf den Geräte-Druckbogen und das
+  Geräte-Einzeletikett; dort lief zusätzlich das eingebettete Skript nicht,
+  sodass Name und Inventarnummer fehlten. Die Stile liegen jetzt als eigene
+  Dateien bei, und die Beschriftung setzt das Hauptfenster — beide Bogen sind
+  dadurch nebenbei auch offline druckbar.
 - **Das Lager funktioniert ohne Netz (Fassung 0.44.12).** Ein Lager liegt im
   Keller, und auf der Baustelle steht der Monteur hinterm Rohbau — genau dort
   war es bisher nicht zu gebrauchen: der Scan lief über den Server, also

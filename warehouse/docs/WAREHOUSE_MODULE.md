@@ -103,9 +103,23 @@ Zielverweis, weil Lagerplatz- und Artikeletikett dieselbe Ausgabe, dieselbe
 Rotation und denselben Widerruf brauchen; zwei fast gleiche Tabellen wären
 doppelter Code ohne fachlichen Gewinn.
 
-Der Etikettendruck übernimmt den A4-Bogen des Gerätemoduls: zehn Spalten, zwölf
-Reihen, 18 × 18 mm je Code, feste Zeilenhöhen. Das Raster ist erprobt und
-erzeugt nachweislich keine zweite Druckseite.
+Das eigene Etikett folgt dem, was im Betrieb ohnehin auf den Kartons klebt:
+oben die Bezeichnung über zwei Zeilen, darunter links der Code und rechts
+daneben die Nummern — beim Artikel „Art.-Nr." und darunter Hersteller samt
+Herstellernummer, beim Lagerplatz der ganze Pfad. Wer solche Aufkleber von
+Hilti oder Kaiser kennt, muss beim eigenen nicht umlernen, und ein Etikett, das
+sich lesen lässt, ohne es zu scannen, hilft genau dann, wenn die Kamera einmal
+nicht mitspielt.
+
+Daraus folgt das Format: 48 × 25 mm quer statt des Quadrats aus dem
+Gerätemodul, vier Spalten und elf Reihen auf A4, 12 mm je Code — das sind bei
+33 × 33 Modulen und zwei Modulen Ruhezone rund 0,32 mm je Modul, die Grenze für
+das Lesen aus der Hand. Möglich ist sie nur, weil die Adresse im Code in
+Großbuchstaben steht und der QR-Code dadurch in den alphanumerischen Modus
+wechselt: 33 statt 37 Module für dieselbe Angabe. Der
+Gerätebogen bleibt bei seinen 120 kleinen Quadraten — dort steht nur eine
+Inventarnummer, hier eine Bezeichnung, die man auch lesen können soll. Über 44
+Etiketten hinaus wird geblättert statt abgeschnitten.
 
 **Ein Artikel ohne Herstellercode ist der Normalfall, nicht die Ausnahme** —
 Kabeltrommel, Schüttgut, eigene Konfektion. Er wird von Hand angelegt und

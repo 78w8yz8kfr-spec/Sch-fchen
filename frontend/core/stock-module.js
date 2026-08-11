@@ -33,13 +33,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.12";
+} from "./stock-management.js?v=0.44.13";
 import {
   erkennungWaehlen,
+  etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.12";
+} from "./barcode-scanner.mjs?v=0.44.13";
 
 const html = `
   <div class="stock-module">
@@ -491,7 +492,7 @@ export function createStockModule({
         melden(new Error("Der Browser hat das Druckfenster blockiert."));
         return;
       }
-      blatt.document.write(etikettBogenHtml(labels));
+      blatt.document.write(etikettBogenHtml(labels, fenster.location.origin));
       blatt.document.close();
     } catch (fehler) {
       melden(fehler);
@@ -968,7 +969,7 @@ export function createStockModule({
    */
   async function handleDeepLink() {
     if (tiefenlinkErledigt || !enabled) return;
-    const kennung = new URLSearchParams(fenster.location.search).get("lager");
+    const kennung = etikettAusAdresse(new URL(fenster.location.href));
     if (!kennung) return;
     tiefenlinkErledigt = true;
 
@@ -977,7 +978,9 @@ export function createStockModule({
     await scanAufloesen(kennung);
 
     const adresse = new URL(fenster.location.href);
-    adresse.searchParams.delete("lager");
+    for (const schluessel of [...adresse.searchParams.keys()]) {
+      if (schluessel.toLowerCase() === "lager") adresse.searchParams.delete(schluessel);
+    }
     fenster.history.replaceState({}, "", adresse);
   }
 

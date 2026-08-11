@@ -60,7 +60,8 @@ erfundenen Hintergrund statt gegen die echte API.
 | Gebinde am Artikel, Einzelentnahme daraus | steht (Fassung 0.44.12, Migration 111) |
 | Freigabe je Firma über die Plattform | steht — Modulschlüssel `warehouse` |
 | Rolle „Lagerist“, von der Firma vergeben | steht |
-| Kamera-Livebild im In-App-Browser | offen, siehe unten |
+| Etiketten im Format der Herstelleraufkleber | steht (Fassung 0.44.13) |
+| Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
 
 ## Prüfen
 
@@ -96,12 +97,38 @@ Tippen vergeben wird: dieselbe Buchung zweimal geschickt zählt einmal. Was der
 Server ablehnt, fällt aus der Schlange und wird gemeldet, statt jeden weiteren
 Nachtrag aufzuhalten.
 
+## Das Etikett
+
+48 × 25 mm, vier Spalten und elf Reihen auf A4. Oben die Bezeichnung über zwei
+Zeilen, darunter links der Code und rechts daneben die Nummern:
+
+```
+┌────────────────────────────────┐
+│ Schalterdose tief              │
+│ ┌──────┐                       │
+│ │ ▪▪▫▪ │  Art.-Nr.: LAG-0001   │
+│ │ ▫▪▪▫ │  Kaiser 1055-04       │
+│ └──────┘                       │
+└────────────────────────────────┘
+```
+
+Beim Lagerplatz steht statt der Artikelnummer der ganze Pfad — „Fach A1" gibt
+es im Materiallager und in der Werkstatt. Ein Etikett, das sich lesen lässt,
+ohne es zu scannen, hilft genau dann, wenn die Kamera einmal nicht mitspielt.
+
+Der Code misst 12 mm. Kleiner geht nicht ohne Verlust: bei 33 × 33 Modulen und
+zwei Modulen Ruhezone sind das 0,32 mm je Modul, und darunter wird das Lesen
+aus der Hand unzuverlässig. Die 12 mm sind überhaupt nur möglich, weil die
+Adresse im Code in Großbuchstaben steht — dann wechselt der QR-Code in den
+alphanumerischen Modus und braucht 33 statt 37 Module. Wer den Code weiter
+verkleinern will, muss zuerst den Inhalt kürzen, nicht das Bild.
+
 ## Was offen ist
 
-Das **Kamera-Livebild** läuft im eigenständigen Browser, aber nicht im
-In-App-Browser mancher Anwendungen: dort liefert `getUserMedia` kein Bild.
-Foto und Handeingabe fangen das ab, und die Meldung sagt es. Der Prüfstand
-`barcode-testseite.html` zeigt, dass der Leser selbst nicht das Problem ist.
+Das **Kamera-Livebild** läuft am Gerät. Im In-App-Browser mancher Anwendungen
+liefert `getUserMedia` allerdings kein Bild; dort fangen Foto und Handeingabe
+es ab, und die Meldung sagt es. Der Prüfstand `barcode-testseite.html` zeigt,
+dass der Leser selbst nicht das Problem ist.
 
 ## Abgrenzung in einem Satz
 

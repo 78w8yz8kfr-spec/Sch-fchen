@@ -97,3 +97,23 @@ test("Eine versehentlich angefügte leere Teilezeile blockiert die Geräteanlage
   assert.equal(includedPartIsEmpty({ categoryId: "battery" }), false);
   assert.equal(includedPartIsEmpty({ inspectionRequired: true }), false);
 });
+
+test('die ausgelieferte Druckdatei ist die des Gerätebogens', async () => {
+  // Dieselbe Falle wie beim Lager: die App läuft unter `style-src 'self'`, und
+  // das Druckfenster erbt die Regel. Ein eingebetteter Block kam dort ohne eine
+  // einzige Regel an, und der Bogen druckte als Liste riesiger Codes.
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const hier = dirname(fileURLToPath(import.meta.url));
+  const datei = readFileSync(join(hier, '..', 'print-devices.css'), 'utf8');
+
+  assert.ok(datei.includes(deviceQrSheetStyles().trim()), 'Die Datei enthält die erzeugten Regeln');
+  assert.ok(datei.includes('.single'), 'Auch das Einzeletikett steht darin');
+
+  // Und im Modul selbst darf kein eingebetteter Stil mehr stehen.
+  const quelle = readFileSync(join(hier, '..', 'core', 'device-management.js'), 'utf8');
+  assert.ok(!quelle.includes('<style>'), 'Kein eingebetteter Stil im Druckfenster');
+  assert.ok(!quelle.includes('<script>'), 'Kein eingebettetes Skript im Druckfenster');
+  assert.ok(quelle.includes('print-devices.css'));
+});
