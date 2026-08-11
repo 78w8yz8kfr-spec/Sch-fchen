@@ -1861,6 +1861,421 @@ async function listInventories(client, context) {
   return result.rows.map(inventoryDto);
 }
 
+// ---------------------------------------------------------------------------
+// Lieferscheine
+//
+// Ein Lieferschein ist hier ein Beleg mit Positionen und nicht nur ein Foto.
+// Erfasst wird er als Entwurf - oft im Stehen, waehrend der Fahrer wartet -
+// und erst das Buchen erzeugt die Materialbewegungen. Danach wird er
+// storniert und nicht mehr geaendert.
+// ---------------------------------------------------------------------------
+
+const DELIVERY_OPEN = ["draft"];
+
+function deliveryNoteDto(row) {
+  return {
+    id: row.id,
+    deliveryNoteNumber: row.delivery_note_number,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name || null,
+    deliveredOn: row.delivered_on
+      ? new Date(row.delivered_on).toISOString().slice(0, 10)
+      : null,
+    purchaseOrderId: row.purchase_order_id || null,
+    purchaseOrderNumber: row.order_number || null,
+    targetLocationId: row.target_location_id,
+    targetLocationName: row.target_location_name || null,
+    constructionSiteId: row.construction_site_id || null,
+    constructionSiteName: row.site_name || null,
+    projectId: row.project_id || null,
+    documentId: row.document_id || null,
+    status: row.status,
+    note: row.note || null,
+    bookedAt: row.booked_at ? new Date(row.booked_at).toISOString() : null,
+    cancelReason: row.cancel_reason || null,
+    rowVersion: Number(row.row_version || 1)
+  };
+}
+
+const DELIVERY_NOTE_SELECT = `
+  SELECT schein.*,
+         lieferant.name AS supplier_name,
+         bestellung.order_number,
+         ziel.name AS target_location_name,
+         baustelle.name AS site_name
+  FROM delivery_notes AS schein
+  JOIN suppliers AS lieferant
+    ON lieferant.company_id = schein.company_id AND lieferant.id = schein.supplier_id
+  JOIN storage_locations AS ziel
+    ON ziel.company_id = schein.company_id AND ziel.id = schein.target_location_id
+  LEFT JOIN purchase_orders AS bestellung
+    ON bestellung.company_id = schein.company_id AND bestellung.id = schein.purchase_order_id
+  LEFT JOIN construction_sites AS baustelle
+    ON baustelle.company_id = schein.company_id AND baustelle.id = schein.construction_site_id`;
+
+async function listDeliveryNotes(client, context, url) {
+  // Auf einem Lieferschein stehen Preise. Wer sie nicht sehen darf, sieht auch
+  // den Schein nicht - das ist dieselbe Grenze wie bei Bestellungen.
+  await requireManager(client, context);
+
+  const status = optionalText(url.searchParams.get("status"), "Status", 20);
+  const result = await client.query(
+    `${DELIVERY_NOTE_SELECT}
+     WHERE schein.company_id = $1
+       AND ($2::TEXT IS NULL OR schein.status = $2)
+     ORDER BY schein.delivered_on DESC, schein.created_at DESC
+     LIMIT 200`,
+    [context.companyId, status]
+  );
+  return result.rows.map(deliveryNoteDto);
+}
+
+/**
+ * Der Abgleich mit der Bestellung.
+ *
+ * Bestellt, bisher geliefert, mit diesem Schein, noch offen - und die
+ * Ueberlieferung als eigene Zahl. Sie wird nicht verhindert: geliefert ist
+ * geliefert, und der Lieferant hat nun einmal 520 statt 500 Meter gebracht.
+ * Verschwiegen wird sie aber auch nicht, denn genau daran haengt spaeter die
+ * Rechnungspruefung.
+ */
+function abgleichZeile(row, scheinGebucht) {
+  const runde = (wert) => Math.round(wert * 1000) / 1000;
+  const bestellt = number(row.quantity_ordered);
+  const jetzt = number(row.quantity_now || 0);
+
+  // `quantity_received` an der Bestellposition ist die Wahrheit ueber alles
+  // Gelieferte. Ist dieser Schein bereits gebucht, steckt seine Menge darin -
+  // sie ein zweites Mal zu addieren, haette aus einer Teillieferung eine
+  // Ueberlieferung gemacht.
+  const geliefert = scheinGebucht
+    ? number(row.quantity_received)
+    : runde(number(row.quantity_received) + jetzt);
+
+  return {
+    purchaseOrderItemId: row.id,
+    itemId: row.item_id,
+    itemNumber: row.item_number,
+    itemName: row.name,
+    unit: row.unit,
+    quantityOrdered: bestellt,
+    quantityReceivedBefore: runde(geliefert - jetzt),
+    quantityOnThisNote: jetzt,
+    quantityDeliveredTotal: geliefert,
+    quantityOpen: Math.max(runde(bestellt - geliefert), 0),
+    quantityOver: Math.max(runde(geliefert - bestellt), 0)
+  };
+}
+
+async function deliveryNoteDetail(client, context, noteId) {
+  await requireManager(client, context);
+
+  const schein = await client.query(
+    `${DELIVERY_NOTE_SELECT} WHERE schein.company_id = $1 AND schein.id = $2`,
+    [context.companyId, noteId]
+  );
+  if (schein.rowCount !== 1) {
+    throw new InputError("Dieser Lieferschein wurde nicht gefunden.", 404, "stock_delivery_note_unknown");
+  }
+
+  const positionen = await client.query(
+    `SELECT zeile.*, artikel.item_number, artikel.name AS item_name, artikel.unit
+     FROM delivery_note_items AS zeile
+     JOIN stock_items AS artikel
+       ON artikel.company_id = zeile.company_id AND artikel.id = zeile.item_id
+     WHERE zeile.company_id = $1 AND zeile.delivery_note_id = $2
+     ORDER BY zeile.line_position`,
+    [context.companyId, noteId]
+  );
+
+  const bestellung = schein.rows[0].purchase_order_id;
+  const abgleich = bestellung
+    ? (await client.query(
+      `SELECT position.id, position.item_id, position.quantity_ordered,
+              position.quantity_received,
+              artikel.item_number, artikel.name, artikel.unit,
+              COALESCE((
+                SELECT SUM(zeile.quantity) FROM delivery_note_items AS zeile
+                WHERE zeile.company_id = position.company_id
+                  AND zeile.purchase_order_item_id = position.id
+                  AND zeile.delivery_note_id = $3
+              ), 0) AS quantity_now
+       FROM purchase_order_items AS position
+       JOIN stock_items AS artikel
+         ON artikel.company_id = position.company_id AND artikel.id = position.item_id
+       WHERE position.company_id = $1 AND position.purchase_order_id = $2
+       ORDER BY position.line_position`,
+      [context.companyId, bestellung, noteId]
+    )).rows.map((row) => abgleichZeile(row, schein.rows[0].status === "booked"))
+    : [];
+
+  const bewegungen = await client.query(
+    `SELECT bewegung.* FROM stock_movements AS bewegung
+     JOIN delivery_note_items AS zeile
+       ON zeile.company_id = bewegung.company_id AND zeile.id = bewegung.delivery_note_item_id
+     WHERE bewegung.company_id = $1 AND zeile.delivery_note_id = $2
+     ORDER BY bewegung.occurred_at`,
+    [context.companyId, noteId]
+  );
+
+  return {
+    deliveryNote: deliveryNoteDto(schein.rows[0]),
+    items: positionen.rows.map((row) => ({
+      id: row.id,
+      itemId: row.item_id,
+      itemNumber: row.item_number,
+      itemName: row.item_name,
+      unit: row.unit,
+      linePosition: Number(row.line_position),
+      quantity: number(row.quantity),
+      purchaseOrderItemId: row.purchase_order_item_id || null,
+      supplierItemNumber: row.supplier_item_number || null,
+      unitPrice: row.unit_price === null ? null : Number(row.unit_price),
+      note: row.note || null
+    })),
+    orderComparison: abgleich,
+    movements: bewegungen.rows.map(movementDto)
+  };
+}
+
+function readDeliveryLines(body) {
+  if (!Array.isArray(body?.items) || !body.items.length) {
+    throw new InputError("Ein Lieferschein braucht mindestens eine Position.");
+  }
+  if (body.items.length > 200) {
+    throw new InputError("Ein Lieferschein fasst höchstens 200 Positionen.");
+  }
+  return body.items.map((eintrag, index) => ({
+    itemId: validateId(eintrag?.itemId, `Artikel in Position ${index + 1}`),
+    quantity: quantity(eintrag?.quantity, `Menge in Position ${index + 1}`),
+    purchaseOrderItemId: optionalId(eintrag?.purchaseOrderItemId, "Bestellposition"),
+    supplierItemNumber: optionalText(eintrag?.supplierItemNumber, "Lieferantenartikelnummer", 60),
+    unitPrice: eintrag?.unitPrice === undefined || eintrag?.unitPrice === null
+      ? null
+      : Number(eintrag.unitPrice),
+    note: optionalText(eintrag?.note, "Hinweis", 2000)
+  }));
+}
+
+async function createDeliveryNote(client, context, body) {
+  await requireManager(client, context);
+
+  const supplierId = validateId(body.supplierId, "Lieferant");
+  const targetLocationId = validateId(body.targetLocationId, "Lieferziel");
+  const lines = readDeliveryLines(body);
+
+  const ziel = await client.query(
+    "SELECT construction_site_id FROM storage_locations WHERE company_id = $1 AND id = $2 AND status = 'active'",
+    [context.companyId, targetLocationId]
+  );
+  if (ziel.rowCount !== 1) {
+    throw new InputError("Dieses Lieferziel gibt es nicht.", 404, "stock_location_unknown");
+  }
+
+  // Die Baustelle steht am Lieferziel und wird nicht getrennt gepflegt: sonst
+  // koennte ein Schein auf Baustelle A zeigen und die Ware auf Baustelle B
+  // landen.
+  const constructionSiteId = ziel.rows[0].construction_site_id
+    || optionalId(body.constructionSiteId, "Baustelle");
+
+  const inserted = await client.query(
+    `INSERT INTO delivery_notes (
+       company_id, supplier_id, delivery_note_number, delivered_on,
+       purchase_order_id, target_location_id, construction_site_id, project_id,
+       document_id, note, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4::DATE, $5, $6, $7, $8, $9, $10, $11, $11)
+     RETURNING id`,
+    [
+      context.companyId, supplierId,
+      requiredText(body.deliveryNoteNumber, "Lieferscheinnummer", 60),
+      requiredText(body.deliveredOn, "Lieferdatum", 10),
+      optionalId(body.purchaseOrderId, "Bestellung"),
+      targetLocationId, constructionSiteId,
+      optionalId(body.projectId, "Projekt"),
+      optionalId(body.documentId, "Dokument"),
+      optionalText(body.note, "Notiz", 2000),
+      context.userId
+    ]
+  ).catch(mapDatabaseError);
+
+  const noteId = inserted.rows[0].id;
+  let position = 0;
+  for (const zeile of lines) {
+    position += 1;
+    await client.query(
+      `INSERT INTO delivery_note_items (
+         company_id, delivery_note_id, item_id, line_position, quantity,
+         purchase_order_item_id, supplier_item_number, unit_price, note
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        context.companyId, noteId, zeile.itemId, position, zeile.quantity,
+        zeile.purchaseOrderItemId, zeile.supplierItemNumber, zeile.unitPrice, zeile.note
+      ]
+    ).catch(mapDatabaseError);
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, new_state)
+     VALUES ($1, 'delivery_note', $2, 'created', $3, $4::JSONB)`,
+    [context.companyId, noteId, context.userId,
+      JSON.stringify({ number: body.deliveryNoteNumber, positions: lines.length })]
+  );
+
+  return deliveryNoteDetail(client, context, noteId);
+}
+
+/**
+ * Aus dem Beleg werden Bewegungen.
+ *
+ * Der Statuswechsel steht bewusst am Anfang und ist an `status = 'draft'`
+ * gebunden. Zwei Leute, die gleichzeitig auf "Buchen" tippen, erzeugen so
+ * nicht zwei Wareneingaenge: der zweite findet keinen Entwurf mehr. Danach
+ * erst entstehen die Bewegungen - in derselben Transaktion, sodass entweder
+ * alle stehen oder keine.
+ */
+async function bookDeliveryNote(client, context, noteId, body) {
+  await requireManager(client, context);
+
+  const schein = await client.query(
+    `SELECT * FROM delivery_notes
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, noteId]
+  );
+  if (schein.rowCount !== 1) {
+    throw new InputError("Dieser Lieferschein wurde nicht gefunden.", 404, "stock_delivery_note_unknown");
+  }
+  if (!DELIVERY_OPEN.includes(schein.rows[0].status)) {
+    throw new InputError(
+      "Dieser Lieferschein ist bereits gebucht oder storniert.",
+      409,
+      "stock_delivery_note_closed"
+    );
+  }
+
+  const gebucht = await client.query(
+    `UPDATE delivery_notes
+     SET status = 'booked', booked_at = CURRENT_TIMESTAMP, booked_by_user_id = $3,
+         changed_by_user_id = $3
+     WHERE company_id = $1 AND id = $2 AND status = 'draft'
+     RETURNING id`,
+    [context.companyId, noteId, context.userId]
+  );
+  if (gebucht.rowCount !== 1) {
+    throw new InputError(
+      "Dieser Lieferschein wurde zwischenzeitlich gebucht.",
+      409,
+      "stock_delivery_note_closed"
+    );
+  }
+
+  const positionen = await client.query(
+    `SELECT * FROM delivery_note_items
+     WHERE company_id = $1 AND delivery_note_id = $2 ORDER BY line_position`,
+    [context.companyId, noteId]
+  );
+  if (!positionen.rowCount) {
+    throw new InputError("Dieser Lieferschein hat keine Positionen.", 409, "stock_delivery_note_empty");
+  }
+
+  const kopf = schein.rows[0];
+  const sourceType = optionalText(body?.sourceType, "Herkunft", 30) || "api";
+  const bestellungen = new Set();
+
+  for (const zeile of positionen.rows) {
+    const buchung = await client.query(
+      `INSERT INTO stock_movements (
+         company_id, item_id, movement_type, quantity, target_location_id,
+         construction_site_id, purchase_order_item_id, delivery_note_item_id,
+         actor_user_id, source_type, reason
+       ) VALUES ($1, $2, 'receipt', $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id`,
+      [
+        context.companyId, zeile.item_id, zeile.quantity, kopf.target_location_id,
+        kopf.construction_site_id, zeile.purchase_order_item_id, zeile.id,
+        context.userId, sourceType,
+        `Lieferschein ${kopf.delivery_note_number}`
+      ]
+    ).catch(mapDatabaseError);
+
+    if (zeile.purchase_order_item_id) {
+      const position = await client.query(
+        `UPDATE purchase_order_items
+         SET quantity_received = quantity_received + $3,
+             row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE company_id = $1 AND id = $2
+         RETURNING purchase_order_id`,
+        [context.companyId, zeile.purchase_order_item_id, zeile.quantity]
+      );
+      if (position.rowCount === 1) bestellungen.add(position.rows[0].purchase_order_id);
+    }
+    void buchung;
+  }
+
+  // Der Stand jeder beruehrten Bestellung folgt aus ihren Positionen und wird
+  // nicht getrennt gepflegt. Eine Ueberlieferung schliesst sie ebenfalls: es
+  // kommt nichts mehr.
+  for (const bestellungId of bestellungen) {
+    const offen = await client.query(
+      `SELECT COUNT(*)::INT AS anzahl FROM purchase_order_items
+       WHERE company_id = $1 AND purchase_order_id = $2
+         AND quantity_received < quantity_ordered`,
+      [context.companyId, bestellungId]
+    );
+    await client.query(
+      `UPDATE purchase_orders
+       SET status = $3, changed_by_user_id = $4, row_version = row_version + 1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE company_id = $1 AND id = $2 AND status IN ('ordered', 'partially_received')`,
+      [
+        context.companyId, bestellungId,
+        offen.rows[0].anzahl === 0 ? "received" : "partially_received",
+        context.userId
+      ]
+    );
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id)
+     VALUES ($1, 'delivery_note', $2, 'booked', $3)`,
+    [context.companyId, noteId, context.userId]
+  );
+
+  return deliveryNoteDetail(client, context, noteId);
+}
+
+async function cancelDeliveryNote(client, context, noteId, body) {
+  await requireManager(client, context);
+
+  const reason = optionalText(body?.reason, "Grund", 2000);
+  if (!reason) throw new InputError("Eine Stornierung braucht einen Grund.");
+
+  // Nur ein Entwurf laesst sich einfach zuruecknehmen. Ist gebucht, haengen
+  // Bewegungen daran, und die werden gegengebucht statt geloescht - das kommt
+  // mit dem Storno der Bewegung.
+  const updated = await client.query(
+    `UPDATE delivery_notes
+     SET status = 'cancelled', cancel_reason = $3, changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2 AND status = 'draft'
+     RETURNING id`,
+    [context.companyId, noteId, reason, context.userId]
+  );
+  if (updated.rowCount !== 1) {
+    throw new InputError(
+      "Nur ein noch nicht gebuchter Lieferschein lässt sich stornieren.",
+      409,
+      "stock_delivery_note_closed"
+    );
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, reason)
+     VALUES ($1, 'delivery_note', $2, 'cancelled', $3, $4)`,
+    [context.companyId, noteId, context.userId, reason]
+  );
+
+  return deliveryNoteDetail(client, context, noteId);
+}
+
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
@@ -1926,6 +2341,29 @@ export async function handleStockRequest({ request, url, client, context, allowe
   if (request.method === "POST" && path === "/api/v1/stock/movements") {
     const body = await readJson(request);
     return { status: 201, body: await bookMovement(client, context, body) };
+  }
+
+  if (request.method === "GET" && path === "/api/v1/stock/delivery-notes") {
+    return { status: 200, body: { deliveryNotes: await listDeliveryNotes(client, context, url) } };
+  }
+
+  if (request.method === "POST" && path === "/api/v1/stock/delivery-notes") {
+    const body = await readJson(request, 200_000);
+    return { status: 201, body: await createDeliveryNote(client, context, body) };
+  }
+
+  const deliveryMatch = /^\/api\/v1\/stock\/delivery-notes\/([^/]+)(?:\/(book|cancel))?$/.exec(path);
+  if (deliveryMatch) {
+    const noteId = validateId(deliveryMatch[1], "Lieferschein-ID");
+    if (request.method === "GET" && !deliveryMatch[2]) {
+      return { status: 200, body: await deliveryNoteDetail(client, context, noteId) };
+    }
+    if (request.method === "POST" && deliveryMatch[2] === "book") {
+      return { status: 200, body: await bookDeliveryNote(client, context, noteId, await readJson(request)) };
+    }
+    if (request.method === "POST" && deliveryMatch[2] === "cancel") {
+      return { status: 200, body: await cancelDeliveryNote(client, context, noteId, await readJson(request)) };
+    }
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/levels") {
