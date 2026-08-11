@@ -1093,6 +1093,122 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.equal(umdisponiert.status, 201);
   });
 
+  await t.test("Bedarfszeile der Baustelle: zurücklegen, Rest bestellen", async () => {
+    // Die Kette aus der Aufgabenstellung, von hinten aufgezäumt: die Baustelle
+    // braucht 300, im Lager sind 120 frei. 120 werden zurückgelegt, 180
+    // bestellt — und beides hängt danach an der Bedarfszeile.
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Kettenkunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Kettenprojekt ${kennung}`]
+    );
+    const baustelle = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Kettenbaustelle ${kennung}`]
+    );
+
+    const lieferant = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/suppliers", {
+      supplierNumber: `L-K-${kennung}`, name: `Kettengroßhandel ${kennung}`
+    });
+    const kabel = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `KET-${kennung}`, name: "NYM-J 3x1,5",
+      groupKey: "cable", unit: "Meter", defaultSupplierId: lieferant.body.supplier.id
+    });
+    const kabelId = kabel.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "opening", quantity: 120, targetLocationId: lager.id
+    });
+
+    const bedarf = await ownerPool.query(
+      `INSERT INTO site_material_entries (
+         company_id, construction_site_id, item_name, quantity, unit, stock_item_id,
+         created_by_user_id, changed_by_user_id
+       ) VALUES ($1, $2, 'NYM-J 3x1,5', 300, 'Meter', $3, $4, $4) RETURNING id`,
+      [companyId, baustelle.rows[0].id, kabelId, buero.userId]
+    );
+    const bedarfId = bedarf.rows[0].id;
+
+    // 1. Zurücklegen: es geht nur so viel, wie frei ist.
+    const reserviert = await aufrufen(
+      apiPool, vorarbeiter, "POST", `/api/v1/stock/site-materials/${bedarfId}/reserve`,
+      { locationId: lager.id }
+    );
+    assert.equal(reserviert.status, 201, JSON.stringify(reserviert.body));
+    assert.deepEqual(
+      { gelegt: reserviert.body.reservedQuantity, offen: reserviert.body.stillOpen },
+      { gelegt: 120, offen: 180 },
+      "120 zurückgelegt, 180 bleiben offen"
+    );
+
+    // Ein zweites Mal geht nicht - sonst läge dieselbe Ware doppelt zurück.
+    await erwarteFehler(
+      apiPool, vorarbeiter, "POST", `/api/v1/stock/site-materials/${bedarfId}/reserve`,
+      { locationId: lager.id }, "site_material_already_reserved"
+    );
+
+    // Und die Reservierung blockiert das Lager wirklich.
+    await erwarteFehler(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "issue", quantity: 10, sourceLocationId: lager.id
+    }, "stock_reserved_for_others");
+
+    // 2. Den Rest bestellen: genau die offenen 180, nicht die vollen 300.
+    const bestellt = await aufrufen(
+      apiPool, buero, "POST", `/api/v1/stock/site-materials/${bedarfId}/order`, {}
+    );
+    assert.equal(bestellt.status, 201, JSON.stringify(bestellt.body));
+    assert.equal(bestellt.body.orderedQuantity, 180);
+
+    const zeile = await ownerPool.query(
+      "SELECT status, stock_reservation_id, purchase_order_item_id FROM site_material_entries WHERE id = $1",
+      [bedarfId]
+    );
+    assert.equal(zeile.rows[0].status, "ordered", "Der Stand folgt der Kette");
+    assert.ok(zeile.rows[0].stock_reservation_id);
+    assert.ok(zeile.rows[0].purchase_order_item_id);
+
+    // Zweimal bestellen wäre eine doppelte Lieferung.
+    await erwarteFehler(
+      apiPool, buero, "POST", `/api/v1/stock/site-materials/${bedarfId}/order`, {},
+      "site_material_already_ordered"
+    );
+
+    // 3. Eine zweite Zeile desselben Lieferanten sammelt sich auf demselben
+    //    Entwurf, statt eine eigene Bestellung zu erzeugen.
+    const zweiterBedarf = await ownerPool.query(
+      `INSERT INTO site_material_entries (
+         company_id, construction_site_id, item_name, quantity, unit, stock_item_id,
+         created_by_user_id, changed_by_user_id
+       ) VALUES ($1, $2, 'NYM-J 3x1,5', 50, 'Meter', $3, $4, $4) RETURNING id`,
+      [companyId, baustelle.rows[0].id, kabelId, buero.userId]
+    );
+    const zweite = await aufrufen(
+      apiPool, buero, "POST", `/api/v1/stock/site-materials/${zweiterBedarf.rows[0].id}/order`, {}
+    );
+    assert.equal(
+      zweite.body.purchaseOrderId, bestellt.body.purchaseOrderId,
+      "Der Bedarf sammelt sich auf einer Bestellung"
+    );
+
+    // 4. Eine Freitextzeile ohne Artikel lässt sich nicht bestellen.
+    const ohneArtikel = await ownerPool.query(
+      `INSERT INTO site_material_entries (
+         company_id, construction_site_id, item_name, quantity, unit,
+         created_by_user_id, changed_by_user_id
+       ) VALUES ($1, $2, 'Kernbohrung 82 mm', 3, 'Stück', $3, $3) RETURNING id`,
+      [companyId, baustelle.rows[0].id, buero.userId]
+    );
+    await erwarteFehler(
+      apiPool, buero, "POST", `/api/v1/stock/site-materials/${ohneArtikel.rows[0].id}/order`, {},
+      "site_material_without_item"
+    );
+  });
+
   await t.test("eine fremde Firma sieht nichts davon", async () => {
     const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}X`);
     const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `LAG-F-${kennung}`, "office");

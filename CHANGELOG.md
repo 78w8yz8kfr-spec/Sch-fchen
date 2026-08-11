@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Aus der Materialliste der Baustelle zurücklegen und bestellen (Fassung
+  0.44.24).** Seit 0.44.17 zeigt eine Zeile auf einen Lagerartikel und sagt, ob
+  der Bestand reicht. Damit endete sie aber auch: was zu tun ist, wenn er nicht
+  reicht, stand nirgends, und wer es tat, tat es woanders — im Lager oder beim
+  Lieferanten —, ohne dass die Baustelle davon erfuhr. Die Liste sagte „es
+  fehlen 180 Meter" und sagte das auch noch, nachdem längst bestellt war. Aus
+  der Zeile führen jetzt zwei Wege: **Zurücklegen** reserviert höchstens, was
+  noch offen und frei verfügbar ist — meist weniger als der Bedarf, und genau
+  diese Differenz ist die Menge, die danach fehlt. **Bestellen** bestellt genau
+  diesen Rest und nicht die volle Menge; die Position geht auf einen offenen
+  Entwurf desselben Lieferanten, sodass sich der Bedarf mehrerer Baustellen auf
+  einer Bestellung sammelt, statt beim Lieferanten als Dutzend
+  Einzelbestellungen anzukommen. Beides genau einmal: eine zweite Reservierung
+  ließe dieselbe Ware doppelt zurückliegen, eine zweite Bestellung ergäbe eine
+  doppelte Lieferung. Die Zeile trägt danach beide Verweise und zeigt, was
+  veranlasst ist. Damit ist die Kette durchgehend: Bedarf → Reservierung →
+  Bestellung → Lieferung → Lieferschein → Lager oder Baustelle → Ausgabe →
+  Rückgabe → Verbrauch.
 - **Die Rückgabe darf der Monteur jetzt auch wirklich buchen (Fassung
   0.44.23).** Die Funktion aus 0.44.22 war für ihn gebaut und für ihn gesperrt:
   eine Rückgabe ist technisch eine Umlagerung, und Umlagern ist

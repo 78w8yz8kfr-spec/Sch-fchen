@@ -1778,3 +1778,29 @@ test('die Rückgabe nimmt nicht mehr, als auf der Baustelle liegt', () => {
   const gleich = rueckgabeBuchungen(BAUSTELLENBESTAND, { a1: '5' }, 'ort-bau');
   assert.match(gleich.fehler, /verschieden/);
 });
+
+
+test('was zurückgelegt oder bestellt ist, fehlt nicht mehr', () => {
+  const basis = {
+    quantity: 300, unit: 'Meter',
+    stockItemId: 'a1', stockItemNumber: 'LAG-1', stockUnit: 'Meter', stockQuantity: 120
+  };
+
+  // Nichts veranlasst: es fehlen 180.
+  assert.equal(materialBestandText(basis), 'Auf Lager: 120 Meter — es fehlen 180 Meter');
+
+  // 120 zurückgelegt, aber noch nichts bestellt: es fehlen weiterhin 180.
+  const nurReserviert = { ...basis, reservedQuantity: 120 };
+  assert.equal(materialBestand(nurReserviert).lage, 'reicht-nicht');
+  assert.match(materialBestandText(nurReserviert), /es fehlen 180 Meter/);
+
+  // Zurückgelegt und der Rest bestellt: es fehlt nichts mehr, da ist es
+  // trotzdem noch nicht.
+  const veranlasst = { ...basis, reservedQuantity: 120, orderedQuantity: 180 };
+  assert.equal(materialBestand(veranlasst).lage, 'veranlasst');
+  assert.equal(materialBestandText(veranlasst), 'Auf Lager: 120 Meter — der Rest ist veranlasst');
+
+  // Teilweise bestellt: die Restlücke wird genannt, nicht die ganze.
+  const teilweise = { ...basis, reservedQuantity: 120, orderedQuantity: 100 };
+  assert.match(materialBestandText(teilweise), /es fehlen 80 Meter/);
+});

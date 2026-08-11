@@ -2902,6 +2902,224 @@ async function listMovements(client, context, url) {
   }));
 }
 
+// ---------------------------------------------------------------------------
+// Von der Bedarfsliste der Baustelle in die Kette
+// ---------------------------------------------------------------------------
+
+/**
+ * Die Bedarfszeile mit allem, was das Lager dazu weiss.
+ *
+ * `nochOffen` ist die Zahl, um die es geht: was gebraucht wird, minus dem, was
+ * bereits zurueckgelegt oder bestellt ist. Ohne sie wuerde jeder Klick auf
+ * "Bestellen" die volle Menge erneut bestellen - der sichere Weg zu einem
+ * Lager voller doppelter Lieferungen.
+ */
+async function bedarfszeile(client, context, entryId) {
+  const result = await client.query(
+    `SELECT bedarf.*, artikel.unit AS stock_unit,
+            artikel.default_supplier_id, artikel.name AS stock_item_name,
+            COALESCE(reservierung.quantity, 0) AS reserved_quantity,
+            reservierung.status AS reservation_status,
+            COALESCE(position.quantity_ordered, 0) AS ordered_quantity,
+            bestellung.order_number, bestellung.status AS order_status
+     FROM site_material_entries AS bedarf
+     LEFT JOIN stock_items AS artikel
+       ON artikel.company_id = bedarf.company_id AND artikel.id = bedarf.stock_item_id
+     LEFT JOIN stock_reservations AS reservierung
+       ON reservierung.company_id = bedarf.company_id
+      AND reservierung.id = bedarf.stock_reservation_id
+     LEFT JOIN purchase_order_items AS position
+       ON position.company_id = bedarf.company_id AND position.id = bedarf.purchase_order_item_id
+     LEFT JOIN purchase_orders AS bestellung
+       ON bestellung.company_id = position.company_id AND bestellung.id = position.purchase_order_id
+     WHERE bedarf.company_id = $1 AND bedarf.id = $2`,
+    [context.companyId, entryId]
+  );
+  if (result.rowCount !== 1) {
+    throw new InputError("Dieser Materialeintrag wurde nicht gefunden.", 404, "site_material_not_found");
+  }
+
+  const zeile = result.rows[0];
+  if (!zeile.stock_item_id) {
+    throw new InputError(
+      "Diese Zeile zeigt auf keinen Lagerartikel. Bitte zuerst einen Artikel zuordnen.",
+      409,
+      "site_material_without_item"
+    );
+  }
+
+  const gebraucht = number(zeile.quantity);
+  const reserviert = zeile.reservation_status === "released" ? 0 : number(zeile.reserved_quantity);
+  const bestellt = number(zeile.ordered_quantity);
+  return {
+    ...zeile,
+    gebraucht,
+    reserviert,
+    bestellt,
+    nochOffen: Math.max(Math.round((gebraucht - reserviert - bestellt) * 1000) / 1000, 0)
+  };
+}
+
+/**
+ * Fuer diese Bedarfszeile im Lager zuruecklegen.
+ *
+ * Zurueckgelegt wird hoechstens, was noch offen und frei verfuegbar ist - und
+ * das ist meist weniger als der Bedarf. Genau diese Differenz ist die Menge,
+ * die anschliessend bestellt werden muss; deshalb steht sie in der Antwort.
+ */
+async function reserveForSiteMaterial(client, context, entryId, body) {
+  await requireMovementPermission(client, context, "transfer");
+  const zeile = await bedarfszeile(client, context, entryId);
+
+  if (zeile.stock_reservation_id && zeile.reservation_status === "open") {
+    throw new InputError(
+      "Für diese Zeile liegt bereits etwas zurück.",
+      409,
+      "site_material_already_reserved"
+    );
+  }
+  if (zeile.nochOffen <= 0) {
+    throw new InputError("Für diese Zeile ist nichts mehr offen.", 409, "site_material_covered");
+  }
+
+  const locationId = optionalId(body?.locationId, "Lagerplatz")
+    || (await loadSettings(client, context)).defaultLocationId;
+  if (!locationId) {
+    throw new InputError("Es ist kein Lagerplatz angegeben.", 400, "stock_location_unknown");
+  }
+
+  const verfuegbar = await client.query(
+    `SELECT COALESCE(free_quantity, 0) AS frei FROM stock_availability
+     WHERE company_id = $1 AND item_id = $2 AND location_id = $3`,
+    [context.companyId, zeile.stock_item_id, locationId]
+  );
+  const frei = number(verfuegbar.rows[0]?.frei ?? 0);
+  if (frei <= 0) {
+    throw new InputError(
+      "An diesem Lagerplatz ist nichts frei verfügbar.",
+      409,
+      "stock_reservation_exceeds_free"
+    );
+  }
+
+  // Nicht mehr als offen ist, und nicht mehr als da ist. Beides zu ignorieren
+  // haette entweder eine Reservierung ueber den Bedarf hinaus ergeben oder
+  // eine, die es gar nicht gibt.
+  const menge = Math.min(zeile.nochOffen, frei);
+
+  const angelegt = await client.query(
+    `INSERT INTO stock_reservations (
+       company_id, item_id, location_id, construction_site_id, quantity,
+       note, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+     RETURNING id`,
+    [
+      context.companyId, zeile.stock_item_id, locationId, zeile.construction_site_id,
+      menge, `Bedarf: ${zeile.item_name}`, context.userId
+    ]
+  ).catch(mapDatabaseError);
+
+  await client.query(
+    `UPDATE site_material_entries
+     SET stock_reservation_id = $3, changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, entryId, angelegt.rows[0].id, context.userId]
+  );
+
+  const danach = await bedarfszeile(client, context, entryId);
+  return {
+    reservedQuantity: menge,
+    stillOpen: danach.nochOffen,
+    reservationId: angelegt.rows[0].id
+  };
+}
+
+/**
+ * Was fehlt, bestellen.
+ *
+ * Die Position geht auf einen offenen Entwurf desselben Lieferanten, wenn es
+ * einen gibt, sonst auf einen neuen. So sammelt sich der Bedarf mehrerer
+ * Baustellen auf einer Bestellung, statt fuer jede Zeile eine eigene zu
+ * erzeugen - was beim Lieferanten als Dutzend Einzelbestellungen ankaeme.
+ */
+async function orderForSiteMaterial(client, context, entryId, body) {
+  await requireManager(client, context);
+  const zeile = await bedarfszeile(client, context, entryId);
+
+  if (zeile.purchase_order_item_id) {
+    throw new InputError(
+      "Für diese Zeile ist bereits bestellt.",
+      409,
+      "site_material_already_ordered"
+    );
+  }
+  if (zeile.nochOffen <= 0) {
+    throw new InputError("Für diese Zeile ist nichts mehr offen.", 409, "site_material_covered");
+  }
+
+  const supplierId = optionalId(body?.supplierId, "Lieferant") || zeile.default_supplier_id;
+  if (!supplierId) {
+    throw new InputError(
+      "Für diesen Artikel ist kein Lieferant hinterlegt. Bitte einen wählen.",
+      409,
+      "stock_supplier_missing"
+    );
+  }
+
+  const entwurf = await client.query(
+    `SELECT id FROM purchase_orders
+     WHERE company_id = $1 AND supplier_id = $2 AND status = 'draft'
+     ORDER BY created_at DESC LIMIT 1`,
+    [context.companyId, supplierId]
+  );
+
+  let orderId = entwurf.rows[0]?.id || null;
+  if (!orderId) {
+    const jahr = new Date().getFullYear();
+    const angelegt = await client.query(
+      `INSERT INTO purchase_orders (
+         company_id, order_number, supplier_id, construction_site_id,
+         created_by_user_id, changed_by_user_id
+       ) VALUES ($1, $2, $3, $4, $5, $5)
+       RETURNING id`,
+      [
+        context.companyId, `B-${jahr}-${String(Date.now()).slice(-6)}`, supplierId,
+        zeile.construction_site_id, context.userId
+      ]
+    ).catch(mapDatabaseError);
+    orderId = angelegt.rows[0].id;
+  }
+
+  const naechste = await client.query(
+    `SELECT COALESCE(MAX(line_position), 0) + 1 AS naechste
+     FROM purchase_order_items WHERE company_id = $1 AND purchase_order_id = $2`,
+    [context.companyId, orderId]
+  );
+
+  const position = await client.query(
+    `INSERT INTO purchase_order_items (
+       company_id, purchase_order_id, item_id, line_position, quantity_ordered
+     ) VALUES ($1, $2, $3, $4, $5)
+     RETURNING id`,
+    [context.companyId, orderId, zeile.stock_item_id, naechste.rows[0].naechste, zeile.nochOffen]
+  ).catch(mapDatabaseError);
+
+  // Der Stand der Zeile folgt der Kette: bestellt ist bestellt, und die
+  // Baustelle sieht es, ohne jemanden zu fragen.
+  await client.query(
+    `UPDATE site_material_entries
+     SET purchase_order_item_id = $3, status = 'ordered', changed_by_user_id = $4
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, entryId, position.rows[0].id, context.userId]
+  );
+
+  return {
+    orderedQuantity: zeile.nochOffen,
+    purchaseOrderId: orderId,
+    purchaseOrderItemId: position.rows[0].id
+  };
+}
+
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
@@ -2973,6 +3191,18 @@ export async function handleStockRequest({ request, url, client, context, allowe
   if (request.method === "GET" && siteMaterialMatch) {
     const siteId = validateId(siteMaterialMatch[1], "Baustellen-ID");
     return { status: 200, body: await siteMaterialOverview(client, context, siteId) };
+  }
+
+  const bedarfMatch = /^\/api\/v1\/stock\/site-materials\/([^/]+)\/(reserve|order)$/.exec(path);
+  if (request.method === "POST" && bedarfMatch) {
+    const entryId = validateId(bedarfMatch[1], "Materialeintrag");
+    const body = await readJson(request);
+    return {
+      status: 201,
+      body: bedarfMatch[2] === "reserve"
+        ? await reserveForSiteMaterial(client, context, entryId, body)
+        : await orderForSiteMaterial(client, context, entryId, body)
+    };
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/reservations") {
