@@ -202,7 +202,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.23";
+export const APPLICATION_VERSION = "0.44.24";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -3038,7 +3038,17 @@ function siteMaterialDto(row) {
     stockItemName: row.stock_item_name || null,
     stockUnit: row.stock_unit || null,
     // Der Bestand ueber alle Lagerplaetze hinweg, aus dem Journal gerechnet.
-    stockQuantity: row.stock_item_id ? Number(row.stock_quantity || 0) : null
+    stockQuantity: row.stock_item_id ? Number(row.stock_quantity || 0) : null,
+    // Die Belegkette an der Bedarfszeile: was liegt zurück, was ist bestellt.
+    stockReservationId: row.stock_reservation_id || null,
+    reservedQuantity: row.reserved_quantity === null || row.reserved_quantity === undefined
+      ? null
+      : Number(row.reserved_quantity),
+    purchaseOrderItemId: row.purchase_order_item_id || null,
+    orderNumber: row.order_number || null,
+    orderedQuantity: row.ordered_quantity === null || row.ordered_quantity === undefined
+      ? null
+      : Number(row.ordered_quantity)
   };
 }
 
@@ -4666,7 +4676,11 @@ async function adminOverview(client, context, date) {
               artikel.item_number AS stock_item_number,
               artikel.name AS stock_item_name,
               artikel.unit AS stock_unit,
-              COALESCE(bestand.summe, 0) AS stock_quantity
+              COALESCE(bestand.summe, 0) AS stock_quantity,
+              eintrag.stock_reservation_id, eintrag.purchase_order_item_id,
+              reservierung.quantity AS reserved_quantity,
+              position.quantity_ordered AS ordered_quantity,
+              bestellung.order_number
        FROM site_material_entries AS eintrag
        LEFT JOIN stock_items AS artikel
          ON artikel.company_id = eintrag.company_id
@@ -4677,6 +4691,16 @@ async function adminOverview(client, context, date) {
        ) AS bestand
          ON bestand.company_id = eintrag.company_id
         AND bestand.item_id = eintrag.stock_item_id
+       LEFT JOIN stock_reservations AS reservierung
+         ON reservierung.company_id = eintrag.company_id
+        AND reservierung.id = eintrag.stock_reservation_id
+        AND reservierung.status = 'open'
+       LEFT JOIN purchase_order_items AS position
+         ON position.company_id = eintrag.company_id
+        AND position.id = eintrag.purchase_order_item_id
+       LEFT JOIN purchase_orders AS bestellung
+         ON bestellung.company_id = position.company_id
+        AND bestellung.id = position.purchase_order_id
        WHERE eintrag.company_id = $1
        ORDER BY CASE eintrag.status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
                 eintrag.created_at DESC`,
@@ -5149,7 +5173,11 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
               artikel.item_number AS stock_item_number,
               artikel.name AS stock_item_name,
               artikel.unit AS stock_unit,
-              COALESCE(bestand.summe, 0) AS stock_quantity
+              COALESCE(bestand.summe, 0) AS stock_quantity,
+              eintrag.stock_reservation_id, eintrag.purchase_order_item_id,
+              reservierung.quantity AS reserved_quantity,
+              position.quantity_ordered AS ordered_quantity,
+              bestellung.order_number
        FROM site_material_entries AS eintrag
        LEFT JOIN stock_items AS artikel
          ON artikel.company_id = eintrag.company_id
@@ -5160,6 +5188,16 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
        ) AS bestand
          ON bestand.company_id = eintrag.company_id
         AND bestand.item_id = eintrag.stock_item_id
+       LEFT JOIN stock_reservations AS reservierung
+         ON reservierung.company_id = eintrag.company_id
+        AND reservierung.id = eintrag.stock_reservation_id
+        AND reservierung.status = 'open'
+       LEFT JOIN purchase_order_items AS position
+         ON position.company_id = eintrag.company_id
+        AND position.id = eintrag.purchase_order_item_id
+       LEFT JOIN purchase_orders AS bestellung
+         ON bestellung.company_id = position.company_id
+        AND bestellung.id = position.purchase_order_id
        WHERE eintrag.company_id = $1
          AND eintrag.construction_site_id = $2
          AND eintrag.status <> 'archived'
@@ -5759,7 +5797,11 @@ async function getSiteMaterialRecord(client, context, materialId) {
             artikel.item_number AS stock_item_number,
             artikel.name AS stock_item_name,
             artikel.unit AS stock_unit,
-            COALESCE(bestand.summe, 0) AS stock_quantity
+            COALESCE(bestand.summe, 0) AS stock_quantity,
+            eintrag.stock_reservation_id, eintrag.purchase_order_item_id,
+            reservierung.quantity AS reserved_quantity,
+            position.quantity_ordered AS ordered_quantity,
+            bestellung.order_number
      FROM site_material_entries AS eintrag
      LEFT JOIN stock_items AS artikel
        ON artikel.company_id = eintrag.company_id
@@ -5770,6 +5812,16 @@ async function getSiteMaterialRecord(client, context, materialId) {
      ) AS bestand
        ON bestand.company_id = eintrag.company_id
       AND bestand.item_id = eintrag.stock_item_id
+     LEFT JOIN stock_reservations AS reservierung
+       ON reservierung.company_id = eintrag.company_id
+      AND reservierung.id = eintrag.stock_reservation_id
+      AND reservierung.status = 'open'
+     LEFT JOIN purchase_order_items AS position
+       ON position.company_id = eintrag.company_id
+      AND position.id = eintrag.purchase_order_item_id
+     LEFT JOIN purchase_orders AS bestellung
+       ON bestellung.company_id = position.company_id
+      AND bestellung.id = position.purchase_order_id
      WHERE eintrag.company_id = $1 AND eintrag.id = $2`,
     [context.companyId, materialId]
   );

@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.23";
-import { serverIsNewer } from "./core/versions.js?v=0.44.23";
+} from "./core/work-time.js?v=0.44.24";
+import { serverIsNewer } from "./core/versions.js?v=0.44.24";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.23";
+} from "./core/sync-queue.js?v=0.44.24";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.23";
+} from "./core/permissions.js?v=0.44.24";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,11 +40,11 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.23";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.23";
-import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.23";
-import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.23";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
+} from "./core/state-store.js?v=0.44.24";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.24";
+import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.24";
+import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.24";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1356,7 +1356,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.23",
+          "X-Schaefchen-Version": "0.44.24",
           ...options.headers
         }
       });
@@ -1391,7 +1391,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.23`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.24`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1413,7 +1413,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.23" }
+        headers: { "X-Schaefchen-Version": "0.44.24" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1460,7 +1460,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.23 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.24 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2495,6 +2495,61 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
     zeile.className = `site-material-stock site-material-stock--${lage.lage}`;
     zeile.textContent = lage.artikelnummer ? `${satz} (${lage.artikelnummer})` : satz;
     parent.append(zeile);
+
+    // Was für diese Zeile schon veranlasst ist. Ohne diesen Satz stünde bei
+    // einer längst bestellten Position weiter "es fehlen 180 Meter", und
+    // jemand bestellt ein zweites Mal.
+    const veranlasst = [
+      material.reservedQuantity ? `${material.reservedQuantity} zurückgelegt` : null,
+      material.orderedQuantity
+        ? `${material.orderedQuantity} bestellt${material.orderNumber ? ` (${material.orderNumber})` : ""}`
+        : null
+    ].filter(Boolean);
+    if (veranlasst.length) {
+      const kette = document.createElement("span");
+      kette.className = "site-material-chain";
+      kette.textContent = veranlasst.join(" · ");
+      parent.append(kette);
+    }
+  }
+
+  // Zurücklegen und bestellen, direkt aus der Bedarfsliste. Der Weg über den
+  // Lagerbereich wäre derselbe Vorgang mit vier Klicks mehr und der Frage,
+  // welche Menge eigentlich noch offen ist.
+  function appendMaterialChainActions(item, material) {
+    if (!moduleEnabled("warehouse") || !material.stockItemId) return;
+    if (material.status === "used" || material.status === "archived") return;
+
+    const knoepfe = document.createElement("div");
+    knoepfe.className = "site-material-actions";
+
+    const aktion = (beschriftung, pfad) => {
+      const knopf = document.createElement("button");
+      knopf.type = "button";
+      knopf.className = "text-button";
+      knopf.textContent = beschriftung;
+      knopf.addEventListener("click", async () => {
+        knopf.disabled = true;
+        try {
+          const antwort = await requestJson(
+            `./api/v1/stock/site-materials/${encodeURIComponent(material.id)}/${pfad}`,
+            { method: "POST", body: JSON.stringify({}) }
+          );
+          await refreshAdmin();
+          showToast(pfad === "reserve"
+            ? `${antwort.reservedQuantity} zurückgelegt, ${antwort.stillOpen} noch offen.`
+            : `${antwort.orderedQuantity} bestellt.`);
+        } catch (error) {
+          showToast(error.message);
+          knopf.disabled = false;
+        }
+      });
+      knoepfe.append(knopf);
+    };
+
+    if (!material.stockReservationId) aktion("Zurücklegen", "reserve");
+    if (!material.purchaseOrderItemId) aktion("Bestellen", "order");
+    if (knoepfe.children.length) item.append(knoepfe);
   }
 
   // Das Material einer Baustelle aus dem Lager: was liegt dort, was ist
@@ -2568,6 +2623,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
       appendMaterialStockLine(content, material);
       item.className = "site-module-item";
       item.append(content);
+      appendMaterialChainActions(item, material);
       if (nextStatus[material.status]) {
         const action = document.createElement("button");
         action.type = "button";
@@ -2879,7 +2935,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.23";
+  const EIGENE_FASSUNG = "0.44.24";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2918,7 +2974,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.23". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.24". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6976,7 +7032,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.23";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.23" }
+        headers: { "X-Schaefchen-Version": "0.44.24" }
       });
       if (response.ok) {
         await cache.put(

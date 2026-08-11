@@ -577,10 +577,25 @@ export function materialBestand(eintrag) {
   if (bestand >= gebraucht) {
     return { ...grund, lage: 'reicht', fehlt: 0 };
   }
+
+  const fehlt = Math.round((gebraucht - bestand) * 1000) / 1000;
+
+  // Was zurueckgelegt oder bestellt ist, fehlt nicht mehr - es ist nur noch
+  // nicht da. Ohne diese Unterscheidung staende an einer laengst bestellten
+  // Zeile weiter "es fehlen 180 Meter", und jemand bestellt ein zweites Mal.
+  const veranlasst = Math.round(
+    (Number(eintrag.reservedQuantity || 0) + Number(eintrag.orderedQuantity || 0)) * 1000
+  ) / 1000;
+  const offen = Math.max(Math.round((gebraucht - Math.max(bestand, veranlasst)) * 1000) / 1000, 0);
+  if (veranlasst > 0 && offen <= 0) {
+    return { ...grund, lage: 'veranlasst', fehlt, offen: 0 };
+  }
+
   return {
     ...grund,
     lage: bestand <= 0 ? 'nichts-da' : 'reicht-nicht',
-    fehlt: Math.round((gebraucht - bestand) * 1000) / 1000
+    fehlt,
+    offen: veranlasst > 0 ? offen : fehlt
   };
 }
 
@@ -596,10 +611,12 @@ export function materialBestandText(eintrag) {
       return `Lager: ${menge(lage.bestand)} — andere Einheit, bitte selbst prüfen`;
     case 'reicht':
       return `Auf Lager: ${menge(lage.bestand)}`;
+    case 'veranlasst':
+      return `Auf Lager: ${menge(lage.bestand)} — der Rest ist veranlasst`;
     case 'nichts-da':
-      return `Nicht auf Lager — es fehlen ${menge(lage.fehlt)}`;
+      return `Nicht auf Lager — es fehlen ${menge(lage.offen)}`;
     default:
-      return `Auf Lager: ${menge(lage.bestand)} — es fehlen ${menge(lage.fehlt)}`;
+      return `Auf Lager: ${menge(lage.bestand)} — es fehlen ${menge(lage.offen)}`;
   }
 }
 
@@ -1629,7 +1646,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.23`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.24`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den

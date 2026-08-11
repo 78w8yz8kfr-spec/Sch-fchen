@@ -4858,10 +4858,15 @@ select:focus-visible {
 .site-stock-overview span { color: var(--muted); font-size: 0.63rem; line-height: 1.45; }
 
 .site-material-stock { font-weight: 600; }
+.site-material-chain { color: var(--muted); font-size: 0.63rem; }
+.site-material-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .site-material-stock--reicht { color: var(--ui-success, #1a7f37); }
 .site-material-stock--reicht-nicht,
 .site-material-stock--nichts-da { color: var(--ui-danger, #b3261e); }
 .site-material-stock--einheiten-verschieden { color: var(--muted); }
+/* Veranlasst ist weder gut noch schlecht: es fehlt nichts mehr, da ist es
+   trotzdem noch nicht. */
+.site-material-stock--veranlasst { color: var(--muted); }
 
 .site-module-item__badges {
   display: inline-flex;
