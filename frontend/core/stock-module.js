@@ -33,13 +33,13 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.12";
+} from "./stock-management.js?v=0.44.13";
 import {
   erkennungWaehlen,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.12";
+} from "./barcode-scanner.mjs?v=0.44.13";
 
 const html = `
   <div class="stock-module">
@@ -491,7 +491,7 @@ export function createStockModule({
         melden(new Error("Der Browser hat das Druckfenster blockiert."));
         return;
       }
-      blatt.document.write(etikettBogenHtml(labels));
+      blatt.document.write(etikettBogenHtml(labels, fenster.location.origin));
       blatt.document.close();
     } catch (fehler) {
       melden(fehler);

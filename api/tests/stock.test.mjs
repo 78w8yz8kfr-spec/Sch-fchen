@@ -1003,6 +1003,48 @@ integrationTest("Lager: Codes nachtragen, zurücknehmen und Etiketten drucken", 
     assert.equal(body.labels.length, 2);
     assert.equal(body.labels[1].label, "Materiallager");
     assert.equal(body.labels[1].targetType, "location");
+
+    // Was auf dem Aufkleber steht: Bezeichnung, Nummer und eine dritte Zeile,
+    // die im Regal weiterhilft.
+    assert.equal(body.labels[0].sublabel, `COD-1-${kennung}`, "Artikel: die eigene Nummer");
+    // Dieser Artikel hat keinen Hersteller; dann bleibt die Zeile leer, statt
+    // Platz für nichts zu verbrauchen.
+    assert.equal(body.labels[0].extra, null);
+    // Beim Lagerplatz steht der Pfad, sonst wäre "Fach A1" nicht zu verorten.
+    assert.equal(body.labels[1].sublabel, "Materiallager");
+    assert.equal(body.labels[1].extra, null);
+  });
+
+  await t.test("Hersteller und Herstellernummer stehen auf dem Etikett", async () => {
+    const mitHersteller = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `COD-H-${kennung}`, name: "Schalterdose tief", groupKey: "other",
+      unit: "Stück", manufacturer: "Kaiser", manufacturerNumber: "1055-04"
+    });
+
+    const { body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/labels/sheet", {
+      targets: [{ targetType: "item", id: mitHersteller.body.item.id }]
+    });
+
+    assert.equal(body.labels[0].label, "Schalterdose tief");
+    assert.equal(body.labels[0].sublabel, `COD-H-${kennung}`);
+    // Danach sucht, wer nachbestellt.
+    assert.equal(body.labels[0].extra, "Kaiser 1055-04");
+  });
+
+  await t.test("ein Fach trägt seinen ganzen Pfad auf dem Etikett", async () => {
+    const regal = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: `Regal ${kennung}`, locationType: "other"
+    });
+    const fach = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: "Fach A1", locationType: "other", parentLocationId: regal.body.location.id
+    });
+
+    const { body } = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/labels/sheet", {
+      targets: [{ targetType: "location", id: fach.body.location.id }]
+    });
+
+    assert.equal(body.labels[0].label, "Fach A1");
+    assert.match(body.labels[0].sublabel, new RegExp(`Regal ${kennung}.*Fach A1`));
   });
 
   await t.test("ein leerer oder überlanger Bogen wird abgewiesen", async () => {

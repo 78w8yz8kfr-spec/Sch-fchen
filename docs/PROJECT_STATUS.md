@@ -1,7 +1,7 @@
 # Projektstatus
 
-Stand: 10.08.2026
-Technischer Stand: V0.44.12
+Stand: 11.08.2026
+Technischer Stand: V0.44.13
 
 ## Abgeschlossen
 
@@ -12,6 +12,16 @@ Technischer Stand: V0.44.12
 - Tiefenlink `?lager=` für gedruckte Etiketten, Auswahl des Lagerplatzes aus
   einer Liste mit vollem Pfad und gemerktem letzten Platz, Suchfeld in der
   Artikelliste
+- Kamera-Livebild des Lagerscanners am echten Gerät bestätigt; im
+  In-App-Browser mancher Anwendungen liefert `getUserMedia` kein Bild, dort
+  fangen Foto und Handeingabe es ab
+- Lageretiketten im Format der Herstelleraufkleber: 48 × 25 mm, Bezeichnung
+  oben, Code links, Artikelnummer und Herstellernummer daneben; PWA-Speicher
+  `schaefchen-online-v95`
+- Druckbogen von Lager und Geräten kommen wieder formatiert an: die Stile
+  liegen als eigene Dateien bei, statt als eingebetteter Block an
+  `style-src 'self'` zu scheitern; das Geräte-Einzeletikett trägt wieder Name
+  und Inventarnummer
 - Gebinde am Artikel (Stückzahl und Name, Migration 111) mit Umschalter
   zwischen ganzem Gebinde und Einzelstück beim Buchen; der Bestand zählt
   weiterhin ausschließlich in der Einheit des Artikels. Nachträgliches Ändern
@@ -452,10 +462,6 @@ Technischer Stand: V0.44.12
   Lizenzprozess
 - genaue Firmenkontakt- und Lizenzdaten der Schaaf Elektro GmbH; im Seed wurden
   bewusst keine Daten erfunden
-- Kamera-Livebild des Lagerscanners auf einem echten Gerät: im eigenständigen
-  Browser läuft es, im In-App-Browser mancher Anwendungen liefert
-  `getUserMedia` kein Bild. Foto und Handeingabe fangen das ab, die Meldung
-  sagt es — der reale Nachweis am Regal fehlt trotzdem
 
 Die vollständigen Gates mit Priorität und Abschlussnachweis stehen in
 [`ROADMAP_ACCEPTANCE.md`](ROADMAP_ACCEPTANCE.md) und

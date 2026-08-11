@@ -58,8 +58,10 @@ import {
   bestellungenAnsicht,
   bestellungAnsicht,
   ETIKETT_BOGEN,
+  ETIKETTEN_JE_SEITE,
   etikettBogenStile,
   etikettBogenHtml,
+  etikettZelle,
   codeArtText,
   leereCodezeile,
   codeNachtragLesen,
@@ -855,19 +857,77 @@ test('ein Hinweis in der Bestellliste wird auch gezeigt', () => {
 // Codes und Etiketten
 // ---------------------------------------------------------------------------
 
-test('der Etikettenbogen hat die erprobten Maße des Gerätemoduls', () => {
-  assert.equal(ETIKETT_BOGEN.spalten * ETIKETT_BOGEN.reihen, ETIKETT_BOGEN.maxEtiketten);
-  assert.ok(ETIKETT_BOGEN.qrGroesseMm < 20, 'Ein Etikett muss unter zwei Zentimetern bleiben');
+test('der Etikettenbogen passt in die Seitenbreite und auf ganze Reihen', () => {
+  assert.equal(ETIKETTEN_JE_SEITE, ETIKETT_BOGEN.spalten * ETIKETT_BOGEN.reihen);
 
-  // Der Bogen darf keine zweite Seite erzeugen.
-  const breite = ETIKETT_BOGEN.spalten * (ETIKETT_BOGEN.zelleBreiteMm + ETIKETT_BOGEN.spaltMm);
-  const hoehe = ETIKETT_BOGEN.reihen * (ETIKETT_BOGEN.zelleHoeheMm + ETIKETT_BOGEN.spaltMm);
-  assert.ok(breite <= ETIKETT_BOGEN.seiteBreiteMm - 2 * ETIKETT_BOGEN.seitenrandMm + 0.5, `Breite ${breite}`);
-  assert.ok(hoehe <= ETIKETT_BOGEN.seiteHoeheMm - 2 * ETIKETT_BOGEN.seitenrandMm + 0.5, `Höhe ${hoehe}`);
+  const breite = ETIKETT_BOGEN.spalten * ETIKETT_BOGEN.zelleBreiteMm
+    + (ETIKETT_BOGEN.spalten - 1) * ETIKETT_BOGEN.spaltMm;
+  const hoehe = ETIKETT_BOGEN.reihen * ETIKETT_BOGEN.zelleHoeheMm
+    + (ETIKETT_BOGEN.reihen - 1) * ETIKETT_BOGEN.spaltMm;
+  assert.ok(breite <= ETIKETT_BOGEN.seiteBreiteMm - 2 * ETIKETT_BOGEN.seitenrandMm, `Breite ${breite}`);
+  assert.ok(hoehe <= ETIKETT_BOGEN.seiteHoeheMm - 2 * ETIKETT_BOGEN.seitenrandMm, `Höhe ${hoehe}`);
+
+  // Der Code muss auf das Etikett passen und darf die Textspalte nicht
+  // erdrücken: er nimmt höchstens die Hälfte der Breite.
+  assert.ok(ETIKETT_BOGEN.qrGroesseMm < ETIKETT_BOGEN.zelleHoeheMm, 'Der Code passt in die Höhe');
+  assert.ok(ETIKETT_BOGEN.qrGroesseMm <= ETIKETT_BOGEN.zelleBreiteMm / 2, 'Neben dem Code bleibt Platz');
 
   const stile = etikettBogenStile();
   assert.ok(stile.includes('size:A4 portrait'));
-  assert.ok(stile.includes('18mm'));
+  assert.ok(stile.includes(`${ETIKETT_BOGEN.qrGroesseMm}mm`));
+  // Mehr als eine Seite darf entstehen; abgeschnitten wird nichts.
+  assert.ok(!stile.includes('overflow:hidden}'), 'Der Druck schneidet keine Seite ab');
+});
+
+test('das Etikett trägt Bezeichnung, Code und Nummer wie ein Herstelleraufkleber', () => {
+  const html = etikettZelle({
+    targetType: 'item', svg: '<svg id="qr"></svg>',
+    label: 'Schalterdose tief', sublabel: 'LAG-0001', extra: 'Kaiser 1055-04'
+  });
+
+  assert.ok(html.includes('label__name'));
+  assert.ok(html.includes('Schalterdose tief'));
+  assert.ok(html.includes('Art.-Nr.: LAG-0001'), 'Die Zahl allein macht ratlos');
+  assert.ok(html.includes('Kaiser 1055-04'));
+  assert.ok(html.includes('<svg id="qr"></svg>'));
+
+  // Ein Lagerplatz hat keine Artikelnummer; dort wäre "Art.-Nr." gelogen.
+  const ort = etikettZelle({
+    targetType: 'location', svg: '<svg></svg>', label: 'Fach A1',
+    sublabel: 'Materiallager › Regal A › Fach A1'
+  });
+  assert.ok(!ort.includes('Art.-Nr.'));
+  assert.ok(ort.includes('Regal A'));
+
+  // Ohne Zusatz bleibt die Zeile weg statt leer dazustehen.
+  const knapp = etikettZelle({ targetType: 'item', label: 'Dose', sublabel: 'LAG-1' });
+  assert.ok(!knapp.includes('label__extra'));
+});
+
+test('der Druckbogen verlinkt seine Stile, statt sie einzubetten', () => {
+  // Die App laeuft unter `style-src 'self'`, und das Druckfenster erbt diese
+  // Regel. Ein eingebetteter Block kam dort ohne eine einzige Regel an: der
+  // Bogen druckte als Liste riesiger Codes über ganze Seiten.
+  const html = etikettBogenHtml([{ label: 'x', svg: '<svg></svg>' }], 'https://app.example');
+  assert.ok(!html.includes('<style'), 'Eingebettete Stile werden verworfen');
+  assert.ok(html.includes('<link rel="stylesheet" href="https://app.example/print-labels.css'));
+
+  // Absolut, denn das Druckfenster hat keine eigene Adresse.
+  assert.ok(etikettBogenHtml([], 'https://app.example/').includes('https://app.example/print-labels.css'),
+    'Ein Schrägstrich am Ende darf keine doppelte Adresse ergeben');
+});
+
+test('die ausgelieferte Stildatei ist die des Bogens', async () => {
+  // Sonst laufen Datei und Erzeuger auseinander, und niemand merkt es: der
+  // Bogen sieht im Test richtig aus und im Druck falsch.
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const hier = dirname(fileURLToPath(import.meta.url));
+  const datei = readFileSync(join(hier, '..', 'print-labels.css'), 'utf8');
+
+  assert.ok(datei.includes(etikettBogenStile().trim()), 'Die Datei enthält die erzeugten Regeln');
+  assert.ok(datei.includes(`${ETIKETT_BOGEN.zelleBreiteMm}mm`));
 });
 
 test('der Druckbogen setzt die Bilder ein und maskiert die Beschriftung', () => {
@@ -883,7 +943,7 @@ test('der Druckbogen setzt die Bilder ein und maskiert die Beschriftung', () => 
   assert.ok(!html.includes('<b>x</b>'));
   assert.ok(html.startsWith('<!doctype html>'));
 
-  // Mehr als ein Bogen passt nicht auf eine Seite.
+  // Der Bogen nimmt so viele auf, wie die Schnittstelle höchstens liefert.
   const viele = etikettBogenHtml(Array.from({ length: 200 }, () => ({ svg: '<svg></svg>', label: 'x' })));
   assert.equal((viele.match(/class="label"/g) || []).length, ETIKETT_BOGEN.maxEtiketten);
 });

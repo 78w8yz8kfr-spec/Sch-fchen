@@ -704,6 +704,12 @@ async function labelSheet(client, context, body, allowedOrigin) {
     throw new InputError("Bitte 1 bis 120 Etiketten für den Druckbogen wählen.");
   }
 
+  // Der Pfad eines Lagerplatzes entsteht aus seinen Eltern; einmal geladen
+  // reicht fuer den ganzen Bogen.
+  const orte = ziele.some((ziel) => ziel?.targetType === "location")
+    ? await loadLocations(client, context)
+    : [];
+
   const labels = [];
   for (const ziel of ziele) {
     const targetType = ziel?.targetType === "location" ? "location" : "item";
@@ -715,13 +721,19 @@ async function labelSheet(client, context, body, allowedOrigin) {
       locationId: targetType === "location" ? id : undefined
     });
 
+    // Was auf dem Etikett steht: Bezeichnung, Nummer und eine dritte Zeile,
+    // die im Regal weiterhilft. Beim Artikel ist das die Herstellernummer -
+    // danach sucht, wer nachbestellt. Beim Lagerplatz der Pfad, damit sich
+    // "Fach A1" im Materiallager von "Fach A1" in der Werkstatt unterscheidet.
     const beschriftung = targetType === "item"
       ? await client.query(
-        "SELECT name, item_number AS nummer FROM stock_items WHERE company_id = $1 AND id = $2",
+        `SELECT name, item_number AS nummer,
+                NULLIF(TRIM(CONCAT_WS(' ', manufacturer, manufacturer_number)), '') AS zusatz
+         FROM stock_items WHERE company_id = $1 AND id = $2`,
         [context.companyId, id]
       )
       : await client.query(
-        "SELECT name, '' AS nummer FROM storage_locations WHERE company_id = $1 AND id = $2",
+        "SELECT name, '' AS nummer, NULL AS zusatz FROM storage_locations WHERE company_id = $1 AND id = $2",
         [context.companyId, id]
       );
     if (beschriftung.rowCount !== 1) {
@@ -735,7 +747,10 @@ async function labelSheet(client, context, body, allowedOrigin) {
       targetType,
       id,
       label: beschriftung.rows[0].name,
-      sublabel: beschriftung.rows[0].nummer || "",
+      sublabel: targetType === "location"
+        ? (orte.find((ort) => ort.id === id)?.path || "")
+        : (beschriftung.rows[0].nummer || ""),
+      extra: beschriftung.rows[0].zusatz || null,
       target: adresse.toString(),
       generation: etikett.generation,
       svg: await qrToString(adresse.toString(), {
