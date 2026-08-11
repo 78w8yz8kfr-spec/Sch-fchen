@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.25
+Technischer Stand: V0.44.26
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,10 @@ Technischer Stand: V0.44.25
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Texterkennung für fotografierte Lieferscheine (Tesseract im Image, deutsches
+  Sprachpaket): Nummer und Datum werden vorgeschlagen, der erkannte Text steht
+  daneben, Positionen bleiben Handarbeit; PWA-Speicher `schaefchen-online-v108`
 
 - Eigener Bereich „Arbeitszeiten" für Stundenzettelprüfung, Korrekturen,
   Abwesenheiten und Export; „Meine Woche" behält nur die eigenen Anträge;

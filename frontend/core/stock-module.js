@@ -39,14 +39,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.25";
+} from "./stock-management.js?v=0.44.26";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.25";
+} from "./barcode-scanner.mjs?v=0.44.26";
 
 const html = `
   <div class="stock-module">
@@ -683,6 +683,10 @@ export function createStockModule({
     });
     auf(".stock-return-book", "click", () => void rueckgabeBuchen());
 
+    auf(".stock-delivery-photo", "change", (ereignis) => {
+      const datei = ereignis.currentTarget.files?.[0];
+      if (datei) void lieferscheinFotoLesen(datei);
+    });
     auf(".stock-delivery-new", "click", () => void lieferscheinFormular());
     auf(".stock-delivery-add-line", "click", () => {
       // Getipptes bleibt stehen: die Zeile kommt zu dem dazu, was im Formular
@@ -792,6 +796,7 @@ export function createStockModule({
       deliveryNoteNumber: wert("deliveryNoteNumber"),
       deliveredOn: wert("deliveredOn"),
       targetLocationId: wert("targetLocationId"),
+      erkannt: zustand.entwurf?.erkannt || null,
       zeilen: [...formular.querySelectorAll(".stock-delivery-line")].map((zeile) => ({
         itemId: zeile.querySelector('[name="itemId"]')?.value || "",
         quantity: zeile.querySelector('[name="quantity"]')?.value || ""
@@ -822,6 +827,46 @@ export function createStockModule({
       render();
     } catch (fehler) {
       melden(fehler);
+    }
+  }
+
+  /**
+   * Nummer und Datum aus einem Foto uebernehmen.
+   *
+   * Uebernommen wird nur, was leer ist: wer schon getippt hat, soll seine
+   * Eingabe nicht von der Erkennung ueberschrieben bekommen. Der gelesene Text
+   * bleibt daneben stehen - wer sieht, was das Programm gelesen hat, versteht
+   * sofort, warum ein Feld leer blieb.
+   */
+  async function lieferscheinFotoLesen(datei) {
+    const bisher = lieferscheinFormularLesen();
+    zustand = { ...zustand, entwurf: { ...bisher, fehler: null }, fehler: "Der Beleg wird gelesen …" };
+    render();
+
+    try {
+      const bild = await new Promise((fertig, scheitert) => {
+        const leser = new FileReader();
+        leser.onload = () => fertig(String(leser.result));
+        leser.onerror = () => scheitert(new Error("Das Bild konnte nicht gelesen werden."));
+        leser.readAsDataURL(datei);
+      });
+      const erkannt = await senden("/delivery-notes/scan", { image: bild });
+      zustand = {
+        ...zustand,
+        entwurf: {
+          ...bisher,
+          deliveryNoteNumber: bisher.deliveryNoteNumber || erkannt.deliveryNoteNumber || "",
+          deliveredOn: bisher.deliveredOn || erkannt.deliveredOn || "",
+          erkannt: erkannt.text
+        },
+        fehler: erkannt.deliveryNoteNumber || erkannt.deliveredOn
+          ? null
+          : "Auf dem Bild war nichts sicher zu lesen. Bitte gerade und scharf fotografieren — oder von Hand eintragen."
+      };
+      render();
+    } catch (fehler) {
+      zustand = { ...zustand, entwurf: bisher, fehler: fehler.message };
+      render();
     }
   }
 
