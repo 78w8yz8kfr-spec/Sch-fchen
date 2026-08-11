@@ -1708,3 +1708,23 @@ test('das Erfassungsformular erklärt die Direktlieferung', () => {
   assert.match(formular, /Als Entwurf speichern/);
   assert.ok(formular.includes('value="2026-08-11"'));
 });
+
+
+test('die Bestandsliste nennt reserviert und frei nur, wenn es etwas zu sagen gibt', () => {
+  const ohne = bestandAnsicht([
+    { itemId: 'a1', itemName: 'Steckdose', itemNumber: 'LAG-1', unit: 'Stück',
+      locationId: 'o1', locationName: 'Materiallager', quantity: 100,
+      reservedQuantity: 0, freeQuantity: 100 }
+  ]);
+  assert.ok(!ohne.includes('reserviert'), '"0 reserviert" an jeder Zeile wäre Lärm');
+
+  const mit = bestandAnsicht([
+    { itemId: 'a1', itemName: 'Steckdose', itemNumber: 'LAG-1', unit: 'Stück',
+      locationId: 'o1', locationName: 'Materiallager', quantity: 100,
+      reservedQuantity: 60, freeQuantity: 40 }
+  ]);
+  assert.match(mit, /60 reserviert, frei 40/);
+  // Der physische Bestand bleibt die Zahl rechts: die kann jemand im Regal
+  // nachzählen.
+  assert.match(mit, /100 Stück/);
+});

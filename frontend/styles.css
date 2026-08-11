@@ -4846,6 +4846,17 @@ select:focus-visible {
 /* Was das Lager zu einer Materialzeile sagt. Die Farbe traegt die Aussage
    nicht allein - der Satz daneben nennt die Fehlmenge -, sie macht sie nur
    im Vorbeigehen sichtbar. */
+/* Der Lagerblock über der Bedarfsliste einer Baustelle. */
+.site-stock-overview { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.site-stock-overview h4 {
+  margin: 0 0 6px; font-size: 0.66rem; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted);
+}
+.site-stock-overview ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.site-stock-overview li { display: grid; gap: 2px; }
+.site-stock-overview strong { font-size: 0.74rem; }
+.site-stock-overview span { color: var(--muted); font-size: 0.63rem; line-height: 1.45; }
+
 .site-material-stock { font-weight: 600; }
 .site-material-stock--reicht { color: var(--ui-success, #1a7f37); }
 .site-material-stock--reicht-nicht,

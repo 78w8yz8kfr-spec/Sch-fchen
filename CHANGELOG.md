@@ -4,6 +4,20 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Material der Baustelle, frei verfügbar und ein ehrlicher
+  Bestellvorschlag (Fassung 0.44.21).** In der Baustellenakte steht jetzt über
+  der Bedarfsliste, was das Lager zu dieser Baustelle sagt: was dort liegt, was
+  ausdrücklich als verbaut gemeldet wurde, was reserviert und was bestellt,
+  aber noch nicht geliefert ist. Die Zahlen stehen nebeneinander und werden
+  bewusst nicht zu einer verrechnet — „Verbrauch = geliefert minus zurück" ist
+  falsch, sobald eine Umbuchung auf eine zweite Baustelle dazwischenliegt, und
+  auf einer laufenden Baustelle ohnehin immer zu früh. In der Bestandsliste
+  steht neben dem physischen Bestand, was davon reserviert und was frei ist —
+  nur dort, wo es etwas zu sagen gibt, denn „0 reserviert" an jeder Zeile wäre
+  Lärm. Und der Bestellvorschlag rechnet endlich mit dem, was wirklich zur
+  Verfügung steht: vorher meldete er volle Regale, während die nächste Entnahme
+  schon nicht mehr ging, weil alles für eine Baustelle zurücklag. Ausgelöst
+  wird beim Meldebestand, wenn einer gepflegt ist.
 - **Reservierungen gehen vom Bestand ab (Fassung 0.44.20).** Ohne sie
   beantwortet das Lager nur „wie viel liegt hier". Die Frage, an der der
   Betrieb hängt, ist eine andere: wie viel davon kann ich mitnehmen? Wer am

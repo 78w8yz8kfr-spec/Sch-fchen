@@ -871,6 +871,71 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.equal(eintrag.suggestedQuantity, 200 - eintrag.totalQuantity);
   });
 
+  await t.test("Baustellenmaterial: da, verbaut, zurück, bestellt — getrennt", async () => {
+    // Der Praxisfall aus der Aufgabenstellung, Abschnitt 31: direkt auf die
+    // Baustelle geliefert, teilweise verbaut, Rest zurück ins Lager.
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Uebersichtkunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Uebersichtprojekt ${kennung}`]
+    );
+    const baustelle = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Baustelle A ${kennung}`]
+    );
+    const siteId = baustelle.rows[0].id;
+    const ort = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: `Baustelle A ${kennung}`, locationType: "construction_site", constructionSiteId: siteId
+    });
+    const ortId = ort.body.location.id;
+
+    const kabel = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `UEB-${kennung}`, name: "NYM-J 3x1,5",
+      groupKey: "cable", unit: "Meter"
+    });
+    const kabelId = kabel.body.item.id;
+
+    // 500 direkt auf die Baustelle geliefert.
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "receipt", quantity: 500,
+      targetLocationId: ortId, constructionSiteId: siteId
+    });
+    // 420 verbaut, 80 zurück ins Hauptlager.
+    await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "consumed", quantity: 420,
+      sourceLocationId: ortId, constructionSiteId: siteId
+    });
+    await aufrufen(apiPool, vorarbeiter, "POST", "/api/v1/stock/movements", {
+      itemId: kabelId, movementType: "transfer", quantity: 80,
+      sourceLocationId: ortId, targetLocationId: lager.id, constructionSiteId: siteId
+    });
+
+    const uebersicht = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/sites/${siteId}`);
+    assert.equal(uebersicht.status, 200, JSON.stringify(uebersicht.body));
+    const zeile = uebersicht.body.items.find((eintrag) => eintrag.itemId === kabelId);
+    assert.deepEqual(
+      {
+        da: zeile.onSite,
+        verbaut: zeile.consumed,
+        geliefert: zeile.deliveredToSite
+      },
+      { da: 0, verbaut: 420, geliefert: 500 },
+      "500 geliefert, 420 verbaut, 80 zurück — nichts bleibt auf der Baustelle"
+    );
+
+    // Und die 80 liegen wieder im Hauptlager.
+    const imLager = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/levels?ort=${lager.id}`);
+    const lagerzeile = imLager.body.levels.find((eintrag) => eintrag.itemId === kabelId);
+    assert.equal(lagerzeile.quantity, 80);
+    assert.equal(lagerzeile.freeQuantity, 80, "Ohne Reservierung ist alles frei");
+  });
+
   await t.test("eine fremde Firma sieht nichts davon", async () => {
     const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}X`);
     const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `LAG-F-${kennung}`, "office");
