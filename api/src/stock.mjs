@@ -156,6 +156,10 @@ function itemDto(row) {
     manufacturerNumber: row.manufacturer_number || null,
     minimumStock: number(row.minimum_stock),
     targetStock: number(row.target_stock),
+    // Das Gebinde ist eine Art, ueber die Menge zu sprechen, kein zweiter
+    // Bestand: `totalQuantity` steht immer in `unit`.
+    packSize: number(row.pack_size),
+    packName: row.pack_name || null,
     totalQuantity: number(row.total_quantity ?? 0),
     note: row.note || null,
     status: row.status,
@@ -261,7 +265,8 @@ async function contexts(client, context) {
 const ITEM_COLUMNS = `
   item.id, item.item_number, item.name, item.unit, item.group_id,
   item.manufacturer, item.manufacturer_number, item.minimum_stock,
-  item.target_stock, item.note, item.status, item.row_version,
+  item.target_stock, item.pack_size, item.pack_name,
+  item.note, item.status, item.row_version,
   gruppe.name AS group_name,
   COALESCE(bestand.summe, 0) AS total_quantity`;
 
@@ -388,6 +393,42 @@ function readBarcodes(body) {
   });
 }
 
+/**
+ * Liest das Gebinde eines Artikels: wie viele Einheiten stecken drin, und wie
+ * heisst es im Betrieb.
+ *
+ * Beides gehoert zusammen. Eine Stueckzahl ohne Namen waere ein Gebinde, das
+ * niemand ansprechen kann ("100 was?"), ein Name ohne Stueckzahl sagt nichts
+ * darueber, wie viel drin ist. Ein Gebinde mit einem Stueck ist kein Gebinde,
+ * sondern das Stueck - es anzubieten hiesse, eine Wahl zu stellen, die keine
+ * ist. Die Datenbank erzwingt dieselben drei Regeln; hier entsteht daraus eine
+ * verstaendliche Meldung statt einer Bedingungsverletzung.
+ */
+function readPack(body) {
+  const size = optionalQuantity(body.packSize, "Stückzahl im Gebinde");
+  const name = optionalText(body.packName, "Gebinde", 40);
+
+  if (size === null && !name) return { size: null, name: null };
+  if (size === null) {
+    throw new InputError("Zum Gebinde fehlt die Stückzahl.", 400, "stock_pack_size_missing");
+  }
+  if (!name) {
+    throw new InputError(
+      "Das Gebinde braucht einen Namen — Karton, Rolle, Bund.",
+      400,
+      "stock_pack_name_missing"
+    );
+  }
+  if (Number(size) <= 1) {
+    throw new InputError(
+      "Ein Gebinde enthält mehr als ein Stück; sonst ist es das Stück selbst.",
+      400,
+      "stock_pack_size_too_small"
+    );
+  }
+  return { size, name };
+}
+
 async function createItem(client, context, body) {
   await requireManager(client, context);
 
@@ -395,6 +436,7 @@ async function createItem(client, context, body) {
   const name = requiredText(body.name, "Bezeichnung", 180);
   const unit = requiredText(body.unit, "Einheit", 20);
   const groupId = await resolveGroup(client, context, body);
+  const pack = readPack(body);
   const barcodes = readBarcodes(body);
 
   if (barcodes.filter((entry) => entry.isPrimary).length > 1) {
@@ -405,9 +447,10 @@ async function createItem(client, context, body) {
     `INSERT INTO stock_items (
        company_id, item_number, name, group_id, unit, manufacturer,
        manufacturer_number, default_supplier_id, default_location_id,
-       minimum_stock, target_stock, note, created_by_user_id, changed_by_user_id
+       minimum_stock, target_stock, pack_size, pack_name, note,
+       created_by_user_id, changed_by_user_id
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-               COALESCE($10::NUMERIC, 0), $11::NUMERIC, $12, $13, $13)
+               COALESCE($10::NUMERIC, 0), $11::NUMERIC, $12::NUMERIC, $13, $14, $15, $15)
      RETURNING id`,
     [
       context.companyId, itemNumber, name, groupId, unit,
@@ -417,6 +460,8 @@ async function createItem(client, context, body) {
       optionalId(body.defaultLocationId, "Standardlagerplatz"),
       optionalQuantity(body.minimumStock, "Mindestbestand"),
       optionalQuantity(body.targetStock, "Zielbestand"),
+      pack.size,
+      pack.name,
       optionalText(body.note, "Notiz", 2000),
       context.userId
     ]
@@ -441,6 +486,85 @@ async function createItem(client, context, body) {
     `INSERT INTO stock_history (company_id, entity_type, entity_id, action, actor_user_id, new_state)
      VALUES ($1, 'stock_item', $2, 'created', $3, $4::JSONB)`,
     [context.companyId, itemId, context.userId, JSON.stringify({ itemNumber, name, unit })]
+  );
+
+  return itemDetail(client, context, itemId);
+}
+
+/**
+ * Aendert einen Artikel.
+ *
+ * Gebraucht wird das vor allem fuer das Gebinde: Artikel, die es vor dieser
+ * Fassung schon gab, sollen eines bekommen koennen, ohne neu angelegt zu
+ * werden. Geaendert wird nur, was mitgeschickt wird - wer bloss das Gebinde
+ * eintraegt, soll dabei nicht den Mindestbestand verlieren.
+ *
+ * `rowVersion` ist Pflicht: zwei Leute im Buero, die denselben Artikel
+ * gleichzeitig offen haben, duerfen sich nicht gegenseitig ueberschreiben.
+ * Die Einheit bleibt aussen vor - sie zu aendern wuerde jeden gebuchten
+ * Bestand still umdeuten, aus 120 Metern wuerden 120 Stueck.
+ */
+async function updateItem(client, context, itemId, body) {
+  await requireManager(client, context);
+
+  const rowVersion = Number(body?.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
+    throw new InputError("Die Artikelversion ist ungültig.");
+  }
+
+  const vorhanden = await client.query(
+    `SELECT item_number, name, minimum_stock, target_stock, pack_size, pack_name, note
+     FROM stock_items WHERE company_id = $1 AND id = $2 AND status = 'active' FOR UPDATE`,
+    [context.companyId, itemId]
+  );
+  if (vorhanden.rowCount !== 1) {
+    throw new InputError("Diesen Artikel gibt es nicht.", 404, "stock_item_unknown");
+  }
+  const alt = vorhanden.rows[0];
+
+  const gesetzt = (feld) => Object.prototype.hasOwnProperty.call(body, feld);
+  const pack = gesetzt("packSize") || gesetzt("packName")
+    ? readPack(body)
+    : { size: alt.pack_size, name: alt.pack_name };
+
+  const aktualisiert = await client.query(
+    `UPDATE stock_items
+     SET name = $3, minimum_stock = COALESCE($4::NUMERIC, 0), target_stock = $5::NUMERIC,
+         pack_size = $6::NUMERIC, pack_name = $7, note = $8,
+         changed_by_user_id = $9, row_version = row_version + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2 AND row_version = $10
+     RETURNING id`,
+    [
+      context.companyId, itemId,
+      gesetzt("name") ? requiredText(body.name, "Bezeichnung", 180) : alt.name,
+      gesetzt("minimumStock") ? optionalQuantity(body.minimumStock, "Mindestbestand") : alt.minimum_stock,
+      gesetzt("targetStock") ? optionalQuantity(body.targetStock, "Zielbestand") : alt.target_stock,
+      pack.size,
+      pack.name,
+      gesetzt("note") ? optionalText(body.note, "Notiz", 2000) : alt.note,
+      context.userId,
+      rowVersion
+    ]
+  ).catch(mapDatabaseError);
+
+  if (aktualisiert.rowCount !== 1) {
+    throw new InputError(
+      "Der Artikel wurde zwischenzeitlich geändert. Bitte die Liste neu laden.",
+      409,
+      "stock_item_row_version_conflict"
+    );
+  }
+
+  await client.query(
+    `INSERT INTO stock_history (
+       company_id, entity_type, entity_id, action, actor_user_id, old_state, new_state
+     ) VALUES ($1, 'stock_item', $2, 'updated', $3, $4::JSONB, $5::JSONB)`,
+    [
+      context.companyId, itemId, context.userId,
+      JSON.stringify({ packSize: number(alt.pack_size), packName: alt.pack_name || null }),
+      JSON.stringify({ packSize: number(pack.size), packName: pack.name || null })
+    ]
   );
 
   return itemDetail(client, context, itemId);
@@ -1661,6 +1785,11 @@ export async function handleStockRequest({ request, url, client, context, allowe
   if (request.method === "GET" && itemMatch) {
     const itemId = validateId(itemMatch[1], "Artikel-ID");
     return { status: 200, body: await itemDetail(client, context, itemId) };
+  }
+  if (request.method === "PATCH" && itemMatch) {
+    const itemId = validateId(itemMatch[1], "Artikel-ID");
+    const body = await readJson(request);
+    return { status: 200, body: await updateItem(client, context, itemId, body) };
   }
 
   if (request.method === "POST" && path === "/api/v1/stock/locations") {

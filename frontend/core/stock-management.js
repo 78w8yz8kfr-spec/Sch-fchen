@@ -25,7 +25,8 @@ export const SCHRITTE = Object.freeze({
   INVENTUR: 'inventur',
   BESTELLUNGEN: 'bestellungen',
   BESTELLUNG: 'bestellung',
-  ARTIKEL_CODES: 'artikelCodes'
+  ARTIKEL_CODES: 'artikelCodes',
+  ORTE: 'orte'
 });
 
 export const BESTELLSTATUS = Object.freeze({
@@ -56,23 +57,56 @@ export function ortSpeicherKey(session) {
   return `schaefchen-stock-place-v1:${session?.company?.number || 'unknown'}:${session?.user?.id || 'unknown'}`;
 }
 
+export function scanSpeicherKey(session) {
+  return `schaefchen-stock-scans-v1:${session?.company?.number || 'unknown'}:${session?.user?.id || 'unknown'}`;
+}
+
+/**
+ * Der Zwischenspeicher der Scans, auf eine tragbare Groesse gestutzt.
+ *
+ * Ohne ihn scheitert im Keller schon der erste Schritt: der Code laesst sich
+ * lesen, aber nicht aufloesen, und der Monteur kommt gar nicht erst zur
+ * Buchung. Im Lager wiederholen sich dieselben Artikel staendig — deshalb
+ * traegt ein Speicher der zuletzt gesehenen Codes weit.
+ *
+ * Gestutzt wird nach Zeitpunkt, damit der Speicher des Geraets nicht
+ * unbegrenzt waechst; was am laengsten nicht gescannt wurde, faellt zuerst.
+ */
+export const SCAN_SPEICHER_GROESSE = 300;
+
+export function scanSpeicherStutzen(speicher = {}, groesse = SCAN_SPEICHER_GROESSE) {
+  return Object.fromEntries(
+    Object.entries(speicher)
+      .sort((links, rechts) => String(rechts[1]?.gesehen || '').localeCompare(String(links[1]?.gesehen || '')))
+      .slice(0, groesse)
+  );
+}
+
 export function lagerZustand(vorgabe = {}) {
   return {
     schritt: SCHRITTE.START,
     ort: null,
     artikel: null,
     bestandAmOrt: null,
+    // In welcher Einheit gerade getippt wird: 'einzeln' oder 'gebinde'.
+    // Gebucht wird immer in der Einheit des Artikels; die Umrechnung passiert
+    // erst in `buchungBauen`, damit im Journal genau eine Wahrheit steht.
+    einheit: 'einzeln',
     gebinde: 1,
     menge: '1',
     baustelleId: null,
     vorgang: 'entnahme',
     zielOrtId: null,
     letzterScan: null,
+    // Der Bestand stammt aus dem Zwischenspeicher des Geraets und kann
+    // ueberholt sein: ohne Netz weiss niemand, was inzwischen gebucht wurde.
+    bestandVeraltet: false,
     bestaetigung: null,
     // Vollstaendig aufgezaehlt, auch wo es null ist: ein Zustand, dessen
     // Schluessel je nach Weg auftauchen und verschwinden, laesst Vergleiche
     // gegen null mal stimmen und mal nicht.
     entwurf: null,
+    suche: '',
     inventur: null,
     zaehlArtikel: null,
     bestellung: null,
@@ -81,6 +115,10 @@ export function lagerZustand(vorgabe = {}) {
     codeEntwurf: null,
     hinweis: null,
     fehler: null,
+    // Wie viele Buchungen noch aufs Netz warten. Sie stehen nicht im Zustand,
+    // sondern im Speicher des Geraets; hier steht nur die Zahl, damit die
+    // Ansicht sie zeigen kann, ohne den Speicher zu kennen.
+    wartend: 0,
     ...vorgabe
   };
 }
@@ -111,6 +149,63 @@ export function mengeAlsText(menge) {
 }
 
 /**
+ * Welche Einheiten stehen fuer diesen Artikel zur Wahl?
+ *
+ * Immer das Einzelstueck - eine einzelne Dose aus dem Karton zu nehmen ist der
+ * Alltag und darf nie versperrt sein. Dazu das Gebinde, wenn es eines gibt.
+ *
+ * Woher das Gebinde kommt, hat eine Rangfolge: Wer gerade einen Kartoncode
+ * gescannt hat, haelt diesen Karton in der Hand - dessen Menge zaehlt, auch
+ * wenn am Artikel ein anderes Gebinde steht. Sonst gilt das Gebinde des
+ * Artikels. Angeboten werden bewusst hoechstens zwei Einheiten; drei Knoepfe
+ * vor dem Regal sind einer zu viel.
+ */
+export function einheitenFuer(artikel, gebindeAusScan = 1) {
+  const einzeln = {
+    schluessel: 'einzeln',
+    name: artikel?.unit || 'Stück',
+    faktor: 1
+  };
+
+  const ausScan = Number(gebindeAusScan) > 1 ? Number(gebindeAusScan) : null;
+  const ausArtikel = Number(artikel?.packSize) > 1 ? Number(artikel.packSize) : null;
+  const faktor = ausScan || ausArtikel;
+  if (!faktor) return [einzeln];
+
+  // Der Name gehoert nur dann zum Gebinde des Artikels, wenn auch dessen
+  // Stueckzahl gilt. Ein gescannter Zehnerpack heisst nicht "Karton", nur
+  // weil am Artikel ein Karton steht.
+  const name = faktor === ausArtikel && artikel?.packName ? artikel.packName : 'Gebinde';
+
+  return [einzeln, { schluessel: 'gebinde', name, faktor }];
+}
+
+/** Der Umrechnungsfaktor der gerade gewaehlten Einheit. */
+export function faktorFuer(zustand) {
+  const einheiten = einheitenFuer(zustand.artikel, zustand.gebinde);
+  const gewaehlt = einheiten.find((eintrag) => eintrag.schluessel === zustand.einheit);
+  return gewaehlt ? gewaehlt.faktor : 1;
+}
+
+/**
+ * Was gerade getippt wurde, in den Worten des Monteurs: "2 Karton".
+ *
+ * Leer, solange in Einzelstuecken gebucht wird — dort sagt die Menge mit ihrer
+ * Einheit schon alles, und "5 Stück (5 Stück)" waere Geschwaetz.
+ */
+export function gebindeText(zustand) {
+  const faktor = faktorFuer(zustand);
+  if (faktor <= 1) return null;
+
+  const einheiten = einheitenFuer(zustand.artikel, zustand.gebinde);
+  const gewaehlt = einheiten.find((eintrag) => eintrag.schluessel === zustand.einheit);
+  const menge = mengeAusText(zustand.menge);
+  if (menge === null) return null;
+
+  return `${mengeAlsText(menge)} ${gewaehlt.name}`;
+}
+
+/**
  * Verarbeitet die Antwort des Scan-Endpunkts.
  *
  * Der Ortskontext ist der Kniff, der die Bedienung kurz macht: einmal das
@@ -128,6 +223,7 @@ export function scanVerarbeiten(zustand, antwort) {
       ...zustand,
       ort: antwort.location,
       schritt: SCHRITTE.START,
+      bestandVeraltet: false,
       hinweis: `Lagerplatz gesetzt: ${antwort.location.path || antwort.location.name}`,
       fehler: null
     };
@@ -139,13 +235,22 @@ export function scanVerarbeiten(zustand, antwort) {
     const gebinde = Number(antwort.packQuantity) > 0 ? Number(antwort.packQuantity) : 1;
     const bestand = (antwort.levels || []).find((zeile) => zeile.locationId === zustand.ort?.id);
 
+    // Wer den Kartoncode scannt, meint den Karton: dann steht die Einheit auf
+    // Gebinde und die Menge auf eins. Ein Griff auf "Einzeln" holt trotzdem
+    // die einzelne Dose heraus - der Karton in der Hand ist kein Zwang.
+    const einheiten = einheitenFuer(antwort.item, gebinde);
+    const gebindeGewaehlt = gebinde > 1 && einheiten.length > 1;
+
     return {
       ...zustand,
       schritt: SCHRITTE.BUCHEN,
       artikel: antwort.item,
       bestandAmOrt: bestand ? bestand.quantity : (zustand.ort ? 0 : null),
+      // Aus dem Zwischenspeicher: die Zahl stimmte, als zuletzt Netz da war.
+      bestandVeraltet: Boolean(antwort.offline),
+      einheit: gebindeGewaehlt ? 'gebinde' : 'einzeln',
       gebinde,
-      menge: mengeAlsText(gebinde),
+      menge: '1',
       bestaetigung: null,
       hinweis: null,
       fehler: null
@@ -195,8 +300,14 @@ export function buchungBauen(zustand, optionen = {}) {
   if (!vorgang) return { fehler: 'Diesen Vorgang gibt es nicht.' };
   if (!zustand.artikel) return { fehler: 'Es ist kein Artikel gewählt.' };
 
-  const menge = mengeAusText(zustand.menge);
-  if (menge === null) return { fehler: 'Bitte eine Menge größer als null eingeben.' };
+  const getippt = mengeAusText(zustand.menge);
+  if (getippt === null) return { fehler: 'Bitte eine Menge größer als null eingeben.' };
+
+  // Hier und nur hier wird aus "zwei Kartons" die Zahl, die ins Journal geht.
+  // Der Bestand kennt ausschliesslich die Einheit des Artikels; ein zweiter
+  // Bestand in Gebinden koennte davon abweichen, und niemand wuesste, welcher
+  // stimmt.
+  const menge = Math.round(getippt * faktorFuer(zustand) * 1000) / 1000;
 
   if (!zustand.ort) {
     return { fehler: 'Zuerst den Lagerplatz scannen oder auswählen.' };
@@ -234,6 +345,40 @@ export function buchungBauen(zustand, optionen = {}) {
   return { buchung };
 }
 
+/**
+ * Was von einer Buchung uebrig bleibt, wenn das Netz fehlt.
+ *
+ * Die Beschreibung ist kein Beiwerk: faellt die Buchung spaeter aus der
+ * Schlange, weil der Server sie ablehnt, ist sie das Einzige, womit sich noch
+ * sagen laesst, was da eigentlich gebucht werden sollte.
+ */
+export function warteschlangeEintrag(zustand, buchung, jetzt = new Date()) {
+  const menge = mengeAusText(zustand.menge);
+  const teile = [
+    menge === null ? null : mengeAlsText(menge),
+    zustand.artikel?.unit,
+    zustand.artikel?.name
+  ].filter(Boolean);
+
+  return {
+    buchung,
+    beschreibung: teile.join(' ') || 'Buchung ohne Angaben',
+    vorgang: VORGAENGE[zustand.vorgang]?.name || '',
+    gestellt: jetzt.toISOString()
+  };
+}
+
+/**
+ * Bleibt eine liegen gebliebene Buchung in der Schlange?
+ *
+ * Nur beim Netz. Eine abgelehnte Buchung - fehlendes Recht, geloeschter
+ * Artikel - wuerde bei jedem Netzwechsel erneut scheitern und den Nachtrag der
+ * uebrigen aufhalten. Sie faellt heraus und wird gemeldet.
+ */
+export function buchungBleibtInWarteschlange(fehler) {
+  return Boolean(fehler?.network);
+}
+
 export function neueVorgangId() {
   const zufall = globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
@@ -251,19 +396,30 @@ export function neueVorgangId() {
 export function buchungVerarbeiten(zustand, antwort) {
   const bestand = (antwort?.levels || []).find((zeile) => zeile.locationId === zustand.ort?.id);
 
+  // Ohne Netz kennt niemand den neuen Bestand: die Buchung liegt im Speicher
+  // des Geraets und ist noch nicht gezaehlt worden. Eine Zahl zu zeigen, die
+  // nur geraten ist, waere schlimmer als keine - danach richtet sich im Lager
+  // jemand.
+  const offline = Boolean(antwort?.offline);
+
   return {
     ...zustand,
     schritt: SCHRITTE.BESTAETIGT,
     bestaetigung: {
       artikelName: zustand.artikel?.name || '',
-      menge: mengeAusText(zustand.menge),
+      menge: Math.round((mengeAusText(zustand.menge) ?? 0) * faktorFuer(zustand) * 1000) / 1000,
       einheit: zustand.artikel?.unit || '',
+      // Was der Monteur getippt hat, in seinen Worten: "2 Karton". Steht
+      // neben der gebuchten Menge, damit beides zusammenpasst.
+      gewaehlt: gebindeText(zustand),
       vorgang: VORGAENGE[zustand.vorgang]?.name || '',
-      neuerBestand: bestand ? bestand.quantity : null,
-      wiederholt: Boolean(antwort?.repeated)
+      neuerBestand: offline ? null : (bestand ? bestand.quantity : null),
+      wiederholt: Boolean(antwort?.repeated),
+      offline
     },
     artikel: null,
     bestandAmOrt: null,
+    einheit: 'einzeln',
     gebinde: 1,
     menge: '1',
     fehler: null
@@ -352,6 +508,21 @@ export function ortLeiste(ort) {
   </button>`;
 }
 
+/**
+ * Wartende Buchungen gehoeren auf die Startseite und nicht in eine Ecke.
+ *
+ * Wer ohne Netz gebucht hat, muss beim naechsten Hinsehen erkennen koennen,
+ * dass noch etwas offen ist - sonst haelt er den Bestand fuer richtig,
+ * waehrend drei Entnahmen noch auf dem Telefon liegen.
+ */
+export function wartendZeile(wartend = 0) {
+  if (!wartend) return '';
+  return `<p class="stock-pack" role="status">
+    ${wartend === 1 ? 'Eine Buchung wartet' : `${sicher(String(wartend))} Buchungen warten`}
+    auf Netz und ${wartend === 1 ? 'wird' : 'werden'} von selbst nachgetragen.
+  </p>`;
+}
+
 export function startAnsicht(zustand, rechte = {}) {
   const kacheln = [
     `<button class="stock-tile stock-tile--stock" type="button" data-ziel="bestand">
@@ -389,8 +560,17 @@ export function startAnsicht(zustand, rechte = {}) {
         <span aria-hidden="true">▣</span> Scannen
       </button>
       ${zustand.hinweis ? `<p class="stock-note" role="status">${sicher(zustand.hinweis)}</p>` : ''}
+      ${wartendZeile(zustand.wartend)}
       <div class="stock-tiles">${kacheln.join('')}</div>
     </div>`;
+}
+
+/** Was aus der getippten Menge im Bestand wird — in der Einheit des Artikels. */
+export function gebuchteMengeText(zustand) {
+  const getippt = mengeAusText(zustand.menge);
+  if (getippt === null) return bestandText(0, zustand.artikel?.unit);
+  const menge = Math.round(getippt * faktorFuer(zustand) * 1000) / 1000;
+  return bestandText(menge, zustand.artikel?.unit);
 }
 
 export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
@@ -400,8 +580,23 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
   const vorgaenge = verfuegbareVorgaenge(rechte);
   const lage = bestandLage(zustand.bestandAmOrt, artikel.minimumStock);
 
-  const gebindeHinweis = zustand.gebinde > 1
-    ? `<p class="stock-pack">Gescannt wurde ein Gebinde mit ${sicher(mengeAlsText(zustand.gebinde))} ${sicher(artikel.unit)}.</p>`
+  const einheiten = einheitenFuer(artikel, zustand.gebinde);
+  const faktor = faktorFuer(zustand);
+
+  // Die Wahl steht ueber der Menge, nicht darunter: erst entscheidet man, wovon
+  // man spricht, dann wie viel davon.
+  const einheitenWahl = einheiten.length > 1
+    ? `<div class="stock-units" role="group" aria-label="Einheit">
+        ${einheiten.map((eintrag) => `
+          <button class="stock-unit${eintrag.schluessel === zustand.einheit ? ' stock-unit--aktiv' : ''}"
+                  type="button" data-einheit="${sicher(eintrag.schluessel)}"
+                  aria-pressed="${eintrag.schluessel === zustand.einheit ? 'true' : 'false'}">
+            <span class="stock-unit__name">${sicher(eintrag.name)}</span>
+            ${eintrag.faktor > 1
+              ? `<span class="stock-unit__hint">${sicher(mengeAlsText(eintrag.faktor))} ${sicher(artikel.unit)}</span>`
+              : '<span class="stock-unit__hint">einzeln</span>'}
+          </button>`).join('')}
+      </div>`
     : '';
 
   return `
@@ -414,9 +609,15 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
         <p class="stock-item__stock stock-item__stock--${lage}">
           Bestand hier: ${sicher(bestandText(zustand.bestandAmOrt, artikel.unit))}
         </p>
+        ${zustand.bestandVeraltet
+          ? `<p class="stock-hint">
+               Ohne Netz: Artikel und Bestand stammen vom letzten Scan mit
+               Verbindung. Buchen kannst du trotzdem.
+             </p>`
+          : ''}
       </div>
 
-      ${gebindeHinweis}
+      ${einheitenWahl}
 
       <div class="stock-amount">
         <button class="button button--secondary stock-amount__step" type="button" data-schritt="-1" aria-label="Menge verringern">−</button>
@@ -425,9 +626,10 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
           <input class="stock-amount__input" type="text" inputmode="decimal"
                  autocomplete="off" value="${sicher(zustand.menge)}">
         </label>
-        <span class="stock-amount__unit">${sicher(artikel.unit)}</span>
+        <span class="stock-amount__unit">${sicher(einheiten.find((eintrag) => eintrag.schluessel === zustand.einheit)?.name || artikel.unit)}</span>
         <button class="button button--secondary stock-amount__step" type="button" data-schritt="1" aria-label="Menge erhöhen">+</button>
       </div>
+      ${faktor > 1 ? `<p class="stock-pack-sum">Das sind ${sicher(gebuchteMengeText(zustand))}.</p>` : ''}
 
       ${baustellenFeld(zustand, optionen)}
 
@@ -473,9 +675,17 @@ export function bestaetigungAnsicht(zustand) {
     <div class="stock-done">
       <p class="stock-done__mark" aria-hidden="true">✓</p>
       <h2 class="stock-done__title">${sicher(b.vorgang)}: ${sicher(mengeAlsText(b.menge))} ${sicher(b.einheit)}</h2>
+      ${b.gewaehlt ? `<p class="stock-done__pack">${sicher(b.gewaehlt)}</p>` : ''}
       <p class="stock-done__item">${sicher(b.artikelName)}</p>
       ${b.neuerBestand !== null
         ? `<p class="stock-done__stock">Neuer Bestand hier: ${sicher(bestandText(b.neuerBestand, b.einheit))}</p>`
+        : ''}
+      ${b.offline
+        ? `<p class="stock-pack">
+             Ohne Verbindung gebucht. Die Buchung liegt auf diesem Gerät und wird
+             nachgetragen, sobald wieder Netz da ist — auch wenn du die App
+             zwischendurch schließt.
+           </p>`
         : ''}
       ${b.wiederholt
         ? '<p class="stock-note">Diese Buchung lag schon vor und wurde nicht doppelt gezählt.</p>'
@@ -569,6 +779,29 @@ export function bestandsmengeAusText(text) {
  * Artikelnummer fehlt. Die Datenbank bleibt die Grenze, das hier ist die
  * Hoeflichkeit.
  */
+function gebindeAusFormular(werte) {
+  const name = String(werte.packName ?? '').trim();
+  const groesse = bestandsmengeAusText(werte.packSize);
+
+  if (groesse === undefined) {
+    return { pack: {}, packFehler: 'Die Stückzahl im Gebinde ist keine gültige Menge.' };
+  }
+  if (groesse === null && !name) return { pack: { size: null, name: null } };
+  if (groesse === null) {
+    return { pack: {}, packFehler: 'Zum Gebinde fehlt die Stückzahl.' };
+  }
+  if (!name) {
+    return { pack: {}, packFehler: 'Das Gebinde braucht einen Namen — Karton, Rolle, Bund.' };
+  }
+  if (groesse <= 1) {
+    return {
+      pack: {},
+      packFehler: 'Ein Gebinde enthält mehr als ein Stück; sonst ist es das Stück selbst.'
+    };
+  }
+  return { pack: { size: groesse, name } };
+}
+
 export function artikelFormularLesen(werte = {}) {
   const text = (wert) => String(wert ?? '').trim();
 
@@ -595,6 +828,11 @@ export function artikelFormularLesen(werte = {}) {
     return { fehler: 'Der Zielbestand liegt unter dem Mindestbestand.' };
   }
 
+  // Dieselben drei Regeln wie in der Schnittstelle und in der Datenbank. Sie
+  // hier zu wiederholen ist kein Zufall: der Monteur soll den Fehler sehen,
+  // bevor das Formular weggeschickt wird.
+  const { pack, packFehler } = gebindeAusFormular(werte);
+
   const codes = (werte.barcodes || []).filter((eintrag) => text(eintrag?.code));
   const barcodes = [];
   for (const eintrag of codes) {
@@ -614,6 +852,11 @@ export function artikelFormularLesen(werte = {}) {
   const entwurf = { itemNumber, name, unit, groupKey, barcodes };
   if (minimumStock !== null) entwurf.minimumStock = minimumStock;
   if (targetStock !== null) entwurf.targetStock = targetStock;
+  if (packFehler) return { fehler: packFehler };
+  if (pack.size !== null) {
+    entwurf.packSize = pack.size;
+    entwurf.packName = pack.name;
+  }
   if (text(werte.manufacturer)) entwurf.manufacturer = text(werte.manufacturer);
   if (text(werte.manufacturerNumber)) entwurf.manufacturerNumber = text(werte.manufacturerNumber);
 
@@ -624,6 +867,38 @@ function kopfzeile(titel) {
   return `<div class="stock-head">
     <button class="button button--quiet stock-home stock-back" type="button" aria-label="Zurück">←</button>
     <h2 class="stock-head__title">${sicher(titel)}</h2>
+  </div>`;
+}
+
+/**
+ * Die Auswahl des Lagerplatzes von Hand.
+ *
+ * Gescannt wird der Platz im Alltag, aber nicht jeder klebt ein Etikett ans
+ * Regal, und am Rechner gibt es keine Kamera. Vorher lief das ueber eine
+ * Schaltflaeche, die reihum durch die Plaetze schaltete - bei drei Plaetzen
+ * ertraeglich, bei dreissig eine Zumutung. Jetzt stehen sie da, mit ihrem
+ * vollen Pfad, damit sich "Fach A1" von "Fach A1" im anderen Regal
+ * unterscheiden laesst.
+ */
+export function orteAnsicht(orte = [], aktiv = null) {
+  if (!orte.length) {
+    return `<div class="stock-list">
+      ${kopfzeile('Lagerplatz')}
+      <p class="stock-empty">Für diese Firma ist kein Lagerplatz angelegt.</p>
+    </div>`;
+  }
+
+  return `<div class="stock-list">
+    ${kopfzeile('Lagerplatz')}
+    <ul class="stock-rows">
+      ${orte.map((ort) => `
+        <li class="stock-row stock-row--tap${ort.id === aktiv ? ' stock-row--gewaehlt' : ''}"
+            data-ort="${sicher(ort.id)}">
+          <span class="stock-row__name">${sicher(ort.name)}</span>
+          <span class="stock-row__number">${sicher(ort.path || ort.name)}</span>
+          ${ort.id === aktiv ? '<span class="stock-row__amount">gewählt</span>' : ''}
+        </li>`).join('')}
+    </ul>
   </div>`;
 }
 
@@ -655,10 +930,15 @@ export function bestandAnsicht(zeilen = []) {
   </div>`;
 }
 
-export function artikelListeAnsicht(artikel = [], rechte = {}) {
+export function artikelListeAnsicht(artikel = [], rechte = {}, suche = '') {
   return `<div class="stock-list">
     ${kopfzeile('Artikel')}
     ${rechte.manage ? '<button class="button button--action stock-new" type="button">Artikel anlegen</button>' : ''}
+    <label class="stock-field stock-search">
+      <span>Suchen</span>
+      <input class="stock-search__input" type="search" autocomplete="off" maxlength="120"
+             value="${sicher(suche)}" placeholder="Name, Artikelnummer oder Herstellernummer">
+    </label>
     ${artikel.length
       ? `<ul class="stock-rows">
           ${artikel.map((eintrag) => `
@@ -670,7 +950,9 @@ export function artikelListeAnsicht(artikel = [], rechte = {}) {
               </span>
             </li>`).join('')}
         </ul>`
-      : '<p class="stock-empty">Noch kein Artikel angelegt.</p>'}
+      : `<p class="stock-empty">${suche
+          ? 'Kein Artikel passt zu dieser Suche.'
+          : 'Noch kein Artikel angelegt.'}</p>`}
   </div>`;
 }
 
@@ -733,6 +1015,18 @@ export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
       <label class="stock-field"><span>Zielbestand</span>
         <input name="targetStock" inputmode="decimal" value="${sicher(daten.targetStock ?? '')}" autocomplete="off"></label>
     </div>
+    <div class="stock-field-pair">
+      <label class="stock-field"><span>Gebinde heißt (freiwillig)</span>
+        <input name="packName" value="${sicher(daten.packName || '')}" autocomplete="off" maxlength="40"
+               placeholder="Karton, Rolle, Bund"></label>
+      <label class="stock-field"><span>Stück im Gebinde</span>
+        <input name="packSize" inputmode="decimal" value="${sicher(daten.packSize ?? '')}" autocomplete="off"
+               placeholder="z. B. 100"></label>
+    </div>
+    <p class="stock-hint">
+      Mit Gebinde lässt sich beim Buchen zwischen ganzen Gebinden und einzelnen
+      Stücken umschalten. Der Bestand zählt immer in ${sicher(daten.unit || 'Stück')}.
+    </p>
     ${codeFelder(daten)}
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
     <button class="button button--action stock-save" type="button">Anlegen</button>
@@ -1204,7 +1498,10 @@ export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BESTAND) return bestandAnsicht(optionen.bestand);
-  if (zustand.schritt === SCHRITTE.ARTIKEL) return artikelListeAnsicht(optionen.artikel, rechte);
+  if (zustand.schritt === SCHRITTE.ORTE) return orteAnsicht(optionen.orte, zustand.ort?.id || null);
+  if (zustand.schritt === SCHRITTE.ARTIKEL) {
+    return artikelListeAnsicht(optionen.artikel, rechte, zustand.suche);
+  }
   if (zustand.schritt === SCHRITTE.NACHBESTELLUNG) return nachbestellungAnsicht(optionen.vorschlaege);
   if (zustand.schritt === SCHRITTE.ARTIKEL_NEU) {
     return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler);

@@ -1,9 +1,21 @@
 # Projektstatus
 
 Stand: 10.08.2026
-Technischer Stand: V0.44.11
+Technischer Stand: V0.44.12
 
 ## Abgeschlossen
+
+- Lager ohne Netz: Zwischenspeicher der gescannten Codes auf dem Gerät,
+  Warteschlange für Buchungen mit Nachtrag bei Netzrückkehr und nach
+  Neustart, Hinweis auf veralteten Bestand, wartende Buchungen auf der
+  Startseite; PWA-Speicher `schaefchen-online-v94`
+- Tiefenlink `?lager=` für gedruckte Etiketten, Auswahl des Lagerplatzes aus
+  einer Liste mit vollem Pfad und gemerktem letzten Platz, Suchfeld in der
+  Artikelliste
+- Gebinde am Artikel (Stückzahl und Name, Migration 111) mit Umschalter
+  zwischen ganzem Gebinde und Einzelstück beim Buchen; der Bestand zählt
+  weiterhin ausschließlich in der Einheit des Artikels. Nachträgliches Ändern
+  eines Artikels über `PATCH /api/v1/stock/items/:id` mit Versionsprüfung
 
 - Lager- und Materialverwaltung mit Barcodes und QR-Codes in der App: Migration
   107 (vierzehn Tabellen, Bestand nur über Trigger aus dem Journal), 108
