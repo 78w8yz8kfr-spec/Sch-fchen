@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.24";
-import { serverIsNewer } from "./core/versions.js?v=0.44.24";
+} from "./core/work-time.js?v=0.44.25";
+import { serverIsNewer } from "./core/versions.js?v=0.44.25";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.24";
+} from "./core/sync-queue.js?v=0.44.25";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.24";
+} from "./core/permissions.js?v=0.44.25";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,11 +40,11 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.24";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.24";
-import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.24";
-import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.24";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
+} from "./core/state-store.js?v=0.44.25";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.25";
+import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.25";
+import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.25";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.25";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -482,6 +482,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     bottomNav: document.querySelector(".bottom-nav"),
     navStart: document.querySelector("#nav-start"),
     navWeek: document.querySelector("#nav-week"),
+    navWorktimes: document.querySelector("#nav-worktimes"),
+    worktimesContent: document.querySelector("#worktimes-content"),
+    worktimesOpenCount: document.querySelector("#worktimes-open-count"),
     navTime: document.querySelector("#nav-time"),
     navApprentice: document.querySelector("#nav-apprentice"),
     navMobilePlanning: document.querySelector("#nav-mobile-planning"),
@@ -1030,11 +1033,15 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     elements.employeeTimesheetExportPanel
   );
   elements.weekAccountSubarea.append(elements.timeAccountPanel);
-  elements.weekRequestsSubarea.append(
-    elements.absenceArea,
+  // Im Wochenreiter bleibt, was mir gehoert: meine eigenen Antraege. Die
+  // Pruefung der Mitarbeiterzeiten zieht in ihren eigenen Bereich - sie ist
+  // Arbeit an fremden Zeiten und hat in "Meine Woche" nie hingehoert.
+  elements.weekRequestsSubarea.append(elements.absenceArea);
+  elements.worktimesContent.append(
     elements.workDayReviewPanel,
     elements.timeCorrectionReviewPanel,
-    elements.absenceReviewPanel
+    elements.absenceReviewPanel,
+    elements.timesheetExportPanel
   );
 
   // Jeder Eintrag der Seitenleiste hat einen eigenen Bereich. Die Tafeln dafuer
@@ -1043,7 +1050,6 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
   elements.reportsContent.append(elements.reportCenter);
   elements.employeesContent.append(elements.employeePanel);
   elements.documentsContent.append(elements.documentManagementPanel);
-  elements.analyticsExportContent.append(elements.timesheetExportPanel);
   elements.customersContent.append(
     elements.customerPanel,
     elements.customerManagementPanel,
@@ -1356,7 +1362,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.24",
+          "X-Schaefchen-Version": "0.44.25",
           ...options.headers
         }
       });
@@ -1391,7 +1397,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.24`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.25`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1413,7 +1419,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.24" }
+        headers: { "X-Schaefchen-Version": "0.44.25" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1460,7 +1466,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.24 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.25 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1559,6 +1565,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     elements.navCustomers.hidden = !planner;
     elements.navDocuments.hidden = !planner;
     elements.navAnalytics.hidden = !planner || isProjectScopedSession();
+    // Den Bereich sieht, wer Zeiten freigeben darf. Fuer alle anderen waere er
+    // eine Tuer, hinter der drei leere Listen stehen.
+    elements.navWorktimes.hidden = !planner;
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
     elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
     deviceModule.setEnabled(!elements.navDevices.hidden);
@@ -2935,7 +2944,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.24";
+  const EIGENE_FASSUNG = "0.44.25";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2974,7 +2983,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.24". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.25". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -5753,11 +5762,28 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
       `${visibleAssignments} sichtbare Einsätze · ${unassignedEmployees} nicht eingeplante Mitarbeiter · Karten lassen sich per Drag-and-drop verschieben`;
   }
 
+  /**
+   * Wie viel im Bereich "Arbeitszeiten" wirklich offen ist.
+   *
+   * Gezaehlt wird aus den drei Listen selbst und nicht noch einmal gerechnet:
+   * so kann die Zahl im Kopf nicht von dem abweichen, was darunter steht -
+   * und genau das ist der Fehler, den solche Zaehler sonst machen.
+   */
+  function renderWorktimesOpenCount() {
+    const zahl = (element) => Number.parseInt(element?.textContent || "0", 10) || 0;
+    const offen = zahl(elements.workDayReviewCount)
+      + zahl(elements.timeCorrectionReviewCount)
+      + zahl(elements.absenceReviewCount);
+    elements.worktimesOpenCount.textContent = offen === 1 ? "1 offen" : `${offen} offen`;
+    elements.worktimesOpenCount.classList.toggle("site-list-summary--alert", offen > 0);
+  }
+
   function renderWorkDayReviews() {
     const workDays = adminState?.workDays || [];
     const actionable = workDays.filter((day) => day.reviewable || day.status === "approved");
     elements.workDayReviewPanel.hidden = !canPlan();
     elements.workDayReviewCount.textContent = String(actionable.length);
+    renderWorktimesOpenCount();
     elements.workDayReviewList.replaceChildren();
     if (workDays.length === 0) {
       const empty = document.createElement("li");
@@ -5948,6 +5974,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     });
     elements.timeCorrectionReviewPanel.hidden = !canPlan();
     elements.timeCorrectionReviewCount.textContent = String(corrections.length);
+    renderWorktimesOpenCount();
     elements.timeCorrectionReviewList.replaceChildren();
     if (corrections.length === 0) {
       const empty = document.createElement("li");
@@ -6043,6 +6070,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     const visible = [...pending, ...approved];
     elements.absenceReviewPanel.hidden = !canPlan() || !moduleEnabled("absences");
     elements.absenceReviewCount.textContent = String(pending.length);
+    renderWorktimesOpenCount();
     elements.absenceReviewList.replaceChildren();
 
     if (visible.length === 0) {
@@ -7032,7 +7060,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.24" }
+        headers: { "X-Schaefchen-Version": "0.44.25" }
       });
       if (response.ok) {
         await cache.put(
@@ -10081,6 +10109,8 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
       "assignments", "sites", "reports", "employees", "customers", "vehicles",
       "documents", "inspections", "analytics", "more"
     ]);
+    // Die Arbeitszeiten stehen in einem eigenen Bereich und nicht in der
+    // Verwaltungsschale: sie sind Fuehrungsarbeit und keine Stammdatenpflege.
     elements.dashboardPanes.forEach((element) => {
       if (element === elements.adminSection) {
         element.hidden = !canPlan() || !adminPanes.has(pane);
@@ -10159,6 +10189,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
     const activeButton = {
       time: elements.navTime,
       week: elements.navWeek,
+      worktimes: elements.navWorktimes,
       apprentice: elements.navApprentice,
       assignments: elements.navAssignments,
       sites: elements.navSites,
@@ -13642,6 +13673,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.24";
   elements.navTime.addEventListener("click", () => {
     showDashboardPane("time");
     void refreshLiveData();
+  });
+  elements.navWorktimes.addEventListener("click", () => {
+    showDashboardPane("worktimes");
   });
   elements.navWeek.addEventListener("click", () => {
     showDashboardPane("week");

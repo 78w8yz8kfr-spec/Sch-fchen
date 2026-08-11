@@ -4,6 +4,20 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Zeiten der Mitarbeiter haben einen eigenen Bereich (Fassung
+  0.44.25).** Sie lagen in „Meine Woche" unter dem Reiter „Anträge & Prüfung" —
+  drei Ebenen tief, in einer Ansicht, die ihrem Namen nach die eigene Woche
+  zeigt. Wer Stundenzettel freigeben sollte, scrollte an seiner eigenen Woche
+  vorbei, um die Zeiten anderer zu finden, und traf dort auf fünf Tafeln
+  nebeneinander. Getrennt wird jetzt danach, wem die Zeit gehört: „Meine Woche"
+  behält Überblick, Arbeitstage, Arbeitskonto und die eigenen Anträge — der
+  Reiter heißt deshalb nur noch „Meine Anträge". Der neue Bereich
+  **Arbeitszeiten** trägt die Arbeit an fremden Zeiten: Stundenzettel prüfen,
+  offene Korrekturen, Abwesenheiten und den Stundenzettel-Export, der bisher in
+  der Auswertung stand. Der Eintrag erscheint nur für die, die freigeben
+  dürfen; im Kopf steht, wie viel offen ist, gezählt aus den Listen selbst,
+  damit die Zahl nicht von dem abweichen kann, was darunter steht. Dieselben
+  Tafeln, dieselben Rechte — ein anderer Ort.
 - **Aus der Materialliste der Baustelle zurücklegen und bestellen (Fassung
   0.44.24).** Seit 0.44.17 zeigt eine Zeile auf einen Lagerartikel und sagt, ob
   der Bestand reicht. Damit endete sie aber auch: was zu tun ist, wenn er nicht

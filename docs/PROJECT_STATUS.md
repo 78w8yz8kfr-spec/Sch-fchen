@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.24
+Technischer Stand: V0.44.25
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,10 @@ Technischer Stand: V0.44.24
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Eigener Bereich „Arbeitszeiten" für Stundenzettelprüfung, Korrekturen,
+  Abwesenheiten und Export; „Meine Woche" behält nur die eigenen Anträge;
+  PWA-Speicher `schaefchen-online-v107`
 
 - Bedarfsliste der Baustelle in der Belegkette (Migration 129): zurücklegen und
   Rest bestellen direkt aus der Zeile, Sammelbestellung je Lieferant, beide

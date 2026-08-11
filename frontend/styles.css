@@ -9571,3 +9571,11 @@ body.hat-fassungshinweis {
 }
 .stock-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
+
+
+/* Der Kopf des Arbeitszeitenbereichs. Rot nur, wenn wirklich etwas offen ist -
+   eine dauerhaft farbige Null lernt man in einer Woche zu übersehen. */
+.site-list-summary--alert {
+  color: var(--brand, #e30613);
+  font-weight: 700;
+}

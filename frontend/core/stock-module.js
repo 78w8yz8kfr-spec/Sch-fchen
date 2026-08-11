@@ -39,14 +39,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.24";
+} from "./stock-management.js?v=0.44.25";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.24";
+} from "./barcode-scanner.mjs?v=0.44.25";
 
 const html = `
   <div class="stock-module">
