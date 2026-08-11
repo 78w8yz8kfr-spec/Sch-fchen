@@ -50,6 +50,11 @@ export const VORGAENGE = Object.freeze({
   verschrottung: { movementType: 'scrap', ort: 'quelle', name: 'Verschrotten', recht: 'verwaltung' }
 });
 
+// Nur diese beiden Vorgaenge tragen eine Baustelle. Eine Umlagerung geht von
+// Lager zu Lager, ein Wareneingang kommt vom Lieferanten, und Verschrottung
+// und Anfangsbestand gehen keine Baustelle etwas an.
+export const BAUSTELLE_BUCHBAR = new Set(['issue', 'return']);
+
 export function offlineLagerQueueKey(session) {
   return `schaefchen-stock-queue-v1:${session?.company?.number || 'unknown'}:${session?.user?.id || 'unknown'}`;
 }
@@ -60,6 +65,60 @@ export function ortSpeicherKey(session) {
 
 export function scanSpeicherKey(session) {
   return `schaefchen-stock-scans-v1:${session?.company?.number || 'unknown'}:${session?.user?.id || 'unknown'}`;
+}
+
+export function baustellenSpeicherKey(session) {
+  return `schaefchen-stock-sites-v1:${session?.company?.number || 'unknown'}:${session?.user?.id || 'unknown'}`;
+}
+
+/**
+ * Die Auswahlliste der Baustellen, in zwei Gruppen.
+ *
+ * Oben stehen die aus dem eigenen Tagesplan: wer den ganzen Tag in derselben
+ * Wohnung arbeitet, soll seine Baustelle nicht in einer Liste mit achtzig
+ * Eintraegen suchen. Darunter der Rest des Betriebs, denn der Lagerist gibt
+ * Material fuer Baustellen heraus, auf denen er selbst nie steht.
+ *
+ * Doppelte fallen heraus - eine Baustelle steht in genau einer Gruppe.
+ */
+export function baustellenListe(eigene = [], alle = []) {
+  const sauber = (liste) => (Array.isArray(liste) ? liste : [])
+    .filter((baustelle) => baustelle?.id)
+    .map((baustelle) => ({
+      id: baustelle.id,
+      name: baustelle.name || 'Ohne Namen',
+      siteNumber: baustelle.siteNumber || null
+    }));
+
+  const meine = [];
+  const gesehen = new Set();
+  for (const baustelle of sauber(eigene)) {
+    if (gesehen.has(baustelle.id)) continue;
+    gesehen.add(baustelle.id);
+    meine.push(baustelle);
+  }
+
+  const weitere = [];
+  for (const baustelle of sauber(alle)) {
+    if (gesehen.has(baustelle.id)) continue;
+    gesehen.add(baustelle.id);
+    weitere.push(baustelle);
+  }
+
+  return { meine, weitere };
+}
+
+/**
+ * Steht die gewaehlte Baustelle ueberhaupt noch zur Wahl?
+ *
+ * Wird sie abgeschlossen, waehrend die App offen ist, faellt sie aus der
+ * Liste - die Kennung im Zustand bliebe aber stehen und wuerde stumm
+ * mitgebucht, ohne dass jemand sie noch im Feld sieht.
+ */
+export function baustelleNochWaehlbar(baustelleId, liste) {
+  if (!baustelleId) return true;
+  return [...(liste?.meine || []), ...(liste?.weitere || [])]
+    .some((baustelle) => baustelle.id === baustelleId);
 }
 
 /**
@@ -342,7 +401,11 @@ export function buchungBauen(zustand, optionen = {}) {
     buchung.targetLocationId = zustand.zielOrtId;
   }
 
-  if (zustand.baustelleId && vorgang.movementType === 'issue') {
+  // Die Baustelle haengt an beiden Richtungen: bei der Entnahme sagt sie,
+  // wohin das Material geht, bei der Rueckgabe, woher es kommt. Vorher trug
+  // nur die Entnahme sie mit — die Rueckgabe verlor damit genau die Angabe,
+  // an der spaeter haengt, was eine Baustelle wirklich verbraucht hat.
+  if (zustand.baustelleId && BAUSTELLE_BUCHBAR.has(vorgang.movementType)) {
     buchung.constructionSiteId = zustand.baustelleId;
   }
   if (zustand.grund) buchung.reason = zustand.grund;
@@ -398,8 +461,16 @@ export function neueVorgangId() {
  * sofort moeglich, ohne dass jemand etwas wegklicken muss — im Lager wird
  * selten nur ein Artikel entnommen.
  */
-export function buchungVerarbeiten(zustand, antwort) {
+export function buchungVerarbeiten(zustand, antwort, optionen = {}) {
   const bestand = (antwort?.levels || []).find((zeile) => zeile.locationId === zustand.ort?.id);
+
+  // Die Baustelle steht in der Bestaetigung, weil sie sonst nirgends mehr
+  // auftaucht: die Auswahl bleibt fuer die naechste Buchung stehen, und eine
+  // falsche waere ohne diesen Satz erst im Journal aufgefallen.
+  const liste = baustellenListe(optionen.eigeneBaustellen, optionen.baustellen);
+  const baustelle = BAUSTELLE_BUCHBAR.has(VORGAENGE[zustand.vorgang]?.movementType)
+    ? [...liste.meine, ...liste.weitere].find((eintrag) => eintrag.id === zustand.baustelleId)
+    : null;
 
   // Ohne Netz kennt niemand den neuen Bestand: die Buchung liegt im Speicher
   // des Geraets und ist noch nicht gezaehlt worden. Eine Zahl zu zeigen, die
@@ -418,6 +489,10 @@ export function buchungVerarbeiten(zustand, antwort) {
       // neben der gebuchten Menge, damit beides zusammenpasst.
       gewaehlt: gebindeText(zustand),
       vorgang: VORGAENGE[zustand.vorgang]?.name || '',
+      baustelle: baustelle?.name || null,
+      // Bei der Entnahme geht das Material hin, bei der Rueckgabe kommt es
+      // her. Ein Satz, den auch jemand versteht, der nur kurz hinschaut.
+      baustelleRichtung: VORGAENGE[zustand.vorgang]?.movementType === 'return' ? 'von' : 'auf',
       neuerBestand: offline ? null : (bestand ? bestand.quantity : null),
       wiederholt: Boolean(antwort?.repeated),
       offline
@@ -680,20 +755,33 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
 }
 
 function baustellenFeld(zustand, optionen = {}) {
-  const baustellen = optionen.baustellen || [];
-  if (!baustellen.length) return '';
+  const liste = baustellenListe(optionen.eigeneBaustellen, optionen.baustellen);
+  if (!liste.meine.length && !liste.weitere.length) return '';
 
   const pflicht = optionen.baustellePflicht;
+  const eintrag = (baustelle) => `
+    <option value="${sicher(baustelle.id)}"${baustelle.id === zustand.baustelleId ? ' selected' : ''}>
+      ${sicher(baustelle.siteNumber ? `${baustelle.name} (${baustelle.siteNumber})` : baustelle.name)}
+    </option>`;
+
+  // Zwei Gruppen nur, wenn es beide gibt: eine einzelne Gruppe mit
+  // Ueberschrift ist eine Ueberschrift ohne Aussage.
+  const felder = liste.meine.length && liste.weitere.length
+    ? `<optgroup label="Meine Baustellen">${liste.meine.map(eintrag).join('')}</optgroup>
+       <optgroup label="Weitere Baustellen">${liste.weitere.map(eintrag).join('')}</optgroup>`
+    : [...liste.meine, ...liste.weitere].map(eintrag).join('');
+
   return `
     <label class="stock-site">
       <span>Baustelle${pflicht ? '' : ' (freiwillig)'}</span>
       <select class="stock-site__select">
         <option value="">${pflicht ? 'Bitte wählen' : 'Ohne Baustelle'}</option>
-        ${baustellen.map((baustelle) => `
-          <option value="${sicher(baustelle.id)}"${baustelle.id === zustand.baustelleId ? ' selected' : ''}>
-            ${sicher(baustelle.name)}
-          </option>`).join('')}
+        ${felder}
       </select>
+      <span class="stock-site__hint">
+        Beim Entnehmen geht das Material auf diese Baustelle, beim Zurückgeben
+        kommt es von dort ins Lager zurück.
+      </span>
     </label>`;
 }
 
@@ -707,6 +795,9 @@ export function bestaetigungAnsicht(zustand) {
       <h2 class="stock-done__title">${sicher(b.vorgang)}: ${sicher(mengeAlsText(b.menge))} ${sicher(b.einheit)}</h2>
       ${b.gewaehlt ? `<p class="stock-done__pack">${sicher(b.gewaehlt)}</p>` : ''}
       <p class="stock-done__item">${sicher(b.artikelName)}</p>
+      ${b.baustelle
+        ? `<p class="stock-done__site">${sicher(b.baustelleRichtung === 'von' ? 'Zurück von' : 'Für')} Baustelle ${sicher(b.baustelle)}</p>`
+        : ''}
       ${b.neuerBestand !== null
         ? `<p class="stock-done__stock">Neuer Bestand hier: ${sicher(bestandText(b.neuerBestand, b.einheit))}</p>`
         : ''}
@@ -1427,7 +1518,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.15`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.16`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den

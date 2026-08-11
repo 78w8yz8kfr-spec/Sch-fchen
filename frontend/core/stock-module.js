@@ -15,6 +15,9 @@ import {
   artikelAlsEntwurf,
   artikelEntwurfAusScan,
   artikelFormularLesen,
+  baustelleNochWaehlbar,
+  baustellenListe,
+  baustellenSpeicherKey,
   buchungBauen,
   buchungBleibtInWarteschlange,
   buchungVerarbeiten,
@@ -34,14 +37,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.15";
+} from "./stock-management.js?v=0.44.16";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.15";
+} from "./barcode-scanner.mjs?v=0.44.16";
 
 const html = `
   <div class="stock-module">
@@ -117,7 +120,7 @@ export function createStockModule({
 
   let enabled = false;
   let geladen = false;
-  let kontext = { groups: [], locations: [], settings: {}, permissions: {} };
+  let kontext = { groups: [], locations: [], sites: [], settings: {}, permissions: {} };
   let zustand = lagerZustand();
   let bestand = [];
   let artikel = [];
@@ -131,7 +134,11 @@ export function createStockModule({
 
   const rechte = () => kontext.permissions || {};
   const optionen = () => ({
-    baustellen: getSites(),
+    // Zwei Quellen: der eigene Tagesplan und die laufenden Baustellen des
+    // Betriebs. Ohne Netz bleibt der zuletzt geladene Stand des Betriebs
+    // stehen, damit auch im Keller eine Baustelle waehlbar ist.
+    eigeneBaustellen: getSites(),
+    baustellen: kontext.sites?.length ? kontext.sites : gemerkteBaustellen(),
     baustellePflicht: Boolean(kontext.settings?.requireSiteOnIssue),
     bestand,
     artikel,
@@ -188,6 +195,15 @@ export function createStockModule({
 
   function gemerkterOrt() {
     return lesen(ortSpeicherKey(getSession()), null);
+  }
+
+  function baustellenMerken(baustellen) {
+    schreiben(baustellenSpeicherKey(getSession()), baustellen || []);
+  }
+
+  function gemerkteBaustellen() {
+    const gemerkt = lesen(baustellenSpeicherKey(getSession()), []);
+    return Array.isArray(gemerkt) ? gemerkt : [];
   }
 
   function scanMerken(code, scan) {
@@ -253,7 +269,21 @@ export function createStockModule({
    * verschwinden lassen.
    */
   function neuerVorgang(zusatz = {}) {
-    return lagerZustand({ ort: zustand.ort, wartend: warteschlange().length, ...zusatz });
+    // Die Baustelle bleibt stehen wie der Lagerplatz. Wer eine Baustelle
+    // ruestet, bucht zehn Artikel nacheinander und geht dazwischen ueber die
+    // Startseite; sie jedesmal neu zu waehlen waere der sichere Weg zu
+    // Buchungen ohne Baustelle. Unsichtbar wird sie dadurch nicht: sie steht
+    // im Feld und noch einmal in der Bestaetigung.
+    //
+    // Ueber einen Neustart der App traegt sie bewusst nicht - anders als der
+    // Lagerplatz, der im Speicher des Geraets liegt. Ein neuer Tag faengt
+    // ohne Baustelle an.
+    return lagerZustand({
+      ort: zustand.ort,
+      baustelleId: zustand.baustelleId,
+      wartend: warteschlange().length,
+      ...zusatz
+    });
   }
 
   function melden(fehler) {
@@ -281,6 +311,14 @@ export function createStockModule({
       const antwort = await laden("/contexts");
       kontext = antwort.context;
       geladen = true;
+      baustellenMerken(kontext.sites || []);
+
+      // Eine abgeschlossene Baustelle faellt aus der Liste. Bliebe ihre
+      // Kennung im Zustand stehen, wuerde weiter auf sie gebucht, obwohl im
+      // Feld nichts mehr davon zu sehen ist.
+      if (!baustelleNochWaehlbar(zustand.baustelleId, baustellenListe(getSites(), kontext.sites))) {
+        zustand = { ...zustand, baustelleId: null };
+      }
       if (!zustand.ort) {
         // Der zuletzt gescannte Platz ueberlebt das Schliessen der App: wer
         // morgens im Fach A1 weitermacht, soll das Regal nicht erneut suchen.
@@ -707,7 +745,7 @@ export function createStockModule({
 
     try {
       const antwort = await senden("/movements", buchung);
-      zustand = buchungVerarbeiten(zustand, antwort);
+      zustand = buchungVerarbeiten(zustand, antwort, optionen());
       render();
     } catch (weg) {
       // Nur das Netz wird aufgehoben. Eine abgelehnte Buchung - fehlendes
@@ -718,7 +756,7 @@ export function createStockModule({
         return undefined;
       }
       warteschlangeSpeichern([...warteschlange(), warteschlangeEintrag(zustand, buchung)]);
-      zustand = buchungVerarbeiten(zustand, { offline: true });
+      zustand = buchungVerarbeiten(zustand, { offline: true }, optionen());
       render();
     }
     return undefined;
@@ -1068,7 +1106,7 @@ export function createStockModule({
   function clear() {
     scannerSchliessen();
     geladen = false;
-    kontext = { groups: [], locations: [], settings: {}, permissions: {} };
+    kontext = { groups: [], locations: [], sites: [], settings: {}, permissions: {} };
     // Die Warteschlange wird bewusst nicht geleert: sie gehoert dem Mitarbeiter
     // und nicht der Sitzung. Wer sich abmeldet, waehrend drei Entnahmen warten,
     // findet sie beim naechsten Anmelden wieder vor.

@@ -9388,6 +9388,10 @@ body.hat-fassungshinweis {
   color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border-strong);
   border-radius: 8px; padding: 10px; min-height: 46px;
 }
+.stock-site__hint {
+  font-size: .78rem; font-weight: 500; letter-spacing: 0; text-transform: none;
+  color: var(--ui-text-tertiary);
+}
 
 .stock-actions { display: flex; flex-direction: column; gap: 8px; }
 
@@ -9399,6 +9403,7 @@ body.hat-fassungshinweis {
 }
 .stock-done__title { margin: 0; font-size: 1.15rem; }
 .stock-done__item { margin: 0; color: var(--ui-text-secondary); }
+.stock-done__site { margin: 0; font-weight: 700; }
 .stock-done__stock { margin: 0; font-variant-numeric: tabular-nums; font-weight: 700; }
 
 .stock-unknown__code { margin: 0; font-variant-numeric: tabular-nums; font-size: 1.2rem; font-weight: 700; word-break: break-all; }

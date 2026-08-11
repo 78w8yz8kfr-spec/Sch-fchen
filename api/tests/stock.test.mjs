@@ -414,6 +414,81 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     );
   });
 
+  await t.test("Material geht auf die Baustelle und kommt von dort zurück", async () => {
+    // Die Baustellen des Betriebs stehen im Lagerkontext. Vorher kannte das
+    // Lager nur die Baustellen aus dem eigenen Tagesplan - der Lagerist gibt
+    // aber Material fuer Baustellen heraus, auf denen er selbst nie steht,
+    // und hatte deshalb gar kein Auswahlfeld.
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Lagerkunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Lagerprojekt ${kennung}`]
+    );
+    const laufend = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Neubau ${kennung}`]
+    );
+    const fertig = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status, completed_at)
+       VALUES ($1, $2, $3, 'completed', CURRENT_TIMESTAMP) RETURNING id`,
+      [companyId, projekt.rows[0].id, `Abgeschlossen ${kennung}`]
+    );
+    const baustelleId = laufend.rows[0].id;
+
+    const sicht = await aufrufen(apiPool, monteur, "GET", "/api/v1/stock/contexts");
+    const gefunden = sicht.body.context.sites.find((eintrag) => eintrag.id === baustelleId);
+    assert.ok(gefunden, "Die laufende Baustelle steht zur Wahl");
+    assert.ok(gefunden.siteNumber, "Die Nummer trennt gleichnamige Baustellen");
+    assert.ok(
+      !sicht.body.context.sites.some((eintrag) => eintrag.id === fertig.rows[0].id),
+      "Auf eine abgeschlossene Baustelle soll nichts mehr gebucht werden"
+    );
+
+    // Ein eigener Artikel: die Bestaende des Hauptartikels tragen die
+    // Erwartungen der folgenden Pruefungen, und die sollen hier nicht
+    // stillschweigend verschoben werden.
+    const material = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `BAU-${kennung}`, name: "Mantelleitung 5x1,5",
+      groupKey: "cable", unit: "Meter"
+    });
+    const materialId = material.body.item.id;
+    await aufrufen(apiPool, buero, "POST", "/api/v1/stock/movements", {
+      itemId: materialId, movementType: "opening", quantity: 100, targetLocationId: lager.id
+    });
+
+    const raus = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: materialId, movementType: "issue", quantity: 12,
+      sourceLocationId: lager.id, constructionSiteId: baustelleId, sourceType: "qr_scan"
+    });
+    assert.equal(raus.status, 201);
+    assert.equal(raus.body.movement.constructionSiteId, baustelleId);
+
+    // Und zurueck: acht Stueck blieben uebrig und gehen ins Lager, mit der
+    // Baustelle daran. Ohne sie stuende im Journal ein Zugang aus dem Nichts,
+    // und die Baustelle haette alles verbraucht.
+    const rein = await aufrufen(apiPool, monteur, "POST", "/api/v1/stock/movements", {
+      itemId: materialId, movementType: "return", quantity: 8,
+      targetLocationId: lager.id, constructionSiteId: baustelleId, sourceType: "qr_scan"
+    });
+    assert.equal(rein.status, 201);
+    assert.equal(rein.body.movement.constructionSiteId, baustelleId);
+    assert.equal(rein.body.levels.find((e) => e.locationId === lager.id).quantity, 96);
+
+    const verbraucht = await ownerPool.query(
+      `SELECT COALESCE(SUM(CASE WHEN movement_type = 'issue' THEN quantity ELSE -quantity END), 0) AS menge
+       FROM stock_movements
+       WHERE company_id = $1 AND construction_site_id = $2 AND item_id = $3`,
+      [companyId, baustelleId, materialId]
+    );
+    assert.equal(Number(verbraucht.rows[0].menge), 4, "Auf der Baustelle blieben vier Meter");
+  });
+
   await t.test("Bestandsliste und Nachbestellvorschlag rechnen aus dem Journal", async () => {
     const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/levels?ort=${lager.id}`);
     assert.equal(bestand.status, 200);

@@ -47,16 +47,26 @@ in einer eigenen Dateiablage.
 Der Monteur scannt den Lagerplatz-QR — damit steht fest, *wo* er ist — und
 danach die Artikel. Der Ort bleibt gesetzt, bis er einen anderen scannt. Jede
 Entnahme fragt nach der Menge und, sofern die Firma es verlangt, nach der
-Baustelle. Ist die Baustelle über die Tageseinsätze eindeutig, wird sie
-vorgeschlagen und muss nur bestätigt werden. Der Monteur sieht drei Schaltflächen:
-Menge, Baustelle, Buchen.
+Baustelle.
+
+Zur Wahl stehen die laufenden Baustellen des Betriebs: die aus dem eigenen
+Tagesplan oben, die übrigen darunter. Nur den eigenen Tagesplan anzubieten
+reichte nicht — der Lagerist gibt Material für Baustellen heraus, auf denen er
+selbst nie steht, und hatte damit gar keine Auswahl. Abgeschlossene,
+abgebrochene und archivierte Baustellen fehlen; auf sie soll nichts mehr
+gebucht werden. Die Auswahl bleibt zwischen zwei Buchungen stehen wie der
+Lagerplatz, denn wer eine Baustelle rüstet, bucht mehrere Artikel nacheinander;
+über einen Neustart der App trägt sie nicht.
 
 ### Umlagerung, Rückgabe, Verschrottung
 
 Umlagerung ist eine Buchung mit Quelle **und** Ziel; das Fahrzeug ist dabei ein
-Lagerplatz wie jeder andere. Rückgabe ist die Umlagerung von der Baustelle oder
-vom Fahrzeug zurück ins Hauptlager. Verschrottung braucht einen Pflichtgrund und
-kein Ziel.
+Lagerplatz wie jeder andere und geht keine Baustelle etwas an. Rückgabe ist der
+Weg von der Baustelle oder vom Fahrzeug zurück ins Hauptlager — und sie trägt
+dieselbe Baustelle wie die Entnahme. Ohne diese Angabe stünde im Journal eine
+Entnahme auf die Baustelle und daneben ein Zugang aus dem Nichts: die Baustelle
+hätte alles verbraucht, auch das, was abends zurück ins Regal ging.
+Verschrottung braucht einen Pflichtgrund und kein Ziel.
 
 ### Inventur
 

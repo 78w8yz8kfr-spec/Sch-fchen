@@ -11,6 +11,8 @@ import {
   verfuegbareVorgaenge,
   darfVorgang,
   buchungBauen,
+  baustellenListe,
+  baustelleNochWaehlbar,
   neueVorgangId,
   buchungVerarbeiten,
   bestandLage,
@@ -238,11 +240,21 @@ test('die Firmenregel zur Baustelle wird vor dem Absenden geprüft', () => {
   );
   assert.equal(mit.buchung.constructionSiteId, 'bau-1');
 
-  // Eine Baustelle bei einer Rückgabe wäre sinnlos und wird nicht mitgeschickt.
+  // Die Rückgabe trägt die Baustelle mit: sie sagt, woher das Material kommt.
+  // Ohne sie stünde im Journal eine Entnahme auf die Baustelle und daneben ein
+  // Zugang aus dem Nichts — die Baustelle hätte alles verbraucht.
   const rueckgabe = buchungBauen(
     buchbarerZustand({ vorgang: 'rueckgabe', baustelleId: 'bau-1' }), { vorgangId: 'op-5' }
   );
-  assert.equal(rueckgabe.buchung.constructionSiteId, undefined);
+  assert.equal(rueckgabe.buchung.constructionSiteId, 'bau-1');
+  assert.equal(rueckgabe.buchung.movementType, 'return');
+
+  // Eine Umlagerung geht von Lager zu Lager und keine Baustelle etwas an.
+  const umlagerung = buchungBauen(
+    buchbarerZustand({ vorgang: 'umlagerung', zielOrtId: 'ort-2', baustelleId: 'bau-1' }),
+    { vorgangId: 'op-6' }
+  );
+  assert.equal(umlagerung.buchung.constructionSiteId, undefined);
 });
 
 test('jede Buchung bekommt eine eigene, wiederverwendbare Vorgangsnummer', () => {
@@ -386,6 +398,69 @@ test('die Baustellenauswahl erscheint nur mit Baustellen und nennt die Pflicht',
   });
   assert.ok(!pflicht.includes('(freiwillig)'));
   assert.ok(pflicht.includes('Bitte wählen'));
+});
+
+test('das Feld nennt beide Richtungen: hin bei der Entnahme, her bei der Rückgabe', () => {
+  const ansicht = buchenAnsicht(buchbarerZustand(), {}, {
+    baustellen: [{ id: 'b1', name: 'Neubau Schule' }]
+  });
+  assert.match(ansicht, /Entnehmen geht das Material auf diese Baustelle/);
+  assert.match(ansicht, /Zurückgeben\s+kommt es von dort ins Lager zurück/);
+});
+
+test('eigene Baustellen stehen oben, der Rest des Betriebs darunter', () => {
+  const liste = baustellenListe(
+    [{ id: 'b1', name: 'Neubau Schule' }],
+    [{ id: 'b1', name: 'Neubau Schule' }, { id: 'b2', name: 'Altbau Post', siteNumber: 'B-2' }]
+  );
+
+  assert.deepEqual(liste.meine.map((eintrag) => eintrag.id), ['b1']);
+  // Die eigene Baustelle steht genau einmal in der Liste, nicht in beiden
+  // Gruppen: sonst wählt jemand die untere und wundert sich über die obere.
+  assert.deepEqual(liste.weitere.map((eintrag) => eintrag.id), ['b2']);
+
+  const ansicht = buchenAnsicht(buchbarerZustand(), {}, {
+    eigeneBaustellen: [{ id: 'b1', name: 'Neubau Schule' }],
+    baustellen: [{ id: 'b2', name: 'Altbau Post', siteNumber: 'B-2' }]
+  });
+  assert.ok(ansicht.includes('<optgroup label="Meine Baustellen">'));
+  assert.ok(ansicht.includes('<optgroup label="Weitere Baustellen">'));
+  assert.ok(ansicht.includes('Altbau Post (B-2)'), 'Die Nummer trennt gleichnamige Baustellen');
+
+  // Nur eine Gruppe: dann ist eine Überschrift eine Überschrift ohne Aussage.
+  const einzeln = buchenAnsicht(buchbarerZustand(), {}, {
+    baustellen: [{ id: 'b2', name: 'Altbau Post' }]
+  });
+  assert.ok(!einzeln.includes('optgroup'));
+});
+
+test('eine abgeschlossene Baustelle gilt nicht mehr als wählbar', () => {
+  const liste = baustellenListe([], [{ id: 'b2', name: 'Altbau Post' }]);
+
+  assert.equal(baustelleNochWaehlbar('b2', liste), true);
+  assert.equal(baustelleNochWaehlbar('weg', liste), false);
+  // Ohne Baustelle ist immer in Ordnung - das Feld ist freiwillig.
+  assert.equal(baustelleNochWaehlbar(null, liste), true);
+});
+
+test('die Bestätigung nennt die Baustelle und die Richtung', () => {
+  const optionen = { baustellen: [{ id: 'b1', name: 'Neubau Schule' }] };
+
+  const entnahme = buchungVerarbeiten(
+    buchbarerZustand({ baustelleId: 'b1' }), { levels: [] }, optionen
+  );
+  assert.equal(entnahme.bestaetigung.baustelle, 'Neubau Schule');
+  assert.match(bestaetigungAnsicht(entnahme), /Für Baustelle Neubau Schule/);
+
+  const rueckgabe = buchungVerarbeiten(
+    buchbarerZustand({ vorgang: 'rueckgabe', baustelleId: 'b1' }), { levels: [] }, optionen
+  );
+  assert.match(bestaetigungAnsicht(rueckgabe), /Zurück von Baustelle Neubau Schule/);
+
+  // Ohne Baustelle steht dort kein leerer Satz.
+  const ohne = buchungVerarbeiten(buchbarerZustand(), { levels: [] }, optionen);
+  assert.equal(ohne.bestaetigung.baustelle, null);
+  assert.ok(!bestaetigungAnsicht(ohne).includes('stock-done__site'));
 });
 
 test('Artikelnamen aus fremder Feder können kein Markup einschleusen', () => {

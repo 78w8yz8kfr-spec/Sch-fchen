@@ -4,6 +4,23 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Material geht auf die Baustelle und kommt von dort zurück (Fassung
+  0.44.16).** Beides war bisher nur halb da. Die Entnahme konnte eine Baustelle
+  tragen, die Rückgabe nicht: im Journal stand dann eine Entnahme auf die
+  Baustelle und daneben ein Zugang aus dem Nichts. Wer später fragte, was eine
+  Baustelle wirklich verbraucht hat, bekam die ausgegebene Menge und nicht die
+  verbaute — der Rest, der abends zurück ins Regal ging, fehlte in der
+  Rechnung. Und die Auswahl war für den Falschen gebaut: sie kannte nur die
+  Baustellen aus dem eigenen Tagesplan. Für den Monteur stimmt das, für den
+  Lageristen nicht — der gibt Material für Baustellen heraus, auf denen er
+  selbst nie steht, und sah deshalb überhaupt kein Auswahlfeld. Der
+  Lagerbereich liefert die laufenden Baustellen des Betriebs jetzt mit; die
+  eigenen stehen oben, der Rest darunter, abgeschlossene gar nicht mehr. Die
+  gewählte Baustelle bleibt zwischen zwei Buchungen stehen wie der Lagerplatz,
+  denn wer eine Baustelle rüstet, bucht zehn Artikel nacheinander; über einen
+  Neustart der App trägt sie bewusst nicht. Ohne Netz bleibt die zuletzt
+  geladene Liste auf dem Gerät, und eine Buchung wandert mitsamt Baustelle in
+  die Warteschlange.
 - **Einzelne Lagerplätze beschriften, und Artikel ändern (Fassung 0.44.15).**
   Bei den Lagerplätzen gab es nur „alle auf einmal" — wer nachträglich ein Fach
   beschriftet, druckte damit den ganzen Satz. Sie bekommen jetzt dieselben

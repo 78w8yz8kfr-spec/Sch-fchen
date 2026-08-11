@@ -411,9 +411,16 @@ const ARTIKEL = [
   }
 ];
 
+// Die eigenen Baustellen aus dem Tagesplan stehen in der Auswahl oben, die
+// uebrigen des Betriebs darunter — der Lagerist gibt Material fuer Baustellen
+// heraus, auf denen er selbst nie steht.
+const EIGENE_BAUSTELLEN = [
+  { id: 'bau-1', name: 'Neubau Grundschule, Haus B' }
+];
+
 const BAUSTELLEN = [
-  { id: 'bau-1', name: 'Neubau Grundschule, Haus B' },
-  { id: 'bau-2', name: 'Sanierung Rathaus' }
+  { id: 'bau-2', name: 'Sanierung Rathaus', siteNumber: 'B-2026-014' },
+  { id: 'bau-3', name: 'Umbau Praxis Dr. Vogt', siteNumber: 'B-2026-021' }
 ];
 
 const bestand = new Map([
@@ -719,6 +726,7 @@ function etikettenDrucken(ziele) {
 }
 
 const optionen = () => ({
+  eigeneBaustellen: EIGENE_BAUSTELLEN,
   baustellen: BAUSTELLEN,
   baustellePflicht: false,
   bestand: alleBestandszeilen(),
