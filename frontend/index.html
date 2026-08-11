@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.24">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.24">
-    <script type="module" src="./app.js?v=0.44.24"></script>
-    <script src="./version.js?v=0.44.24" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.25">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.25">
+    <script type="module" src="./app.js?v=0.44.25"></script>
+    <script src="./version.js?v=0.44.25" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.24</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.25</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -748,6 +748,26 @@
             </ol>
           </section>
 
+          <!-- Die Zeiten der Mitarbeiter: erfassen, bearbeiten, freigeben.
+               Sie lagen bisher in "Meine Woche" unter einem Reiter - drei
+               Ebenen tief, in einer Ansicht, die dem eigenen Namen nach die
+               eigene Woche zeigt. Wer freigeben soll, sucht sie dort nicht. -->
+          <section id="worktimes-section" class="section" data-dashboard-pane="worktimes"
+                   aria-labelledby="worktimes-title" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Führung</p>
+                <h2 id="worktimes-title">Arbeitszeiten</h2>
+                <p class="section-intro">
+                  Stundenzettel, Korrekturen und Abwesenheiten der Mitarbeiter
+                  prüfen, freigeben und auswerten.
+                </p>
+              </div>
+              <span id="worktimes-open-count" class="site-list-summary" aria-live="polite">0 offen</span>
+            </div>
+            <div id="worktimes-content" class="planning-group"></div>
+          </section>
+
           <section id="week-section" class="section" data-dashboard-pane="week" aria-labelledby="week-title" hidden>
             <div class="section-heading week-heading">
               <div>
@@ -770,7 +790,7 @@
               <button class="page-tab page-tab--active" type="button" data-week-view-button="overview" aria-pressed="true">Überblick</button>
               <button class="page-tab" type="button" data-week-view-button="days" aria-pressed="false">Arbeitstage</button>
               <button class="page-tab" type="button" data-week-view-button="account" aria-pressed="false">Arbeitskonto</button>
-              <button class="page-tab" type="button" data-week-view-button="requests" aria-pressed="false">Anträge &amp; Prüfung</button>
+              <button class="page-tab" type="button" data-week-view-button="requests" aria-pressed="false">Meine Anträge</button>
             </nav>
             <div id="week-strip" class="week-strip" role="group" aria-label="Aktuelle Woche"></div>
             <span id="week-total-break" hidden>00:00</span>
@@ -3090,6 +3110,10 @@
           <button id="nav-sites" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="planning">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M8 20v-6h8v6"/></svg>
             <span>Baustellen</span>
+          </button>
+          <button id="nav-worktimes" class="nav-item nav-item--desktop" type="button" hidden data-nav-group="planning">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M3 5h4"/></svg>
+            <span>Arbeitszeiten</span>
           </button>
 
           <p class="nav-group-label" data-nav-group-label="documentation">Dokumentation</p>
