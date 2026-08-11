@@ -33,14 +33,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.13";
+} from "./stock-management.js?v=0.44.14";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.13";
+} from "./barcode-scanner.mjs?v=0.44.14";
 
 const html = `
   <div class="stock-module">
@@ -323,7 +323,7 @@ export function createStockModule({
   async function zeigen(schritt) {
     // Ein Suchbegriff, der eine Ansicht ueberlebt, laesst die Liste beim
     // naechsten Aufruf leer wirken, ohne dass jemand sieht, warum.
-    if (schritt !== SCHRITTE.ARTIKEL) zustand = { ...zustand, suche: '' };
+    if (schritt !== SCHRITTE.ARTIKEL) zustand = { ...zustand, suche: '', druckwahl: [] };
     try {
       await listeLaden(schritt);
       zustand = { ...zustand, schritt, fehler: null };
@@ -485,6 +485,7 @@ export function createStockModule({
   // -------------------------------------------------------------------------
 
   async function etikettenDrucken(ziele) {
+    if (!ziele.length) return melden(new Error("Für den Bogen ist nichts ausgewählt."));
     try {
       const { labels } = await senden("/labels/sheet", { targets: ziele });
       const blatt = fenster.open("", "_blank");
@@ -497,6 +498,7 @@ export function createStockModule({
     } catch (fehler) {
       melden(fehler);
     }
+    return undefined;
   }
 
   // -------------------------------------------------------------------------
@@ -609,6 +611,36 @@ export function createStockModule({
     });
     auf(".stock-order-receive", "click", () => void wareneingangBuchen());
     auf(".stock-order-cancel", "click", () => void bestellungStornieren());
+
+    // Das Kaestchen waehlt fuers Etikett, der Rest der Zeile oeffnet den
+    // Artikel. Ohne diese Trennung koennte man nichts anhaken, ohne
+    // wegzuspringen.
+    auf(".stock-pick__box", "click", (ereignis) => {
+      ereignis.stopPropagation();
+      const id = ereignis.currentTarget.dataset.wahl;
+      const wahl = new Set(zustand.druckwahl);
+      if (wahl.has(id)) wahl.delete(id);
+      else wahl.add(id);
+      zustand = { ...zustand, druckwahl: [...wahl] };
+      render();
+    });
+
+    auf(".stock-sheet-all", "click", () => {
+      const alle = artikel.map((eintrag) => eintrag.id);
+      zustand = {
+        ...zustand,
+        druckwahl: zustand.druckwahl.length === alle.length ? [] : alle
+      };
+      render();
+    });
+
+    auf(".stock-sheet-print", "click", () => void etikettenDrucken(
+      zustand.druckwahl.map((id) => ({ targetType: "item", id }))
+    ));
+
+    auf(".stock-sheet-locations", "click", () => void etikettenDrucken(
+      (kontext.locations || []).map((ort) => ({ targetType: "location", id: ort.id }))
+    ));
 
     auf(".stock-row--tap", "click", (ereignis) => {
       const zeile = ereignis.currentTarget;

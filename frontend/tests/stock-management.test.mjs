@@ -22,6 +22,7 @@ import {
   wartendZeile,
   bestaetigungAnsicht,
   orteAnsicht,
+  druckKnopf,
   einheitenFuer,
   faktorFuer,
   gebindeText,
@@ -1357,4 +1358,71 @@ test('das Formular liest das Gebinde und weist die drei Halbheiten ab', () => {
     artikelFormularLesen({ ...grund, packName: 'Karton', packSize: 'viele' }).fehler,
     /gültige Menge/
   );
+});
+
+// ---------------------------------------------------------------------------
+// Etikettenbogen aus der Liste
+// ---------------------------------------------------------------------------
+
+const DREI = [
+  { id: 'a1', name: 'Schalterdose', itemNumber: 'LAG-1', unit: 'Stück', totalQuantity: 10 },
+  { id: 'a2', name: 'Kabel', itemNumber: 'LAG-2', unit: 'Meter', totalQuantity: 20 },
+  { id: 'a3', name: 'Klemme', itemNumber: 'LAG-3', unit: 'Stück', totalQuantity: 30 }
+];
+
+test('ohne Auswahl lässt sich kein leerer Bogen drucken', () => {
+  const html = druckKnopf(0);
+  assert.ok(html.includes('disabled'), 'Ein Knopf, der nichts erzeugt, ist eine Falle');
+  assert.ok(html.includes('Etiketten drucken'));
+});
+
+test('der Druckknopf sagt, wie viele es werden', () => {
+  assert.ok(druckKnopf(1).includes('1 Etikett drucken'));
+  assert.ok(!druckKnopf(1).includes('disabled'));
+  assert.ok(druckKnopf(7).includes('7 Etiketten drucken'));
+});
+
+test('über 120 Etiketten sagt der Knopf das, statt in einen Fehler zu laufen', () => {
+  // Die Schnittstelle nimmt nicht mehr an. Das gehört an den Knopf, bevor
+  // jemand 300 anhakt und eine Fehlermeldung bekommt.
+  const html = druckKnopf(200);
+  assert.ok(html.includes('disabled'));
+  assert.ok(html.includes('höchstens 120'));
+});
+
+test('die Artikelliste bietet Kästchen und einen Bogen — aber nur der Verwaltung', () => {
+  const buero = artikelListeAnsicht(DREI, { manage: true }, '', ['a1', 'a3']);
+  assert.ok(buero.includes('data-wahl="a1"'));
+  assert.ok(buero.includes('2 Etiketten drucken'));
+  assert.ok(buero.includes('Alle auswählen'));
+  assert.equal((buero.match(/checked/g) || []).length, 2, 'Genau die zwei sind angehakt');
+
+  // Der Monteur druckt keine Etiketten; ihm fehlt dafür auch das Recht in der
+  // Schnittstelle, und ein Knopf, der danach abgewiesen wird, wäre gelogen.
+  const monteur = artikelListeAnsicht(DREI, {}, '', []);
+  assert.ok(!monteur.includes('stock-pick'));
+  assert.ok(!monteur.includes('stock-sheet-print'));
+});
+
+test('sind alle angehakt, hebt derselbe Knopf die Auswahl wieder auf', () => {
+  const alle = artikelListeAnsicht(DREI, { manage: true }, '', ['a1', 'a2', 'a3']);
+  assert.ok(alle.includes('Auswahl aufheben'));
+  assert.ok(alle.includes('3 Etiketten drucken'));
+});
+
+test('die Lagerplätze lassen sich in einem Rutsch beschriften', () => {
+  const mit = orteAnsicht(ORTE, 'ort-1', { manage: true });
+  assert.ok(mit.includes('stock-sheet-locations'));
+  assert.ok(mit.includes(`für alle ${ORTE.length} Lagerplätze`));
+
+  // Einzahl: "alle 1 Lagerplätze" liest sich wie ein Fehler.
+  assert.ok(orteAnsicht([ORTE[0]], null, { manage: true }).includes('für den Lagerplatz'));
+
+  assert.ok(!orteAnsicht(ORTE, 'ort-1', {}).includes('stock-sheet-locations'),
+    'Wer nicht verwaltet, druckt keine Platzetiketten');
+});
+
+test('der Zustand kennt die Druckauswahl von Anfang an', () => {
+  assert.deepEqual(lagerZustand().druckwahl, []);
+  assert.deepEqual(lagerZustand({ druckwahl: ['a1'] }).druckwahl, ['a1']);
 });
