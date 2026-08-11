@@ -1,10 +1,16 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.15
+Technischer Stand: V0.44.16
 
 ## Abgeschlossen
 
+- Material auf eine Baustelle entnehmen und von dort ins Lager zurückgeben:
+  beide Richtungen tragen die Baustelle im Journal. Zur Wahl stehen die
+  laufenden Baustellen des Betriebs — die eigenen aus dem Tagesplan oben, der
+  Rest darunter; abgeschlossene, abgebrochene und archivierte fehlen. Die
+  Auswahl bleibt zwischen zwei Buchungen stehen und ohne Netz auf dem Gerät;
+  PWA-Speicher `schaefchen-online-v98`
 - Lager ohne Netz: Zwischenspeicher der gescannten Codes auf dem Gerät,
   Warteschlange für Buchungen mit Nachtrag bei Netzrückkehr und nach
   Neustart, Hinweis auf veralteten Bestand, wartende Buchungen auf der

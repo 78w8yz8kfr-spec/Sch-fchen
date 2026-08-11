@@ -52,7 +52,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Migration 108 (Lebenslauf der Codes) | steht |
 | Migration 109 (Rolle „Lagerist“) | steht |
 | Barcode-Leser für EAN-13/EAN-8/UPC-A/Code 128 | steht, 28 Tests grün |
-| API `/api/v1/stock/*` | vollständig — 58 Abnahmen gegen eine echte Datenbank |
+| API `/api/v1/stock/*` | vollständig — 63 Abnahmen gegen eine echte Datenbank |
 | Bedienoberfläche | Monteursablauf, Büroansichten, Inventur, Bestellwesen, Codes und Etikettendruck |
 | Einhängen in `app.mjs` und Navigation | steht (Fassung 0.44.11) |
 | Bedienung ohne Netz: Scanspeicher, Warteschlange, Nachtrag | steht (Fassung 0.44.12) |
@@ -63,6 +63,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Etiketten im Format der Herstelleraufkleber | steht (Fassung 0.44.14) |
 | Etiketten einzeln oder in Auswahl drucken | steht (Fassung 0.44.15) |
 | Artikel nachträglich ändern | steht (Fassung 0.44.15) |
+| Entnahme auf eine Baustelle, Rückgabe von dort | steht (Fassung 0.44.16) |
 | Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
 
 ## Prüfen
@@ -71,7 +72,7 @@ Alles läuft im regulären Ablauf des Hauptprojekts mit:
 
 ```bash
 make db-test                       # Migrationen 107-109 samt Abnahmetests
-npm --prefix api test              # 58 Lagerabnahmen unter 175
+npm --prefix api test              # 63 Lagerabnahmen unter 185
 node --test frontend/tests/*.test.mjs
 ```
 

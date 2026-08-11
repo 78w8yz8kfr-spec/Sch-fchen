@@ -226,6 +226,36 @@ async function loadLocations(client, context) {
   return result.rows.map(locationDto);
 }
 
+/**
+ * Die Baustellen, auf die gebucht werden darf.
+ *
+ * Bisher kannte das Lager nur die Baustellen aus dem eigenen Tagesplan. Fuer
+ * einen Monteur reicht das, fuer den Lageristen nicht: der gibt Material fuer
+ * eine Baustelle heraus, auf der er selbst nie steht, und sah deshalb gar kein
+ * Auswahlfeld. Deshalb kommen hier die laufenden Baustellen des Betriebs
+ * dazu; die eigenen sortiert die App danach nach oben.
+ *
+ * Abgeschlossene, abgebrochene und archivierte Baustellen fehlen bewusst: auf
+ * sie soll nichts mehr gebucht werden. Rueckgaben von dort sind trotzdem
+ * moeglich, weil eine Rueckgabe ohne Baustelle gebucht werden kann.
+ */
+async function loadSites(client, context) {
+  const result = await client.query(
+    `SELECT id, site_number, name
+     FROM construction_sites
+     WHERE company_id = $1
+       AND status IN ('planned', 'active', 'on_hold', 'delayed')
+     ORDER BY name, site_number
+     LIMIT 500`,
+    [context.companyId]
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    siteNumber: row.site_number
+  }));
+}
+
 async function loadSettings(client, context) {
   const result = await client.query(
     `SELECT default_location_id, require_site_on_issue, block_negative_stock,
@@ -253,13 +283,14 @@ async function loadSettings(client, context) {
 }
 
 async function contexts(client, context) {
-  const [groups, locations, settings, allowed] = await Promise.all([
+  const [groups, locations, sites, settings, allowed] = await Promise.all([
     loadGroups(client, context),
     loadLocations(client, context),
+    loadSites(client, context),
     loadSettings(client, context),
     permissions(client, context)
   ]);
-  return { groups, locations, settings, permissions: allowed };
+  return { groups, locations, sites, settings, permissions: allowed };
 }
 
 const ITEM_COLUMNS = `
