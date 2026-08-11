@@ -1,10 +1,15 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.18
+Technischer Stand: V0.44.19
 
 ## Abgeschlossen
 
+- Lieferscheine als Beleg mit Positionen (Migration 121): Entwurf und Buchen
+  getrennt, Bewegungen aus dem Beleg, Abgleich mit der Bestellung samt Teil-
+  und Überlieferung, Direktlieferung ohne Umweg über das Hauptlager, Verweis
+  auf das Originaldokument statt zweiter Ablage; PWA-Speicher
+  `schaefchen-online-v101`
 - Fundament der Materialkette (Migration 119): Fahrzeuge, Retouren- und
   Sperrlager als Lagerorte; Buchungsart „Verbaut" bucht Material mit Pflicht
   zur Baustelle aus dem Baustellenbestand aus; Bestellungen tragen Lieferziel,

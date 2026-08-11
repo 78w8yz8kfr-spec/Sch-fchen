@@ -4,6 +4,25 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Lieferscheine sind Belege, keine Bilder mehr (Fassung 0.44.19).** Bisher
+  landete ein Lieferschein im Dokumentenmodul: ein Foto oder ein PDF, ablegbar
+  und wiederfindbar, aber ohne Positionen. Was tatsächlich geliefert wurde,
+  tippte jemand danach ein zweites Mal als Wareneingang ab — oder eben nicht.
+  Damit war der Beleg da und der Bestand trotzdem falsch. Ein Lieferschein wird
+  jetzt mit Positionen erfasst, und aus ihm entstehen die Materialbewegungen.
+  Erfassen und Buchen sind zwei Schritte: erfasst wird im Stehen, während der
+  Fahrer wartet, und solange nichts gebucht ist, lässt sich alles korrigieren —
+  erst das Buchen legt Bestand an, danach wird storniert statt geändert.
+  Zweimal buchen geht nicht, und denselben Schein ein zweites Mal zu erfassen
+  auch nicht: das fängt der eindeutige Index je Lieferant ab, auch bei anderer
+  Schreibweise. Der Abgleich mit der Bestellung nennt bestellt, bisher
+  geliefert, mit diesem Schein und noch offen — und die Überlieferung als
+  eigene Zahl, denn der Lieferant hat nun einmal 110 statt 100 gebracht.
+  Verhindert wird sie nicht, verschwiegen aber auch nicht. Eine Direktlieferung
+  bucht unmittelbar auf die Baustelle; der Umweg über das Hauptlager, den es
+  nie gab, wäre im Journal eine Lüge. Das Originaldokument bleibt im
+  Dokumentenmodul — es entsteht kein zweiter Ablageort, nur ein Verweis, und
+  umgekehrt kennt jede Bewegung ihre Lieferscheinposition.
 - **Fahrzeuge sind Lagerorte, und Verbautes wird ausgebucht (Fassung
   0.44.18).** Der Transporter ist der häufigste Lagerort im Betrieb: morgens
   beladen, abends halb leer — und niemand wusste, was drin liegt. Er ist jetzt

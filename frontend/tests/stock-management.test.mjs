@@ -11,6 +11,9 @@ import {
   verfuegbareVorgaenge,
   darfVorgang,
   buchungBauen,
+  lieferscheineAnsicht,
+  lieferscheinAnsicht,
+  lieferscheinFormularAnsicht,
   materialBestand,
   materialBestandText,
   baustellenListe,
@@ -1638,4 +1641,70 @@ test('verbaut braucht die Baustelle und bucht aus dem Baustellenbestand aus', ()
   // Quelle ja, Ziel nein: verbaut kommt nirgends an.
   assert.equal(mit.buchung.sourceLocationId, REGAL.id);
   assert.equal(mit.buchung.targetLocationId, undefined);
+});
+
+
+test('die Lieferscheinliste trennt Entwurf und Gebuchtes', () => {
+  const leer = lieferscheineAnsicht([]);
+  assert.match(leer, /Noch kein Lieferschein erfasst/);
+  assert.match(leer, /stock-delivery-new/);
+
+  const liste = lieferscheineAnsicht([
+    { id: 'l1', supplierName: 'Großhandel', deliveryNoteNumber: 'LS-4711', status: 'draft',
+      constructionSiteName: 'Baustelle Müller' },
+    { id: 'l2', supplierName: 'Großhandel', deliveryNoteNumber: 'LS-4712', status: 'booked' }
+  ]);
+  assert.ok(liste.includes('data-lieferschein="l1"'));
+  assert.match(liste, /Entwurf/);
+  assert.match(liste, /Gebucht/);
+  assert.match(liste, /Baustelle Müller/);
+});
+
+test('der Bestellabgleich nennt offen und zu viel, nicht nur eine Zahl', () => {
+  const beleg = {
+    deliveryNote: {
+      id: 'l1', deliveryNoteNumber: 'LS-4711', supplierName: 'Großhandel',
+      status: 'draft', deliveredOn: '2026-08-11',
+      targetLocationName: 'Baustelle Müller', constructionSiteName: 'Baustelle Müller',
+      purchaseOrderNumber: 'B-815'
+    },
+    items: [{ id: 'p1', itemName: 'Steckdose', itemNumber: 'LAG-1', unit: 'Stück', quantity: 60 }],
+    orderComparison: [
+      { itemName: 'Steckdose', unit: 'Stück', quantityOrdered: 100, quantityOnThisNote: 60,
+        quantityReceivedBefore: 0, quantityOpen: 40, quantityOver: 0 }
+    ],
+    movements: []
+  };
+  const ansicht = lieferscheinAnsicht({ lieferschein: beleg });
+  assert.match(ansicht, /40 offen/);
+  assert.match(ansicht, /Zur Bestellung B-815/);
+  // Ein Entwurf hat noch nichts gebucht, und das steht auch da.
+  assert.match(ansicht, /erst das Buchen legt den Bestand an/);
+  assert.match(ansicht, /stock-delivery-book/);
+
+  const zuviel = lieferscheinAnsicht({
+    lieferschein: {
+      ...beleg,
+      deliveryNote: { ...beleg.deliveryNote, status: 'booked' },
+      orderComparison: [{ ...beleg.orderComparison[0], quantityOpen: 0, quantityOver: 10 }],
+      movements: [{ id: 'm1' }]
+    }
+  });
+  assert.match(zuviel, /10 zu viel/);
+  assert.ok(!zuviel.includes('stock-delivery-book'), 'Gebuchtes wird nicht noch einmal gebucht');
+  assert.match(zuviel, /1 Buchung\s+aus diesem Lieferschein/);
+});
+
+test('das Erfassungsformular erklärt die Direktlieferung', () => {
+  const formular = lieferscheinFormularAnsicht(
+    { deliveredOn: '2026-08-11' },
+    {
+      lieferanten: [{ id: 's1', name: 'Großhandel' }],
+      orte: [{ id: 'o1', name: 'Materiallager', path: 'Materiallager' }],
+      artikel: [{ id: 'a1', name: 'Steckdose', itemNumber: 'LAG-1' }]
+    }
+  );
+  assert.match(formular, /nicht über das Hauptlager/);
+  assert.match(formular, /Als Entwurf speichern/);
+  assert.ok(formular.includes('value="2026-08-11"'));
 });

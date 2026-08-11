@@ -586,6 +586,170 @@ integrationTest("Lager: Artikel, Etikett, Scan und Buchung von Anfang bis Ende",
     assert.equal(Number(journal.rows[0].quantity), 95);
   });
 
+  await t.test("Lieferschein: erfassen, buchen, abgleichen, nicht doppelt", async () => {
+    // Der Praxisfall aus der Aufgabenstellung: Direktlieferung auf die
+    // Baustelle, Teillieferung, dann der Rest mit Überlieferung.
+    const kunde = await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', $2, 'active') RETURNING id`,
+      [companyId, `Lieferkunde ${kennung} GmbH`]
+    );
+    const projekt = await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, kunde.rows[0].id, `Lieferprojekt ${kennung}`]
+    );
+    const baustelle = await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING id`,
+      [companyId, projekt.rows[0].id, `Baustelle Müller ${kennung}`]
+    );
+    const baustellenort = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/locations", {
+      name: `Baustelle Müller ${kennung}`,
+      locationType: "construction_site",
+      constructionSiteId: baustelle.rows[0].id
+    });
+    const zielId = baustellenort.body.location.id;
+
+    const lieferant = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/suppliers", {
+      supplierNumber: `L-LS-${kennung}`, name: `Großhandel Lieferschein ${kennung}`
+    });
+    const lieferantId = lieferant.body.supplier.id;
+
+    const dose = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+      itemNumber: `LS-${kennung}`, name: "Jung Steckdose 1520 WW",
+      groupKey: "switches", unit: "Stück"
+    });
+    const doseId = dose.body.item.id;
+
+    const bestellung = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/orders", {
+      supplierId: lieferantId,
+      lines: [{ itemId: doseId, quantity: 100 }]
+    });
+    assert.equal(bestellung.status, 201, JSON.stringify(bestellung.body));
+    const bestellId = bestellung.body.order.id;
+    const bestellposition = bestellung.body.lines[0].id;
+    // Erst abschicken, dann liefern - eine Lieferung gegen einen Entwurf, den
+    // niemand verschickt hat, gibt es im Betrieb nicht.
+    await aufrufen(apiPool, buero, "POST", `/api/v1/stock/orders/${bestellId}/send`, {});
+
+    // 1. Erster Schein: 60 von 100 - eine Teillieferung.
+    const ersterSchein = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/delivery-notes", {
+      supplierId: lieferantId,
+      deliveryNoteNumber: `LS-${kennung}-1`,
+      deliveredOn: new Date().toISOString().slice(0, 10),
+      purchaseOrderId: bestellId,
+      targetLocationId: zielId,
+      items: [{ itemId: doseId, quantity: 60, purchaseOrderItemId: bestellposition }]
+    });
+    assert.equal(ersterSchein.status, 201, JSON.stringify(ersterSchein.body));
+    assert.equal(ersterSchein.body.deliveryNote.status, "draft");
+    assert.equal(
+      ersterSchein.body.deliveryNote.constructionSiteId, baustelle.rows[0].id,
+      "Die Baustelle kommt vom Lieferziel und wird nicht getrennt gepflegt"
+    );
+
+    // Ein Entwurf hat noch nichts gebucht.
+    const vorBuchung = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${doseId}`);
+    assert.equal(vorBuchung.body.levels.length, 0, "Ein Entwurf darf keinen Bestand erzeugen");
+
+    const gebucht = await aufrufen(
+      apiPool, buero, "POST", `/api/v1/stock/delivery-notes/${ersterSchein.body.deliveryNote.id}/book`, {}
+    );
+    assert.equal(gebucht.status, 200, JSON.stringify(gebucht.body));
+    assert.equal(gebucht.body.deliveryNote.status, "booked");
+    assert.equal(gebucht.body.movements.length, 1);
+    assert.equal(gebucht.body.movements[0].constructionSiteId, baustelle.rows[0].id);
+
+    const abgleich = gebucht.body.orderComparison[0];
+    assert.deepEqual(
+      {
+        bestellt: abgleich.quantityOrdered,
+        jetzt: abgleich.quantityOnThisNote,
+        offen: abgleich.quantityOpen,
+        zuviel: abgleich.quantityOver
+      },
+      { bestellt: 100, jetzt: 60, offen: 40, zuviel: 0 }
+    );
+
+    // Die Ware liegt auf der Baustelle - und nicht im Hauptlager.
+    const nachBuchung = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/items/${doseId}`);
+    assert.equal(nachBuchung.body.levels.find((e) => e.locationId === zielId).quantity, 60);
+    assert.ok(
+      !nachBuchung.body.levels.some((e) => e.locationId === lager.id && e.quantity !== 0),
+      "Eine Direktlieferung darf nicht über das Hauptlager laufen"
+    );
+
+    // Die Bestellung steht auf teilweise geliefert.
+    const teilweise = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/orders/${bestellId}`);
+    assert.equal(teilweise.body.order.status, "partially_received");
+
+    // 2. Zweimal buchen geht nicht - der häufigste Bürofehler.
+    await erwarteFehler(
+      apiPool, buero, "POST",
+      `/api/v1/stock/delivery-notes/${ersterSchein.body.deliveryNote.id}/book`, {},
+      "stock_delivery_note_closed"
+    );
+
+    // 3. Und derselbe Schein lässt sich nicht ein zweites Mal erfassen.
+    await erwarteFehler(apiPool, buero, "POST", "/api/v1/stock/delivery-notes", {
+      supplierId: lieferantId,
+      deliveryNoteNumber: `ls-${kennung}-1`,
+      deliveredOn: new Date().toISOString().slice(0, 10),
+      targetLocationId: zielId,
+      items: [{ itemId: doseId, quantity: 60 }]
+    }, "stock_duplicate");
+
+    // 4. Zweiter Schein mit Überlieferung: 50 statt der offenen 40.
+    const zweiterSchein = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/delivery-notes", {
+      supplierId: lieferantId,
+      deliveryNoteNumber: `LS-${kennung}-2`,
+      deliveredOn: new Date().toISOString().slice(0, 10),
+      purchaseOrderId: bestellId,
+      targetLocationId: zielId,
+      items: [{ itemId: doseId, quantity: 50, purchaseOrderItemId: bestellposition }]
+    });
+    const zweiterGebucht = await aufrufen(
+      apiPool, buero, "POST", `/api/v1/stock/delivery-notes/${zweiterSchein.body.deliveryNote.id}/book`, {}
+    );
+    const zweiterAbgleich = zweiterGebucht.body.orderComparison[0];
+    assert.deepEqual(
+      {
+        offen: zweiterAbgleich.quantityOpen,
+        zuviel: zweiterAbgleich.quantityOver
+      },
+      { offen: 0, zuviel: 10 },
+      "Eine Überlieferung wird nicht verhindert, aber genannt"
+    );
+
+    const vollstaendig = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/orders/${bestellId}`);
+    assert.equal(vollstaendig.body.order.status, "received");
+
+    // 5. Ein Entwurf lässt sich stornieren, ein gebuchter Schein nicht.
+    const entwurf = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/delivery-notes", {
+      supplierId: lieferantId,
+      deliveryNoteNumber: `LS-${kennung}-3`,
+      deliveredOn: new Date().toISOString().slice(0, 10),
+      targetLocationId: lager.id,
+      items: [{ itemId: doseId, quantity: 5 }]
+    });
+    const storniert = await aufrufen(
+      apiPool, buero, "POST", `/api/v1/stock/delivery-notes/${entwurf.body.deliveryNote.id}/cancel`,
+      { reason: "Falsch erfasst" }
+    );
+    assert.equal(storniert.body.deliveryNote.status, "cancelled");
+
+    await erwarteFehler(
+      apiPool, buero, "POST",
+      `/api/v1/stock/delivery-notes/${ersterSchein.body.deliveryNote.id}/cancel`,
+      { reason: "Zu spät" }, "stock_delivery_note_closed"
+    );
+
+    // 6. Der Monteur erfasst keine Lieferscheine.
+    await erwarteFehler(apiPool, monteur, "GET", "/api/v1/stock/delivery-notes",
+      undefined, "stock_manage_forbidden");
+  });
+
   await t.test("Bestandsliste und Nachbestellvorschlag rechnen aus dem Journal", async () => {
     const bestand = await aufrufen(apiPool, buero, "GET", `/api/v1/stock/levels?ort=${lager.id}`);
     assert.equal(bestand.status, 200);

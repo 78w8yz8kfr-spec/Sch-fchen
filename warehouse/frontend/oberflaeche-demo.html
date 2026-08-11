@@ -1164,6 +1164,8 @@ const SCHRITTE = Object.freeze({
   INVENTUR: 'inventur',
   BESTELLUNGEN: 'bestellungen',
   BESTELLUNG: 'bestellung',
+  LIEFERSCHEINE: 'lieferscheine',
+  LIEFERSCHEIN: 'lieferschein',
   ARTIKEL_CODES: 'artikelCodes',
   ARTIKEL_AENDERN: 'artikelAendern',
   ORTE: 'orte'
@@ -1315,6 +1317,8 @@ function lagerZustand(vorgabe = {}) {
     // Set haette das nicht ueberlebt.
     druckwahl: [],
     inventur: null,
+    // Der geoeffnete Lieferschein samt Positionen und Bestellabgleich.
+    lieferschein: null,
     zaehlArtikel: null,
     bestellung: null,
     eingang: null,
@@ -1866,6 +1870,10 @@ function startAnsicht(zustand, rechte = {}) {
     kacheln.push(`<button class="stock-tile" type="button" data-ziel="bestellungen">
        <span class="stock-tile__name">Bestellungen</span>
        <span class="stock-tile__hint">Offen und unterwegs</span>
+     </button>`);
+    kacheln.push(`<button class="stock-tile" type="button" data-ziel="lieferscheine">
+       <span class="stock-tile__name">Lieferscheine</span>
+       <span class="stock-tile__hint">Erfassen und buchen</span>
      </button>`);
   }
 
@@ -2730,7 +2738,7 @@ function etikettZelle(etikett = {}) {
  */
 function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.18`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.19`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -2973,6 +2981,14 @@ function ansichtFuer(zustand, rechte, optionen = {}) {
     return bestellungenAnsicht(optionen.bestellungen, rechte, zustand.fehler);
   }
   if (zustand.schritt === SCHRITTE.BESTELLUNG) return bestellungAnsicht(zustand, rechte);
+  if (zustand.schritt === SCHRITTE.LIEFERSCHEINE) {
+    return lieferscheineAnsicht(optionen.lieferscheine, zustand.fehler);
+  }
+  if (zustand.schritt === SCHRITTE.LIEFERSCHEIN) {
+    return zustand.entwurf
+      ? lieferscheinFormularAnsicht(zustand.entwurf, optionen, zustand.fehler)
+      : lieferscheinAnsicht(zustand);
+  }
   if (zustand.schritt === SCHRITTE.ARTIKEL_CODES) return artikelCodesAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BUCHEN) return buchenAnsicht(zustand, rechte, optionen);
   if (zustand.schritt === SCHRITTE.BESTAETIGT) return bestaetigungAnsicht(zustand);
@@ -2992,6 +3008,203 @@ function ansichtFuer(zustand, rechte, optionen = {}) {
     return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler, true);
   }
   return startAnsicht(zustand, rechte);
+}
+
+
+const LIEFERSCHEINSTATUS = Object.freeze({
+  draft: 'Entwurf',
+  booked: 'Gebucht',
+  cancelled: 'Storniert'
+});
+
+function lieferscheinStatusText(status) {
+  return LIEFERSCHEINSTATUS[status] || status;
+}
+
+function lieferscheineAnsicht(scheine = [], fehler = null) {
+  return `<div class="stock-list">
+    ${kopfzeile('Lieferscheine')}
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+    ${scheine.length
+      ? `<ul class="stock-rows">
+          ${scheine.map((schein) => `
+            <li class="stock-row stock-row--tap" data-lieferschein="${sicher(schein.id)}">
+              <span class="stock-row__name">${sicher(schein.supplierName || '')}</span>
+              <span class="stock-row__number">
+                ${sicher(schein.deliveryNoteNumber)}${schein.constructionSiteName
+                  ? ` · ${sicher(schein.constructionSiteName)}`
+                  : ''}
+              </span>
+              <span class="stock-row__amount stock-row__amount--${schein.status === 'draft' ? 'knapp' : 'offen'}">
+                ${sicher(lieferscheinStatusText(schein.status))}
+              </span>
+            </li>`).join('')}
+        </ul>`
+      : '<p class="stock-empty">Noch kein Lieferschein erfasst.</p>'}
+    <button class="button button--action stock-delivery-new" type="button">Lieferschein erfassen</button>
+  </div>`;
+}
+
+/**
+ * Eine Zeile des Bestellabgleichs.
+ *
+ * Vier Zahlen, die im Betrieb regelmaessig durcheinandergehen: was bestellt
+ * wurde, was frueher kam, was auf diesem Schein steht und was noch aussteht.
+ * Die fuenfte - zu viel geliefert - steht nur da, wenn es sie gibt, und dann
+ * auffaellig: an ihr haengt die Rechnungspruefung.
+ */
+function abgleichZeileAnsicht(zeile) {
+  return `<li class="stock-row stock-row--order-line">
+    <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+    <span class="stock-row__number">
+      ${sicher(mengeAlsText(zeile.quantityOnThisNote))} von ${sicher(mengeAlsText(zeile.quantityOrdered))}
+      ${sicher(zeile.unit)} · vorher ${sicher(mengeAlsText(zeile.quantityReceivedBefore))}
+    </span>
+    <span class="stock-row__amount stock-row__amount--${zeile.quantityOver > 0 ? 'unplausibel' : (zeile.quantityOpen > 0 ? 'knapp' : 'gut')}">
+      ${zeile.quantityOver > 0
+        ? `${sicher(mengeAlsText(zeile.quantityOver))} zu viel`
+        : (zeile.quantityOpen > 0
+          ? `${sicher(mengeAlsText(zeile.quantityOpen))} offen`
+          : 'vollständig')}
+    </span>
+  </li>`;
+}
+
+function lieferscheinAnsicht(zustand) {
+  const beleg = zustand.lieferschein;
+  if (!beleg) return '';
+  const schein = beleg.deliveryNote;
+  const entwurf = schein.status === 'draft';
+
+  return `<div class="stock-list stock-delivery">
+    ${kopfzeile(schein.deliveryNoteNumber)}
+    <p class="stock-order__supplier">${sicher(schein.supplierName || '')}</p>
+    <p class="stock-order__status">
+      ${sicher(lieferscheinStatusText(schein.status))} · geliefert am ${sicher(schein.deliveredOn || '')}
+    </p>
+    <p class="stock-delivery__target">
+      Ziel: ${sicher(schein.targetLocationName || '')}${schein.constructionSiteName
+        ? ` (Baustelle ${sicher(schein.constructionSiteName)})`
+        : ''}
+    </p>
+    ${schein.purchaseOrderNumber
+      ? `<p class="stock-delivery__order">Zur Bestellung ${sicher(schein.purchaseOrderNumber)}</p>`
+      : '<p class="stock-delivery__order">Ohne Bestellung</p>'}
+
+    <h3 class="stock-subhead">Positionen</h3>
+    <ul class="stock-rows">
+      ${beleg.items.map((zeile) => `
+        <li class="stock-row stock-row--order-line">
+          <span class="stock-row__name">${sicher(zeile.itemName)}</span>
+          <span class="stock-row__number">${sicher(zeile.itemNumber)}</span>
+          <span class="stock-row__amount">
+            ${sicher(mengeAlsText(zeile.quantity))} ${sicher(zeile.unit)}
+          </span>
+        </li>`).join('')}
+    </ul>
+
+    ${beleg.orderComparison?.length
+      ? `<h3 class="stock-subhead">Abgleich mit der Bestellung</h3>
+         <ul class="stock-rows">${beleg.orderComparison.map(abgleichZeileAnsicht).join('')}</ul>`
+      : ''}
+
+    ${entwurf
+      ? `<p class="stock-hint">
+           Noch nichts gebucht: erst das Buchen legt den Bestand an. Danach wird
+           der Schein storniert und nicht mehr geändert.
+         </p>
+         <button class="button button--action stock-delivery-book" type="button">Buchen</button>
+         <button class="button button--quiet stock-delivery-cancel" type="button">Stornieren</button>`
+      : `<p class="stock-note">
+           ${sicher(beleg.movements.length)} Buchung${beleg.movements.length === 1 ? '' : 'en'}
+           aus diesem Lieferschein.
+         </p>`}
+    ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
+    <button class="button button--quiet stock-home" type="button">Fertig</button>
+  </div>`;
+}
+
+/**
+ * Das Erfassungsformular.
+ *
+ * Bewusst kurz: Lieferant, Nummer, Datum, Ziel - und darunter Positionen, die
+ * sich wie im Artikelformular nachlegen lassen. Alles Weitere (Preise,
+ * Lieferantenartikelnummern) steht am Beleg und laesst sich spaeter ergaenzen;
+ * wer im Stehen erfasst, waehrend der Fahrer wartet, tippt es ohnehin nicht.
+ */
+function lieferscheinFormularAnsicht(entwurf = {}, optionen = {}, fehler = null) {
+  const lieferanten = optionen.lieferanten || [];
+  const orte = optionen.orte || [];
+  const artikel = optionen.artikel || [];
+  const zeilen = entwurf.zeilen?.length ? entwurf.zeilen : [{ itemId: '', quantity: '' }];
+
+  return `<form class="stock-form stock-delivery-form">
+    ${kopfzeile('Lieferschein erfassen')}
+    ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+
+    <label class="stock-field">
+      <span>Lieferant</span>
+      <select name="supplierId" required>
+        <option value="">Bitte wählen</option>
+        ${lieferanten.map((eintrag) => `
+          <option value="${sicher(eintrag.id)}"${eintrag.id === entwurf.supplierId ? ' selected' : ''}>
+            ${sicher(eintrag.name)}
+          </option>`).join('')}
+      </select>
+    </label>
+
+    <label class="stock-field">
+      <span>Lieferscheinnummer</span>
+      <input name="deliveryNoteNumber" type="text" maxlength="60" required
+             value="${sicher(entwurf.deliveryNoteNumber || '')}" placeholder="LS-4711">
+    </label>
+
+    <label class="stock-field">
+      <span>Lieferdatum</span>
+      <input name="deliveredOn" type="date" required value="${sicher(entwurf.deliveredOn || '')}">
+    </label>
+
+    <label class="stock-field">
+      <span>Lieferziel</span>
+      <select name="targetLocationId" required>
+        <option value="">Bitte wählen</option>
+        ${orte.map((ort) => `
+          <option value="${sicher(ort.id)}"${ort.id === entwurf.targetLocationId ? ' selected' : ''}>
+            ${sicher(ort.path || ort.name)}
+          </option>`).join('')}
+      </select>
+      <span class="stock-field__hint">
+        Bei einer Direktlieferung der Baustellenplatz — die Ware läuft dann
+        nicht über das Hauptlager.
+      </span>
+    </label>
+
+    <h3 class="stock-subhead">Positionen</h3>
+    <div class="stock-delivery-lines">
+      ${zeilen.map((zeile, index) => `
+        <div class="stock-delivery-line" data-zeile="${index}">
+          <label class="stock-field">
+            <span>Artikel</span>
+            <select name="itemId" required>
+              <option value="">Bitte wählen</option>
+              ${artikel.map((eintrag) => `
+                <option value="${sicher(eintrag.id)}"${eintrag.id === zeile.itemId ? ' selected' : ''}>
+                  ${sicher(eintrag.name)} (${sicher(eintrag.itemNumber)})
+                </option>`).join('')}
+            </select>
+          </label>
+          <label class="stock-field">
+            <span>Menge</span>
+            <input name="quantity" type="text" inputmode="decimal"
+                   value="${sicher(zeile.quantity || '')}">
+          </label>
+        </div>`).join('')}
+    </div>
+    <button class="button button--quiet stock-delivery-add-line" type="button">Weitere Position</button>
+
+    <button class="button button--action" type="submit">Als Entwurf speichern</button>
+    <button class="button button--quiet stock-cancel" type="button">Abbrechen</button>
+  </form>`;
 }
 
 
