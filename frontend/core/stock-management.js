@@ -26,6 +26,7 @@ export const SCHRITTE = Object.freeze({
   BESTELLUNGEN: 'bestellungen',
   BESTELLUNG: 'bestellung',
   ARTIKEL_CODES: 'artikelCodes',
+  ARTIKEL_AENDERN: 'artikelAendern',
   ORTE: 'orte'
 });
 
@@ -472,6 +473,30 @@ export function knappeArtikel(artikel = []) {
  * wird dabei uebernommen, damit er nach dem Speichern sofort gefunden wird —
  * sonst legt jemand den Artikel an und scannt gleich darauf wieder ins Leere.
  */
+/**
+ * Macht aus einem gespeicherten Artikel den Entwurf fuers Aendern.
+ *
+ * Die Warengruppe kommt als Schluessel zurueck und nicht als Kennung: das
+ * Formular waehlt danach aus, und die Schnittstelle nimmt beides.
+ */
+export function artikelAlsEntwurf(artikel, gruppen = []) {
+  if (!artikel) return null;
+  const gruppe = gruppen.find((eintrag) => eintrag.id === artikel.groupId);
+
+  return {
+    itemNumber: artikel.itemNumber || '',
+    name: artikel.name || '',
+    unit: artikel.unit || '',
+    groupKey: gruppe?.key || '',
+    manufacturerNumber: artikel.manufacturerNumber || '',
+    minimumStock: artikel.minimumStock ?? '',
+    targetStock: artikel.targetStock ?? '',
+    packName: artikel.packName || '',
+    packSize: artikel.packSize ?? '',
+    rowVersion: artikel.rowVersion
+  };
+}
+
 export function artikelEntwurfAusScan(scan, gruppen = []) {
   if (!scan) return null;
   const istGtin = scan.art === 'gtin';
@@ -647,7 +672,8 @@ export function buchenAnsicht(zustand, rechte = {}, optionen = {}) {
 
       ${zustand.fehler ? `<p class="stock-error" role="alert">${sicher(zustand.fehler)}</p>` : ''}
       ${rechte.manage
-        ? '<button class="button button--quiet stock-codes-open" type="button">Codes und Etikett</button>'
+        ? `<button class="button button--quiet stock-codes-open" type="button">Codes und Etikett</button>
+           <button class="button button--quiet stock-item-edit" type="button">Artikel ändern</button>`
         : ''}
       <button class="button button--quiet stock-cancel" type="button">Abbrechen</button>
     </div>`;
@@ -884,7 +910,7 @@ function kopfzeile(titel) {
  * vollen Pfad, damit sich "Fach A1" von "Fach A1" im anderen Regal
  * unterscheiden laesst.
  */
-export function orteAnsicht(orte = [], aktiv = null, rechte = {}) {
+export function orteAnsicht(orte = [], aktiv = null, rechte = {}, wahl = []) {
   if (!orte.length) {
     return `<div class="stock-list">
       ${kopfzeile('Lagerplatz')}
@@ -892,12 +918,20 @@ export function orteAnsicht(orte = [], aktiv = null, rechte = {}) {
     </div>`;
   }
 
+  const gewaehlt = new Set(wahl);
+
   return `<div class="stock-list">
     ${kopfzeile('Lagerplatz')}
     <ul class="stock-rows">
       ${orte.map((ort) => `
         <li class="stock-row stock-row--tap${ort.id === aktiv ? ' stock-row--gewaehlt' : ''}"
             data-ort="${sicher(ort.id)}">
+          ${rechte.manage
+            ? `<label class="stock-pick" title="Für den Etikettenbogen">
+                 <input type="checkbox" class="stock-pick__box" data-wahl="${sicher(ort.id)}"
+                        ${gewaehlt.has(ort.id) ? 'checked' : ''}>
+               </label>`
+            : ''}
           <span class="stock-row__name">${sicher(ort.name)}</span>
           <span class="stock-row__number">${sicher(ort.path || ort.name)}</span>
           ${ort.id === aktiv ? '<span class="stock-row__amount">gewählt</span>' : ''}
@@ -905,11 +939,10 @@ export function orteAnsicht(orte = [], aktiv = null, rechte = {}) {
     </ul>
     ${rechte.manage
       ? `<div class="stock-sheet">
-           <button class="button button--secondary stock-sheet-locations" type="button">
-             ${orte.length === 1
-               ? 'Etikett für den Lagerplatz drucken'
-               : `Etiketten für alle ${sicher(String(orte.length))} Lagerplätze drucken`}
+           <button class="button button--quiet stock-sheet-all" type="button">
+             ${gewaehlt.size === orte.length ? 'Auswahl aufheben' : 'Alle auswählen'}
            </button>
+           ${druckKnopf(gewaehlt.size)}
          </div>`
       : ''}
   </div>`;
@@ -1037,25 +1070,36 @@ export function nachbestellungAnsicht(vorschlaege = []) {
   </div>`;
 }
 
-export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
+/**
+ * Das Artikelformular - zum Anlegen und zum Aendern.
+ *
+ * Beim Aendern bleiben drei Felder gesperrt: Artikelnummer, Einheit und
+ * Warengruppe. Die Nummer steht auf gedruckten Etiketten, und die Einheit zu
+ * aendern wuerde jeden gebuchten Bestand still umdeuten - aus 120 Metern
+ * wuerden 120 Stueck. Beides waere keine Aenderung, sondern ein neuer Artikel.
+ * Sie stehen trotzdem da, nur nicht zum Anfassen: wer sie sucht, soll sie
+ * sehen und nicht raten, wo sie geblieben sind.
+ */
+export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null, aendern = false) {
   // Ein leerer Entwurf kommt als null aus dem Zustand und als undefined aus
   // einem direkten Aufruf; beide meinen dasselbe leere Formular.
   const daten = entwurf || {};
   const code = daten.barcodes?.[0];
+  const fest = aendern ? ' disabled' : '';
 
   return `<div class="stock-form">
-    ${kopfzeile('Artikel anlegen')}
-    ${code
+    ${kopfzeile(aendern ? 'Artikel ändern' : 'Artikel anlegen')}
+    ${code && !aendern
       ? `<p class="stock-note">Der gescannte Code <strong>${sicher(code.code)}</strong> wird übernommen.</p>`
       : ''}
-    <label class="stock-field"><span>Artikelnummer</span>
-      <input name="itemNumber" value="${sicher(daten.itemNumber || '')}" autocomplete="off" maxlength="40"></label>
+    <label class="stock-field"><span>Artikelnummer${aendern ? ' (steht auf Etiketten)' : ''}</span>
+      <input name="itemNumber" value="${sicher(daten.itemNumber || '')}" autocomplete="off" maxlength="40"${fest}></label>
     <label class="stock-field"><span>Bezeichnung</span>
       <input name="name" value="${sicher(daten.name || '')}" autocomplete="off" maxlength="180"></label>
-    <label class="stock-field"><span>Einheit</span>
-      <input name="unit" value="${sicher(daten.unit || 'Stück')}" autocomplete="off" maxlength="20"></label>
+    <label class="stock-field"><span>Einheit${aendern ? ' (der Bestand zählt darin)' : ''}</span>
+      <input name="unit" value="${sicher(daten.unit || 'Stück')}" autocomplete="off" maxlength="20"${fest}></label>
     <label class="stock-field"><span>Warengruppe</span>
-      <select name="groupKey">
+      <select name="groupKey"${fest}>
         ${gruppen.map((gruppe) => `
           <option value="${sicher(gruppe.key)}"${gruppe.key === daten.groupKey ? ' selected' : ''}>
             ${sicher(gruppe.name)}
@@ -1081,9 +1125,13 @@ export function artikelFormularAnsicht(entwurf, gruppen = [], fehler = null) {
       Mit Gebinde lässt sich beim Buchen zwischen ganzen Gebinden und einzelnen
       Stücken umschalten. Der Bestand zählt immer in ${sicher(daten.unit || 'Stück')}.
     </p>
-    ${codeFelder(daten)}
+    ${aendern
+      ? '<p class="stock-hint">Codes werden über „Codes und Etikett" gepflegt.</p>'
+      : codeFelder(daten)}
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
-    <button class="button button--action stock-save" type="button">Anlegen</button>
+    <button class="button button--action stock-save" type="button">
+      ${aendern ? 'Änderungen speichern' : 'Anlegen'}
+    </button>
     <button class="button button--quiet stock-home" type="button">Abbrechen</button>
   </div>`;
 }
@@ -1379,7 +1427,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.14`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.15`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -1628,7 +1676,7 @@ export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.UNBEKANNT) return unbekanntAnsicht(zustand, rechte);
   if (zustand.schritt === SCHRITTE.BESTAND) return bestandAnsicht(optionen.bestand);
   if (zustand.schritt === SCHRITTE.ORTE) {
-    return orteAnsicht(optionen.orte, zustand.ort?.id || null, rechte);
+    return orteAnsicht(optionen.orte, zustand.ort?.id || null, rechte, zustand.druckwahl);
   }
   if (zustand.schritt === SCHRITTE.ARTIKEL) {
     return artikelListeAnsicht(optionen.artikel, rechte, zustand.suche, zustand.druckwahl);
@@ -1636,6 +1684,9 @@ export function ansichtFuer(zustand, rechte, optionen = {}) {
   if (zustand.schritt === SCHRITTE.NACHBESTELLUNG) return nachbestellungAnsicht(optionen.vorschlaege);
   if (zustand.schritt === SCHRITTE.ARTIKEL_NEU) {
     return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler);
+  }
+  if (zustand.schritt === SCHRITTE.ARTIKEL_AENDERN) {
+    return artikelFormularAnsicht(zustand.entwurf, optionen.gruppen, zustand.fehler, true);
   }
   return startAnsicht(zustand, rechte);
 }
