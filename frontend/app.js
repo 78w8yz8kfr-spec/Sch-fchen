@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.20";
-import { serverIsNewer } from "./core/versions.js?v=0.44.20";
+} from "./core/work-time.js?v=0.44.21";
+import { serverIsNewer } from "./core/versions.js?v=0.44.21";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.20";
+} from "./core/sync-queue.js?v=0.44.21";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.20";
+} from "./core/permissions.js?v=0.44.21";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,11 +40,11 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.20";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.20";
-import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.20";
-import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.20";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
+} from "./core/state-store.js?v=0.44.21";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.21";
+import { baustellenAusEinsaetzen, createStockModule } from "./core/stock-module.js?v=0.44.21";
+import { materialBestand, materialBestandText } from "./core/stock-management.js?v=0.44.21";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.21";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1356,7 +1356,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.20",
+          "X-Schaefchen-Version": "0.44.21",
           ...options.headers
         }
       });
@@ -1391,7 +1391,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.20`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.21`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1413,7 +1413,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.20" }
+        headers: { "X-Schaefchen-Version": "0.44.21" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1460,7 +1460,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.20 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.21 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2497,6 +2497,48 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
     parent.append(zeile);
   }
 
+  // Das Material einer Baustelle aus dem Lager: was liegt dort, was ist
+  // verbaut, was kommt noch. Die Zahlen stehen nebeneinander und werden nicht
+  // zu einer verrechnet - "geliefert minus zurück" wäre auf einer laufenden
+  // Baustelle immer zu früh und bei einer Umbuchung schlicht falsch.
+  async function renderSiteStockOverview(siteId) {
+    const ziel = elements.siteDashboardMaterials;
+    if (!ziel || !moduleEnabled("warehouse")) return;
+    let uebersicht = null;
+    try {
+      uebersicht = await requestJson(`./api/v1/stock/sites/${encodeURIComponent(siteId)}`);
+    } catch {
+      // Ohne Lagerbereich bleibt die Bedarfsliste für sich. Das ist kein
+      // Fehler, den jemand sehen müsste.
+      return;
+    }
+    if (!uebersicht?.items?.length) return;
+
+    const block = document.createElement("div");
+    block.className = "site-stock-overview";
+    const titel = document.createElement("h4");
+    titel.textContent = "Aus dem Lager";
+    block.append(titel);
+
+    const liste = document.createElement("ul");
+    uebersicht.items.forEach((zeile) => {
+      const eintrag = document.createElement("li");
+      const name = document.createElement("strong");
+      const zahlen = document.createElement("span");
+      name.textContent = `${zeile.itemName} (${zeile.itemNumber})`;
+      zahlen.textContent = [
+        `auf der Baustelle: ${zeile.onSite} ${zeile.unit}`,
+        zeile.consumed ? `verbaut: ${zeile.consumed}` : null,
+        zeile.reservedForSite ? `reserviert: ${zeile.reservedForSite}` : null,
+        zeile.orderedOpen ? `bestellt, noch offen: ${zeile.orderedOpen}` : null
+      ].filter(Boolean).join(" · ");
+      eintrag.append(name, zahlen);
+      liste.append(eintrag);
+    });
+    block.append(liste);
+    ziel.prepend(block);
+  }
+
   function renderSiteMaterials(siteId) {
     const materials = (adminState?.siteMaterials || []).filter((material) => (
       material.constructionSiteId === siteId && material.status !== "archived"
@@ -2837,7 +2879,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.20";
+  const EIGENE_FASSUNG = "0.44.21";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2876,7 +2918,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.20". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.21". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -4756,6 +4798,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
     renderSiteTasks(site.id);
     renderSiteNotes(site.id);
     renderSiteMaterials(site.id);
+    void renderSiteStockOverview(site.id);
     renderSiteReports(site.id);
     renderSiteVdeInspections(site.id);
     showSiteDashboardSection(siteDashboardSection);
@@ -6933,7 +6976,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.20";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.20" }
+        headers: { "X-Schaefchen-Version": "0.44.21" }
       });
       if (response.ok) {
         await cache.put(

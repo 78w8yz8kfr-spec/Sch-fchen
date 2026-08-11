@@ -1227,17 +1227,18 @@ async function listLevels(client, context, url) {
   const locationId = optionalId(url.searchParams.get("ort"), "Lagerplatz");
 
   const result = await client.query(
-    `SELECT bestand.item_id, bestand.location_id, bestand.quantity,
+    `SELECT sicht.item_id, sicht.location_id,
+            sicht.physical_quantity, sicht.reserved_quantity, sicht.free_quantity,
             item.item_number, item.name AS item_name, item.unit,
-            ort.name AS location_name
-     FROM stock_levels AS bestand
+            ort.name AS location_name, ort.location_type
+     FROM stock_availability AS sicht
      JOIN stock_items AS item
-       ON item.company_id = bestand.company_id AND item.id = bestand.item_id
+       ON item.company_id = sicht.company_id AND item.id = sicht.item_id
      JOIN storage_locations AS ort
-       ON ort.company_id = bestand.company_id AND ort.id = bestand.location_id
-     WHERE bestand.company_id = $1
-       AND ($2::UUID IS NULL OR bestand.location_id = $2::UUID)
-       AND bestand.quantity <> 0
+       ON ort.company_id = sicht.company_id AND ort.id = sicht.location_id
+     WHERE sicht.company_id = $1
+       AND ($2::UUID IS NULL OR sicht.location_id = $2::UUID)
+       AND sicht.physical_quantity <> 0
      ORDER BY ort.name, item.name
      LIMIT 500`,
     [context.companyId, locationId]
@@ -1250,7 +1251,12 @@ async function listLevels(client, context, url) {
     unit: row.unit,
     locationId: row.location_id,
     locationName: row.location_name,
-    quantity: number(row.quantity)
+    locationType: row.location_type,
+    // `quantity` bleibt der physische Bestand und heisst weiter so: an ihm
+    // haengen Ansichten, die es schon gab. Frei und reserviert kommen daneben.
+    quantity: number(row.physical_quantity),
+    reservedQuantity: number(row.reserved_quantity),
+    freeQuantity: number(row.free_quantity)
   }));
 }
 
@@ -1260,24 +1266,47 @@ async function listLevels(client, context, url) {
  * darin; die vorgeschlagene Menge fuellt bis zum Zielbestand auf.
  */
 async function reorderSuggestions(client, context) {
+  // Gerechnet wird mit dem *frei verfuegbaren* Bestand, nicht mit dem
+  // physischen: was fuer eine Baustelle zurueckliegt, steht dem Lager nicht
+  // mehr zur Verfuegung. Ohne diese Unterscheidung meldet das System volle
+  // Regale, waehrend die naechste Entnahme schon nicht mehr geht.
+  //
+  // Ausgeloest wird beim Meldebestand, wenn es einen gibt. Er liegt ueber dem
+  // Mindestbestand, damit bestellt wird, bevor es knapp ist - und nicht erst,
+  // wenn es zu spaet ist.
   const result = await client.query(
     `SELECT ${ITEM_COLUMNS},
-            GREATEST(COALESCE(item.target_stock, item.minimum_stock)
-                     - COALESCE(bestand.summe, 0), 0) AS suggested_quantity,
+            COALESCE(reserviert.summe, 0) AS reserved_total,
+            COALESCE(bestand.summe, 0) - COALESCE(reserviert.summe, 0) AS free_total,
+            COALESCE(item.reorder_point, item.minimum_stock) AS trigger_point,
+            GREATEST(COALESCE(item.target_stock, COALESCE(item.reorder_point, item.minimum_stock))
+                     - (COALESCE(bestand.summe, 0) - COALESCE(reserviert.summe, 0)), 0)
+              AS suggested_quantity,
             lieferant.name AS supplier_name, lieferant.id AS supplier_id
      ${ITEM_FROM}
+     LEFT JOIN (
+       SELECT company_id, item_id, SUM(quantity - quantity_fulfilled) AS summe
+       FROM stock_reservations WHERE status = 'open'
+       GROUP BY company_id, item_id
+     ) AS reserviert
+       ON reserviert.company_id = item.company_id AND reserviert.item_id = item.id
      LEFT JOIN suppliers AS lieferant
        ON lieferant.company_id = item.company_id AND lieferant.id = item.default_supplier_id
      WHERE item.company_id = $1 AND item.status = 'active'
-       AND item.minimum_stock > 0
-       AND COALESCE(bestand.summe, 0) < item.minimum_stock
-     ORDER BY (COALESCE(bestand.summe, 0) / NULLIF(item.minimum_stock, 0)), item.name
+       AND COALESCE(item.reorder_point, item.minimum_stock) > 0
+       AND COALESCE(bestand.summe, 0) - COALESCE(reserviert.summe, 0)
+           < COALESCE(item.reorder_point, item.minimum_stock)
+     ORDER BY ((COALESCE(bestand.summe, 0) - COALESCE(reserviert.summe, 0))
+               / NULLIF(COALESCE(item.reorder_point, item.minimum_stock), 0)), item.name
      LIMIT 200`,
     [context.companyId]
   );
 
   return result.rows.map((row) => ({
     ...itemDto(row),
+    reservedQuantity: number(row.reserved_total),
+    freeQuantity: number(row.free_total),
+    reorderPoint: number(row.trigger_point),
     suggestedQuantity: number(row.suggested_quantity),
     supplierId: row.supplier_id || null,
     supplierName: row.supplier_name || null
@@ -2504,6 +2533,137 @@ async function releaseReservation(client, context, reservationId, body) {
   return { reservation: alle.find((eintrag) => eintrag.id === reservationId) || null };
 }
 
+/**
+ * Das Material einer Baustelle auf einen Blick.
+ *
+ * Die vier Zahlen, die im Betrieb regelmaessig durcheinandergehen, stehen hier
+ * bewusst nebeneinander und werden nicht zu einer verrechnet:
+ *
+ *   * `onSite` - was jetzt dort liegt. Kommt aus dem Bestand am
+ *     Baustellenlagerort und ist damit dieselbe Zahl wie ueberall sonst.
+ *   * `consumed` - was ausdruecklich als verbaut gemeldet wurde.
+ *   * `returned` - was zurueckging.
+ *   * `ordered` - was bestellt, aber noch nicht geliefert ist.
+ *
+ * Nicht gerechnet wird "Verbrauch = geliefert minus zurueck". Sobald eine
+ * Umbuchung auf eine zweite Baustelle dazwischenliegt, ist die Formel falsch,
+ * und auf einer laufenden Baustelle ist sie immer zu frueh: was heute im
+ * Container steht, ist nicht verbraucht.
+ */
+async function siteMaterialOverview(client, context, siteId) {
+  const baustelle = await client.query(
+    "SELECT id, name FROM construction_sites WHERE company_id = $1 AND id = $2",
+    [context.companyId, siteId]
+  );
+  if (baustelle.rowCount !== 1) {
+    throw new InputError("Diese Baustelle wurde nicht gefunden.", 404, "stock_site_unknown");
+  }
+
+  const [bestand, bewegungen, reservierungen, bestellt, scheine] = await Promise.all([
+    client.query(
+      `SELECT sicht.item_id, sicht.physical_quantity, sicht.reserved_quantity,
+              artikel.item_number, artikel.name, artikel.unit
+       FROM stock_availability AS sicht
+       JOIN storage_locations AS ort
+         ON ort.company_id = sicht.company_id AND ort.id = sicht.location_id
+       JOIN stock_items AS artikel
+         ON artikel.company_id = sicht.company_id AND artikel.id = sicht.item_id
+       WHERE sicht.company_id = $1 AND ort.construction_site_id = $2
+         AND sicht.physical_quantity <> 0
+       ORDER BY artikel.name`,
+      [context.companyId, siteId]
+    ),
+    client.query(
+      `SELECT bewegung.item_id, bewegung.movement_type,
+              SUM(bewegung.quantity) AS menge,
+              artikel.item_number, artikel.name, artikel.unit
+       FROM stock_movements AS bewegung
+       JOIN stock_items AS artikel
+         ON artikel.company_id = bewegung.company_id AND artikel.id = bewegung.item_id
+       WHERE bewegung.company_id = $1 AND bewegung.construction_site_id = $2
+       GROUP BY bewegung.item_id, bewegung.movement_type,
+                artikel.item_number, artikel.name, artikel.unit`,
+      [context.companyId, siteId]
+    ),
+    client.query(
+      `SELECT reservierung.item_id,
+              SUM(reservierung.quantity - reservierung.quantity_fulfilled) AS menge,
+              artikel.item_number, artikel.name, artikel.unit
+       FROM stock_reservations AS reservierung
+       JOIN stock_items AS artikel
+         ON artikel.company_id = reservierung.company_id AND artikel.id = reservierung.item_id
+       WHERE reservierung.company_id = $1 AND reservierung.construction_site_id = $2
+         AND reservierung.status = 'open'
+       GROUP BY reservierung.item_id, artikel.item_number, artikel.name, artikel.unit`,
+      [context.companyId, siteId]
+    ),
+    client.query(
+      `SELECT position.item_id,
+              SUM(position.quantity_ordered - position.quantity_received) AS menge,
+              artikel.item_number, artikel.name, artikel.unit
+       FROM purchase_order_items AS position
+       JOIN purchase_orders AS bestellung
+         ON bestellung.company_id = position.company_id
+        AND bestellung.id = position.purchase_order_id
+       JOIN stock_items AS artikel
+         ON artikel.company_id = position.company_id AND artikel.id = position.item_id
+       WHERE position.company_id = $1 AND bestellung.construction_site_id = $2
+         AND bestellung.status IN ('ordered', 'partially_received')
+         AND position.quantity_received < position.quantity_ordered
+       GROUP BY position.item_id, artikel.item_number, artikel.name, artikel.unit`,
+      [context.companyId, siteId]
+    ),
+    client.query(
+      `${DELIVERY_NOTE_SELECT}
+       WHERE schein.company_id = $1 AND schein.construction_site_id = $2
+       ORDER BY schein.delivered_on DESC LIMIT 50`,
+      [context.companyId, siteId]
+    )
+  ]);
+
+  // Je Artikel eine Zeile, in die alle Zahlen einlaufen. Fuenf getrennte
+  // Listen waeren fuer den Bauleiter unlesbar - er will je Ware wissen, wie
+  // sie steht.
+  const zeilen = new Map();
+  const zeile = (row) => {
+    if (!zeilen.has(row.item_id)) {
+      zeilen.set(row.item_id, {
+        itemId: row.item_id,
+        itemNumber: row.item_number,
+        itemName: row.name,
+        unit: row.unit,
+        onSite: 0,
+        reservedForSite: 0,
+        consumed: 0,
+        returned: 0,
+        deliveredToSite: 0,
+        orderedOpen: 0
+      });
+    }
+    return zeilen.get(row.item_id);
+  };
+
+  for (const row of bestand.rows) {
+    const eintrag = zeile({ ...row, name: row.name });
+    eintrag.onSite = number(row.physical_quantity);
+  }
+  for (const row of bewegungen.rows) {
+    const eintrag = zeile(row);
+    const menge = number(row.menge);
+    if (row.movement_type === "consumed") eintrag.consumed += menge;
+    if (row.movement_type === "return") eintrag.returned += menge;
+    if (row.movement_type === "receipt") eintrag.deliveredToSite += menge;
+  }
+  for (const row of reservierungen.rows) zeile(row).reservedForSite = number(row.menge);
+  for (const row of bestellt.rows) zeile(row).orderedOpen = number(row.menge);
+
+  return {
+    constructionSite: { id: baustelle.rows[0].id, name: baustelle.rows[0].name },
+    items: [...zeilen.values()].sort((links, rechts) => links.itemName.localeCompare(rechts.itemName, "de")),
+    deliveryNotes: scheine.rows.map(deliveryNoteDto)
+  };
+}
+
 export async function handleStockRequest({ request, url, client, context, allowedOrigin }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/stock")) return null;
@@ -2569,6 +2729,12 @@ export async function handleStockRequest({ request, url, client, context, allowe
   if (request.method === "POST" && path === "/api/v1/stock/movements") {
     const body = await readJson(request);
     return { status: 201, body: await bookMovement(client, context, body) };
+  }
+
+  const siteMaterialMatch = /^\/api\/v1\/stock\/sites\/([^/]+)$/.exec(path);
+  if (request.method === "GET" && siteMaterialMatch) {
+    const siteId = validateId(siteMaterialMatch[1], "Baustellen-ID");
+    return { status: 200, body: await siteMaterialOverview(client, context, siteId) };
   }
 
   if (request.method === "GET" && path === "/api/v1/stock/reservations") {

@@ -1120,6 +1120,20 @@ export function orteAnsicht(orte = [], aktiv = null, rechte = {}, wahl = []) {
   </div>`;
 }
 
+/**
+ * Was von einer Bestandszeile reserviert ist.
+ *
+ * Nur wenn es etwas zu sagen gibt: "reserviert 0" an jeder Zeile waere Laerm.
+ * Der physische Bestand steht weiter rechts wie bisher - er ist die Zahl, die
+ * jemand im Regal nachzaehlen kann. Frei verfuegbar ist die Zahl, nach der
+ * gehandelt wird, und sie gehoert deshalb daneben und nicht anstelle.
+ */
+function reservierungsZusatz(zeile) {
+  const reserviert = Number(zeile.reservedQuantity || 0);
+  if (!reserviert) return '';
+  return ` · ${mengeAlsText(reserviert)} reserviert, frei ${mengeAlsText(Number(zeile.freeQuantity || 0))}`;
+}
+
 export function bestandAnsicht(zeilen = []) {
   const orte = bestandNachOrt(zeilen);
   if (!orte.length) {
@@ -1138,7 +1152,9 @@ export function bestandAnsicht(zeilen = []) {
           ${ort.zeilen.map((zeile) => `
             <li class="stock-row">
               <span class="stock-row__name">${sicher(zeile.itemName)}</span>
-              <span class="stock-row__number">${sicher(zeile.itemNumber)}</span>
+              <span class="stock-row__number">
+                ${sicher(zeile.itemNumber)}${reservierungsZusatz(zeile)}
+              </span>
               <span class="stock-row__amount stock-row__amount--${bestandLage(zeile.quantity)}">
                 ${sicher(bestandText(zeile.quantity, zeile.unit))}
               </span>
@@ -1599,7 +1615,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.20`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.21`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den

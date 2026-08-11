@@ -68,7 +68,8 @@ erfundenen Hintergrund statt gegen die echte API.
 | Fahrzeug-, Retouren- und Sperrlager; Buchung „Verbaut"; Lieferziel der Bestellung | steht (Fassung 0.44.18, Migration 119) |
 | Lieferscheine als strukturierter Beleg | steht (Fassung 0.44.19, Migration 121) |
 | Reservierungen und frei verfügbarer Bestand | steht (Fassung 0.44.20, Migration 123) |
-| Baustellenbereich Material (Bestand, verbaut, Kosten) | offen — Stufe 4 |
+| Baustellenbereich Material (Bestand, verbaut, reserviert, bestellt) | steht (Fassung 0.44.21) |
+| Materialkosten je Baustelle | offen — Stufe 5 |
 | Einkaufspreise und Lieferantenartikelnummern | offen — Stufe 5 |
 | Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
 

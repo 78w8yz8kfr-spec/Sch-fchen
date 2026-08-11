@@ -1,10 +1,15 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.20
+Technischer Stand: V0.44.21
 
 ## Abgeschlossen
 
+- Materialübersicht je Baustelle (`GET /api/v1/stock/sites/:id`) in der
+  Baustellenakte: auf der Baustelle, verbaut, reserviert, bestellt und offen —
+  getrennt statt verrechnet; frei verfügbar in der Bestandsliste;
+  Bestellvorschlag aus frei verfügbarem Bestand und Meldebestand;
+  PWA-Speicher `schaefchen-online-v103`
 - Reservierungen (Migration 123): frei verfügbar = physisch minus reserviert,
   Sicht `stock_availability`; die eigene Baustelle baut ihre Reservierung beim
   Holen ab, Dritte werden mit Nennung der Baustelle abgewiesen; Aufheben nur
