@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Fahrzeuge sind Lagerorte, und Verbautes wird ausgebucht (Fassung
+  0.44.18).** Der Transporter ist der häufigste Lagerort im Betrieb: morgens
+  beladen, abends halb leer — und niemand wusste, was drin liegt. Er ist jetzt
+  ein Ort wie das Regal, hängt aber am Fuhrpark und trägt kein zweites
+  Kennzeichen. Dazu kommen Retouren- und Sperrlager, denn was zum Lieferanten
+  zurück soll oder beschädigt ist, darf im normalen Bestand nicht mitgezählt
+  werden — sonst greift jemand danach. Zweitens: „auf der Baustelle" und
+  „verbaut" sind zwei verschiedene Dinge, und die Verwechslung ist der
+  häufigste Fehler in der Materialabrechnung. Bisher verschwand Material von
+  der Baustelle nur durch Rückgabe oder Umbuchung; was verbaut war, stand
+  weiter im Baustellenbestand. Die neue Buchung „Verbaut" bucht es aus — mit
+  Quelle, ohne Ziel, denn verbaut ist verbaut. Buchen darf sie der Monteur: er
+  weiß es zuerst. Bewusst nicht gerechnet wird „Verbrauch = geliefert minus
+  zurück"; sobald eine Umbuchung auf eine zweite Baustelle dazwischenliegt, ist
+  diese Formel falsch, und auf einer laufenden Baustelle ist sie immer zu früh.
+  Drittens trägt eine Bestellung jetzt ihr Lieferziel: Lager, Fahrzeug oder
+  Baustelle, dazu Projekt und Baustelle — die Direktlieferung ließ sich bisher
+  gar nicht planen.
 - **Das Material der Baustelle kennt jetzt das Lager (Fassung 0.44.17).**
   Bisher standen dieselben Dinge zweimal im System: an der Baustelle eine
   Freitextzeile — „Mantelleitung 5x1,5", 300, Meter —, im Lager ein Artikel mit

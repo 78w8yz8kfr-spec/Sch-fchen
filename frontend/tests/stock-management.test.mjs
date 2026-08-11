@@ -165,11 +165,12 @@ test('ein unbekannter Code führt zur Neuanlage statt in eine Sackgasse', () => 
 });
 
 test('wer was darf, entscheidet die Rolle', () => {
+  // Verbaut darf der Monteur: er weiss als Erster, was verbraucht ist.
   const monteur = verfuegbareVorgaenge({}).map((v) => v.schluessel);
-  assert.deepEqual(monteur, ['entnahme', 'rueckgabe']);
+  assert.deepEqual(monteur, ['entnahme', 'rueckgabe', 'verbaut']);
 
   const vorarbeiter = verfuegbareVorgaenge({ transfer: true }).map((v) => v.schluessel);
-  assert.deepEqual(vorarbeiter, ['entnahme', 'rueckgabe', 'umlagerung']);
+  assert.deepEqual(vorarbeiter, ['entnahme', 'rueckgabe', 'verbaut', 'umlagerung']);
 
   const buero = verfuegbareVorgaenge({ transfer: true, manage: true }).map((v) => v.schluessel);
   assert.deepEqual(buero, Object.keys(VORGAENGE));
@@ -1619,4 +1620,22 @@ test('ein negativer Bestand deckt nichts', () => {
   const lage = materialBestand(eintrag);
   assert.equal(lage.lage, 'nichts-da');
   assert.equal(lage.fehlt, 60);
+});
+
+
+test('verbaut braucht die Baustelle und bucht aus dem Baustellenbestand aus', () => {
+  // Ohne Baustelle wäre "verbaut" keine Aussage: verbraucht ist es dann zwar,
+  // aber niemand könnte sagen, wofür - und genau daran hängt die
+  // Nachkalkulation.
+  const ohne = buchungBauen(buchbarerZustand({ vorgang: 'verbaut' }), {});
+  assert.match(ohne.fehler, /Baustelle/);
+
+  const mit = buchungBauen(
+    buchbarerZustand({ vorgang: 'verbaut', baustelleId: 'bau-1' }), { vorgangId: 'op-9' }
+  );
+  assert.equal(mit.buchung.movementType, 'consumed');
+  assert.equal(mit.buchung.constructionSiteId, 'bau-1');
+  // Quelle ja, Ziel nein: verbaut kommt nirgends an.
+  assert.equal(mit.buchung.sourceLocationId, REGAL.id);
+  assert.equal(mit.buchung.targetLocationId, undefined);
 });
