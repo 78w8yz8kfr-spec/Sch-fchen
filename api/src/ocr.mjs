@@ -14,15 +14,25 @@
 // "1,5" wird "15", und ein verrutschter Spaltenrand macht aus zwei Zeilen
 // eine.
 //
-// Deshalb liest dieses Modul ausdruecklich NUR den Kopf des Belegs aus -
-// Lieferscheinnummer und Datum - und gibt den erkannten Text unveraendert mit
-// zurueck. Die Positionen tippt weiterhin ein Mensch.
+// Deshalb liest dieses Modul den Kopf des Belegs aus - Lieferscheinnummer und
+// Datum - und gibt den erkannten Text unveraendert mit zurueck.
 //
-// Das ist keine Sparsamkeit, sondern der Kern der Sache: eine falsch erkannte
-// Menge waere schlimmer als gar keine. Sie sieht aus wie eine Eingabe, wird
-// gebucht und faellt erst bei der Inventur auf. Eine falsch erkannte
-// Lieferscheinnummer dagegen faellt sofort auf, weil sie neben dem Papier
-// steht, das der Fahrer dagelassen hat.
+// Die Positionen liest es ebenfalls, aber nach einer anderen Regel: eine Zeile
+// wird nur dann zu einem Vorschlag, wenn ihre Artikelnummer im eigenen
+// Artikelstamm wirklich existiert. Damit entscheidet nicht die Erkennung,
+// sondern der Abgleich. Aus "NYM-)" wird kein Artikel, weil es keinen Artikel
+// "NYM-)" gibt; aus "NYM3X15" schon, weil genau dieser Artikel angelegt ist.
+//
+// Die Messungen dazu waren eindeutig: auf einem Handyfoto in voller Aufloesung
+// kamen Artikelnummer und Menge fehlerfrei durch - "1055-04", "100 Stk",
+// "NYM3X15", "500m" -, waehrend die Klartext-Bezeichnung danebenlag. Deshalb
+// wird ueber die Nummer zugeordnet und nie ueber den Namen.
+//
+// Gebucht wird davon nichts. Der Vorschlag landet in denselben Feldern, die
+// sonst getippt werden, und geht denselben Weg: speichern, pruefen, buchen.
+// Eine falsch erkannte Menge waere schlimmer als gar keine - sie saehe aus wie
+// eine Eingabe -, und deshalb steht sie sichtbar im Formular statt still im
+// Bestand.
 
 import { spawn } from "node:child_process";
 
@@ -131,6 +141,125 @@ export function datumAusText(text) {
 }
 
 /**
+ * Die Einheiten, die auf deutschen Lieferscheinen stehen.
+ *
+ * Links steht, was gedruckt wird, rechts, wie es im Artikelstamm heisst. Ohne
+ * diese Uebersetzung waere "Stck" auf dem Papier und "Stk" im Stamm ein
+ * Widerspruch, den jemand von Hand aufloesen muesste - jedes Mal aufs Neue.
+ *
+ * Bewusst nicht dabei: "x". Es steht auf einem Beleg oefter zwischen zwei
+ * Massen ("3x1,5") als vor einer Menge.
+ */
+const EINHEITEN = new Map([
+  ["stk", "Stk"], ["st", "Stk"], ["stck", "Stk"], ["stück", "Stk"],
+  ["stueck", "Stk"], ["stk.", "Stk"], ["pcs", "Stk"],
+  ["m", "m"], ["meter", "m"], ["mtr", "m"], ["lfm", "m"], ["lfdm", "m"],
+  ["km", "km"], ["cm", "cm"], ["mm", "mm"],
+  ["kg", "kg"], ["g", "g"], ["t", "t"],
+  ["l", "l"], ["ltr", "l"], ["liter", "l"], ["ml", "ml"],
+  ["m2", "m²"], ["m²", "m²"], ["qm", "m²"],
+  ["pack", "Pack"], ["pck", "Pack"], ["packung", "Pack"],
+  ["ve", "VE"], ["karton", "Karton"], ["kt", "Karton"], ["ktn", "Karton"],
+  ["rolle", "Rolle"], ["rlle", "Rolle"], ["ring", "Ring"],
+  ["btl", "Beutel"], ["beutel", "Beutel"], ["sack", "Sack"],
+  ["set", "Set"], ["paar", "Paar"], ["dose", "Dose"], ["eimer", "Eimer"]
+]);
+
+// Laengste Schreibweise zuerst, sonst schluckt "m" das "meter" daneben.
+const EINHEIT_MUSTER = [...EINHEITEN.keys()]
+  .sort((eins, zwei) => zwei.length - eins.length)
+  .map((wort) => wort.replace(/[.²]/g, (zeichen) => `\\${zeichen}`))
+  .join("|");
+
+const MENGE_MIT_EINHEIT = new RegExp(`(\\d[\\d.,]*)\\s*(${EINHEIT_MUSTER})(?![A-Za-zÄÖÜäöüß])`, "gi");
+
+/** Die Einheit in der Schreibweise des Artikelstamms. */
+export function einheitNormal(roh) {
+  const wort = String(roh || "").trim().toLowerCase();
+  return EINHEITEN.get(wort) || (wort ? String(roh).trim() : null);
+}
+
+/**
+ * Eine Zahl, wie sie auf einem deutschen Beleg steht.
+ *
+ * "1.000,5" und "1000,5" und "1000.5" meinen dasselbe. Der Punkt ist der
+ * schwierige Fall: er trennt Tausender oder Nachkommastellen, je nachdem, was
+ * dahinter steht. Drei Ziffern hinter dem letzten Punkt heissen Tausender -
+ * anders herum waere "1.000" ein Meter statt tausend.
+ */
+export function zahlAusText(roh) {
+  const text = String(roh || "").trim();
+  if (!/^\d[\d.,]*$/.test(text)) return null;
+
+  let normal;
+  if (text.includes(",")) {
+    normal = text.replace(/\./g, "").replace(",", ".");
+  } else {
+    const teile = text.split(".");
+    normal = teile.length > 1 && teile[teile.length - 1].length === 3
+      ? teile.join("")
+      : text;
+  }
+  const zahl = Number(normal);
+  return Number.isFinite(zahl) && zahl > 0 ? zahl : null;
+}
+
+/**
+ * Sieht dieses Wort aus wie eine Artikelnummer?
+ *
+ * Mindestens vier Zeichen, mindestens eine Ziffer, und nichts darin, was in
+ * einer Artikelnummer nicht vorkommt. "Schalterdose" faellt an der Ziffer
+ * durch, "tief" an der Laenge, "NYM-)" an der Klammer.
+ */
+function siehtAusWieNummer(wort) {
+  if (wort.length < 4 || wort.length > 40) return false;
+  if (!/\d/.test(wort)) return false;
+  return /^[A-Za-z0-9][A-Za-z0-9\-_./]*$/.test(wort);
+}
+
+/**
+ * Die Positionszeilen eines Belegs.
+ *
+ * Eine Zeile zaehlt nur, wenn sie beides hat: eine Menge mit Einheit und davor
+ * etwas, das wie eine Artikelnummer aussieht. Diese Bedingung wirft den
+ * Briefkopf, die Kundennummer und das Datum von allein hinaus - keine davon
+ * traegt eine Einheit.
+ *
+ * Genommen wird die LETZTE Menge der Zeile. In "NYM-J 3x1,5 Ring 500m" ist die
+ * erste Zahl ein Querschnitt und die letzte die Lieferung; andersherum
+ * gerechnet stuenden 3 Meter Kabel im Lager.
+ */
+export function positionenAusText(text) {
+  const zeilen = String(text || "").split(/\r?\n/);
+  const gefunden = [];
+
+  zeilen.forEach((zeile, nummer) => {
+    const treffer = [...zeile.matchAll(MENGE_MIT_EINHEIT)];
+    if (!treffer.length) return;
+    const letzte = treffer[treffer.length - 1];
+    const menge = zahlAusText(letzte[1]);
+    if (menge === null) return;
+
+    // Vor der Menge steht die Nummer. Eine fuehrende Positionsziffer faellt
+    // weg, sonst waere "1" der Artikel und nicht die Zeilennummer.
+    const woerter = zeile.slice(0, letzte.index).trim().split(/\s+/).filter(Boolean);
+    if (woerter.length > 1 && /^\d{1,3}[.)]?$/.test(woerter[0])) woerter.shift();
+    const code = woerter.find(siehtAusWieNummer);
+    if (!code) return;
+
+    gefunden.push({
+      line: nummer + 1,
+      text: zeile.trim(),
+      code: code.replace(/[.\-/]+$/, ""),
+      quantity: menge,
+      unit: einheitNormal(letzte[2])
+    });
+  });
+
+  return gefunden;
+}
+
+/**
  * Was aus einem Foto herauszuholen ist.
  *
  * `text` steht immer dabei, auch wenn nichts erkannt wurde. Wer sieht, was das
@@ -142,6 +271,7 @@ export async function belegAuslesen(bild, optionen = {}) {
   return {
     text: text.trim(),
     deliveryNoteNumber: lieferscheinnummerAusText(text),
-    deliveredOn: datumAusText(text)
+    deliveredOn: datumAusText(text),
+    positions: positionenAusText(text)
   };
 }

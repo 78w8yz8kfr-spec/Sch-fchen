@@ -69,6 +69,7 @@ erfundenen Hintergrund statt gegen die echte API.
 | Fahrzeug-, Retouren- und Sperrlager; Buchung „Verbaut"; Lieferziel der Bestellung | steht (Fassung 0.44.18, Migration 119) |
 | Lieferscheine als strukturierter Beleg | steht (Fassung 0.44.19, Migration 121) |
 | Lieferschein per Foto: Nummer und Datum erkennen | steht (Fassung 0.44.26, Tesseract) |
+| Lieferschein per Foto: Positionen über die Artikelnummer zuordnen | steht (Fassung 0.44.27) |
 | Reservierungen und frei verfügbarer Bestand | steht (Fassung 0.44.20, Migration 123) |
 | Baustellenbereich Material (Bestand, verbaut, reserviert, bestellt) | steht (Fassung 0.44.21) |
 | Rückgabe ohne Scanner, Storno als Gegenbuchung, gefilterte Historie | steht (Fassung 0.44.22, Migration 126) |

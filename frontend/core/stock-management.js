@@ -1646,7 +1646,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.26`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.27`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -2047,6 +2047,69 @@ export function lieferscheinAnsicht(zustand) {
  * Lieferantenartikelnummern) steht am Beleg und laesst sich spaeter ergaenzen;
  * wer im Stehen erfasst, waehrend der Fahrer wartet, tippt es ohnehin nicht.
  */
+/**
+ * Erkannte Positionen in das Formular uebernehmen.
+ *
+ * Nur Zeilen mit zugeordnetem Artikel werden uebernommen - alles andere waere
+ * ein leeres Feld mit einer Behauptung daneben. Getipptes bleibt stehen: eine
+ * bereits gefuellte Zeile wird nie ueberschrieben, die Vorschlaege fuellen die
+ * leeren und haengen sich sonst hinten an.
+ *
+ * Ein Vorschlag, der schon im Formular steht, kommt nicht ein zweites Mal
+ * dazu. Wer zweimal fotografiert, weil das erste Bild verwackelt war, soll
+ * nicht die doppelte Menge buchen.
+ */
+export function positionenUebernehmen(zeilen = [], vorschlaege = []) {
+  const brauchbar = vorschlaege.filter((zeile) => zeile.stockItemId && zeile.quantity > 0);
+  const bestehend = zeilen.filter((zeile) => zeile.itemId || String(zeile.quantity || '').trim());
+  const schonDa = new Set(bestehend.map((zeile) => zeile.itemId).filter(Boolean));
+
+  const neue = brauchbar
+    .filter((zeile) => !schonDa.has(zeile.stockItemId))
+    .map((zeile) => ({ itemId: zeile.stockItemId, quantity: mengeAlsText(zeile.quantity) }));
+
+  const zusammen = [...bestehend, ...neue];
+  return zusammen.length ? zusammen : [{ itemId: '', quantity: '' }];
+}
+
+/**
+ * Was auf dem Bild an Positionen stand.
+ *
+ * Auch die nicht zugeordneten Zeilen stehen hier - und gerade sie sind
+ * wichtig. Wer nur die Treffer sieht, haelt eine halb gelesene Lieferung fuer
+ * eine vollstaendige. Wer die Luecke sieht, tippt sie nach.
+ */
+export function erkanntePositionenAnsicht(positionen = []) {
+  if (!positionen.length) return '';
+
+  return `<div class="stock-ocr-lines">
+    <h3 class="stock-subhead">Vom Bild gelesen</h3>
+    <ul class="stock-rows">
+      ${positionen.map((zeile) => {
+        const zustand = !zeile.stockItemId
+          ? 'unbekannt'
+          : (zeile.unitMatches ? 'gut' : 'knapp');
+        const hinweis = !zeile.stockItemId
+          ? 'kein Artikel dazu'
+          : (zeile.unitMatches
+            ? 'übernommen'
+            : `Einheit prüfen: ${sicher(zeile.stockUnit || '')}`);
+        return `<li class="stock-row stock-row--ocr">
+          <span class="stock-row__name">${sicher(zeile.stockItemName || zeile.text)}</span>
+          <span class="stock-row__number">
+            ${sicher(zeile.code)} · ${sicher(mengeAlsText(zeile.quantity))} ${sicher(zeile.unit || '')}
+          </span>
+          <span class="stock-row__amount stock-row__amount--${zustand}">${hinweis}</span>
+        </li>`;
+      }).join('')}
+    </ul>
+    <p class="stock-field__hint">
+      Vorgeschlagen, nicht gebucht. Die Mengen stehen unten im Formular und
+      gehen erst mit dem Buchen in den Bestand.
+    </p>
+  </div>`;
+}
+
 export function lieferscheinFormularAnsicht(entwurf = {}, optionen = {}, fehler = null) {
   const lieferanten = optionen.lieferanten || [];
   const orte = optionen.orte || [];
@@ -2072,10 +2135,11 @@ export function lieferscheinFormularAnsicht(entwurf = {}, optionen = {}, fehler 
       <span>Foto des Lieferscheins</span>
       <input class="stock-delivery-photo" type="file" accept="image/*" capture="environment">
       <span class="stock-field__hint">
-        Liest Nummer und Datum aus dem Bild. Die Positionen bleiben Handarbeit —
-        eine falsch erkannte Menge sähe aus wie eine Eingabe.
+        Liest Nummer, Datum und die Positionen aus dem Bild. Vorgeschlagen wird
+        nur, was im Artikelstamm wirklich steht — den Rest tragen Sie nach.
       </span>
     </label>
+    ${erkanntePositionenAnsicht(entwurf.erkanntePositionen || [])}
     ${entwurf.erkannt
       ? `<details class="stock-ocr">
            <summary>Erkannter Text</summary>

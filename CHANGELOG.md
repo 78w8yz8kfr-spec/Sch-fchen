@@ -4,6 +4,30 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Foto des Lieferscheins liest jetzt auch die Positionen (Fassung
+  0.44.27).** Die vorige Fassung liess sie bewusst weg — mit einer Begründung,
+  die zu kurz griff. Das Prüfbild dahinter war 1000 auf 700 Bildpunkte groß und
+  absichtlich unscharf gerechnet: kein Handyfoto, sondern ein schlechtes Fax.
+  Auf einer Aufnahme in voller Auflösung, schief gehalten und mit Lichtverlauf,
+  kamen Artikelnummer und Menge fehlerfrei durch — „1055-04", „100 Stk",
+  „NYM3X15", „500m" —, während die Klartext-Bezeichnung danebenlag. Genau diese
+  Verteilung trägt die Lösung: zugeordnet wird über die Nummer und nie über den
+  Namen. Und nicht die Erkennung entscheidet, sondern der Abgleich — eine
+  gelesene Zeile wird nur dann zum Vorschlag, wenn ihre Nummer im eigenen
+  Artikelstamm wirklich existiert, als Artikelnummer, als Herstellernummer oder
+  als hinterlegter Strichcode, mit oder ohne Trennzeichen. Aus einem verlesenen
+  „NYM-)" wird deshalb kein Artikel. Trifft eine Nummer auf zwei Artikel, wird
+  sie gar nicht zugeordnet: ein Vorschlag, der zwischen zweien rät, sieht
+  genauso aus wie ein richtiger. Eine Zeile zählt außerdem nur mit Menge und
+  Einheit — das wirft Briefkopf, Kunden- und Bestellnummer von allein hinaus.
+  Genommen wird die letzte Menge der Zeile: in „NYM-J 3x1,5 Ring 500m" ist die
+  erste Zahl ein Querschnitt. Die Einheit wird verglichen und nicht
+  umgerechnet; „Ring" statt „Meter" steht als Hinweis an der Zeile, denn 500
+  Meter können ein Ring sein oder fünfhundert. Gebucht wird davon nichts: der
+  Vorschlag landet in denselben Feldern, die sonst getippt werden. Nicht
+  zugeordnete Zeilen stehen sichtbar daneben — wer nur die Treffer sähe, hielte
+  eine halb gelesene Lieferung für eine vollständige. Ein zweites Foto
+  verdoppelt die Mengen nicht.
 - **Ein Foto des Lieferscheins füllt Nummer und Datum aus (Fassung 0.44.26).**
   Erkannt wird mit Tesseract, das jetzt im Auslieferungsimage mitliegt — kein
   Dienst im Netz, denn ein Lieferschein nennt Lieferant, Mengen und Preise.

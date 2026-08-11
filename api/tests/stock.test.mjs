@@ -4,7 +4,7 @@ import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 
 import { createPool, withTenantTransaction } from "../src/database.mjs";
-import { handleStockRequest } from "../src/stock.mjs";
+import { handleStockRequest, positionenZuordnen } from "../src/stock.mjs";
 
 // Der Test spricht den Endpunktbaum direkt an und nicht ueber HTTP. Die
 // Sitzungsaufloesung, die Mandantengrenze und die Rollen laufen trotzdem
@@ -1934,5 +1934,113 @@ integrationTest("Lager: Codes nachtragen, zurücknehmen und Etiketten drucken", 
 
     assert.equal(nachher.body.item.totalQuantity, vorher.body.item.totalQuantity);
     assert.deepEqual(nachher.body.levels, vorher.body.levels);
+  });
+});
+
+integrationTest("Lieferschein-Foto: erkannte Positionen finden ihren Artikel", async (t) => {
+  const apiPool = createPool(datenbank);
+  const ownerPool = createPool({
+    ...datenbank,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD
+  });
+  t.after(async () => {
+    await apiPool.end();
+    await ownerPool.end();
+  });
+
+  const kennung = `O${String(Date.now()).slice(-5)}`;
+  const companyId = await firmaAnlegen(ownerPool, kennung);
+  const buero = await mitarbeiterAnlegen(ownerPool, companyId, `OCR-B-${kennung}`, "office");
+
+  const dose = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+    itemNumber: "LAG-2001",
+    name: "Schalterdose tief",
+    groupKey: "installation",
+    unit: "Stück",
+    manufacturerNumber: "1055-04",
+    barcodes: [{ code: "4006381333931", codeType: "gtin", isPrimary: true }]
+  });
+  const kabel = await aufrufen(apiPool, buero, "POST", "/api/v1/stock/items", {
+    itemNumber: "NYM3X15",
+    name: "NYM-J 3x1,5",
+    groupKey: "installation",
+    unit: "Meter"
+  });
+
+  // Der Aufruf geht direkt an die Zuordnung und nicht über den Endpunkt: den
+  // gelesenen Text liefert Tesseract, das auf dem Prüfrechner nicht liegen
+  // muss. Geprüft wird hier, was ohne Datenbank nicht zu prüfen ist — der
+  // Abgleich mit dem eigenen Artikelstamm.
+  const zuordnen = (positionen, kontext = buero) => withTenantTransaction(
+    apiPool, kontext, (client) => positionenZuordnen(client, kontext, positionen)
+  );
+
+  await t.test("die Nummer des Lieferanten trifft den eigenen Artikel", async () => {
+    const [herstellernummer, eigene, strichcode] = await zuordnen([
+      { line: 1, text: "1 1055-04 Schalterdose tief 100 Stk", code: "1055-04", quantity: 100, unit: "Stk" },
+      { line: 2, text: "2 LAG-2001 Dose 5 Stk", code: "LAG-2001", quantity: 5, unit: "Stk" },
+      { line: 3, text: "3 4006381333931 Dose 7 Stk", code: "4006381333931", quantity: 7, unit: "Stk" }
+    ]);
+
+    // Alle drei Wege führen zum selben Artikel: der Lieferant druckt die
+    // Nummer, die er führt, und das ist selten die eigene.
+    assert.equal(herstellernummer.stockItemId, dose.body.item.id, "über die Herstellernummer");
+    assert.equal(eigene.stockItemId, dose.body.item.id, "über die eigene Artikelnummer");
+    assert.equal(strichcode.stockItemId, dose.body.item.id, "über den hinterlegten Strichcode");
+    assert.equal(herstellernummer.stockItemName, "Schalterdose tief");
+    assert.equal(herstellernummer.quantity, 100, "Die gelesene Menge bleibt unangetastet");
+  });
+
+  await t.test("Trennzeichen entscheiden nicht über die Zuordnung", async () => {
+    // "1055-04" und "105504" sind derselbe Artikel. Welche Schreibweise auf
+    // dem Papier steht, entscheidet der Lieferant und nicht das Lager.
+    const [ohneStrich] = await zuordnen([
+      { line: 1, text: "1 105504 Dose 100 Stk", code: "105504", quantity: 100, unit: "Stk" }
+    ]);
+    assert.equal(ohneStrich.stockItemId, dose.body.item.id);
+  });
+
+  await t.test("eine unbekannte Nummer wird nicht geraten", async () => {
+    // Der Kern der Sache: nicht die Erkennung entscheidet, sondern der
+    // Abgleich. Aus einem verlesenen "NYM-)" wird kein Artikel.
+    const [unbekannt] = await zuordnen([
+      { line: 1, text: "1 XYZ-9999 Irgendwas 12 Stk", code: "XYZ-9999", quantity: 12, unit: "Stk" }
+    ]);
+    assert.equal(unbekannt.stockItemId, null);
+    assert.equal(unbekannt.stockItemName, null);
+    assert.equal(unbekannt.quantity, 12, "Die Zeile bleibt sichtbar, damit sie niemand übersieht");
+    assert.equal(unbekannt.code, "XYZ-9999");
+  });
+
+  await t.test("eine abweichende Einheit wird gemeldet statt umgerechnet", async () => {
+    const [passend, abweichend] = await zuordnen([
+      { line: 1, text: "1 1055-04 Dose 100 Stk", code: "1055-04", quantity: 100, unit: "Stk" },
+      { line: 2, text: "2 NYM3X15 Kabel 500 Ring", code: "NYM3X15", quantity: 500, unit: "Ring" }
+    ]);
+
+    // "Stk" auf dem Papier und "Stück" im Stamm sind dasselbe.
+    assert.equal(passend.unitMatches, true);
+    // "Ring" und "Meter" sind es nicht — und ein automatischer Faktor wäre
+    // geraten. 500 Meter können ein Ring sein oder fünfhundert.
+    assert.equal(abweichend.unitMatches, false);
+    assert.equal(abweichend.stockItemId, kabel.body.item.id, "Zugeordnet wird trotzdem");
+    assert.equal(abweichend.stockUnit, "Meter", "Die Einheit des Stamms steht daneben");
+  });
+
+  await t.test("der Artikel einer fremden Firma wird nicht gefunden", async () => {
+    const fremdeFirma = await firmaAnlegen(ownerPool, `${kennung}F`);
+    const fremder = await mitarbeiterAnlegen(ownerPool, fremdeFirma, `OCR-F-${kennung}`, "office");
+
+    const [nichts] = await zuordnen(
+      [{ line: 1, text: "1 1055-04 Dose 100 Stk", code: "1055-04", quantity: 100, unit: "Stk" }],
+      fremder
+    );
+    assert.equal(nichts.stockItemId, null,
+      "Dieselbe Herstellernummer im Nachbarbetrieb bleibt unsichtbar");
+  });
+
+  await t.test("ohne Positionen wird die Datenbank nicht gefragt", async () => {
+    assert.deepEqual(await zuordnen([]), []);
   });
 });
