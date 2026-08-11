@@ -12,6 +12,8 @@ import {
   darfVorgang,
   buchungBauen,
   lieferscheineAnsicht,
+  rueckgabeAnsicht,
+  rueckgabeBuchungen,
   lieferscheinAnsicht,
   lieferscheinFormularAnsicht,
   materialBestand,
@@ -1727,4 +1729,52 @@ test('die Bestandsliste nennt reserviert und frei nur, wenn es etwas zu sagen gi
   // Der physische Bestand bleibt die Zahl rechts: die kann jemand im Regal
   // nachzählen.
   assert.match(mit, /100 Stück/);
+});
+
+
+const BAUSTELLENBESTAND = {
+  constructionSite: { id: 'bau-1', name: 'Baustelle Müller', locationId: 'ort-bau', locationName: 'Baustelle Müller' },
+  items: [
+    { itemId: 'a1', itemName: 'NYM-J 3x1,5', itemNumber: 'LAG-1', unit: 'Meter', onSite: 80 },
+    { itemId: 'a2', itemName: 'Steckdose', itemNumber: 'LAG-2', unit: 'Stück', onSite: 8 },
+    { itemId: 'a3', itemName: 'Präsenzmelder', itemNumber: 'LAG-3', unit: 'Stück', onSite: 0 }
+  ]
+};
+
+test('die Rückgabe zeigt, was da ist, und schlägt keine Menge vor', () => {
+  const ansicht = rueckgabeAnsicht(BAUSTELLENBESTAND, {}, [{ id: 'ort-lager', name: 'Materiallager' }]);
+  assert.match(ansicht, /Baustelle Müller/);
+  assert.match(ansicht, /auf der Baustelle: 80 Meter/);
+  // Was nicht mehr da ist, steht nicht in der Liste.
+  assert.ok(!ansicht.includes('Präsenzmelder'), 'Ein leerer Posten gehört nicht in die Rückgabe');
+  // Kein Vorschlag: eine vorgeschlagene Menge wäre eine Behauptung darüber,
+  // was übrig ist, und die stimmt nie.
+  assert.ok(!/value="8[0"]/.test(ansicht.split('stock-return__input')[1] || ''), 'Es darf nichts vorbelegt sein');
+  assert.match(ansicht, /stock-return-book/);
+});
+
+test('aus den Mengen werden einzelne Buchungen mit eigener Vorgangsnummer', () => {
+  const { buchungen, fehler } = rueckgabeBuchungen(
+    BAUSTELLENBESTAND, { a1: '80', a2: '8' }, 'ort-lager'
+  );
+  assert.equal(fehler, undefined);
+  assert.equal(buchungen.length, 2, 'Nur die ausgefüllten Zeilen werden gebucht');
+  assert.equal(buchungen[0].sourceLocationId, 'ort-bau');
+  assert.equal(buchungen[0].targetLocationId, 'ort-lager');
+  assert.equal(buchungen[0].constructionSiteId, 'bau-1');
+  assert.notEqual(
+    buchungen[0].clientOperationId, buchungen[1].clientOperationId,
+    'Zwei Zeilen dürfen nicht dieselbe Vorgangsnummer tragen'
+  );
+});
+
+test('die Rückgabe nimmt nicht mehr, als auf der Baustelle liegt', () => {
+  const zuviel = rueckgabeBuchungen(BAUSTELLENBESTAND, { a2: '20' }, 'ort-lager');
+  assert.match(zuviel.fehler, /nur 8 Stück auf der Baustelle/);
+
+  const leer = rueckgabeBuchungen(BAUSTELLENBESTAND, {}, 'ort-lager');
+  assert.match(leer.fehler, /mindestens eine Menge/);
+
+  const gleich = rueckgabeBuchungen(BAUSTELLENBESTAND, { a1: '5' }, 'ort-bau');
+  assert.match(gleich.fehler, /verschieden/);
 });

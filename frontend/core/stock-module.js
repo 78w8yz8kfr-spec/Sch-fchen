@@ -21,6 +21,7 @@ import {
   buchungBauen,
   buchungBleibtInWarteschlange,
   lieferscheinFormularAnsicht,
+  rueckgabeBuchungen,
   buchungVerarbeiten,
   codeNachtragLesen,
   eingangVorbelegen,
@@ -38,14 +39,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.21";
+} from "./stock-management.js?v=0.44.22";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.21";
+} from "./barcode-scanner.mjs?v=0.44.22";
 
 const html = `
   <div class="stock-module">
@@ -142,6 +143,7 @@ export function createStockModule({
     // stehen, damit auch im Keller eine Baustelle waehlbar ist.
     eigeneBaustellen: getSites(),
     baustellen: kontext.sites?.length ? kontext.sites : gemerkteBaustellen(),
+    eigeneBaustelleId: getSites()[0]?.id || null,
     baustellePflicht: Boolean(kontext.settings?.requireSiteOnIssue),
     bestand,
     artikel,
@@ -597,6 +599,11 @@ export function createStockModule({
     auf(".stock-do", "click", (ereignis) => void buchen(ereignis.currentTarget.dataset.vorgang));
 
     auf(".stock-tile", "click", (ereignis) => {
+      // Die Rueckgabe ist keine Liste, sondern braucht die Uebersicht ihrer
+      // Baustelle - sie geht deshalb einen eigenen Weg.
+      if (ereignis.currentTarget.dataset.ziel === "rueckgabe") {
+        return void rueckgabeOeffnen(optionen().eigeneBaustelleId);
+      }
       const ziele = {
         bestand: SCHRITTE.BESTAND,
         artikel: SCHRITTE.ARTIKEL,
@@ -667,6 +674,14 @@ export function createStockModule({
     });
     auf(".stock-order-receive", "click", () => void wareneingangBuchen());
     auf(".stock-order-cancel", "click", () => void bestellungStornieren());
+
+    auf(".stock-return__input", "input", (ereignis) => {
+      zustand.entwurf = {
+        ...(zustand.entwurf || {}),
+        [ereignis.currentTarget.dataset.artikel]: ereignis.currentTarget.value
+      };
+    });
+    auf(".stock-return-book", "click", () => void rueckgabeBuchen());
 
     auf(".stock-delivery-new", "click", () => void lieferscheinFormular());
     auf(".stock-delivery-add-line", "click", () => {
@@ -883,6 +898,64 @@ export function createStockModule({
       zustand = { ...zustand, fehler: fehler.message };
       render();
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Schnelle Rueckgabe von der Baustelle
+  // -------------------------------------------------------------------------
+
+  async function rueckgabeOeffnen(siteId) {
+    try {
+      const uebersicht = await laden(`/sites/${encodeURIComponent(siteId)}`);
+      zustand = {
+        ...zustand, schritt: SCHRITTE.RUECKGABE, rueckgabe: uebersicht,
+        entwurf: {}, fehler: null
+      };
+      render();
+    } catch (fehler) {
+      melden(fehler);
+    }
+  }
+
+  async function rueckgabeBuchen() {
+    const ziel = elements.view.querySelector(".stock-return__target")?.value || null;
+    const { buchungen, fehler } = rueckgabeBuchungen(
+      zustand.rueckgabe, zustand.entwurf || {}, ziel
+    );
+    if (fehler) {
+      zustand = { ...zustand, fehler };
+      render();
+      return;
+    }
+
+    // Je Zeile eine Buchung mit eigener Vorgangsnummer. Was ohne Netz
+    // scheitert, geht in die Warteschlange - die anderen sind trotzdem
+    // gebucht.
+    let gebucht = 0;
+    let gewartet = 0;
+    for (const buchung of buchungen) {
+      try {
+        await senden("/movements", buchung);
+        gebucht += 1;
+      } catch (weg) {
+        if (!weg.network) {
+          zustand = { ...zustand, fehler: weg.message };
+          render();
+          return;
+        }
+        warteschlangeSpeichern([
+          ...warteschlange(),
+          { buchung, beschreibung: "Rückgabe von der Baustelle", vorgang: "Zurückgeben", gestellt: new Date().toISOString() }
+        ]);
+        gewartet += 1;
+      }
+    }
+
+    showToast(gewartet
+      ? `${gebucht} zurückgebucht, ${gewartet} wartet auf Netz.`
+      : `${gebucht} Position${gebucht === 1 ? '' : 'en'} zurückgebucht.`);
+    zustand = neuerVorgang();
+    await zeigen(SCHRITTE.START);
   }
 
   async function buchen(vorgang) {
