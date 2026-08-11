@@ -202,7 +202,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.16";
+export const APPLICATION_VERSION = "0.44.17";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -3028,7 +3028,17 @@ function siteMaterialDto(row) {
     status: row.status,
     note: row.note,
     rowVersion: Number(row.row_version),
-    createdAt: new Date(row.created_at).toISOString()
+    createdAt: new Date(row.created_at).toISOString(),
+    // Der verknuepfte Lagerartikel. `stockItemId` steht am Eintrag, alles
+    // Weitere kommt aus dem Lager und ist deshalb `null`, solange keine
+    // Verknuepfung besteht - nicht `0`. Der Unterschied zaehlt: "kein Artikel
+    // hinterlegt" ist etwas anderes als "nichts mehr da".
+    stockItemId: row.stock_item_id || null,
+    stockItemNumber: row.stock_item_number || null,
+    stockItemName: row.stock_item_name || null,
+    stockUnit: row.stock_unit || null,
+    // Der Bestand ueber alle Lagerplaetze hinweg, aus dem Journal gerechnet.
+    stockQuantity: row.stock_item_id ? Number(row.stock_quantity || 0) : null
   };
 }
 
@@ -4650,12 +4660,26 @@ async function adminOverview(client, context, date) {
       [context.companyId]
     ),
     client.query(
-      `SELECT id, construction_site_id, item_name, quantity, unit, status,
-              note, row_version, created_at
-       FROM site_material_entries
-       WHERE company_id = $1
-       ORDER BY CASE status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
-                created_at DESC`,
+      `SELECT eintrag.id, eintrag.construction_site_id, eintrag.item_name,
+              eintrag.quantity, eintrag.unit, eintrag.status, eintrag.note,
+              eintrag.row_version, eintrag.created_at, eintrag.stock_item_id,
+              artikel.item_number AS stock_item_number,
+              artikel.name AS stock_item_name,
+              artikel.unit AS stock_unit,
+              COALESCE(bestand.summe, 0) AS stock_quantity
+       FROM site_material_entries AS eintrag
+       LEFT JOIN stock_items AS artikel
+         ON artikel.company_id = eintrag.company_id
+        AND artikel.id = eintrag.stock_item_id
+       LEFT JOIN (
+         SELECT company_id, item_id, SUM(quantity) AS summe
+         FROM stock_levels GROUP BY company_id, item_id
+       ) AS bestand
+         ON bestand.company_id = eintrag.company_id
+        AND bestand.item_id = eintrag.stock_item_id
+       WHERE eintrag.company_id = $1
+       ORDER BY CASE eintrag.status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
+                eintrag.created_at DESC`,
       [context.companyId]
     ),
     client.query(
@@ -5119,14 +5143,28 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
       [context.companyId, constructionSiteId, access.canLead, context.userId]
     ),
     client.query(
-      `SELECT id, construction_site_id, item_name, quantity, unit, status,
-              note, row_version, created_at
-       FROM site_material_entries
-       WHERE company_id = $1
-         AND construction_site_id = $2
-         AND status <> 'archived'
-       ORDER BY CASE status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
-                created_at DESC`,
+      `SELECT eintrag.id, eintrag.construction_site_id, eintrag.item_name,
+              eintrag.quantity, eintrag.unit, eintrag.status, eintrag.note,
+              eintrag.row_version, eintrag.created_at, eintrag.stock_item_id,
+              artikel.item_number AS stock_item_number,
+              artikel.name AS stock_item_name,
+              artikel.unit AS stock_unit,
+              COALESCE(bestand.summe, 0) AS stock_quantity
+       FROM site_material_entries AS eintrag
+       LEFT JOIN stock_items AS artikel
+         ON artikel.company_id = eintrag.company_id
+        AND artikel.id = eintrag.stock_item_id
+       LEFT JOIN (
+         SELECT company_id, item_id, SUM(quantity) AS summe
+         FROM stock_levels GROUP BY company_id, item_id
+       ) AS bestand
+         ON bestand.company_id = eintrag.company_id
+        AND bestand.item_id = eintrag.stock_item_id
+       WHERE eintrag.company_id = $1
+         AND eintrag.construction_site_id = $2
+         AND eintrag.status <> 'archived'
+       ORDER BY CASE eintrag.status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
+                eintrag.created_at DESC`,
       [context.companyId, constructionSiteId]
     ),
     client.query(
@@ -5715,36 +5753,81 @@ async function updateMobileSiteTask(
 
 async function getSiteMaterialRecord(client, context, materialId) {
   const result = await client.query(
-    `SELECT id, construction_site_id, item_name, quantity, unit, status,
-            note, row_version, created_at
-     FROM site_material_entries
-     WHERE company_id = $1 AND id = $2`,
+    `SELECT eintrag.id, eintrag.construction_site_id, eintrag.item_name,
+            eintrag.quantity, eintrag.unit, eintrag.status, eintrag.note,
+            eintrag.row_version, eintrag.created_at, eintrag.stock_item_id,
+            artikel.item_number AS stock_item_number,
+            artikel.name AS stock_item_name,
+            artikel.unit AS stock_unit,
+            COALESCE(bestand.summe, 0) AS stock_quantity
+     FROM site_material_entries AS eintrag
+     LEFT JOIN stock_items AS artikel
+       ON artikel.company_id = eintrag.company_id
+      AND artikel.id = eintrag.stock_item_id
+     LEFT JOIN (
+       SELECT company_id, item_id, SUM(quantity) AS summe
+       FROM stock_levels GROUP BY company_id, item_id
+     ) AS bestand
+       ON bestand.company_id = eintrag.company_id
+      AND bestand.item_id = eintrag.stock_item_id
+     WHERE eintrag.company_id = $1 AND eintrag.id = $2`,
     [context.companyId, materialId]
   );
   if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde nicht gefunden.", 404, "site_material_not_found");
   return siteMaterialDto(result.rows[0]);
 }
 
+/**
+ * Zeigt der Eintrag auf einen Artikel, der zu dieser Firma gehoert?
+ *
+ * Der Fremdschluessel faengt den Fall zwar ab, aber als Datenbankfehler. Wer
+ * eine Kennung von Hand eintippt, soll einen Satz lesen und keinen Code.
+ * Archivierte Artikel bleiben erlaubt: eine alte Baustellenakte darf weiter
+ * auf sie zeigen, nur neu waehlen laesst sich ein archivierter nicht.
+ */
+async function requireStockItemForMaterial(client, context, stockItemId) {
+  if (!stockItemId) return null;
+  const vorhanden = await client.query(
+    "SELECT id FROM stock_items WHERE company_id = $1 AND id = $2 AND status = 'active'",
+    [context.companyId, stockItemId]
+  );
+  if (vorhanden.rowCount !== 1) {
+    throw new InputError("Dieser Lagerartikel wurde nicht gefunden.", 404, "stock_item_unknown");
+  }
+  return stockItemId;
+}
+
 async function storeSiteMaterial(client, context, input) {
+  const stockItemId = await requireStockItemForMaterial(client, context, input.stockItemId);
   const result = await client.query(
     `INSERT INTO site_material_entries (
        company_id, construction_site_id, item_name, quantity, unit, status,
-       note, created_by_user_id, changed_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+       note, stock_item_id, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
      RETURNING id`,
     [context.companyId, input.constructionSiteId, input.itemName, input.quantity,
-      input.unit, input.status, input.note, context.userId]
+      input.unit, input.status, input.note, stockItemId, context.userId]
   );
   return getSiteMaterialRecord(client, context, result.rows[0].id);
 }
 
 async function storeSiteMaterialStatus(client, context, materialId, input) {
+  // Die Verknuepfung wird nur angefasst, wenn sie mitgeschickt wurde. Sonst
+  // haette das blosse Weiterschalten des Status sie geloescht.
+  if (input.stockItem?.provided) {
+    await requireStockItemForMaterial(client, context, input.stockItem.id);
+  }
   const result = await client.query(
     `UPDATE site_material_entries
-     SET status = $3, changed_by_user_id = $4
+     SET status = $3,
+         stock_item_id = CASE WHEN $6::BOOLEAN THEN $7::UUID ELSE stock_item_id END,
+         changed_by_user_id = $4
      WHERE company_id = $1 AND id = $2 AND row_version = $5
      RETURNING id`,
-    [context.companyId, materialId, input.status, context.userId, input.rowVersion]
+    [
+      context.companyId, materialId, input.status, context.userId, input.rowVersion,
+      Boolean(input.stockItem?.provided), input.stockItem?.id || null
+    ]
   );
   if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde geändert. Bitte neu laden.", 409, "row_version_conflict");
   return getSiteMaterialRecord(client, context, materialId);

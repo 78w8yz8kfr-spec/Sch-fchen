@@ -574,7 +574,29 @@ test("Baustellenmodule validieren Aufgaben, Notizen, Material und Berichte", () 
     unit: "m",
     status: "planned"
   }).quantity, 50);
-  assert.deepEqual(validateSiteMaterialUpdate({ status: "used", rowVersion: 1 }), { status: "used", rowVersion: 1 });
+  // Ohne `stockItemId` im Rumpf bleibt die Verknüpfung zum Lagerartikel
+  // unangetastet - sonst hätte jedes Weiterschalten des Stands sie gelöscht.
+  assert.deepEqual(
+    validateSiteMaterialUpdate({ status: "used", rowVersion: 1 }),
+    { status: "used", rowVersion: 1, stockItem: { provided: false, id: null } }
+  );
+  const artikelId = "66666666-6666-4666-8666-666666666666";
+  assert.deepEqual(
+    validateSiteMaterialUpdate({ status: "used", rowVersion: 1, stockItemId: artikelId }),
+    { status: "used", rowVersion: 1, stockItem: { provided: true, id: artikelId } }
+  );
+  // Ausdrücklich `null` löst sie.
+  assert.deepEqual(
+    validateSiteMaterialUpdate({ status: "used", rowVersion: 1, stockItemId: null }),
+    { status: "used", rowVersion: 1, stockItem: { provided: true, id: null } }
+  );
+  assert.equal(
+    validateSiteMaterial({
+      constructionSiteId: siteId, itemName: "Mantelleitung", quantity: 5,
+      unit: "m", status: "planned", stockItemId: artikelId
+    }).stockItemId,
+    artikelId
+  );
 
   const noteId = "55555555-5555-4555-8555-555555555555";
   assert.deepEqual(validateSiteNote({
