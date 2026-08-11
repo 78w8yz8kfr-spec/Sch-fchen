@@ -23,6 +23,7 @@ import {
   bestaetigungAnsicht,
   orteAnsicht,
   druckKnopf,
+  artikelAlsEntwurf,
   einheitenFuer,
   faktorFuer,
   gebindeText,
@@ -1410,19 +1411,82 @@ test('sind alle angehakt, hebt derselbe Knopf die Auswahl wieder auf', () => {
   assert.ok(alle.includes('3 Etiketten drucken'));
 });
 
-test('die Lagerplätze lassen sich in einem Rutsch beschriften', () => {
-  const mit = orteAnsicht(ORTE, 'ort-1', { manage: true });
-  assert.ok(mit.includes('stock-sheet-locations'));
-  assert.ok(mit.includes(`für alle ${ORTE.length} Lagerplätze`));
+test('einzelne Lagerplätze lassen sich beschriften, nicht nur alle', () => {
+  // Wer nachträglich ein Fach beschriftet, will nicht den ganzen Satz drucken.
+  const eines = orteAnsicht(ORTE, 'ort-1', { manage: true }, ['ort-2']);
+  assert.ok(eines.includes('data-wahl="ort-2"'));
+  assert.ok(eines.includes('1 Etikett drucken'));
+  assert.equal((eines.match(/checked/g) || []).length, 1);
 
-  // Einzahl: "alle 1 Lagerplätze" liest sich wie ein Fehler.
-  assert.ok(orteAnsicht([ORTE[0]], null, { manage: true }).includes('für den Lagerplatz'));
+  const alle = orteAnsicht(ORTE, null, { manage: true }, ORTE.map((o) => o.id));
+  assert.ok(alle.includes(`${ORTE.length} Etiketten drucken`));
+  assert.ok(alle.includes('Auswahl aufheben'));
 
-  assert.ok(!orteAnsicht(ORTE, 'ort-1', {}).includes('stock-sheet-locations'),
+  // Ohne Auswahl ist der Knopf da, aber abgeschaltet.
+  assert.ok(orteAnsicht(ORTE, null, { manage: true }, []).includes('disabled'));
+
+  assert.ok(!orteAnsicht(ORTE, 'ort-1', {}).includes('stock-pick'),
     'Wer nicht verwaltet, druckt keine Platzetiketten');
+});
+
+test('das Kästchen und die Zeile bleiben zwei verschiedene Griffe', () => {
+  // Die Zeile setzt den Lagerplatz, das Kästchen wählt fürs Etikett. Stünde
+  // beides am selben Element, könnte man nichts anhaken, ohne wegzuspringen.
+  const html = orteAnsicht(ORTE, null, { manage: true }, []);
+  assert.ok(html.includes('data-ort="ort-1"'));
+  assert.ok(html.includes('data-wahl="ort-1"'));
 });
 
 test('der Zustand kennt die Druckauswahl von Anfang an', () => {
   assert.deepEqual(lagerZustand().druckwahl, []);
   assert.deepEqual(lagerZustand({ druckwahl: ['a1'] }).druckwahl, ['a1']);
+});
+
+// ---------------------------------------------------------------------------
+// Artikel ändern
+// ---------------------------------------------------------------------------
+
+test('aus einem gespeicherten Artikel wird ein Formularentwurf', () => {
+  const gruppen = [{ id: 'g1', key: 'installation', name: 'Installation' }];
+  const entwurf = artikelAlsEntwurf({
+    id: 'a1', itemNumber: 'LAG-1', name: 'Dose', unit: 'Stück', groupId: 'g1',
+    manufacturerNumber: '1055-04', minimumStock: 50, targetStock: 300,
+    packName: 'Karton', packSize: 100, rowVersion: 7
+  }, gruppen);
+
+  // Die Warengruppe kommt als Schlüssel zurück, denn danach wählt das Formular.
+  assert.equal(entwurf.groupKey, 'installation');
+  assert.equal(entwurf.packSize, 100);
+  assert.equal(entwurf.rowVersion, 7, 'Ohne sie ließe sich nicht speichern');
+  assert.equal(artikelAlsEntwurf(null), null);
+});
+
+test('beim Ändern sind Nummer, Einheit und Warengruppe gesperrt', () => {
+  // Die Nummer steht auf gedruckten Etiketten, und die Einheit zu ändern würde
+  // jeden gebuchten Bestand still umdeuten: aus 120 Metern würden 120 Stück.
+  const entwurf = { itemNumber: 'LAG-1', name: 'Dose', unit: 'Meter', groupKey: 'other' };
+  const html = artikelFormularAnsicht(entwurf, [{ key: 'other', name: 'Sonstiges' }], null, true);
+
+  assert.ok(html.includes('Artikel ändern'));
+  assert.ok(html.includes('Änderungen speichern'));
+  assert.equal((html.match(/disabled/g) || []).length, 3, 'Genau die drei');
+  assert.ok(html.includes('steht auf Etiketten'));
+  assert.ok(html.includes('der Bestand zählt darin'));
+
+  // Codes gehören in ihre eigene Ansicht, nicht ins Änderungsformular.
+  assert.ok(!html.includes('data-code-index'));
+  assert.ok(html.includes('Codes und Etikett'));
+});
+
+test('beim Anlegen ist nichts gesperrt und die Codezeilen sind da', () => {
+  const html = artikelFormularAnsicht(null, [{ key: 'other', name: 'Sonstiges' }], null, false);
+  assert.ok(html.includes('Artikel anlegen'));
+  assert.ok(!html.includes('disabled'));
+  assert.ok(html.includes('data-code-index'));
+});
+
+test('der Weg zum Ändern steht nur der Verwaltung offen', () => {
+  const zustand = lagerZustand({ schritt: SCHRITTE.BUCHEN, ort: REGAL, artikel: ARTIKEL });
+  assert.ok(!buchenAnsicht(zustand, {}, {}).includes('stock-item-edit'));
+  assert.ok(buchenAnsicht(zustand, { manage: true }, {}).includes('stock-item-edit'));
 });

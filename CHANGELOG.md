@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Einzelne Lagerplätze beschriften, und Artikel ändern (Fassung 0.44.15).**
+  Bei den Lagerplätzen gab es nur „alle auf einmal" — wer nachträglich ein Fach
+  beschriftet, druckte damit den ganzen Satz. Sie bekommen jetzt dieselben
+  Kästchen wie die Artikel; „Alle auswählen" bleibt daneben, denn beim ersten
+  Einrichten will man wirklich alle. Das Kästchen und die Zeile bleiben zwei
+  verschiedene Griffe: die Zeile setzt den Lagerplatz für die nächste Buchung,
+  das Kästchen wählt fürs Etikett. Und ein Artikel ließ sich nach dem Anlegen
+  überhaupt nicht mehr ändern: ein Vertipper in der Bezeichnung war dauerhaft,
+  ein Mindestbestand nicht nachzutragen, das Gebinde nur beim Anlegen zu
+  setzen. Der Endpunkt dafür stand seit 0.44.12 bereit — die Oberfläche hat ihn
+  nur nie benutzt. „Artikel ändern" führt jetzt aus der Buchansicht ins
+  bekannte Formular. Drei Felder bleiben gesperrt: Artikelnummer, Einheit und
+  Warengruppe. Die Nummer steht auf gedruckten Etiketten, und die Einheit zu
+  ändern würde jeden gebuchten Bestand still umdeuten — aus 120 Metern würden
+  120 Stück. Zwei Leute im Büro, die denselben Artikel gleichzeitig offen
+  haben, überschreiben sich nicht.
 - **Der Etikettenbogen hat endlich einen Knopf (Fassung 0.44.14).** Drucken
   ließ sich nur ein einzelnes Etikett, und dafür musste man drei Ebenen tief:
   Artikel, Artikel antippen, „Codes und Etikett". Ein Bogen für 64 Etiketten,

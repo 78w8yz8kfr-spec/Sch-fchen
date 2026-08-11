@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.14
+Technischer Stand: V0.44.15
 
 ## Abgeschlossen
 
@@ -18,8 +18,12 @@ Technischer Stand: V0.44.14
 - Lageretiketten im Format der Herstelleraufkleber: 48 × 17 mm, links der Code,
   rechts daneben Bezeichnung, Artikelnummer und Herstellernummer; 64 Etiketten
   je A4-Seite; PWA-Speicher `schaefchen-online-v96`
-- Etikettenbogen aus der Artikelliste heraus: Kästchen je Zeile, „Alle
-  auswählen", Knopf mit Anzahl; Lagerplätze in einem Rutsch
+- Etikettenbogen aus der Artikelliste und aus der Lagerplatzliste heraus:
+  Kästchen je Zeile, „Alle auswählen", Knopf mit Anzahl; PWA-Speicher
+  `schaefchen-online-v97`
+- Artikel nachträglich ändern (Bezeichnung, Mindest- und Zielbestand,
+  Herstellernummer, Gebinde) mit Versionsprüfung; Artikelnummer, Einheit und
+  Warengruppe bleiben gesperrt
 - Druckbogen von Lager und Geräten kommen wieder formatiert an: die Stile
   liegen als eigene Dateien bei, statt als eingebetteter Block an
   `style-src 'self'` zu scheitern; das Geräte-Einzeletikett trägt wieder Name

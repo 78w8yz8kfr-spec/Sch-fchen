@@ -61,6 +61,8 @@ erfundenen Hintergrund statt gegen die echte API.
 | Freigabe je Firma über die Plattform | steht — Modulschlüssel `warehouse` |
 | Rolle „Lagerist“, von der Firma vergeben | steht |
 | Etiketten im Format der Herstelleraufkleber | steht (Fassung 0.44.14) |
+| Etiketten einzeln oder in Auswahl drucken | steht (Fassung 0.44.15) |
+| Artikel nachträglich ändern | steht (Fassung 0.44.15) |
 | Kamera-Livebild | läuft am Gerät; im In-App-Browser siehe unten |
 
 ## Prüfen
@@ -111,9 +113,10 @@ daneben alles zum Lesen:
 └────────────────────────────────┘
 ```
 
-Gedruckt wird aus der Artikelliste: ein Kästchen je Zeile, „Alle auswählen",
-und ein Knopf, der sagt, wie viele es werden. Lagerplätze gehen in einem
-Rutsch — die beschriftet man ohnehin alle auf einmal.
+Gedruckt wird aus der Artikelliste und aus der Lagerplatzliste: ein Kästchen je
+Zeile, „Alle auswählen", und ein Knopf, der sagt, wie viele es werden. Bei den
+Lagerplätzen bleiben Kästchen und Zeile zwei verschiedene Griffe — die Zeile
+setzt den Platz für die nächste Buchung, das Kästchen wählt fürs Etikett.
 
 Die Bezeichnung stand zuerst quer darüber. Das kostete eine ganze Zeile Höhe
 für etwas, das neben dem Code Platz hat: „NYM-J 5x1,5mm2" braucht keine eigene

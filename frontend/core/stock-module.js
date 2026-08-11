@@ -12,6 +12,7 @@
 import {
   SCHRITTE,
   ansichtFuer,
+  artikelAlsEntwurf,
   artikelEntwurfAusScan,
   artikelFormularLesen,
   buchungBauen,
@@ -33,14 +34,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.14";
+} from "./stock-management.js?v=0.44.15";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.14";
+} from "./barcode-scanner.mjs?v=0.44.15";
 
 const html = `
   <div class="stock-module">
@@ -587,6 +588,15 @@ export function createStockModule({
     });
 
     auf(".stock-codes-open", "click", () => void codesOeffnen());
+    auf(".stock-item-edit", "click", () => {
+      zustand = {
+        ...zustand,
+        schritt: SCHRITTE.ARTIKEL_AENDERN,
+        entwurf: artikelAlsEntwurf(zustand.artikel, kontext.groups),
+        fehler: null
+      };
+      render();
+    });
     auf(".stock-code-save", "click", () => void codeSpeichern());
     auf(".stock-code-revoke", "click", (ereignis) => void codeZuruecknehmen(
       ereignis.currentTarget.dataset.code
@@ -625,8 +635,14 @@ export function createStockModule({
       render();
     });
 
+    // Dieselben zwei Knoepfe fuer beide Listen; woraus gewaehlt wird, sagt der
+    // Schritt. Ein zweiter Satz Knoepfe waere derselbe Code mit anderem Namen.
+    const druckliste = () => (zustand.schritt === SCHRITTE.ORTE
+      ? { art: "location", eintraege: kontext.locations || [] }
+      : { art: "item", eintraege: artikel });
+
     auf(".stock-sheet-all", "click", () => {
-      const alle = artikel.map((eintrag) => eintrag.id);
+      const alle = druckliste().eintraege.map((eintrag) => eintrag.id);
       zustand = {
         ...zustand,
         druckwahl: zustand.druckwahl.length === alle.length ? [] : alle
@@ -634,13 +650,10 @@ export function createStockModule({
       render();
     });
 
-    auf(".stock-sheet-print", "click", () => void etikettenDrucken(
-      zustand.druckwahl.map((id) => ({ targetType: "item", id }))
-    ));
-
-    auf(".stock-sheet-locations", "click", () => void etikettenDrucken(
-      (kontext.locations || []).map((ort) => ({ targetType: "location", id: ort.id }))
-    ));
+    auf(".stock-sheet-print", "click", () => {
+      const { art } = druckliste();
+      void etikettenDrucken(zustand.druckwahl.map((id) => ({ targetType: art, id })));
+    });
 
     auf(".stock-row--tap", "click", (ereignis) => {
       const zeile = ereignis.currentTarget;
@@ -665,7 +678,7 @@ export function createStockModule({
   // -------------------------------------------------------------------------
 
   function ortWaehlen() {
-    zustand = { ...zustand, schritt: SCHRITTE.ORTE, fehler: null };
+    zustand = { ...zustand, schritt: SCHRITTE.ORTE, druckwahl: [], fehler: null };
     render();
   }
 
@@ -751,7 +764,20 @@ export function createStockModule({
       isPrimary: index === 0
     })).filter((zeile) => zeile.code.trim());
 
-    const { entwurf, fehler } = artikelFormularLesen(werte);
+    // Beim Aendern sind Nummer, Einheit und Warengruppe gesperrt und kommen
+    // deshalb nicht aus dem Formular. Die Pruefung braucht sie trotzdem, sonst
+    // meldet sie eine fehlende Artikelnummer, die nur niemand tippen konnte.
+    const aendern = zustand.schritt === SCHRITTE.ARTIKEL_AENDERN;
+    const vollstaendig = aendern
+      ? {
+        ...werte,
+        itemNumber: zustand.entwurf?.itemNumber,
+        unit: zustand.entwurf?.unit,
+        groupKey: zustand.entwurf?.groupKey
+      }
+      : werte;
+
+    const { entwurf, fehler } = artikelFormularLesen(vollstaendig);
     if (fehler) {
       zustand = { ...zustand, entwurf: { ...zustand.entwurf, ...werte }, fehler };
       render();
@@ -759,8 +785,26 @@ export function createStockModule({
     }
 
     try {
-      await senden("/items", entwurf);
-      showToast("Artikel angelegt.");
+      if (aendern) {
+        await requestJson(
+          `./api/v1/stock/items/${encodeURIComponent(zustand.artikel.id)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: entwurf.name,
+              minimumStock: entwurf.minimumStock ?? "",
+              targetStock: entwurf.targetStock ?? "",
+              packName: entwurf.packName ?? "",
+              packSize: entwurf.packSize ?? "",
+              rowVersion: zustand.entwurf.rowVersion
+            })
+          }
+        );
+        showToast("Artikel geändert.");
+      } else {
+        await senden("/items", entwurf);
+        showToast("Artikel angelegt.");
+      }
       await zeigen(SCHRITTE.ARTIKEL);
     } catch (weg) {
       zustand = { ...zustand, entwurf: { ...zustand.entwurf, ...werte } };
