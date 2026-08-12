@@ -4,6 +4,29 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Lagerverwaltung ist abgeschafft (Fassung 0.44.35).** Sie kam mit
+  0.44.11 und wuchs über vierundzwanzig Fassungen: Artikelstamm, Lagerplätze,
+  Bewegungsjournal mit Bestandsfortschreibung, Strichcodes und Etiketten,
+  Inventur, Bestellwesen, Lieferscheine, Reservierungen, Fahrzeug- und
+  Retourenlager, die Verknüpfung mit der Baustellenliste und zuletzt die
+  Texterkennung auf fotografierten Belegen. Entfernt sind der Bereich „Lager &
+  Material" samt Navigationseintrag, alle Endpunkte unter `/api/v1/stock`, der
+  Modulschlüssel `warehouse`, der Strichcodeleser, der Etikettendruck, die
+  Werkbank sowie Tesseract und ImageMagick aus dem Auslieferungsimage.
+  **Migration 141 löscht die vierzehn Tabellen samt Inhalt**: gebuchte
+  Bestände, Bewegungen, Lieferscheine und Bestellungen stehen danach nur noch
+  in einer Sicherung von vorher — das ist so gewollt und nicht umkehrbar. Die
+  Rolle „Lagerist" wird stillgelegt statt gelöscht, weil widerrufene
+  Zuweisungen darauf zeigen: wer wann welche Berechtigung hatte, ist
+  Personalgeschichte des Betriebs und war nie Teil des Lagers. Zwei Auslöser an
+  `companies` fielen mit, die sonst jede neu angelegte Firma wieder mit Lager
+  und Lagerist ausgestattet hätten — beim Prüfen genau so passiert. **Die
+  Materialliste der Baustelle bleibt vollständig**: sie gab es vor dem Lager,
+  sie hängt am eigenen Modulschlüssel `materials` und führt ihre Zeilen mit
+  Menge und Stand weiter, nur ohne die Bestandsanzeige darunter. Ebenfalls
+  unberührt bleibt die Geräteverwaltung — ein Gerät ist ein Einzelstück mit
+  einem Besitzer, Lagermaterial waren Mengen an einem Ort.
+
 - **Der Positionsleser taugte nichts für echte Belege (Fassung 0.44.34).** Seit
   0.44.33 läuft die Erkennung ohne Abbruch — was sie auf einem echten
   Großhändlerbeleg herausbrachte, war allerdings unbrauchbar: aus

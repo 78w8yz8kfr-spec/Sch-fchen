@@ -55,7 +55,6 @@ import {
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
-import { handleStockRequest } from "./stock.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -202,7 +201,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.34";
+export const APPLICATION_VERSION = "0.44.35";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -3028,27 +3027,7 @@ function siteMaterialDto(row) {
     status: row.status,
     note: row.note,
     rowVersion: Number(row.row_version),
-    createdAt: new Date(row.created_at).toISOString(),
-    // Der verknuepfte Lagerartikel. `stockItemId` steht am Eintrag, alles
-    // Weitere kommt aus dem Lager und ist deshalb `null`, solange keine
-    // Verknuepfung besteht - nicht `0`. Der Unterschied zaehlt: "kein Artikel
-    // hinterlegt" ist etwas anderes als "nichts mehr da".
-    stockItemId: row.stock_item_id || null,
-    stockItemNumber: row.stock_item_number || null,
-    stockItemName: row.stock_item_name || null,
-    stockUnit: row.stock_unit || null,
-    // Der Bestand ueber alle Lagerplaetze hinweg, aus dem Journal gerechnet.
-    stockQuantity: row.stock_item_id ? Number(row.stock_quantity || 0) : null,
-    // Die Belegkette an der Bedarfszeile: was liegt zurück, was ist bestellt.
-    stockReservationId: row.stock_reservation_id || null,
-    reservedQuantity: row.reserved_quantity === null || row.reserved_quantity === undefined
-      ? null
-      : Number(row.reserved_quantity),
-    purchaseOrderItemId: row.purchase_order_item_id || null,
-    orderNumber: row.order_number || null,
-    orderedQuantity: row.ordered_quantity === null || row.ordered_quantity === undefined
-      ? null
-      : Number(row.ordered_quantity)
+    createdAt: new Date(row.created_at).toISOString()
   };
 }
 
@@ -4672,35 +4651,8 @@ async function adminOverview(client, context, date) {
     client.query(
       `SELECT eintrag.id, eintrag.construction_site_id, eintrag.item_name,
               eintrag.quantity, eintrag.unit, eintrag.status, eintrag.note,
-              eintrag.row_version, eintrag.created_at, eintrag.stock_item_id,
-              artikel.item_number AS stock_item_number,
-              artikel.name AS stock_item_name,
-              artikel.unit AS stock_unit,
-              COALESCE(bestand.summe, 0) AS stock_quantity,
-              eintrag.stock_reservation_id, eintrag.purchase_order_item_id,
-              reservierung.quantity AS reserved_quantity,
-              position.quantity_ordered AS ordered_quantity,
-              bestellung.order_number
+              eintrag.row_version, eintrag.created_at
        FROM site_material_entries AS eintrag
-       LEFT JOIN stock_items AS artikel
-         ON artikel.company_id = eintrag.company_id
-        AND artikel.id = eintrag.stock_item_id
-       LEFT JOIN (
-         SELECT company_id, item_id, SUM(quantity) AS summe
-         FROM stock_levels GROUP BY company_id, item_id
-       ) AS bestand
-         ON bestand.company_id = eintrag.company_id
-        AND bestand.item_id = eintrag.stock_item_id
-       LEFT JOIN stock_reservations AS reservierung
-         ON reservierung.company_id = eintrag.company_id
-        AND reservierung.id = eintrag.stock_reservation_id
-        AND reservierung.status = 'open'
-       LEFT JOIN purchase_order_items AS position
-         ON position.company_id = eintrag.company_id
-        AND position.id = eintrag.purchase_order_item_id
-       LEFT JOIN purchase_orders AS bestellung
-         ON bestellung.company_id = position.company_id
-        AND bestellung.id = position.purchase_order_id
        WHERE eintrag.company_id = $1
        ORDER BY CASE eintrag.status WHEN 'planned' THEN 1 WHEN 'ordered' THEN 2 WHEN 'available' THEN 3 WHEN 'used' THEN 4 ELSE 5 END,
                 eintrag.created_at DESC`,
@@ -5169,35 +5121,8 @@ async function getSiteWorkspace(client, context, constructionSiteId, date) {
     client.query(
       `SELECT eintrag.id, eintrag.construction_site_id, eintrag.item_name,
               eintrag.quantity, eintrag.unit, eintrag.status, eintrag.note,
-              eintrag.row_version, eintrag.created_at, eintrag.stock_item_id,
-              artikel.item_number AS stock_item_number,
-              artikel.name AS stock_item_name,
-              artikel.unit AS stock_unit,
-              COALESCE(bestand.summe, 0) AS stock_quantity,
-              eintrag.stock_reservation_id, eintrag.purchase_order_item_id,
-              reservierung.quantity AS reserved_quantity,
-              position.quantity_ordered AS ordered_quantity,
-              bestellung.order_number
+              eintrag.row_version, eintrag.created_at
        FROM site_material_entries AS eintrag
-       LEFT JOIN stock_items AS artikel
-         ON artikel.company_id = eintrag.company_id
-        AND artikel.id = eintrag.stock_item_id
-       LEFT JOIN (
-         SELECT company_id, item_id, SUM(quantity) AS summe
-         FROM stock_levels GROUP BY company_id, item_id
-       ) AS bestand
-         ON bestand.company_id = eintrag.company_id
-        AND bestand.item_id = eintrag.stock_item_id
-       LEFT JOIN stock_reservations AS reservierung
-         ON reservierung.company_id = eintrag.company_id
-        AND reservierung.id = eintrag.stock_reservation_id
-        AND reservierung.status = 'open'
-       LEFT JOIN purchase_order_items AS position
-         ON position.company_id = eintrag.company_id
-        AND position.id = eintrag.purchase_order_item_id
-       LEFT JOIN purchase_orders AS bestellung
-         ON bestellung.company_id = position.company_id
-        AND bestellung.id = position.purchase_order_id
        WHERE eintrag.company_id = $1
          AND eintrag.construction_site_id = $2
          AND eintrag.status <> 'archived'
@@ -5793,93 +5718,35 @@ async function getSiteMaterialRecord(client, context, materialId) {
   const result = await client.query(
     `SELECT eintrag.id, eintrag.construction_site_id, eintrag.item_name,
             eintrag.quantity, eintrag.unit, eintrag.status, eintrag.note,
-            eintrag.row_version, eintrag.created_at, eintrag.stock_item_id,
-            artikel.item_number AS stock_item_number,
-            artikel.name AS stock_item_name,
-            artikel.unit AS stock_unit,
-            COALESCE(bestand.summe, 0) AS stock_quantity,
-            eintrag.stock_reservation_id, eintrag.purchase_order_item_id,
-            reservierung.quantity AS reserved_quantity,
-            position.quantity_ordered AS ordered_quantity,
-            bestellung.order_number
-     FROM site_material_entries AS eintrag
-     LEFT JOIN stock_items AS artikel
-       ON artikel.company_id = eintrag.company_id
-      AND artikel.id = eintrag.stock_item_id
-     LEFT JOIN (
-       SELECT company_id, item_id, SUM(quantity) AS summe
-       FROM stock_levels GROUP BY company_id, item_id
-     ) AS bestand
-       ON bestand.company_id = eintrag.company_id
-      AND bestand.item_id = eintrag.stock_item_id
-     LEFT JOIN stock_reservations AS reservierung
-       ON reservierung.company_id = eintrag.company_id
-      AND reservierung.id = eintrag.stock_reservation_id
-      AND reservierung.status = 'open'
-     LEFT JOIN purchase_order_items AS position
-       ON position.company_id = eintrag.company_id
-      AND position.id = eintrag.purchase_order_item_id
-     LEFT JOIN purchase_orders AS bestellung
-       ON bestellung.company_id = position.company_id
-      AND bestellung.id = position.purchase_order_id
-     WHERE eintrag.company_id = $1 AND eintrag.id = $2`,
+            eintrag.row_version, eintrag.created_at
+       FROM site_material_entries AS eintrag
+       WHERE eintrag.company_id = $1 AND eintrag.id = $2`,
     [context.companyId, materialId]
   );
   if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde nicht gefunden.", 404, "site_material_not_found");
   return siteMaterialDto(result.rows[0]);
 }
 
-/**
- * Zeigt der Eintrag auf einen Artikel, der zu dieser Firma gehoert?
- *
- * Der Fremdschluessel faengt den Fall zwar ab, aber als Datenbankfehler. Wer
- * eine Kennung von Hand eintippt, soll einen Satz lesen und keinen Code.
- * Archivierte Artikel bleiben erlaubt: eine alte Baustellenakte darf weiter
- * auf sie zeigen, nur neu waehlen laesst sich ein archivierter nicht.
- */
-async function requireStockItemForMaterial(client, context, stockItemId) {
-  if (!stockItemId) return null;
-  const vorhanden = await client.query(
-    "SELECT id FROM stock_items WHERE company_id = $1 AND id = $2 AND status = 'active'",
-    [context.companyId, stockItemId]
-  );
-  if (vorhanden.rowCount !== 1) {
-    throw new InputError("Dieser Lagerartikel wurde nicht gefunden.", 404, "stock_item_unknown");
-  }
-  return stockItemId;
-}
-
 async function storeSiteMaterial(client, context, input) {
-  const stockItemId = await requireStockItemForMaterial(client, context, input.stockItemId);
   const result = await client.query(
     `INSERT INTO site_material_entries (
        company_id, construction_site_id, item_name, quantity, unit, status,
-       note, stock_item_id, created_by_user_id, changed_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+       note, created_by_user_id, changed_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
      RETURNING id`,
     [context.companyId, input.constructionSiteId, input.itemName, input.quantity,
-      input.unit, input.status, input.note, stockItemId, context.userId]
+      input.unit, input.status, input.note, context.userId]
   );
   return getSiteMaterialRecord(client, context, result.rows[0].id);
 }
 
 async function storeSiteMaterialStatus(client, context, materialId, input) {
-  // Die Verknuepfung wird nur angefasst, wenn sie mitgeschickt wurde. Sonst
-  // haette das blosse Weiterschalten des Status sie geloescht.
-  if (input.stockItem?.provided) {
-    await requireStockItemForMaterial(client, context, input.stockItem.id);
-  }
   const result = await client.query(
     `UPDATE site_material_entries
-     SET status = $3,
-         stock_item_id = CASE WHEN $6::BOOLEAN THEN $7::UUID ELSE stock_item_id END,
-         changed_by_user_id = $4
+     SET status = $3, changed_by_user_id = $4
      WHERE company_id = $1 AND id = $2 AND row_version = $5
      RETURNING id`,
-    [
-      context.companyId, materialId, input.status, context.userId, input.rowVersion,
-      Boolean(input.stockItem?.provided), input.stockItem?.id || null
-    ]
+    [context.companyId, materialId, input.status, context.userId, input.rowVersion]
   );
   if (result.rowCount !== 1) throw new InputError("Der Materialeintrag wurde geändert. Bitte neu laden.", 409, "row_version_conflict");
   return getSiteMaterialRecord(client, context, materialId);
@@ -7085,51 +6952,7 @@ async function createEmployee(client, context, input) {
      VALUES ($1, $2, $3, $4, 'Anlage in der Verwaltung')`,
     [context.companyId, inserted.rows[0].id, roleResult.rows[0].id, context.userId]
   );
-  if (input.warehouseManager) {
-    await assignWarehouseManagerRole(client, context, inserted.rows[0].id, true);
-  }
   return getEmployeeRecord(client, context, inserted.rows[0].id);
-}
-
-/**
- * Setzt oder nimmt die Rolle "Lagerist" - zusaetzlich zur Hauptrolle.
- *
- * Wer das Lager fuehrt, bleibt daneben Monteur, Vorarbeiter oder Bueromensch.
- * Die Rolle wird deshalb neben der Hauptrolle gehalten und beim Speichern des
- * Mitarbeiters nicht mit abgeraeumt. Zurueckgenommen wird sie wie jede andere:
- * mit Zeitpunkt und Grund, nicht durch Loeschen.
- */
-async function assignWarehouseManagerRole(client, context, employeeId, gewuenscht) {
-  const rolle = await client.query(
-    "SELECT id FROM roles WHERE company_id = $1 AND role_key = 'warehouse_manager' AND status = 'active'",
-    [context.companyId]
-  );
-  if (rolle.rowCount !== 1) {
-    throw new InputError("Die Rolle Lagerist ist nicht verfügbar.", 409, "warehouse_role_missing");
-  }
-  const roleId = rolle.rows[0].id;
-
-  if (gewuenscht) {
-    await client.query(
-      `INSERT INTO user_roles (company_id, user_id, role_id, assigned_by_user_id, reason)
-       SELECT $1, $2, $3, $4, 'Lagerist in der Mitarbeiterverwaltung vergeben'
-       WHERE NOT EXISTS (
-         SELECT 1 FROM user_roles
-         WHERE company_id = $1 AND user_id = $2 AND role_id = $3 AND revoked_at IS NULL
-       )`,
-      [context.companyId, employeeId, roleId, context.userId]
-    );
-    return;
-  }
-
-  await client.query(
-    `UPDATE user_roles
-     SET revoked_at = CURRENT_TIMESTAMP,
-         revoked_by_user_id = $3,
-         reason = 'Lagerist in der Mitarbeiterverwaltung entzogen'
-     WHERE company_id = $1 AND user_id = $2 AND role_id = $4 AND revoked_at IS NULL`,
-    [context.companyId, employeeId, context.userId, roleId]
-  );
 }
 
 async function updateEmployee(client, context, employeeId, input) {
@@ -7285,10 +7108,6 @@ async function updateEmployee(client, context, employeeId, input) {
       "row_version_conflict"
     );
   }
-
-  // Die Lageristenrolle bleibt hier unangetastet: sie steht neben der
-  // Hauptrolle und wird eine Zeile weiter unten eigens gesetzt oder entzogen.
-  // Ohne diese Ausnahme naehme jede Namensaenderung dem Lageristen sein Lager.
   await client.query(
     `UPDATE user_roles AS zuordnung
      SET revoked_at = CURRENT_TIMESTAMP,
@@ -7300,8 +7119,7 @@ async function updateEmployee(client, context, employeeId, input) {
        AND zuordnung.revoked_at IS NULL
        AND zuordnung.role_id <> $4
        AND rolle.company_id = zuordnung.company_id
-       AND rolle.id = zuordnung.role_id
-       AND rolle.role_key <> 'warehouse_manager'`,
+       AND rolle.id = zuordnung.role_id`,
     [context.companyId, employeeId, context.userId, roleResult.rows[0].id]
   );
   await client.query(
@@ -7315,7 +7133,6 @@ async function updateEmployee(client, context, employeeId, input) {
      )`,
     [context.companyId, employeeId, roleResult.rows[0].id, context.userId]
   );
-  await assignWarehouseManagerRole(client, context, employeeId, input.warehouseManager);
 
   return getEmployeeRecord(client, context, employeeId);
 }
@@ -10660,25 +10477,6 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           })
         );
         if (handled?.document) return inlineDocument(response, handled.document);
-        if (handled) return json(response, handled.status, handled.body);
-      }
-
-      // Die Lagerverwaltung kapselt ihre Fachlogik ebenso in einem eigenen
-      // Modul. Die Sitzung wird auch hier aufgeloest, bevor das Modul etwas
-      // sieht: company_id und user_id kommen aus dem HttpOnly-Cookie und nie
-      // aus einem Barcode oder einem Frontend-Feld.
-      if (url.pathname.startsWith("/api/v1/stock")) {
-        const handled = await withReadySession(
-          pool,
-          tokenHash,
-          (client, context) => handleStockRequest({
-            request,
-            url,
-            client,
-            context,
-            allowedOrigin: config.allowedOrigin
-          })
-        );
         if (handled) return json(response, handled.status, handled.body);
       }
 

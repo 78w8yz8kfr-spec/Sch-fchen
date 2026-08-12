@@ -419,7 +419,7 @@
           // Plattform ein Pflichtupdate setzt: der Server kann eine fehlende
           // Fassung nicht von einer zu alten unterscheiden. Das VDE-Modul waere
           // dann als einziges vollstaendig ausgefallen.
-          "X-Schaefchen-Version": "0.44.34",
+          "X-Schaefchen-Version": "0.44.35",
           ...(options.body ? { "Content-Type": "application/json" } : {}),
           ...options.headers
         }
@@ -1476,7 +1476,7 @@
       elements.openPdf.href = apiPath(
         `/inspections/${encodeURIComponent(currentInspection.id)}/pdf?date=${
           encodeURIComponent(accessDate)
-        }&appVersion=0.44.34`
+        }&appVersion=0.44.35`
       );
       elements.saveState.textContent = `Unveränderlich abgeschlossen am ${
         new Intl.DateTimeFormat("de-DE", {
