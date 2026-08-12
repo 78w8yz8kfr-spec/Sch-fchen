@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Einsatzplanung ist wieder zu überblicken (Fassung 0.44.28).** Die Seite
+  war 2863 Bildpunkte hoch, und darin standen drei Dinge in genau der falschen
+  Reihenfolge: oben die Plantafel, darunter das dauerhaft aufgeklappte Formular
+  „Einsätze anlegen" mit acht Feldern, Mitarbeiterliste und Excel-Import — 900
+  Bildpunkte, auch wenn gar nichts angelegt werden sollte —, und ganz unten die
+  „Tageslage im Betrieb". Dass heute sieben Mitarbeiter ohne Einsatz sind, ist
+  aber das Erste, was ein Disponent wissen will, und nicht das Letzte. Die
+  Tageslage steht jetzt direkt unter der Überschrift, vor der Reiterleiste —
+  vor ihr und nicht dahinter, weil „Wochenplan" und „Monatsplan" zur Plantafel
+  darunter gehören. Das Anlegeformular ist zugeklappt und wird von dem Knopf
+  geöffnet, der ohnehin schon in der Leiste stand: „Neuer Einsatz" klappt auf,
+  rollt hin und setzt den Schreibbalken ins erste Feld. Dazu fällt eine
+  doppelte Unterzeile weg. Gemessen: 2863 auf 1663 Bildpunkte, die Tageslage
+  von Bildpunkt 1376 auf 196. Kein Bedienschritt kommt hinzu, keiner fällt weg.
+
 - **Das Foto des Lieferscheins liest jetzt auch die Positionen (Fassung
   0.44.27).** Die vorige Fassung liess sie bewusst weg — mit einer Begründung,
   die zu kurz griff. Das Prüfbild dahinter war 1000 auf 700 Bildpunkte groß und

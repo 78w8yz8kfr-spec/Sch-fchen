@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.27
+Technischer Stand: V0.44.28
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,10 @@ Technischer Stand: V0.44.27
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Einsatzplanung entzerrt: Tageslage zuoberst statt zuunterst, Anlegeformular
+  zugeklappt hinter „Neuer Einsatz", doppelte Unterzeile entfernt; 2863 → 1663
+  Bildpunkte; PWA-Speicher `schaefchen-online-v110`
 
 - Positionsvorschläge aus dem Lieferscheinfoto: gelesene Artikel-, Hersteller-
   und Strichcodenummern werden gegen den eigenen Artikelstamm abgeglichen, eine

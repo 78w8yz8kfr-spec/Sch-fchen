@@ -1609,9 +1609,10 @@ body:has(#vde-app) main {
     order: 2;
   }
 
-  #dispatch-summary {
-    order: 3;
-  }
+  /* Die Tageslage hatte hier "order: 3" und stand damit am Fuss der Seite.
+     Das stammt aus der Zeit, als sie neben der Planungsschale lag; seit sie
+     darin steht, sortiert sie ihre Stelle im Dokument - direkt unter der
+     Ueberschrift, wo ein Disponent zuerst hinsieht. */
 
   .platform-auth__card {
     padding: 30px;
