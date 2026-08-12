@@ -14,6 +14,7 @@
 import { toString as qrToString } from "qrcode";
 import { InputError, readJson, validateId } from "../../api/src/validation.mjs";
 import { loadCompanyModules } from "../../api/src/company-modules.mjs";
+import { bildVerkleinern } from "./bild.mjs";
 import { belegAuslesen, einheitNormal } from "./ocr.mjs";
 
 export const STOCK_MODULE_KEY = "warehouse";
@@ -3231,7 +3232,12 @@ export async function positionenZuordnen(client, context, positionen = []) {
 async function scanDeliveryNote(client, context, body) {
   await requireManager(client, context);
 
-  const roh = requiredText(body?.image, "Bild", 12_000_000, 100);
+  // Achtundzwanzig Millionen Zeichen sind rund zwanzig Megabyte Bild: ein
+  // Telefon mit achtundvierzig Megapixeln bleibt darunter. Die Grenze lag bei
+  // zwoelf Millionen und wies solche Fotos ab - damals richtig, weil der
+  // Server ein grosses Bild nicht verarbeiten konnte. Seit er verkleinert,
+  // kostet ein grosses Foto rund eine Sekunde mehr statt eines Abbruchs.
+  const roh = requiredText(body?.image, "Bild", 28_000_000, 100);
   const inhalt = roh.includes(",") && roh.startsWith("data:") ? roh.slice(roh.indexOf(",") + 1) : roh;
   let bild;
   try {
@@ -3242,18 +3248,29 @@ async function scanDeliveryNote(client, context, body) {
   if (bild.length < 1000) {
     throw new InputError("Das Bild ist zu klein für eine Erkennung.");
   }
-  if (bild.length > 8_000_000) {
+  if (bild.length > 20_000_000) {
     throw new InputError("Das Bild ist zu groß. Bitte mit geringerer Auflösung fotografieren.");
   }
 
+  // Erst kleiner, dann lesen. Der Browser sollte das schon getan haben, aber
+  // ein Telefon liefert HEIC, ein alter Browser kann kein Canvas, und ein
+  // sehr grosses Bild misslingt beim Zeichnen still - dann kam bisher das
+  // Original an, und die Erkennung lief in die Zeitgrenze.
+  const aufbereitet = await bildVerkleinern(bild);
+
   let gelesen;
   try {
-    gelesen = await belegAuslesen(bild);
+    gelesen = await belegAuslesen(aufbereitet.bild);
   } catch (fehler) {
     // Fehlt Tesseract oder bricht es ab, scheitert diese eine Anfrage - und
     // nicht der Wareneingang. Erfasst wird dann von Hand wie bisher.
+    // Die Maße stehen in der Meldung: ohne sie lässt sich hinterher nicht
+    // sagen, ob das Bild zu groß ankam oder der Rechner zu langsam war.
+    const mass = `${Math.round(bild.length / 1024)} KB`
+      + (aufbereitet.verkleinert ? ` verkleinert auf ${Math.round(aufbereitet.bild.length / 1024)} KB` : " unverkleinert")
+      + (aufbereitet.grund ? ` (${aufbereitet.grund})` : "");
     throw new InputError(
-      `Der Beleg ließ sich nicht lesen: ${fehler.message} Bitte von Hand eintragen.`,
+      `Der Beleg ließ sich nicht lesen: ${fehler.message} [${mass}] Bitte von Hand eintragen.`,
       503,
       "stock_ocr_unavailable"
     );

@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.31
+Technischer Stand: V0.44.32
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,12 @@ Technischer Stand: V0.44.31
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Belegfoto wird serverseitig auf 2000 Bildpunkte gebracht (ImageMagick im
+  Image, `jpeg:size`-Hinweis): 48 MP in 1,6 s statt 6,5 s, unabhängig davon,
+  was das Telefon schickt; HEIC wird lesbar, das Tesseract nicht öffnet; ohne
+  Werkzeug Rückfall auf das Original mit Grund in der Meldung; Größengrenze
+  8 → 20 MB; PWA-Speicher `schaefchen-online-v114`
 
 - Lieferscheinfoto aus dem Betrieb repariert: Bild wird im Browser auf 2000
   Bildpunkte verkleinert (2,06 → 0,50 MB in der Anfrage, 2,1 → 0,8 s Erkennung

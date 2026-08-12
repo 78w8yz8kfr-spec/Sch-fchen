@@ -5,7 +5,15 @@ FROM node:24-alpine
 # Netz, denn ein Lieferschein nennt Lieferant, Mengen und Preise. Das deutsche
 # Sprachpaket ist Pflicht: ohne es liest die Erkennung "Lieferschein-Nr." als
 # englisches Wortgebilde und findet die Beschriftung nicht.
-RUN apk add --no-cache postgresql-client tesseract-ocr tesseract-ocr-data-deu
+#
+# ImageMagick bringt das Foto vorher auf Arbeitsmass. Der Browser tut das
+# schon, aber nicht verlaesslich: ein Telefon liefert HEIC, ein aelterer
+# Browser kennt kein Canvas, und bei sehr grossen Bildern misslingt das
+# Zeichnen still. Dann kam das Original an, und die Erkennung lief in die
+# Zeitgrenze - im Betrieb zweimal beobachtet. Gemessen an 48 Megapixeln auf
+# einem Kern: 6,5 s direkt, 1,6 s ueber den Umweg. Und HEIC, das Tesseract
+# ueberhaupt nicht liest, kann ImageMagick oeffnen.
+RUN apk add --no-cache postgresql-client tesseract-ocr tesseract-ocr-data-deu imagemagick
 
 WORKDIR /app
 
