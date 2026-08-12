@@ -646,21 +646,19 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       [
         "absences", "apprentice_reports", "assembly_reports", "devices",
         "documents", "fleet", "materials", "site_daily_reports", "site_qr",
-        "vde", "warehouse"
+        "vde"
       ]
     );
-    // Der Standardumfang steht ohne Zutun offen. Drei Bereiche gehoeren nicht
-    // dazu, weil die Plattform sie je Firma freigibt: VDE als Spezialmodul,
-    // das Berichtsheft und die Lagerverwaltung als eigene verkaufte Bereiche.
-    // Die Materialverwaltung der Baustelle ist davon unberuehrt - sie ist
-    // etwas anderes als das Lager und bleibt im Standardumfang.
+    // Der Standardumfang steht ohne Zutun offen. Zwei Bereiche gehoeren nicht
+    // dazu, weil die Plattform sie je Firma freigibt: VDE als Spezialmodul und
+    // das Berichtsheft. Die Materialverwaltung der Baustelle ist davon
+    // unberuehrt und bleibt im Standardumfang.
     assert.equal(initialModules.vde, false);
     assert.equal(initialModules.apprentice_reports, false);
-    assert.equal(initialModules.warehouse, false);
     assert.equal(initialModules.materials, true);
     assert.ok(
       Object.entries(initialModules)
-        .filter(([key]) => !["vde", "apprentice_reports", "warehouse"].includes(key))
+        .filter(([key]) => !["vde", "apprentice_reports"].includes(key))
         .every(([, enabled]) => enabled === true)
     );
 
@@ -823,74 +821,6 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(updatedEditableEmployee.phone, "+49 171 7654321");
     assert.deepEqual(updatedEditableEmployee.roles, ["foreman"]);
     assert.ok(updatedEditableEmployee.rowVersion > editableEmployee.rowVersion);
-
-    // Die Firma entscheidet, wer das Lager fuehrt. Der Lagerist kommt zur
-    // Hauptrolle hinzu, statt sie zu ersetzen: in kleinen Betrieben fuehrt das
-    // Lager der Vorarbeiter, der ohnehin am Regal steht.
-    const lageristResponse = await fetch(
-      `${baseUrl}/api/v1/admin/employees/${editableEmployee.id}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-        body: JSON.stringify({
-          personnelNumber: updatedEditableEmployee.personnelNumber,
-          firstName: updatedEditableEmployee.firstName,
-          lastName: updatedEditableEmployee.lastName,
-          email: updatedEditableEmployee.email,
-          phone: updatedEditableEmployee.phone,
-          role: "foreman",
-          warehouseManager: true,
-          rowVersion: updatedEditableEmployee.rowVersion
-        })
-      }
-    );
-    assert.equal(lageristResponse.status, 200, await lageristResponse.clone().text());
-    const mitLager = (await lageristResponse.json()).employee;
-    assert.deepEqual(mitLager.roles, ["foreman", "warehouse_manager"]);
-
-    // Eine Aenderung an Namen oder Telefon darf ihm das Lager nicht nehmen.
-    const namensaenderung = await fetch(
-      `${baseUrl}/api/v1/admin/employees/${editableEmployee.id}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-        body: JSON.stringify({
-          personnelNumber: mitLager.personnelNumber,
-          firstName: "Erika Maria",
-          lastName: mitLager.lastName,
-          email: mitLager.email,
-          phone: mitLager.phone,
-          role: "foreman",
-          warehouseManager: true,
-          rowVersion: mitLager.rowVersion
-        })
-      }
-    );
-    assert.equal(namensaenderung.status, 200, await namensaenderung.clone().text());
-    const nachUmbenennung = (await namensaenderung.json()).employee;
-    assert.deepEqual(nachUmbenennung.roles, ["foreman", "warehouse_manager"]);
-
-    // Und sie laesst sich genauso wieder entziehen.
-    const ohneLagerResponse = await fetch(
-      `${baseUrl}/api/v1/admin/employees/${editableEmployee.id}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-        body: JSON.stringify({
-          personnelNumber: nachUmbenennung.personnelNumber,
-          firstName: nachUmbenennung.firstName,
-          lastName: nachUmbenennung.lastName,
-          email: nachUmbenennung.email,
-          phone: nachUmbenennung.phone,
-          role: "foreman",
-          warehouseManager: false,
-          rowVersion: nachUmbenennung.rowVersion
-        })
-      }
-    );
-    assert.equal(ohneLagerResponse.status, 200, await ohneLagerResponse.clone().text());
-    updatedEditableEmployee = (await ohneLagerResponse.json()).employee;
-    assert.deepEqual(updatedEditableEmployee.roles, ["foreman"]);
 
     const customerResponse = await fetch(`${baseUrl}/api/v1/admin/customers`, {
       method: "POST",
@@ -5543,152 +5473,6 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       fremd.status === 403 || fremd.status === 404,
       `Ein nicht eingeteilter Monteur darf nicht eintragen, bekam aber ${fremd.status}`
     );
-  });
-
-  await t.test("Baustellenmaterial zeigt auf einen Lagerartikel und dessen Bestand", async () => {
-    // Die Liste der Baustelle beantwortet "was brauchen wir hier", das Lager
-    // "wie viel liegt wo". Bisher wussten die beiden nichts voneinander:
-    // dieselbe Ware stand zweimal im System, und niemand konnte sagen, ob das
-    // eine das andere deckt.
-    const lagerFreischalten = async () => {
-      const antwort = await fetch(
-        `${baseUrl}/api/v1/platform/companies/${tenantCompany.id}/modules/warehouse`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Cookie: platformCookie },
-          body: JSON.stringify({
-            status: "permanent",
-            includedInPlan: true,
-            separatelyBilled: false,
-            featureScope: {},
-            reason: "Lager im Integrationstest freischalten"
-          })
-        }
-      );
-      assert.equal(antwort.status, 200, await antwort.clone().text());
-    };
-    await lagerFreischalten();
-
-    const artikelAnlegen = await fetch(`${baseUrl}/api/v1/stock/items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-      body: JSON.stringify({
-        itemNumber: `BAU-${suffix}`,
-        name: "Mantelleitung 5x1,5",
-        groupKey: "cable",
-        unit: "Meter"
-      })
-    });
-    assert.equal(artikelAnlegen.status, 201, await artikelAnlegen.clone().text());
-    const artikel = (await artikelAnlegen.json()).item;
-
-    const kontext = await fetch(`${baseUrl}/api/v1/stock/contexts`, {
-      headers: { Cookie: plannerCookie }
-    });
-    const lagerort = (await kontext.json()).context.locations
-      .find((ort) => ort.name === "Materiallager");
-    await fetch(`${baseUrl}/api/v1/stock/movements`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-      body: JSON.stringify({
-        itemId: artikel.id, movementType: "opening", quantity: 120,
-        targetLocationId: lagerort.id
-      })
-    });
-
-    // 300 gebraucht, 120 im Regal: die Zeile muss die Unterdeckung zeigen.
-    const angelegt = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-      body: JSON.stringify({
-        constructionSiteId: structuredSite.id,
-        itemName: "Mantelleitung 5x1,5",
-        quantity: 300,
-        unit: "Meter",
-        status: "planned",
-        stockItemId: artikel.id
-      })
-    });
-    assert.equal(angelegt.status, 201, await angelegt.clone().text());
-    const eintrag = (await angelegt.json()).siteMaterial;
-    assert.equal(eintrag.stockItemId, artikel.id);
-    assert.equal(eintrag.stockItemNumber, artikel.itemNumber);
-    assert.equal(eintrag.stockUnit, "Meter");
-    assert.equal(eintrag.stockQuantity, 120);
-
-    // Eine Zeile ohne Artikel bleibt möglich und behauptet keinen Bestand.
-    const frei = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-      body: JSON.stringify({
-        constructionSiteId: structuredSite.id,
-        itemName: "Kernbohrung 82 mm",
-        quantity: 3,
-        unit: "Stück",
-        status: "planned"
-      })
-    });
-    const ohneArtikel = (await frei.json()).siteMaterial;
-    assert.equal(ohneArtikel.stockItemId, null);
-    assert.equal(
-      ohneArtikel.stockQuantity, null,
-      "Ohne Artikel darf kein Bestand behauptet werden - auch keine Null"
-    );
-
-    // Ein erfundener Artikel wird abgewiesen, und zwar mit einem Satz.
-    const erfunden = await fetch(`${baseUrl}/api/v1/admin/site-materials`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-      body: JSON.stringify({
-        constructionSiteId: structuredSite.id,
-        itemName: "Erfunden",
-        quantity: 1,
-        unit: "Stück",
-        status: "planned",
-        stockItemId: randomUUID()
-      })
-    });
-    assert.equal(erfunden.status, 404, await erfunden.clone().text());
-
-    // Der Stand lässt sich weiterschalten, ohne die Verknüpfung zu verlieren.
-    const weiter = await fetch(
-      `${baseUrl}/api/v1/admin/site-materials/${eintrag.id}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-        body: JSON.stringify({ status: "ordered", rowVersion: eintrag.rowVersion })
-      }
-    );
-    assert.equal(weiter.status, 200, await weiter.clone().text());
-    const geschaltet = (await weiter.json()).siteMaterial;
-    assert.equal(geschaltet.status, "ordered");
-    assert.equal(
-      geschaltet.stockItemId, artikel.id,
-      "Das Weiterschalten des Stands darf die Verknüpfung nicht löschen"
-    );
-
-    // Und sie lässt sich ausdrücklich lösen.
-    const geloest = await fetch(
-      `${baseUrl}/api/v1/admin/site-materials/${eintrag.id}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
-        body: JSON.stringify({
-          status: "ordered", rowVersion: geschaltet.rowVersion, stockItemId: null
-        })
-      }
-    );
-    assert.equal((await geloest.json()).siteMaterial.stockItemId, null);
-
-    // Auch die Baustellenakte auf dem Telefon trägt den Bestand.
-    const akte = await fetch(
-      `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/dashboard?date=${assignmentDate}`,
-      { headers: { Cookie: foremanCookie } }
-    );
-    const ausDerAkte = (await akte.json()).dashboard.materials
-      .find((material) => material.itemName === "Kernbohrung 82 mm");
-    assert.ok(ausDerAkte, "Die Zeile ohne Artikel fehlt in der Akte");
-    assert.equal(ausDerAkte.stockQuantity, null);
   });
 
   await t.test("Material: der Schalter sperrt auch die Schnittstelle", async () => {

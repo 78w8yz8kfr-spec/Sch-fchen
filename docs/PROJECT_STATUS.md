@@ -1,46 +1,26 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.34
+Technischer Stand: V0.44.35
 
-- Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
-  Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
-  `schaefchen-online-v105`
-- Schnelle Rückgabe aus dem Baustellenbestand ohne Scanner, je Zeile eine
-  eigene Buchung mit eigener Vorgangsnummer; Storno als Gegenbuchung
-  (Migration 126, eindeutiger Index statt Sperre, weil das Journal für die
-  API-Rolle nur lesbar und anfügbar ist); Historie mit Filtern und Belegkette;
-  PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
 
-- Positionsleser an einem echten Großhändlerbeleg nachgeschärft: fünfstellige
-  Positionsnummern werden nicht mehr für Artikelnummern gehalten (reine
-  Ziffernfolgen zählen erst ab sechs Stellen), Maßeinheiten wie mm/t/g gelten
-  nicht mehr als Liefermenge, Fließtext unter den Positionen wird verworfen,
-  das Lieferdatum ist an seiner Beschriftung verankert, und ohne Treffer steht
-  ein Satz statt einer Liste voller „kein Artikel dazu";
-  PWA-Speicher `schaefchen-online-v116`
-
-- Rechenfäden der Texterkennung nach der cgroup-Zuteilung statt nach
-  `os.cpus()`: sechzehn OpenMP-Fäden auf einem Zehntel Kern waren die Ursache
-  der Zeitüberschreitungen, feste Begrenzung auf eins wäre auf freien Kernen
-  ihrerseits 6× langsamer; zweiter Anlauf mit 800 Bildpunkten rettet Nummer und
-  Datum; Arbeitskante 2000 → 1600; Fehlermeldung nennt Laufzeiten, Kerne und
-  Modellgröße; PWA-Speicher `schaefchen-online-v115`
-
-- Belegfoto wird serverseitig auf 2000 Bildpunkte gebracht (ImageMagick im
-  Image, `jpeg:size`-Hinweis): 48 MP in 1,6 s statt 6,5 s, unabhängig davon,
-  was das Telefon schickt; HEIC wird lesbar, das Tesseract nicht öffnet; ohne
-  Werkzeug Rückfall auf das Original mit Grund in der Meldung; Größengrenze
-  8 → 20 MB; PWA-Speicher `schaefchen-online-v114`
-
-- Lieferscheinfoto aus dem Betrieb repariert: Bild wird im Browser auf 2000
-  Bildpunkte verkleinert (2,06 → 0,50 MB in der Anfrage, 2,1 → 0,8 s Erkennung
-  auf einem Kern), Zeitgrenze 20 → 60 s als Netz darunter, Fortschritt nicht
-  mehr als Fehler mit `role="alert"`, Meldung ohne Stottern, und das erkannte
-  Datum schlägt die Vorbelegung „heute";
-  PWA-Speicher `schaefchen-online-v113`
+- **Die Lagerverwaltung ist abgeschafft** (Fassung 0.44.35, Migrationen 141
+  und 142). Sie kam mit 0.44.11 und wuchs über vierundzwanzig Fassungen:
+  Artikelstamm, Lagerplätze, Bewegungsjournal, Strichcodes und Etiketten,
+  Inventur, Bestellwesen, Lieferscheine, Reservierungen, Fahrzeug- und
+  Retourenlager sowie zuletzt die Texterkennung auf fotografierten Belegen.
+  Entfernt sind Bereich, Navigationseintrag, alle Endpunkte unter
+  `/api/v1/stock`, der Modulschlüssel `warehouse`, der Strichcodeleser, die
+  Werkbank und Tesseract samt ImageMagick aus dem Auslieferungsimage. Die
+  vierzehn Tabellen sind samt Inhalt gelöscht — Bestände, Bewegungen, Belege
+  und Bestellungen stehen nur noch in einer Sicherung von vorher. Die Rolle
+  „Lagerist" ist stillgelegt statt gelöscht, weil widerrufene Zuweisungen
+  darauf zeigen: wer wann welche Berechtigung hatte, ist Personalgeschichte
+  und war nie Teil des Lagers. Die Materialliste der Baustelle bleibt
+  vollständig, nur ohne Bestandsanzeige; PWA-Speicher
+  `schaefchen-online-v117`
 
 - Einstellungen in voller Breite: Arbeitskonten, Feiertage und Zeitregeln
   belegten im zweispaltigen Raster nur eine Spalte (500 statt 1016 Bildpunkte),
@@ -58,91 +38,9 @@ Technischer Stand: V0.44.34
   zugeklappt hinter „Neuer Einsatz", doppelte Unterzeile entfernt; 2863 → 1663
   Bildpunkte; PWA-Speicher `schaefchen-online-v110`
 
-- Positionsvorschläge aus dem Lieferscheinfoto: gelesene Artikel-, Hersteller-
-  und Strichcodenummern werden gegen den eigenen Artikelstamm abgeglichen, eine
-  mehrdeutige Nummer wird nicht zugeordnet, nicht gefundene Zeilen bleiben
-  sichtbar; PWA-Speicher `schaefchen-online-v109`
-
-- Texterkennung für fotografierte Lieferscheine (Tesseract im Image, deutsches
-  Sprachpaket): Nummer und Datum werden vorgeschlagen, der erkannte Text steht
-  daneben; PWA-Speicher `schaefchen-online-v108`
-
 - Eigener Bereich „Arbeitszeiten" für Stundenzettelprüfung, Korrekturen,
   Abwesenheiten und Export; „Meine Woche" behält nur die eigenen Anträge;
   PWA-Speicher `schaefchen-online-v107`
-
-- Bedarfsliste der Baustelle in der Belegkette (Migration 129): zurücklegen und
-  Rest bestellen direkt aus der Zeile, Sammelbestellung je Lieferant, beide
-  Verweise an der Zeile; PWA-Speicher `schaefchen-online-v106`
-
-- Materialübersicht je Baustelle (`GET /api/v1/stock/sites/:id`) in der
-  Baustellenakte: auf der Baustelle, verbaut, reserviert, bestellt und offen —
-  getrennt statt verrechnet; frei verfügbar in der Bestandsliste;
-  Bestellvorschlag aus frei verfügbarem Bestand und Meldebestand;
-  PWA-Speicher `schaefchen-online-v103`
-- Reservierungen (Migration 123): frei verfügbar = physisch minus reserviert,
-  Sicht `stock_availability`; die eigene Baustelle baut ihre Reservierung beim
-  Holen ab, Dritte werden mit Nennung der Baustelle abgewiesen; Aufheben nur
-  mit Grund; Meldebestand am Artikel; PWA-Speicher `schaefchen-online-v102`
-- Lieferscheine als Beleg mit Positionen (Migration 121): Entwurf und Buchen
-  getrennt, Bewegungen aus dem Beleg, Abgleich mit der Bestellung samt Teil-
-  und Überlieferung, Direktlieferung ohne Umweg über das Hauptlager, Verweis
-  auf das Originaldokument statt zweiter Ablage; PWA-Speicher
-  `schaefchen-online-v101`
-- Fundament der Materialkette (Migration 119): Fahrzeuge, Retouren- und
-  Sperrlager als Lagerorte; Buchungsart „Verbaut" bucht Material mit Pflicht
-  zur Baustelle aus dem Baustellenbestand aus; Bestellungen tragen Lieferziel,
-  Projekt und Baustelle; PWA-Speicher `schaefchen-online-v100`
-- Materialliste der Baustelle mit dem Lagerartikel verknüpft (Migration 117):
-  je Zeile freiwillig ein Artikel, darunter der Bestand aus dem Journal mit
-  Fehlmenge. Ohne Artikel keine Aussage, bei verschiedenen Einheiten kein
-  Vergleich; PWA-Speicher `schaefchen-online-v99`
-- Material auf eine Baustelle entnehmen und von dort ins Lager zurückgeben:
-  beide Richtungen tragen die Baustelle im Journal. Zur Wahl stehen die
-  laufenden Baustellen des Betriebs — die eigenen aus dem Tagesplan oben, der
-  Rest darunter; abgeschlossene, abgebrochene und archivierte fehlen. Die
-  Auswahl bleibt zwischen zwei Buchungen stehen und ohne Netz auf dem Gerät;
-  PWA-Speicher `schaefchen-online-v98`
-- Lager ohne Netz: Zwischenspeicher der gescannten Codes auf dem Gerät,
-  Warteschlange für Buchungen mit Nachtrag bei Netzrückkehr und nach
-  Neustart, Hinweis auf veralteten Bestand, wartende Buchungen auf der
-  Startseite; PWA-Speicher `schaefchen-online-v94`
-- Tiefenlink `?lager=` für gedruckte Etiketten, Auswahl des Lagerplatzes aus
-  einer Liste mit vollem Pfad und gemerktem letzten Platz, Suchfeld in der
-  Artikelliste
-- Kamera-Livebild des Lagerscanners am echten Gerät bestätigt; im
-  In-App-Browser mancher Anwendungen liefert `getUserMedia` kein Bild, dort
-  fangen Foto und Handeingabe es ab
-- Lageretiketten im Format der Herstelleraufkleber: 48 × 17 mm, links der Code,
-  rechts daneben Bezeichnung, Artikelnummer und Herstellernummer; 64 Etiketten
-  je A4-Seite; PWA-Speicher `schaefchen-online-v96`
-- Etikettenbogen aus der Artikelliste und aus der Lagerplatzliste heraus:
-  Kästchen je Zeile, „Alle auswählen", Knopf mit Anzahl; PWA-Speicher
-  `schaefchen-online-v97`
-- Artikel nachträglich ändern (Bezeichnung, Mindest- und Zielbestand,
-  Herstellernummer, Gebinde) mit Versionsprüfung; Artikelnummer, Einheit und
-  Warengruppe bleiben gesperrt
-- Druckbogen von Lager und Geräten kommen wieder formatiert an: die Stile
-  liegen als eigene Dateien bei, statt als eingebetteter Block an
-  `style-src 'self'` zu scheitern; das Geräte-Einzeletikett trägt wieder Name
-  und Inventarnummer
-- Gebinde am Artikel (Stückzahl und Name, Migration 111) mit Umschalter
-  zwischen ganzem Gebinde und Einzelstück beim Buchen; der Bestand zählt
-  weiterhin ausschließlich in der Einheit des Artikels. Nachträgliches Ändern
-  eines Artikels über `PATCH /api/v1/stock/items/:id` mit Versionsprüfung
-
-- Lager- und Materialverwaltung mit Barcodes und QR-Codes in der App: Migration
-  107 (vierzehn Tabellen, Bestand nur über Trigger aus dem Journal), 108
-  (Lebenslauf der Codes), 109 (Systemrolle „Lagerist“); Endpunkte
-  `/api/v1/stock/*` in `api/src/stock.mjs`, Bedienung in
-  `frontend/core/stock-module.js` und `stock-management.js`, eigener
-  Barcode-Leser für EAN-13, EAN-8, UPC-A und Code 128; PWA-Speicher
-  `schaefchen-online-v93`
-- eigener Modulschlüssel `warehouse`, nicht im Standardumfang: die
-  Plattformverwaltung gibt das Lager je Firma frei. Der vorhandene Schlüssel
-  `materials` bleibt unberührt bei der Materialverwaltung der Baustelle
-- Rolle „Lagerist“ in jeder Firma vorhanden, aber zunächst unbesetzt: wer sie
-  bekommt, entscheidet die Firma in ihrer Mitarbeiterverwaltung
 
 - sichtbarer Menüpunkt „Azubi“ in der mobilen Bereichsleiste: die Ausnahme für
   das Berichtsheft steht nun hinter der allgemeinen Ausblendregel des
@@ -177,9 +75,6 @@ Technischer Stand: V0.44.34
   gegen unbestätigte Azubi-Rollenverluste aus einer noch geöffneten alten App;
   PWA-Speicher `schaefchen-online-v88`
 
-- papierarmer Geräte-QR-Druckbogen mit bis zu 120 Etiketten auf einer
-  A4-Seite; QR-Codes 18 × 18 mm, kompakte Geräte- und Inventarbeschriftung
-
 - eigenständiger mobiler Azubi-Bereich in der unteren Hauptnavigation;
   eingereichte und freigegebene Wochen belegen die Startseite nicht mehr
 - kompakter Berichtsheft-Hinweis nur bei fehlendem heutigem Eintrag oder einer
@@ -191,11 +86,6 @@ Technischer Stand: V0.44.34
 - mobile Teileanlage mit eigener verständlicher Pflichtfeldmeldung je Teil;
   versehentlich angefügte, inhaltlich leere Teile blockieren die Anlage nicht
 
-- ausfallsichere Geräteübersicht: Kennzahlen, Auswahldaten, Bestand, Hinweise
-  und Sets laden unabhängig; berechtigte Benutzer verlieren „Gerät anlegen“
-  nicht mehr durch den Fehler eines einzelnen Endpunkts
-- gegliederte Geräteanlage mit Seriennummer, festem und aktuellem Besitzer,
-  Standort sowie unmittelbar anschließender QR-Anzeige und Etikettendruck
 - vollständig bedienbare Gerätesets: Hauptgerät und beiliegende Akkus,
   Ladegeräte oder Koffer werden transaktional als einzelne Inventargegenstände
   mit eigenem QR-Code angelegt und bleiben im gemeinsamen Set sichtbar
@@ -203,16 +93,9 @@ Technischer Stand: V0.44.34
 - QR-Livekamera und QR-Fotoerkennung mit lokal ausgeliefertem Decoder für
   Safari auf iPhone/iPad; die native Browsererkennung bleibt der schnelle
   Pfad und die Kamerafreigabe ist auf Schäfchens eigene Herkunft begrenzt
-- vollständiges Modul „Maschinen & Geräte“ mit mobiler QR-Kamera,
-  automatischer Übernahme freier Geräte, bestätigter Fremdübernahme,
-  Rückgabe, gezielter Mitarbeiterübergabe, Lager-/Baustellenzuordnung und
-  „Meine Geräte“ für festen und aktuellen Besitz
 - eigenständiges Akkuinventar mit QR-Code, Akkusystem, Spannung, Kapazität,
   Ladezyklen und Kapazitätstest; Gerätesets sowie Fahrzeugstandorte sind im
   relationalen Modell vorbereitet
-- mandantengetrennte Migration 095 mit 18 RLS-geschützten Gerätetabellen,
-  stabilen UUID-Relationen, unveränderlicher Bewegungs-/Audit-Historie,
-  Defekten, Prüfungen, Fotos, Benachrichtigungen und QR-Inventur
 - konfliktfeste Übergaben über Row-Lock, Gerätestand und idempotente
   Client-Operation; benutzer- und firmengetrennte Offline-Warteschlange mit
   eindeutiger serverseitiger Konfliktauflösung
@@ -340,7 +223,6 @@ Technischer Stand: V0.44.34
 - strukturierte, reihenfolgetreue Verteilungen, FI/RCD-Gruppen und Stromkreise mit LS, FI/LS, NH, Diazed, Neozed und sonstigen Schutzorganen
 - getrennte Messwerte RPE, RISO, Zi, Zs und Ik sowie RCD-Auslösezeit und -strom am betroffenen Stromkreis
 - optionales Stromkreisverzeichnis und ausschließlich bei Auswahl sichtbare detaillierte Isolationsmessung
-- mobiler VDE-Editor mit Plausibilitätsanzeige, lokaler Entwurfssicherung ohne Signatur und kontrolliertem V15-JSON/PDF-Bestandsimport
 - unveränderlicher, unterschriebener VDE-Abschluss als A4-PDF mit Firmenlogo, fester Fußzeile, Messwerten ab Seite zwei und optionalem Stromkreisverzeichnis auf eigener Folgeseite
 - vollständige Versionshistorie, Idempotenz, RLS, Mandantentrennung, Rollen- und Tageszuweisungsprüfung in Migration 036
 - automatischer deutscher Feiertagskalender mit bundesweiten und landesweiten Regeln aller 16 Bundesländer sowie reproduzierbarer Osterberechnung
@@ -497,9 +379,6 @@ Technischer Stand: V0.44.34
 - sicherer Produktions-Vorabcheck repariert den kurzzeitig veroeffentlichten V1-Logovertrag vor den normalen Migrationen
 - CI prueft den echten Upgradepfad vom betroffenen Produktionsstand bis zum erfolgreichen Neustart
 - verbindlicher Produktfokus auf Elektrobetriebe bei später erweiterbarem gemeinsamen Kern
-- direkte Kameraaktion für Lieferscheine im Dokumentbereich der geöffneten Baustelle
-- einmalige zentrale Speicherung des Lieferschein-Fotos mit automatischer Verknüpfung zu Baustelle, Projekt und Kunde
-- serverseitige Beschränkung von Lieferscheinen auf JPG, PNG oder WebP bis 5 MB
 - abgeglichener, phasenweiser Umsetzungsplan aus dem Projekt-GPT „Render für Web-App Hosting“
 - Migration 020 für Baustellenaufgaben mit Priorität, Mitarbeiterzuweisung, Fälligkeit, Status und Abschlusszeitpunkt
 - Migration 021 für Baustellenmaterial mit Menge, Einheit und nachvollziehbaren Statusstufen

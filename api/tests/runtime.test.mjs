@@ -25,9 +25,9 @@ test("Browser-Sicherheitsregeln erlauben nur Schäfchens eigene QR-Kamera", () =
 });
 
 // Der Barcode-Leser des Lagers ist die erste ausgelieferte .mjs-Datei. Fehlt
-// ihr Typ in der Tabelle, kommt sie als application/octet-stream an, der
-// Browser lehnt sie als Modul ab, und der Lagerbereich bleibt leer - ohne dass
-// im Serverprotokoll etwas auffaellt.
+// ihr Typ in der Tabelle, kommt sie als application/octet-stream an, und der
+// Browser lehnt sie als Modul ab - ohne dass im Serverprotokoll etwas
+// auffaellt.
 test("ausgelieferte .mjs-Dateien kommen als JavaScript beim Browser an", async () => {
   const frontend = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend");
   const server = createServer((request, response) => {
@@ -37,10 +37,6 @@ test("ausgelieferte .mjs-Dateien kommen als JavaScript beim Browser an", async (
   const { port } = server.address();
 
   try {
-    const modul = await fetch(`http://127.0.0.1:${port}/core/barcode-decoder.mjs`);
-    assert.equal(modul.status, 200);
-    assert.equal(modul.headers.get("content-type"), "text/javascript; charset=utf-8");
-
     const skript = await fetch(`http://127.0.0.1:${port}/app.js`);
     assert.equal(skript.headers.get("content-type"), "text/javascript; charset=utf-8");
   } finally {

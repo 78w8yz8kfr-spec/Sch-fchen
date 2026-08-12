@@ -53,13 +53,10 @@ BEGIN
         RAISE EXCEPTION 'Die Fassung 0.44.12 nennt mehr Migrationen, als sie mitbringt';
     END IF;
 
-    -- Das Gebinde muss wirklich in der Datenbank stehen, nicht nur im Text.
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'stock_items' AND column_name = 'pack_size'
-    ) THEN
-        RAISE EXCEPTION 'Die Fassung nennt das Gebinde, die Spalte fehlt aber';
-    END IF;
+    -- Die Pruefung auf die Gebindespalte ist mit Migration 141 entfallen: die
+    -- Lagerverwaltung wurde abgeschafft, und mit ihr die Tabelle. Der Eintrag
+    -- im Fassungsverzeichnis bleibt stehen - er beschreibt, was damals
+    -- ausgeliefert wurde, und das aendert sich rueckwirkend nicht.
 END;
 $$;
 
