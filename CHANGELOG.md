@@ -4,6 +4,30 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Positionsleser taugte nichts für echte Belege (Fassung 0.44.34).** Seit
+  0.44.33 läuft die Erkennung ohne Abbruch — was sie auf einem echten
+  Großhändlerbeleg herausbrachte, war allerdings unbrauchbar: aus
+  „00010 33803088 P-5A0 4 4 ST" wurde die Artikelnummer **00010** statt
+  33803088, aus einer Zeile Kleingedrucktem eine Position über **3 t**, und das
+  Lieferdatum stand auf **22.06.** bei einem Beleg vom August. Drei Fehler aus
+  demselben Grund: geprüft worden war nur gegen einen selbstgebauten
+  Musterbeleg, und der war zu ordentlich. **Die Positionsnummer** drucken
+  Großhändler fünfstellig; die alte Regel warf am Zeilenanfang nur bis zu drei
+  Stellen weg. Jetzt fällt sie in jeder Länge weg, und eine reine Ziffernfolge
+  zählt erst ab sechs Stellen als Artikelnummer — darunter ist sie fast immer
+  etwas anderes. **Das Kleingedruckte** unter den Positionen enthält lange
+  Nummern und Zahlen; dagegen helfen zwei Regeln: Maße sind keine Liefermengen
+  (mm, cm, km, g, t und ml zählen nicht mehr, sonst wird „Kabelbinder 200mm" zu
+  einer Menge von 200), und eine Positionszeile trägt ihre Nummer vorn, nicht
+  irgendwo im Satz. **Das Datum** ist jetzt an einer Beschriftung verankert —
+  „Lieferdatum", „Datum", „geliefert am" —, aus demselben Grund wie die
+  Lieferscheinnummer: auf einem echten Beleg stehen fünf Datumsangaben, und wer
+  das erste nimmt, nimmt fast immer das falsche. **Und traf keine Zeile einen
+  Artikel**, stand bisher trotzdem eine Liste da, jede mit „kein Artikel dazu"
+  daneben — richtig, aber unbrauchbar, und es sah aus, als hätte das Programm
+  etwas verstanden. Jetzt steht dort ein Satz; gibt es Treffer, stehen sie
+  oben.
+
 - **Die Texterkennung bekam sechzehn Rechenfäden für ein Zehntel Kern (Fassung
   0.44.33).** Nach zwei Fassungen, die am Bild ansetzten, kam im Betrieb wieder
   ein Abbruch — diesmal mit den Zahlen, die 0.44.32 mitgeliefert hatte:

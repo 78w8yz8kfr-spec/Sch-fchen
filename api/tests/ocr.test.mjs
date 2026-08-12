@@ -41,10 +41,17 @@ test("eine falsch gelesene Nummer wird lieber verworfen als übernommen", () => 
     "Zu wenige Ziffern für eine Lieferscheinnummer");
 });
 
-test("das Datum wird in beiden gebräuchlichen Schreibweisen gelesen", () => {
+test("das Datum wird an seiner Beschriftung gefunden, nicht irgendwo", () => {
   assert.equal(datumAusText("Datum: 11.08.2026"), "2026-08-11");
   assert.equal(datumAusText("Lieferdatum 1.9.2026"), "2026-09-01");
-  assert.equal(datumAusText("2026-08-11"), "2026-08-11");
+  assert.equal(datumAusText("Lieferdatum: 2026-08-11"), "2026-08-11");
+  assert.equal(datumAusText("geliefert am 03.07.2026"), "2026-07-03");
+
+  // Auf einem echten Beleg stehen fünf Datumsangaben. Wer das erste nimmt,
+  // das wie ein Datum aussieht, nimmt fast immer das falsche — im Betrieb
+  // stand danach der 22.06. im Feld, auf einem Beleg vom August.
+  assert.equal(datumAusText("Auftrag vom 22.06.2026"), null);
+  assert.equal(datumAusText("Zahlbar bis 30.09.2026 ohne Abzug"), null);
 
   // Zweistellige Jahre werden nicht ergänzt: "11.08.26" könnte 1926 heißen,
   // und ein geratenes Jahrhundert im Wareneingang findet später niemand mehr.
@@ -122,6 +129,31 @@ test("ohne Artikelnummer entsteht keine Position", () => {
 test("die Positionsziffer am Zeilenanfang wird nicht für die Artikelnummer gehalten", () => {
   const [zeile] = positionenAusText("3. 4711-99 Kabelbinder 200mm 500 Stk");
   assert.equal(zeile.code, "4711-99");
+  assert.equal(zeile.quantity, 500, "\"200mm\" ist ein Maß aus der Bezeichnung, keine Menge");
+});
+
+test("Zeilen eines echten Großhändlerbelegs", () => {
+  // Wortlaut aus dem Betrieb. Vorher las das Programm hier "00010" als
+  // Artikelnummer — die Positionsnummer, weil sie fünfstellig gedruckt wird
+  // und die Regel nur bis zu drei Stellen fallen ließ.
+  const [zeile] = positionenAusText("00010 33803088 P-5A0 4 4 ST");
+  assert.equal(zeile.code, "33803088");
+  assert.equal(zeile.quantity, 4);
+  assert.equal(zeile.unit, "Stk");
+});
+
+test("das Kleingedruckte wird nicht zur Position", () => {
+  // Ebenfalls aus dem Betrieb: aus einer Zeile Fußnotentext wurde eine
+  // Position über "3 t" — drei Tonnen Kleinmaterial. Zwei Regeln verhindern
+  // das: Maßeinheiten wie t, g und mm zählen nicht als Liefermenge, und die
+  // Artikelnummer muss vorn stehen, nicht irgendwo im Satz.
+  assert.deepEqual(
+    positionenAusText("Geschäfte ug GUN: 4016708000008 * FU F3 T1r 1661991 > Persönieh haltende MN hafterin: UNL ELEKTRO Fac"),
+    []
+  );
+  assert.deepEqual(positionenAusText("Es gilt unser Gerichtsstand 12345 Hamburg, Zahlung 30 Tage"), []);
+  assert.deepEqual(positionenAusText("Sendungsgewicht 3 t"), [],
+    "Eine Tonne ist keine Liefereinheit für Elektromaterial");
 });
 
 test("eine abgebrochene Erkennung meldet sich verständlich", async () => {
