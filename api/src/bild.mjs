@@ -32,8 +32,15 @@
 
 import { spawn } from "node:child_process";
 
-/** Die laengste Kante, mit der ein Beleg in die Erkennung geht. */
-export const ARBEITSKANTE = 2000;
+/**
+ * Die laengste Kante, mit der ein Beleg in die Erkennung geht.
+ *
+ * Gemessen auf einem Kern mit begrenztem OpenMP: 2000 Bildpunkte 0,40 s,
+ * 1600 Bildpunkte 0,35 s - beide lesen Nummer, Datum und beide Positionen.
+ * Erst bei 1000 faellt eine Positionszeile aus. Sechzehnhundert nimmt den
+ * Sicherheitsabstand mit, den zweitausend nicht gebraucht haette.
+ */
+export const ARBEITSKANTE = 1600;
 
 /** Wie lange das Verkleinern hoechstens dauern darf. */
 const ZEITGRENZE_MS = 30_000;

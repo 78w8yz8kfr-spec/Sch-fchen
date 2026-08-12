@@ -15,7 +15,7 @@ import { toString as qrToString } from "qrcode";
 import { InputError, readJson, validateId } from "../../api/src/validation.mjs";
 import { loadCompanyModules } from "../../api/src/company-modules.mjs";
 import { bildVerkleinern } from "./bild.mjs";
-import { belegAuslesen, einheitNormal } from "./ocr.mjs";
+import { belegAuslesen, einheitNormal, werkzeugstand } from "./ocr.mjs";
 
 export const STOCK_MODULE_KEY = "warehouse";
 
@@ -3256,24 +3256,39 @@ async function scanDeliveryNote(client, context, body) {
   // ein Telefon liefert HEIC, ein alter Browser kann kein Canvas, und ein
   // sehr grosses Bild misslingt beim Zeichnen still - dann kam bisher das
   // Original an, und die Erkennung lief in die Zeitgrenze.
+  const vorUhr = Date.now();
   const aufbereitet = await bildVerkleinern(bild);
+  const verkleinerDauer = Date.now() - vorUhr;
 
   let gelesen;
+  const leseUhr = Date.now();
   try {
-    gelesen = await belegAuslesen(aufbereitet.bild);
+    gelesen = await belegAuslesen(aufbereitet.bild, { zeitgrenze: 40_000 });
   } catch (fehler) {
-    // Fehlt Tesseract oder bricht es ab, scheitert diese eine Anfrage - und
-    // nicht der Wareneingang. Erfasst wird dann von Hand wie bisher.
-    // Die Maße stehen in der Meldung: ohne sie lässt sich hinterher nicht
-    // sagen, ob das Bild zu groß ankam oder der Rechner zu langsam war.
-    const mass = `${Math.round(bild.length / 1024)} KB`
-      + (aufbereitet.verkleinert ? ` verkleinert auf ${Math.round(aufbereitet.bild.length / 1024)} KB` : " unverkleinert")
-      + (aufbereitet.grund ? ` (${aufbereitet.grund})` : "");
-    throw new InputError(
-      `Der Beleg ließ sich nicht lesen: ${fehler.message} [${mass}] Bitte von Hand eintragen.`,
-      503,
-      "stock_ocr_unavailable"
-    );
+    // Zweiter Anlauf mit einem deutlich kleineren Bild. Bei 800 Bildpunkten
+    // kommen Nummer und Datum noch durch, von den Positionen nur ein Teil -
+    // gemessen. Der halbe Beleg ist mehr wert als gar keiner, und wer die
+    // Nummer hat, tippt den Rest in einer Minute nach.
+    try {
+      const notfall = await bildVerkleinern(bild, { kante: 800 });
+      gelesen = await belegAuslesen(notfall.bild, { zeitgrenze: 15_000 });
+    } catch {
+      // Auch der zweite Anlauf scheitert: dann scheitert diese eine Anfrage -
+      // und nicht der Wareneingang. Erfasst wird von Hand wie bisher.
+      //
+      // Alles steht in der Meldung, was die Ursache eingrenzt: die Maße, wie
+      // lange jeder Schritt lief, und womit gerechnet wurde. Nach drei
+      // Anläufen im Betrieb ist Raten keine Arbeitsweise mehr.
+      const mass = `${Math.round(bild.length / 1024)} KB`
+        + (aufbereitet.verkleinert ? ` → ${Math.round(aufbereitet.bild.length / 1024)} KB` : " unverkleinert")
+        + (aufbereitet.grund ? ` (${aufbereitet.grund})` : "")
+        + `, ${verkleinerDauer} ms + ${Date.now() - leseUhr} ms, ${werkzeugstand()}`;
+      throw new InputError(
+        `Der Beleg ließ sich nicht lesen: ${fehler.message} [${mass}] Bitte von Hand eintragen.`,
+        503,
+        "stock_ocr_unavailable"
+      );
+    }
   }
 
   return {

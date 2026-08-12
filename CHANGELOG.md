@@ -4,6 +4,31 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Texterkennung bekam sechzehn Rechenfäden für ein Zehntel Kern (Fassung
+  0.44.33).** Nach zwei Fassungen, die am Bild ansetzten, kam im Betrieb wieder
+  ein Abbruch — diesmal mit den Zahlen, die 0.44.32 mitgeliefert hatte:
+  `[996 KB verkleinert auf 518 KB]`. Damit war die bisherige Erklärung
+  erledigt. Das Bild kam klein an, der Server verkleinerte es noch einmal, und
+  Tesseract brauchte auf einem halben Megabyte trotzdem länger als sechzig
+  Sekunden — auf dem Prüfrechner sind das vier Zehntelsekunden. **Nicht das
+  Bild war das Problem.** Tesseract verteilt seine Arbeit über OpenMP auf so
+  viele Fäden, wie der Rechner Kerne meldet; in einem Behälter ist das die Zahl
+  des Wirts, während davon nur ein Bruchteil eines Kerns zusteht. Sechzehn
+  Fäden drängeln sich dann um ein Zehntel Kern und warten mehr aufeinander, als
+  sie rechnen. Einfach auf einen Faden zu begrenzen wäre andersherum genauso
+  falsch: gemessen an 48 Megapixeln braucht derselbe Beleg mit vier freien
+  Kernen 1,5 s ohne Begrenzung und 8,8 s mit fester Grenze von eins — auf einem
+  Kern bei vier gemeldeten dagegen 0,75 s ohne und 0,40 s mit. Deshalb wird
+  nicht geraten, sondern nachgesehen: die Zuteilung steht im Dateisystem der
+  Steuergruppe, und danach richtet sich die Fadenzahl. Am ganzen Weg
+  nachgemessen: **0,8 Sekunden** von der Anfrage bis zu den zugeordneten
+  Positionen, mit einem unverkleinerten 5,9-MB-Foto. Reicht es trotzdem nicht,
+  folgt ein zweiter Anlauf mit 800 Bildpunkten — dort kommen Nummer und Datum
+  noch durch, von den Positionen nur ein Teil. Der halbe Beleg ist mehr wert
+  als gar keiner. Die Arbeitskante sinkt von 2000 auf 1600 Bildpunkte, und
+  scheitern beide Anläufe, nennt die Meldung jetzt auch die Laufzeiten beider
+  Schritte, die Zahl der Kerne und die Größe des Sprachmodells.
+
 - **Der Server bringt das Belegfoto jetzt selbst auf Arbeitsmaß (Fassung
   0.44.32).** Fassung 0.44.31 ließ den Browser verkleinern. Im Betrieb kam
   trotzdem wieder „das Bild war zu groß oder der Server zu langsam" — dieselbe

@@ -35,6 +35,8 @@
 // Bestand.
 
 import { spawn } from "node:child_process";
+import { cpus } from "node:os";
+import { readFileSync, statSync } from "node:fs";
 
 /**
  * Wie lange Tesseract hoechstens rechnen darf.
@@ -54,19 +56,69 @@ import { spawn } from "node:child_process";
 const ZEITGRENZE_MS = 60_000;
 
 /**
+ * Wie viel Rechenzeit diesem Behaelter wirklich zusteht.
+ *
+ * `os.cpus()` meldet die Kerne des Wirts, nicht die eigene Zuteilung. Genau
+ * daran verschluckt sich Tesseract: OpenMP startet so viele Faeden, wie Kerne
+ * gemeldet sind, und wenn davon nur ein Zehntel eines Kerns zusteht, draengeln
+ * sich sechzehn Faeden darum und verbringen mehr Zeit mit Warten aufeinander
+ * als mit Rechnen.
+ *
+ * Die wahre Zahl steht im Dateisystem der Steuergruppe. Bei "max" gibt es
+ * keine Grenze - dann bleibt es bei den gemeldeten Kernen, denn dort ist
+ * Parallelitaet ein Gewinn und keine Bremse.
+ *
+ * Gemessen an einem Beleg mit 48 Megapixeln: auf dieser Maschine mit vier
+ * freien Kernen 1,5 s ohne Begrenzung und 8,8 s mit fester Grenze von eins -
+ * fest zu begrenzen waere also falsch. Auf einem Kern bei vier gemeldeten
+ * dagegen 0,75 s ohne und 0,40 s mit. Beides zusammen heisst: nicht raten,
+ * sondern nachsehen.
+ */
+export function fadengrenze() {
+  const gemeldet = Math.max(1, cpus().length);
+  const lesen = (ort) => {
+    try {
+      return readFileSync(ort, "utf8").trim();
+    } catch {
+      return null;
+    }
+  };
+
+  // Steuergruppen der zweiten Bauart: "<Anteil> <Zeitraum>" oder "max ...".
+  const zwei = lesen("/sys/fs/cgroup/cpu.max");
+  if (zwei) {
+    const [anteil, zeitraum] = zwei.split(/\s+/);
+    if (anteil !== "max" && Number(zeitraum) > 0) {
+      return Math.max(1, Math.min(gemeldet, Math.floor(Number(anteil) / Number(zeitraum))));
+    }
+    return gemeldet;
+  }
+
+  // Erste Bauart: zwei getrennte Dateien, -1 heisst unbegrenzt.
+  const anteil = Number(lesen("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"));
+  const zeitraum = Number(lesen("/sys/fs/cgroup/cpu/cpu.cfs_period_us"));
+  if (anteil > 0 && zeitraum > 0) {
+    return Math.max(1, Math.min(gemeldet, Math.floor(anteil / zeitraum)));
+  }
+  return gemeldet;
+}
+
+/**
  * Erkennt den Text eines Bildes.
  *
  * Tesseract wird als Programm aufgerufen und nicht als Bibliothek eingebunden:
  * das haelt die Abhaengigkeiten der API bei fuenf und macht den Ausfall
  * harmlos - fehlt das Programm, scheitert diese eine Anfrage und sonst nichts.
  */
-export function texterkennung(bild, { sprache = "deu", befehl = "tesseract" } = {}) {
+export function texterkennung(bild, { sprache = "deu", befehl = "tesseract", zeitgrenze = ZEITGRENZE_MS } = {}) {
   return new Promise((fertig, scheitert) => {
     let lauf;
     try {
       // `stdin` als Quelle und `stdout` als Ziel: kein Zwischenspeichern auf
       // der Platte, und damit auch keine Reste, wenn etwas abbricht.
-      lauf = spawn(befehl, ["stdin", "stdout", "-l", sprache, "--psm", "6"]);
+      lauf = spawn(befehl, ["stdin", "stdout", "-l", sprache, "--psm", "6"], {
+        env: { ...process.env, OMP_THREAD_LIMIT: String(fadengrenze()) }
+      });
     } catch (fehler) {
       scheitert(fehler);
       return;
@@ -80,7 +132,7 @@ export function texterkennung(bild, { sprache = "deu", befehl = "tesseract" } = 
       // dem Aufrufer angehaengt, deshalb steht hier kein zweites Mal
       // "Texterkennung" - sonst stottert die Meldung auf dem Telefon.
       scheitert(new Error("das Bild war zu gross oder der Server zu langsam."));
-    }, ZEITGRENZE_MS);
+    }, zeitgrenze);
 
     lauf.stdout.on("data", (teil) => { text += teil.toString("utf8"); });
     lauf.stderr.on("data", (teil) => { fehlerstrom += teil.toString("utf8"); });
@@ -283,6 +335,35 @@ export function positionenAusText(text) {
  * Programm gelesen hat, versteht sofort, warum ein Feld leer blieb - und
  * fotografiert das naechste Mal gerader statt zu raten.
  */
+/**
+ * Was ueber die Erkennung selbst zu sagen ist, wenn sie versagt.
+ *
+ * Nach drei Anlaeufen im Betrieb war klar: raten hilft nicht. Diese Angaben
+ * stehen deshalb in der Fehlermeldung, und sie beantworten genau die zwei
+ * Fragen, die offenblieben - wie viele Kerne meldet der Rechner (danach
+ * richtet sich OpenMP), und welches Sprachmodell liegt dort. Das schnelle
+ * deutsche Modell misst rund anderthalb Megabyte; das genaue misst das Zehn-
+ * bis Zwanzigfache und rechnet entsprechend laenger.
+ */
+export function werkzeugstand() {
+  const orte = [
+    "/usr/share/tessdata/deu.traineddata",
+    "/usr/share/tesseract-ocr/tessdata/deu.traineddata",
+    "/usr/share/tesseract-ocr/5/tessdata/deu.traineddata",
+    "/usr/share/tesseract-ocr/4.00/tessdata/deu.traineddata"
+  ];
+  let modell = "Sprachmodell nicht gefunden";
+  for (const ort of orte) {
+    try {
+      modell = `Modell ${Math.round(statSync(ort).size / 1024)} KB`;
+      break;
+    } catch {
+      // Weitersuchen; der Ort haengt an der Paketquelle.
+    }
+  }
+  return `${cpus().length} Kerne gemeldet, ${fadengrenze()} genutzt, ${modell}`;
+}
+
 export async function belegAuslesen(bild, optionen = {}) {
   const text = await texterkennung(bild, optionen);
   return {
