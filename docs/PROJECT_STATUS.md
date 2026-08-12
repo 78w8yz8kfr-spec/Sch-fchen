@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.28
+Technischer Stand: V0.44.29
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,12 @@ Technischer Stand: V0.44.28
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Filterleiste der Plantafel bricht um statt abgeschnitten zu werden: Baustelle,
+  Projektleiter und Planstatus waren am Telefon hinter dem Bildrand und durch
+  `overflow-x: hidden` unerreichbar; Beschriftung und Feld im Stundenexport
+  stehen wieder beieinander (10 statt ~500 Bildpunkte);
+  PWA-Speicher `schaefchen-online-v111`
 
 - Einsatzplanung entzerrt: Tageslage zuoberst statt zuunterst, Anlegeformular
   zugeklappt hinter „Neuer Einsatz", doppelte Unterzeile entfernt; 2863 → 1663

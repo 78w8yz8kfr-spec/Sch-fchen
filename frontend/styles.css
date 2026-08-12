@@ -1632,9 +1632,14 @@ select:focus-visible {
   width: 100%;
 }
 
+/* Die Beschriftung bekommt genau die Breite ihres Wortes, nicht die halbe
+   Tafel. Mit zwei gleich breiten Spalten stand "Von" am linken Rand und sein
+   Datumsfeld einen halben Meter weiter rechts - in der schmalen Auswertung
+   fiel das nicht auf, im neuen Bereich "Arbeitszeiten" ist die Tafel tausend
+   Bildpunkte breit, und dort riss es Beschriftung und Feld auseinander. */
 .timesheet-export-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px 10px;
   margin-top: 14px;
 }
@@ -3099,7 +3104,8 @@ select:focus-visible {
 
 .planning-board-toolbar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  /* Umbrechen statt herausragen - siehe die Begruendung im Designsystem. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   padding: 12px;
   border-bottom: 1px solid var(--line);
