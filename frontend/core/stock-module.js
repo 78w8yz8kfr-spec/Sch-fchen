@@ -42,14 +42,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.31";
+} from "./stock-management.js?v=0.44.32";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.31";
+} from "./barcode-scanner.mjs?v=0.44.32";
 
 const html = `
   <div class="stock-module">
@@ -866,23 +866,62 @@ export function createStockModule({
    * fehl - alter Browser, kein Canvas, ein Format, das er nicht zeichnet -,
    * geht das Original los wie bisher. Lieber langsam als gar nicht.
    */
-  async function belegVerkleinern(datei) {
-    const roh = await new Promise((fertig, scheitert) => {
+  /** Die Datei als Datenadresse - der Weg, der immer geht. */
+  function alsDatenadresse(datei) {
+    return new Promise((fertig, scheitert) => {
       const leser = new FileReader();
       leser.onload = () => fertig(String(leser.result));
       leser.onerror = () => scheitert(new Error("Das Bild konnte nicht gelesen werden."));
       leser.readAsDataURL(datei);
     });
+  }
 
+  /**
+   * Das Bild oeffnen, auf zwei Wegen.
+   *
+   * `createImageBitmap` bekommt die Datei unmittelbar und kommt mit Formaten
+   * zurecht, an denen der Umweg ueber eine Datenadresse scheitert - auf einem
+   * Telefon ist das der Regelfall, denn dort liegt das Foto als HEIC vor.
+   * Ausserdem entsteht dabei keine Zeichenkette von mehreren Megabyte im
+   * Speicher, an der ein Telefon schon einmal aufgibt.
+   *
+   * Der zweite Weg ist der alte: laden, in ein Bildelement haengen, warten.
+   * Er bleibt fuer Browser ohne `createImageBitmap`.
+   */
+  async function bildOeffnen(datei) {
+    if (typeof fenster.createImageBitmap === "function") {
+      try {
+        return await fenster.createImageBitmap(datei);
+      } catch {
+        // Weiter mit dem alten Weg.
+      }
+    }
+    const roh = await alsDatenadresse(datei);
+    return new Promise((fertig, scheitert) => {
+      const el = new fenster.Image();
+      el.onload = () => fertig(el);
+      el.onerror = () => scheitert(new Error("nicht zeichenbar"));
+      el.src = roh;
+    });
+  }
+
+  /**
+   * Das Foto auf ein vernuenftiges Mass bringen, bevor es losgeht.
+   *
+   * Ein Telefon liefert zwoelf bis achtundvierzig Megapixel. Ungekuerzt sind
+   * das mehrere Megabyte, im Datenteil einer Anfrage ein Drittel mehr -
+   * hochgeladen ueber Mobilfunk, und danach rechnet der Server darauf.
+   *
+   * Schlaegt es fehl, geht das Original los. Das ist kein Drama mehr: seit
+   * dieser Fassung verkleinert auch der Server, bevor er liest. Zwei
+   * Sicherungen, weil eine im Betrieb zweimal nicht gereicht hat.
+   */
+  async function belegVerkleinern(datei) {
+    let bild = null;
     try {
-      const bild = await new Promise((fertig, scheitert) => {
-        const el = new fenster.Image();
-        el.onload = () => fertig(el);
-        el.onerror = () => scheitert(new Error("nicht zeichenbar"));
-        el.src = roh;
-      });
-      const mass = belegMass(bild.naturalWidth || bild.width, bild.naturalHeight || bild.height);
-      if (!mass.verkleinert) return roh;
+      bild = await bildOeffnen(datei);
+      const mass = belegMass(bild.width || bild.naturalWidth, bild.height || bild.naturalHeight);
+      if (!mass.verkleinert) return await alsDatenadresse(datei);
 
       const tafel = fenster.document.createElement("canvas");
       tafel.width = mass.breite;
@@ -890,10 +929,13 @@ export function createStockModule({
       tafel.getContext("2d").drawImage(bild, 0, 0, mass.breite, mass.hoehe);
       // JPEG und nicht PNG: ein Foto ist keine Strichzeichnung, und PNG waere
       // hier um ein Vielfaches groesser ohne einen lesbaren Buchstaben mehr.
-      const kleiner = tafel.toDataURL("image/jpeg", 0.85);
-      return kleiner.length < roh.length ? kleiner : roh;
+      return tafel.toDataURL("image/jpeg", 0.85);
     } catch {
-      return roh;
+      return await alsDatenadresse(datei);
+    } finally {
+      // Ein Bitmap haelt seinen Speicher, bis es geschlossen wird - auf einem
+      // Telefon mit einem 48-Megapixel-Foto ist das spuerbar.
+      if (bild && typeof bild.close === "function") bild.close();
     }
   }
 

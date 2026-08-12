@@ -4,6 +4,28 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Server bringt das Belegfoto jetzt selbst auf Arbeitsmaß (Fassung
+  0.44.32).** Fassung 0.44.31 ließ den Browser verkleinern. Im Betrieb kam
+  trotzdem wieder „das Bild war zu groß oder der Server zu langsam" — dieselbe
+  Stelle, eine Fassung später. Die Annahme, der Browser könne das zuverlässig,
+  war falsch: ein Telefon liefert HEIC statt JPEG, ein älterer Browser kennt
+  kein Canvas, und bei sehr großen Bildern misslingt das Zeichnen still. In
+  allen drei Fällen ging das Original los, genau wie vorher. Die Verkleinerung
+  steht deshalb jetzt dort, wo sie nicht ausweichen kann: vor der Erkennung,
+  auf dem Server. Gemessen an einem Beleg mit 48 Megapixeln auf einem Kern:
+  6,5 s direkt an die Erkennung, 5,4 s mit gewöhnlichem Verkleinern — und
+  **1,6 s mit dem `jpeg:size`-Hinweis**, weil libjpeg dann gleich auf der
+  nächstkleineren Stufe dekodiert, statt erst alles zu entpacken und dann neun
+  Zehntel wegzuwerfen. Nachgemessen mit einem unverkleinerten 5,9-MB-Foto
+  direkt am Endpunkt, also genau im Fall, der im Betrieb scheiterte: 1,5
+  Sekunden, Nummer, Datum und beide Positionen richtig. Nebenbei liest
+  ImageMagick **HEIC**, das Tesseract überhaupt nicht öffnen kann — ein Foto,
+  das bisher gar nicht zu lesen war, wird damit lesbar. Fehlt das Werkzeug,
+  geht der Beleg unverkleinert weiter wie bisher, und der Grund steht in der
+  Fehlermeldung. Die Größengrenze steigt von acht auf zwanzig Megabyte: sie
+  stammte aus der Zeit, als der Server ein großes Bild nicht verarbeiten
+  konnte.
+
 - **Das Lieferscheinfoto lief im Betrieb in die Zeitgrenze (Fassung 0.44.31).**
   Gemeldet wurde: „Die Texterkennung hat nicht funktioniert: Die Texterkennung
   hat zu lange gebraucht." Ein Telefon fotografiert mit zwölf Megapixeln —
