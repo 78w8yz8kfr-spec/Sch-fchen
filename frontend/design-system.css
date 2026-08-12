@@ -852,10 +852,17 @@ textarea {
   font-size: 1rem;
 }
 
+/* `auto-fit` statt fester Fünf: die Leiste legt so viele Filter nebeneinander,
+   wie hineinpassen, und bricht den Rest um. Mit `repeat(5, ...)` standen fünf
+   Spalten zu je mindestens 112 Pixeln fest - 560 Pixel in einer 328 Pixel
+   breiten Leiste. Auf dem Telefon lagen Baustelle, Projektleiter und
+   Planstatus dadurch ausserhalb des Bildes, und weil `.admin-week` seitlich
+   abschneidet, waren sie dort nicht zu erreichen: der Vorarbeiter konnte den
+   Plan am Telefon nach nichts davon filtern. */
 .planning-board-toolbar {
   gap: 7px;
   padding: 10px 12px;
-  grid-template-columns: repeat(5, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
 }
 
 .planning-board-toolbar > label:first-child {
@@ -1239,14 +1246,17 @@ textarea {
 }
 
 @media (min-width: 760px) {
-  .analytics-export-content .timesheet-export-form {
-    display: grid;
+  /* Zwei Paare nebeneinander, sobald Platz ist: Beschriftung und Feld bleiben
+     beieinander, und aus vier Zeilen werden zwei. Die Regel galt vorher nur
+     in der Auswertung; dieselbe Tafel steht seit Fassung 0.44.25 auch unter
+     "Arbeitszeiten" und sah dort anders aus als hier. */
+  .timesheet-export-form {
     align-items: end;
     gap: 10px;
-    grid-template-columns: repeat(4, minmax(130px, 1fr));
+    grid-template-columns: repeat(2, auto minmax(130px, 1fr));
   }
 
-  .analytics-export-content .timesheet-export-actions {
+  .timesheet-export-actions {
     display: flex;
     grid-column: 1 / -1;
     justify-content: flex-end;

@@ -4,6 +4,29 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Drei Filter der Plantafel waren am Telefon nicht zu erreichen (Fassung
+  0.44.29).** Die Filterleiste stand auf fünf festen Spalten zu je mindestens
+  112 Bildpunkten — 560 Bildpunkte in einer Leiste, die auf dem Telefon 328
+  breit ist. Mitarbeiter und Team passten, **Baustelle, Projektleiter und
+  Planstatus lagen außerhalb**. Das wäre allein schon hässlich gewesen;
+  schlimmer ist, dass die Plantafel seitlich abschneidet: die drei Felder waren
+  nicht bloß verschoben, sie waren weg. Ein Vorarbeiter konnte den Plan am
+  Telefon nach Baustelle, Projektleiter und Planstatus überhaupt nicht filtern
+  — und sah auch nicht, dass es die Filter gibt. Jetzt legt die Leiste so viele
+  Filter nebeneinander, wie hineinpassen, und bricht den Rest um: am Telefon
+  zwei je Zeile in drei Zeilen, am Schreibtisch weiterhin alle fünf.
+- **Im Stundenexport steht die Beschriftung wieder neben ihrem Feld (Fassung
+  0.44.29).** Das Formular „Stundenzettel exportieren" stand auf zwei gleich
+  breiten Spalten — links die Beschriftung, rechts das Feld. In der schmalen
+  Auswertung fiel das nicht auf; seit dieselbe Tafel im Bereich
+  „Arbeitszeiten" steht, ist sie tausend Bildpunkte breit, und „Von" stand rund
+  fünfhundert Bildpunkte von seinem Datumsfeld entfernt. Die
+  Beschriftungsspalte bekommt jetzt die Breite ihres Wortes statt der halben
+  Tafel, und sobald Platz ist, stehen zwei Paare nebeneinander: aus rund
+  fünfhundert Bildpunkten Abstand werden zehn. Die dafür nötige Regel gab es
+  schon, aber nur für die Auswertung — dieselbe Tafel soll nicht an zwei Orten
+  verschieden aussehen.
+
 - **Die Einsatzplanung ist wieder zu überblicken (Fassung 0.44.28).** Die Seite
   war 2863 Bildpunkte hoch, und darin standen drei Dinge in genau der falschen
   Reihenfolge: oben die Plantafel, darunter das dauerhaft aufgeklappte Formular
