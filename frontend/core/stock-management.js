@@ -1646,7 +1646,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.30`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.31`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -2047,6 +2047,64 @@ export function lieferscheinAnsicht(zustand) {
  * Lieferantenartikelnummern) steht am Beleg und laesst sich spaeter ergaenzen;
  * wer im Stehen erfasst, waehrend der Fahrer wartet, tippt es ohnehin nicht.
  */
+/** Die laengste Kante, mit der ein Beleg zur Erkennung geht. */
+export const BELEGKANTE = 2000;
+
+/**
+ * Auf welches Mass ein Foto verkleinert wird.
+ *
+ * Ein Telefon fotografiert mit zwoelf Megapixeln. Fuer die Texterkennung ist
+ * das Verschwendung an beiden Enden: das Bild wird gross hochgeladen, und der
+ * Server rechnet lange darauf.
+ *
+ * Gemessen an einem Beleg mit Bildrauschen und Hintergrund, auf einem Kern:
+ *
+ *   4032 Bildpunkte   2,1 s   2112 KB
+ *   2000 Bildpunkte   0,8 s    423 KB
+ *   1600 Bildpunkte   0,7 s    291 KB
+ *   1200 Bildpunkte   1,0 s    ---   <- hier faellt eine Positionszeile aus
+ *
+ * Zweitausend ist der Punkt, an dem nichts mehr zu gewinnen und noch nichts
+ * verloren ist. Bei 1200 laesst die Erkennung die erste Positionszeile fallen
+ * - deshalb wird nicht weiter verkleinert, obwohl es schneller waere.
+ *
+ * Kleinere Bilder bleiben unangetastet: ein Scan mit 1200 Bildpunkten wird
+ * nicht kuenstlich aufgeblasen.
+ */
+export function belegMass(breite, hoehe, kante = BELEGKANTE) {
+  const laengste = Math.max(breite, hoehe);
+  if (!laengste || laengste <= kante) return { breite, hoehe, verkleinert: false };
+  const faktor = kante / laengste;
+  return {
+    breite: Math.max(1, Math.round(breite * faktor)),
+    hoehe: Math.max(1, Math.round(hoehe * faktor)),
+    verkleinert: true
+  };
+}
+
+/**
+ * Welches Lieferdatum gilt: das vom Papier oder das im Formular?
+ *
+ * Das Feld startet auf heute. Das ist als Vorbelegung richtig - die meisten
+ * Lieferungen werden am selben Tag erfasst -, aber es ist eine Annahme der
+ * App und keine Eingabe eines Menschen. Bis hierher hat sie trotzdem gegen
+ * das Papier gewonnen, weil "nur leere Felder fuellen" ein volles Feld sah:
+ * wer einen Beleg von vorgestern fotografierte, buchte ihn auf heute.
+ *
+ * Deshalb drei Faelle statt zwei:
+ *
+ *   Feld leer                     -> das erkannte Datum
+ *   Feld noch auf der Vorbelegung -> das erkannte Datum (das Papier weiss es
+ *                                    besser als die Uhr)
+ *   Feld von Hand geaendert       -> bleibt, wie es steht
+ */
+export function datumUebernehmen(entwurf = {}, erkannt = null) {
+  const jetzt = entwurf.deliveredOn || '';
+  if (!erkannt) return jetzt;
+  if (!jetzt) return erkannt;
+  return jetzt === entwurf.vorbelegtesDatum ? erkannt : jetzt;
+}
+
 /**
  * Erkannte Positionen in das Formular uebernehmen.
  *
@@ -2119,6 +2177,13 @@ export function lieferscheinFormularAnsicht(entwurf = {}, optionen = {}, fehler 
   return `<form class="stock-form stock-delivery-form">
     ${kopfzeile('Lieferschein erfassen')}
     ${fehler ? `<p class="stock-error" role="alert">${sicher(fehler)}</p>` : ''}
+    ${entwurf.hinweis
+      // "Der Beleg wird gelesen" stand bis hierher im roten Fehlerkasten und
+      // mit `role="alert"`. Das war zweimal falsch: es sah aus, als waere
+      // etwas schiefgegangen, und Vorleseprogramme meldeten einen Fehler,
+      // wenn gerade alles seinen Gang ging.
+      ? `<p class="stock-progress" role="status">${sicher(entwurf.hinweis)}</p>`
+      : ''}
 
     <label class="stock-field">
       <span>Lieferant</span>

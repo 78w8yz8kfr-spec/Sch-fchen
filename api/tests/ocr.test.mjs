@@ -6,6 +6,7 @@ import {
   einheitNormal,
   lieferscheinnummerAusText,
   positionenAusText,
+  texterkennung,
   zahlAusText
 } from "../src/ocr.mjs";
 
@@ -117,4 +118,18 @@ test("ohne Artikelnummer entsteht keine Position", () => {
 test("die Positionsziffer am Zeilenanfang wird nicht für die Artikelnummer gehalten", () => {
   const [zeile] = positionenAusText("3. 4711-99 Kabelbinder 200mm 500 Stk");
   assert.equal(zeile.code, "4711-99");
+});
+
+test("eine abgebrochene Erkennung meldet sich verständlich", async () => {
+  // Der Wortlaut wird vom Aufrufer angehängt ("Der Beleg ließ sich nicht
+  // lesen: …"). Stünde hier noch einmal "Texterkennung", stotterte die
+  // Meldung auf dem Telefon — genau so stand sie im Betrieb.
+  await assert.rejects(
+    () => texterkennung(Buffer.from("kein Bild"), { befehl: "gibt-es-nicht-auf-diesem-rechner" }),
+    (fehler) => {
+      assert.ok(!/texterkennung/i.test(fehler.message),
+        `Die Meldung wiederholt das Wort des Aufrufers: ${fehler.message}`);
+      return true;
+    }
+  );
 });

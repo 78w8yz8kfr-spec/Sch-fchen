@@ -4,6 +4,35 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das Lieferscheinfoto lief im Betrieb in die Zeitgrenze (Fassung 0.44.31).**
+  Gemeldet wurde: „Die Texterkennung hat nicht funktioniert: Die Texterkennung
+  hat zu lange gebraucht." Ein Telefon fotografiert mit zwölf Megapixeln —
+  über zwei Megabyte Bild, im Datenteil der Anfrage ein Drittel mehr,
+  hochgeladen über Mobilfunk, und danach rechnet der Server darauf. Gemessen an
+  einem Beleg mit Rauschen und Hintergrund, auf einem Kern: 4032 Bildpunkte
+  2,1 s, 2000 Bildpunkte 0,8 s, 1600 Bildpunkte 0,7 s — und bei 1200 fällt eine
+  Positionszeile aus. Auf einer geteilten Instanz wird aus den 2,1 Sekunden
+  schnell das Zwanzigfache, und die Grenze lag bei zwanzig. Das Bild geht
+  deshalb auf 2000 Bildpunkte verkleinert los; im Browser nachgemessen sind das
+  2,06 MB auf der Platte gegen 0,50 MB in der Anfrage. Verkleinert wird dort,
+  wo das Bild ohnehin liegt — scheitert es, geht das Original los wie bisher.
+  Die Zeitgrenze steigt zusätzlich auf sechzig Sekunden: das ist das Netz
+  darunter, kein Ersatz fürs Verkleinern.
+- **„Der Beleg wird gelesen …" stand im roten Fehlerkasten (Fassung 0.44.31).**
+  Mit `role="alert"` obendrein — es sah aus, als wäre etwas schiefgegangen, und
+  Vorleseprogramme meldeten einen Fehler, während alles seinen Gang ging. Jetzt
+  eine ruhige Zeile mit `role="status"`.
+- **Die Fehlermeldung stotterte (Fassung 0.44.31).** „Die Texterkennung hat
+  nicht funktioniert: Die Texterkennung hat zu lange gebraucht." Jetzt nennt
+  der innere Teil die Ursache und der äußere, was zu tun ist.
+- **Das Datum vom Papier verlor gegen die Uhr (Fassung 0.44.31).** Das
+  Lieferdatum ist mit heute vorbelegt; die Regel „nur leere Felder füllen" sah
+  darin ein volles Feld und verwarf das erkannte Datum — wer einen Beleg von
+  vorgestern fotografierte, buchte ihn auf heute. Eine Vorbelegung ist aber
+  eine Annahme der App und keine Eingabe eines Menschen: steht das Feld noch
+  unverändert auf dem Startwert, gewinnt das Datum vom Beleg; was jemand selbst
+  getippt hat, bleibt unangetastet.
+
 - **Drei von vier Einstellungsreitern waren halb so breit wie der vierte
   (Fassung 0.44.30).** Der Einstellungsbereich ist auf breiten Schirmen ein
   zweispaltiges Raster; alle Tafeln laufen über beide Spalten — bis auf drei,

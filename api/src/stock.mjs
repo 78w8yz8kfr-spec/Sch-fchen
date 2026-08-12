@@ -3253,7 +3253,7 @@ async function scanDeliveryNote(client, context, body) {
     // Fehlt Tesseract oder bricht es ab, scheitert diese eine Anfrage - und
     // nicht der Wareneingang. Erfasst wird dann von Hand wie bisher.
     throw new InputError(
-      `Die Texterkennung hat nicht funktioniert: ${fehler.message}`,
+      `Der Beleg ließ sich nicht lesen: ${fehler.message} Bitte von Hand eintragen.`,
       503,
       "stock_ocr_unavailable"
     );
