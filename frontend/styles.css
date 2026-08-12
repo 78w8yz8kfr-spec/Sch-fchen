@@ -6623,11 +6623,13 @@ select:focus-visible {
     grid-column: 1 / -1;
   }
 
-  #time-account-admin-panel,
-  #holiday-calendar-admin,
-  #time-correction-policy-admin {
-    grid-column: auto;
-  }
+  /* Diese drei standen einmal gleichrangig nebeneinander, deshalb bekam jede
+     nur eine Spalte. Seit die Einstellungen Reiter haben, ist immer genau
+     eine davon zu sehen - und eine einzelne Tafel in einem zweispaltigen
+     Raster nimmt die halbe Breite und laesst die andere Haelfte leer. Vier
+     Reiter, von denen drei halb so breit erscheinen wie "Mein Konto": das
+     sah nach Fehler aus, weil es einer war. Sie laufen jetzt wie alle
+     anderen ueber die volle Breite. */
 
   /* Formulare in der Verwaltung: die Felder stehen zu zweit, das Formular
      bleibt aber schmal genug, um lesbar zu sein. Ein Namensfeld über die
