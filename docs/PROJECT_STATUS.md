@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.32
+Technischer Stand: V0.44.33
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,13 @@ Technischer Stand: V0.44.32
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Rechenfäden der Texterkennung nach der cgroup-Zuteilung statt nach
+  `os.cpus()`: sechzehn OpenMP-Fäden auf einem Zehntel Kern waren die Ursache
+  der Zeitüberschreitungen, feste Begrenzung auf eins wäre auf freien Kernen
+  ihrerseits 6× langsamer; zweiter Anlauf mit 800 Bildpunkten rettet Nummer und
+  Datum; Arbeitskante 2000 → 1600; Fehlermeldung nennt Laufzeiten, Kerne und
+  Modellgröße; PWA-Speicher `schaefchen-online-v115`
 
 - Belegfoto wird serverseitig auf 2000 Bildpunkte gebracht (ImageMagick im
   Image, `jpeg:size`-Hinweis): 48 MP in 1,6 s statt 6,5 s, unabhängig davon,

@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { cpus } from "node:os";
+
 import {
   datumAusText,
+  fadengrenze,
+  werkzeugstand,
   einheitNormal,
   lieferscheinnummerAusText,
   positionenAusText,
@@ -132,4 +136,29 @@ test("eine abgebrochene Erkennung meldet sich verständlich", async () => {
       return true;
     }
   );
+});
+
+test("die Fadenzahl richtet sich nach der Zuteilung, nicht nach den gemeldeten Kernen", () => {
+  // Der Kern des Problems: `os.cpus()` meldet die Kerne des Wirts. Steht dem
+  // Behälter nur ein Bruchteil davon zu, drängeln sich ebenso viele Fäden um
+  // ihn und warten mehr aufeinander, als sie rechnen. Gemessen an 48 MP: mit
+  // vier freien Kernen 1,5 s ohne Grenze gegen 8,8 s mit fester Grenze eins —
+  // auf einem Kern bei vier gemeldeten dagegen 0,75 s gegen 0,40 s. Fest zu
+  // begrenzen wäre also genauso falsch wie gar nicht.
+  const grenze = fadengrenze();
+  assert.ok(Number.isInteger(grenze) && grenze >= 1,
+    `Es muss mindestens ein Faden herauskommen, bekommen: ${grenze}`);
+  assert.ok(grenze <= Math.max(1, cpus().length),
+    "Mehr Fäden als gemeldete Kerne wären in keinem Fall sinnvoll");
+});
+
+test("der Werkzeugstand nennt, was für eine spätere Diagnose nötig ist", () => {
+  // Nach drei Anläufen im Betrieb steht das in der Fehlermeldung: die Zahl
+  // der Kerne entscheidet über OpenMP, die Größe des Sprachmodells über die
+  // Rechenzeit. Das schnelle deutsche Modell misst rund anderthalb Megabyte,
+  // das genaue ein Vielfaches.
+  const stand = werkzeugstand();
+  assert.match(stand, /Kerne gemeldet/);
+  assert.match(stand, /genutzt/);
+  assert.match(stand, /Modell \d+ KB|Sprachmodell nicht gefunden/);
 });
