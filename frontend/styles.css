@@ -9383,6 +9383,11 @@ body.hat-fassungshinweis {
 .stock-note { margin: 0; font-size: .84rem; color: var(--ui-success); background: var(--ui-success-soft); border-radius: 8px; padding: 8px 10px; }
 .stock-error { margin: 0; font-size: .86rem; color: var(--ui-danger); background: var(--ui-danger-soft); border-radius: 8px; padding: 8px 10px; }
 
+/* Etwas laeuft gerade - kein Fehler. Dieselbe Form wie die Fehlerzeile, damit
+   nichts springt, aber in ruhigen Farben: der Kasten sagt "warte", nicht
+   "kaputt". */
+.stock-progress { margin: 0; font-size: .86rem; color: var(--ui-text-secondary); background: var(--ui-surface-muted); border-radius: 8px; padding: 8px 10px; }
+
 .stock-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stock-tile {
   appearance: none; border: 1px solid var(--ui-border); background: var(--ui-surface-muted); color: var(--ui-text);

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   SCHRITTE,
+  belegMass,
+  datumUebernehmen,
   VORGAENGE,
   lagerZustand,
   mengeAusText,
@@ -1863,4 +1865,55 @@ test('was zurückgelegt oder bestellt ist, fehlt nicht mehr', () => {
   // Teilweise bestellt: die Restlücke wird genannt, nicht die ganze.
   const teilweise = { ...basis, reservedQuantity: 120, orderedQuantity: 100 };
   assert.match(materialBestandText(teilweise), /es fehlen 80 Meter/);
+});
+
+test('ein Handyfoto wird auf ein vernünftiges Maß gebracht', () => {
+  // Zwölf Megapixel vom Telefon: die längste Kante landet auf 2000, das
+  // Seitenverhältnis bleibt. Ungekürzt lief die Erkennung im Betrieb in die
+  // Zeitgrenze — gemessen 2,1 s gegen 0,8 s auf einem Kern.
+  assert.deepEqual(belegMass(4032, 3024), { breite: 2000, hoehe: 1500, verkleinert: true });
+  assert.deepEqual(belegMass(3024, 4032), { breite: 1500, hoehe: 2000, verkleinert: true },
+    'Hochkant fotografiert gilt dieselbe längste Kante');
+
+  // Was schon klein genug ist, bleibt unangetastet: ein Scan mit 1200
+  // Bildpunkten wird nicht künstlich aufgeblasen.
+  assert.deepEqual(belegMass(1600, 1200), { breite: 1600, hoehe: 1200, verkleinert: false });
+  assert.deepEqual(belegMass(2000, 1400), { breite: 2000, hoehe: 1400, verkleinert: false },
+    'Genau auf dem Maß wird nicht gerechnet');
+});
+
+test('der Fortschritt beim Lesen ist kein Fehler', () => {
+  // "Der Beleg wird gelesen …" stand im roten Fehlerkasten mit role="alert".
+  // Das sah aus, als wäre etwas schiefgegangen, und Vorleseprogramme meldeten
+  // einen Fehler, während alles seinen Gang ging.
+  const laeuft = lieferscheinFormularAnsicht({ hinweis: 'Der Beleg wird gelesen …' }, {});
+  assert.match(laeuft, /class="stock-progress" role="status"/);
+  assert.ok(!laeuft.includes('stock-error'), 'Kein Fehlerkasten, solange nichts fehlgeschlagen ist');
+
+  // Ein echter Fehler bleibt ein echter Fehler.
+  const kaputt = lieferscheinFormularAnsicht({}, {}, 'Der Beleg ließ sich nicht lesen.');
+  assert.match(kaputt, /class="stock-error" role="alert"/);
+  assert.ok(!kaputt.includes('stock-progress'));
+});
+
+test('das Datum vom Papier schlägt die Vorbelegung, aber nicht die Eingabe', () => {
+  // Das Feld startet auf heute. Das ist eine Annahme der App, keine Eingabe
+  // eines Menschen — und bis hierher gewann sie gegen das Papier: wer einen
+  // Beleg von vorgestern fotografierte, buchte ihn auf heute.
+  assert.equal(
+    datumUebernehmen({ deliveredOn: '2026-08-12', vorbelegtesDatum: '2026-08-12' }, '2026-08-10'),
+    '2026-08-10',
+    'Die unveränderte Vorbelegung weicht dem Datum vom Beleg'
+  );
+
+  // Was jemand selbst eingetragen hat, bleibt stehen.
+  assert.equal(
+    datumUebernehmen({ deliveredOn: '2026-08-05', vorbelegtesDatum: '2026-08-12' }, '2026-08-10'),
+    '2026-08-05'
+  );
+
+  // Ein leeres Feld nimmt das erkannte Datum, und ohne Erkennung ändert sich
+  // nichts.
+  assert.equal(datumUebernehmen({ deliveredOn: '', vorbelegtesDatum: '2026-08-12' }, '2026-08-10'), '2026-08-10');
+  assert.equal(datumUebernehmen({ deliveredOn: '2026-08-12', vorbelegtesDatum: '2026-08-12' }, null), '2026-08-12');
 });

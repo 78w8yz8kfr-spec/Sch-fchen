@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.30";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.31";
 let qrScannerLibraryPromise = null;
 
 export const DEVICE_QR_SHEET_LAYOUT = Object.freeze({
@@ -1942,7 +1942,7 @@ export function createDeviceModule({
   function druckseite(popup, titel, stildatei) {
     popup.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">`
       + `<title>${titel}</title>`
-      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.30">`
+      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.31">`
       + `</head><body></body></html>`);
   }
 

@@ -36,8 +36,22 @@
 
 import { spawn } from "node:child_process";
 
-/** Wie lange Tesseract hoechstens rechnen darf. */
-const ZEITGRENZE_MS = 20_000;
+/**
+ * Wie lange Tesseract hoechstens rechnen darf.
+ *
+ * Zwanzig Sekunden waren zu knapp, und zwar nachweislich: im Betrieb lief die
+ * Erkennung eines Handyfotos in die Grenze. Auf dem Pruefrechner braucht
+ * derselbe Beleg mit Rauschen und Hintergrund 2,1 Sekunden auf einem Kern -
+ * eine geteilte Instanz mit einem Bruchteil davon liegt schnell beim
+ * Zwanzigfachen.
+ *
+ * Die eigentliche Abhilfe steht nicht hier, sondern im Browser: das Bild geht
+ * seit dieser Fassung auf 2000 Bildpunkte verkleinert los, was dieselbe Zahl
+ * auf 0,8 Sekunden drueckt. Diese Grenze ist das Netz darunter, kein Ersatz
+ * dafuer - und lieber grosszuegig, denn ein Abbruch kostet den ganzen Beleg,
+ * waehrend ein paar Sekunden Warten nur Geduld kosten.
+ */
+const ZEITGRENZE_MS = 60_000;
 
 /**
  * Erkennt den Text eines Bildes.
@@ -62,7 +76,10 @@ export function texterkennung(bild, { sprache = "deu", befehl = "tesseract" } = 
     let fehlerstrom = "";
     const uhr = setTimeout(() => {
       lauf.kill("SIGKILL");
-      scheitert(new Error("Die Texterkennung hat zu lange gebraucht."));
+      // Der Wortlaut sagt, was zu tun ist, und nicht nur, was war. Er wird
+      // dem Aufrufer angehaengt, deshalb steht hier kein zweites Mal
+      // "Texterkennung" - sonst stottert die Meldung auf dem Telefon.
+      scheitert(new Error("das Bild war zu gross oder der Server zu langsam."));
     }, ZEITGRENZE_MS);
 
     lauf.stdout.on("data", (teil) => { text += teil.toString("utf8"); });

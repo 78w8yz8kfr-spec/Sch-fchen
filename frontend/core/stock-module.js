@@ -18,6 +18,8 @@ import {
   baustelleNochWaehlbar,
   baustellenListe,
   baustellenSpeicherKey,
+  belegMass,
+  datumUebernehmen,
   buchungBauen,
   buchungBleibtInWarteschlange,
   lieferscheinFormularAnsicht,
@@ -40,14 +42,14 @@ import {
   scanVerarbeiten,
   wareneingangBauen,
   zaehlungBauen
-} from "./stock-management.js?v=0.44.30";
+} from "./stock-management.js?v=0.44.31";
 import {
   erkennungWaehlen,
   etikettAusAdresse,
   gtinNormalisieren,
   scanDeuten,
   scanSchleifeStarten
-} from "./barcode-scanner.mjs?v=0.44.30";
+} from "./barcode-scanner.mjs?v=0.44.31";
 
 const html = `
   <div class="stock-module">
@@ -798,7 +800,9 @@ export function createStockModule({
       deliveredOn: wert("deliveredOn"),
       targetLocationId: wert("targetLocationId"),
       erkannt: zustand.entwurf?.erkannt || null,
+      vorbelegtesDatum: zustand.entwurf?.vorbelegtesDatum || null,
       erkanntePositionen: zustand.entwurf?.erkanntePositionen || [],
+      hinweis: zustand.entwurf?.hinweis || null,
       zeilen: [...formular.querySelectorAll(".stock-delivery-line")].map((zeile) => ({
         itemId: zeile.querySelector('[name="itemId"]')?.value || "",
         quantity: zeile.querySelector('[name="quantity"]')?.value || ""
@@ -816,12 +820,18 @@ export function createStockModule({
       ]);
       lieferanten = lieferantenAntwort.suppliers;
       artikel = artikelAntwort.items;
+      const heute = new Date().toISOString().slice(0, 10);
       zustand = {
         ...zustand,
         schritt: SCHRITTE.LIEFERSCHEIN,
         lieferschein: null,
         entwurf: {
-          deliveredOn: new Date().toISOString().slice(0, 10),
+          deliveredOn: heute,
+          // Womit das Feld startete. Ein Vorschlag der App ist keine Eingabe
+          // des Menschen: steht das Datum noch unveraendert auf heute, darf
+          // das Datum vom Papier gewinnen. Was jemand selbst getippt hat,
+          // bleibt unangetastet.
+          vorbelegtesDatum: heute,
           zeilen: [{ itemId: "", quantity: "" }]
         },
         fehler: null
@@ -844,18 +854,56 @@ export function createStockModule({
    * ohne Artikel. Gerade sie sind wichtig: wer nur die Treffer sieht, haelt
    * eine halb gelesene Lieferung fuer eine vollstaendige.
    */
-  async function lieferscheinFotoLesen(datei) {
-    const bisher = lieferscheinFormularLesen();
-    zustand = { ...zustand, entwurf: { ...bisher, fehler: null }, fehler: "Der Beleg wird gelesen …" };
-    render();
+  /**
+   * Das Foto auf ein vernuenftiges Mass bringen, bevor es losgeht.
+   *
+   * Ein Telefon liefert zwoelf Megapixel. Ungekuerzt sind das ueber zwei
+   * Megabyte Bild, im Datenteil einer Anfrage ein Drittel mehr - hochgeladen
+   * ueber Mobilfunk, und danach rechnet der Server darauf, bis die Zeitgrenze
+   * greift. Genau das ist im Betrieb passiert.
+   *
+   * Verkleinert wird im Browser, weil dort das Bild schon liegt. Schlaegt es
+   * fehl - alter Browser, kein Canvas, ein Format, das er nicht zeichnet -,
+   * geht das Original los wie bisher. Lieber langsam als gar nicht.
+   */
+  async function belegVerkleinern(datei) {
+    const roh = await new Promise((fertig, scheitert) => {
+      const leser = new FileReader();
+      leser.onload = () => fertig(String(leser.result));
+      leser.onerror = () => scheitert(new Error("Das Bild konnte nicht gelesen werden."));
+      leser.readAsDataURL(datei);
+    });
 
     try {
       const bild = await new Promise((fertig, scheitert) => {
-        const leser = new FileReader();
-        leser.onload = () => fertig(String(leser.result));
-        leser.onerror = () => scheitert(new Error("Das Bild konnte nicht gelesen werden."));
-        leser.readAsDataURL(datei);
+        const el = new fenster.Image();
+        el.onload = () => fertig(el);
+        el.onerror = () => scheitert(new Error("nicht zeichenbar"));
+        el.src = roh;
       });
+      const mass = belegMass(bild.naturalWidth || bild.width, bild.naturalHeight || bild.height);
+      if (!mass.verkleinert) return roh;
+
+      const tafel = fenster.document.createElement("canvas");
+      tafel.width = mass.breite;
+      tafel.height = mass.hoehe;
+      tafel.getContext("2d").drawImage(bild, 0, 0, mass.breite, mass.hoehe);
+      // JPEG und nicht PNG: ein Foto ist keine Strichzeichnung, und PNG waere
+      // hier um ein Vielfaches groesser ohne einen lesbaren Buchstaben mehr.
+      const kleiner = tafel.toDataURL("image/jpeg", 0.85);
+      return kleiner.length < roh.length ? kleiner : roh;
+    } catch {
+      return roh;
+    }
+  }
+
+  async function lieferscheinFotoLesen(datei) {
+    const bisher = lieferscheinFormularLesen();
+    zustand = { ...zustand, entwurf: { ...bisher, hinweis: "Der Beleg wird gelesen …" }, fehler: null };
+    render();
+
+    try {
+      const bild = await belegVerkleinern(datei);
       const erkannt = await senden("/delivery-notes/scan", { image: bild });
       const vorschlaege = erkannt.positions || [];
       const uebernommen = vorschlaege.filter((zeile) => zeile.stockItemId).length;
@@ -864,10 +912,11 @@ export function createStockModule({
         entwurf: {
           ...bisher,
           deliveryNoteNumber: bisher.deliveryNoteNumber || erkannt.deliveryNoteNumber || "",
-          deliveredOn: bisher.deliveredOn || erkannt.deliveredOn || "",
+          deliveredOn: datumUebernehmen(bisher, erkannt.deliveredOn),
           zeilen: positionenUebernehmen(bisher.zeilen, vorschlaege),
           erkannt: erkannt.text,
-          erkanntePositionen: vorschlaege
+          erkanntePositionen: vorschlaege,
+          hinweis: null
         },
         fehler: erkannt.deliveryNoteNumber || erkannt.deliveredOn || uebernommen
           ? null
@@ -875,7 +924,7 @@ export function createStockModule({
       };
       render();
     } catch (fehler) {
-      zustand = { ...zustand, entwurf: bisher, fehler: fehler.message };
+      zustand = { ...zustand, entwurf: { ...bisher, hinweis: null }, fehler: fehler.message };
       render();
     }
   }

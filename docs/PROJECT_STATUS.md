@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.30
+Technischer Stand: V0.44.31
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,13 @@ Technischer Stand: V0.44.30
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Lieferscheinfoto aus dem Betrieb repariert: Bild wird im Browser auf 2000
+  Bildpunkte verkleinert (2,06 → 0,50 MB in der Anfrage, 2,1 → 0,8 s Erkennung
+  auf einem Kern), Zeitgrenze 20 → 60 s als Netz darunter, Fortschritt nicht
+  mehr als Fehler mit `role="alert"`, Meldung ohne Stottern, und das erkannte
+  Datum schlägt die Vorbelegung „heute";
+  PWA-Speicher `schaefchen-online-v113`
 
 - Einstellungen in voller Breite: Arbeitskonten, Feiertage und Zeitregeln
   belegten im zweispaltigen Raster nur eine Spalte (500 statt 1016 Bildpunkte),
