@@ -1646,7 +1646,7 @@ export function etikettZelle(etikett = {}) {
  */
 export function etikettBogenHtml(labels = [], herkunft = '') {
   const zellen = labels.slice(0, ETIKETT_BOGEN.maxEtiketten).map(etikettZelle).join('');
-  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.33`;
+  const stile = `${String(herkunft).replace(/\/$/, '')}/print-labels.css?v=0.44.34`;
 
   // Die feste Fensterbreite entspricht der A4-Seite. Ohne sie zeigt ein Telefon
   // eine vergroesserte Ecke des Bogens; so passt das ganze Blatt auf den
@@ -2140,10 +2140,30 @@ export function positionenUebernehmen(zeilen = [], vorschlaege = []) {
 export function erkanntePositionenAnsicht(positionen = []) {
   if (!positionen.length) return '';
 
+  const zugeordnet = positionen.filter((zeile) => zeile.stockItemId);
+
+  // Traf keine einzige Zeile einen Artikel, ist die Liste nichts wert. Im
+  // Betrieb standen dort zwei Zeilen aus dem Kleingedruckten mit "kein
+  // Artikel dazu" daneben - richtig, aber unbrauchbar, und es sah aus, als
+  // haette das Programm etwas verstanden. Ein Satz sagt mehr.
+  if (!zugeordnet.length) {
+    return `<div class="stock-ocr-lines">
+      <p class="stock-field__hint">
+        Keine Position sicher erkannt. Der gelesene Text steht unten — die
+        Positionen bitte von Hand eintragen.
+      </p>
+    </div>`;
+  }
+
+  // Zugeordnetes zuerst: das ist die Arbeit, die abgenommen wurde. Was ohne
+  // Artikel blieb, steht darunter, damit niemand eine halb gelesene Lieferung
+  // fuer eine vollstaendige haelt.
+  const geordnet = [...zugeordnet, ...positionen.filter((zeile) => !zeile.stockItemId)];
+
   return `<div class="stock-ocr-lines">
     <h3 class="stock-subhead">Vom Bild gelesen</h3>
     <ul class="stock-rows">
-      ${positionen.map((zeile) => {
+      ${geordnet.map((zeile) => {
         const zustand = !zeile.stockItemId
           ? 'unbekannt'
           : (zeile.unitMatches ? 'gut' : 'knapp');

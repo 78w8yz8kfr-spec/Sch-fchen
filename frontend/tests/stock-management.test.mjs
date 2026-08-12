@@ -1917,3 +1917,33 @@ test('das Datum vom Papier schlägt die Vorbelegung, aber nicht die Eingabe', ()
   assert.equal(datumUebernehmen({ deliveredOn: '', vorbelegtesDatum: '2026-08-12' }, '2026-08-10'), '2026-08-10');
   assert.equal(datumUebernehmen({ deliveredOn: '2026-08-12', vorbelegtesDatum: '2026-08-12' }, null), '2026-08-12');
 });
+
+test('ohne einen einzigen Treffer wird keine Liste voller Müll gezeigt', () => {
+  // Aus dem Betrieb: zwei Zeilen aus dem Kleingedruckten standen als
+  // „gelesene Positionen" da, jede mit „kein Artikel dazu" daneben. Richtig,
+  // aber unbrauchbar — und es sah aus, als hätte das Programm etwas
+  // verstanden.
+  const nurMuell = erkanntePositionenAnsicht([
+    { code: '00010', text: '00010 33803088 P-5A0 4 4 ST', quantity: 4, unit: 'Stk',
+      stockItemId: null, stockItemName: null, stockUnit: null, unitMatches: false },
+    { code: '4016708000008', text: 'Geschäfte ug GUN: …', quantity: 3, unit: 't',
+      stockItemId: null, stockItemName: null, stockUnit: null, unitMatches: false }
+  ]);
+  assert.match(nurMuell, /Keine Position sicher erkannt/);
+  assert.ok(!nurMuell.includes('kein Artikel dazu'), 'Keine Liste ohne einen einzigen Treffer');
+  assert.ok(!nurMuell.includes('Vom Bild gelesen'), 'Auch keine Überschrift darüber');
+});
+
+test('mit Treffern stehen die zugeordneten Zeilen oben', () => {
+  const gemischt = erkanntePositionenAnsicht([
+    { code: 'XYZ-99', text: '…', quantity: 12, unit: 'Stk',
+      stockItemId: null, stockItemName: null, stockUnit: null, unitMatches: false },
+    { code: '1055-04', text: '…', quantity: 100, unit: 'Stk',
+      stockItemId: 'a1', stockItemName: 'Schalterdose tief', stockUnit: 'Stk', unitMatches: true }
+  ]);
+  assert.match(gemischt, /Vom Bild gelesen/);
+  // Der Treffer steht vor der nicht zugeordneten Zeile: das ist die Arbeit,
+  // die abgenommen wurde.
+  assert.ok(gemischt.indexOf('Schalterdose tief') < gemischt.indexOf('XYZ-99'));
+  assert.match(gemischt, /kein Artikel dazu/);
+});

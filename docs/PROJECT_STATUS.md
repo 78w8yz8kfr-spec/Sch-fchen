@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.33
+Technischer Stand: V0.44.34
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,14 @@ Technischer Stand: V0.44.33
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Positionsleser an einem echten Großhändlerbeleg nachgeschärft: fünfstellige
+  Positionsnummern werden nicht mehr für Artikelnummern gehalten (reine
+  Ziffernfolgen zählen erst ab sechs Stellen), Maßeinheiten wie mm/t/g gelten
+  nicht mehr als Liefermenge, Fließtext unter den Positionen wird verworfen,
+  das Lieferdatum ist an seiner Beschriftung verankert, und ohne Treffer steht
+  ein Satz statt einer Liste voller „kein Artikel dazu";
+  PWA-Speicher `schaefchen-online-v116`
 
 - Rechenfäden der Texterkennung nach der cgroup-Zuteilung statt nach
   `os.cpus()`: sechzehn OpenMP-Fäden auf einem Zehntel Kern waren die Ursache

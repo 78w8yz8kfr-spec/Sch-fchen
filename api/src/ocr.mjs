@@ -194,19 +194,39 @@ export function lieferscheinnummerAusText(text) {
 /**
  * Das Lieferdatum.
  *
+ * Verankert an einer Beschriftung, aus demselben Grund wie die
+ * Lieferscheinnummer: auf einem echten Beleg stehen fuenf Datumsangaben -
+ * Bestelldatum, Druckdatum, Zahlungsziel, Kundennummer seit, und irgendwo
+ * dazwischen die Lieferung. Wer das erste nimmt, das wie ein Datum aussieht,
+ * nimmt fast immer das falsche.
+ *
+ * Im Betrieb war genau das zu sehen: auf einem Beleg vom August stand danach
+ * der 22.06.2026 im Feld. Ohne Beschriftung wird deshalb nicht mehr geraten.
+ *
  * Zwei Schreibweisen decken die deutschen Belege ab: 11.08.2026 und
  * 2026-08-11. Zweistellige Jahre werden bewusst NICHT ergaenzt - "11.08.26"
  * koennte 1926 heissen, und ein geratenes Jahrhundert im Wareneingang ist
  * genau die Art Fehler, die niemand mehr findet.
  */
 export function datumAusText(text) {
-  const gefunden = /\b(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{4})\b/.exec(String(text || ""));
-  if (gefunden) {
-    const [, tag, monat, jahr] = gefunden;
-    return `${jahr}-${monat.padStart(2, "0")}-${tag.padStart(2, "0")}`;
+  const beschriftung = /(liefer|leistungs|versand|waren)?\s*datum|geliefert am|lieferung am|tag der lieferung/i;
+  const deutsch = /\b(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{4})\b/;
+  const iso = /\b(\d{4})-(\d{2})-(\d{2})\b/;
+
+  for (const zeile of String(text || "").split(/\r?\n/)) {
+    const marke = beschriftung.exec(zeile);
+    if (!marke) continue;
+    // Nur was hinter der Beschriftung steht: davor steht die Zeile davor.
+    const rest = zeile.slice(marke.index + marke[0].length);
+    const gefunden = deutsch.exec(rest);
+    if (gefunden) {
+      const [, tag, monat, jahr] = gefunden;
+      return `${jahr}-${monat.padStart(2, "0")}-${tag.padStart(2, "0")}`;
+    }
+    const alsIso = iso.exec(rest);
+    if (alsIso) return alsIso[0];
   }
-  const iso = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(String(text || ""));
-  return iso ? iso[0] : null;
+  return null;
 }
 
 /**
@@ -223,9 +243,12 @@ const EINHEITEN = new Map([
   ["stk", "Stk"], ["st", "Stk"], ["stck", "Stk"], ["stück", "Stk"],
   ["stueck", "Stk"], ["stk.", "Stk"], ["pcs", "Stk"],
   ["m", "m"], ["meter", "m"], ["mtr", "m"], ["lfm", "m"], ["lfdm", "m"],
-  ["km", "km"], ["cm", "cm"], ["mm", "mm"],
-  ["kg", "kg"], ["g", "g"], ["t", "t"],
-  ["l", "l"], ["ltr", "l"], ["liter", "l"], ["ml", "ml"],
+  // Bewusst NICHT dabei: mm, cm, km, g, t, ml. Das sind Masse aus der
+  // Bezeichnung ("Kabelbinder 200mm", "M12x30"), keine Liefermengen. Auf
+  // einem echten Beleg machte "t" aus einer Zeile Fussnotentext eine
+  // Position ueber "3 t" - drei Tonnen Kleinmaterial.
+  ["kg", "kg"],
+  ["l", "l"], ["ltr", "l"], ["liter", "l"],
   ["m2", "m²"], ["m²", "m²"], ["qm", "m²"],
   ["pack", "Pack"], ["pck", "Pack"], ["packung", "Pack"],
   ["ve", "VE"], ["karton", "Karton"], ["kt", "Karton"], ["ktn", "Karton"],
@@ -283,7 +306,14 @@ export function zahlAusText(roh) {
 function siehtAusWieNummer(wort) {
   if (wort.length < 4 || wort.length > 40) return false;
   if (!/\d/.test(wort)) return false;
-  return /^[A-Za-z0-9][A-Za-z0-9\-_./]*$/.test(wort);
+  if (!/^[A-Za-z0-9][A-Za-z0-9\-_./]*$/.test(wort)) return false;
+
+  // Eine reine Ziffernfolge ist erst ab sechs Stellen eine Artikelnummer.
+  // Darunter ist sie fast immer etwas anderes: eine Positionsnummer, eine
+  // Menge, eine Jahreszahl. Nummern mit Buchstaben oder Trennzeichen sind
+  // dagegen schon ab vier Zeichen eindeutig genug ("1055-04", "NYM3X15").
+  if (/^\d+$/.test(wort) && wort.length < 6) return false;
+  return true;
 }
 
 /**
@@ -312,9 +342,21 @@ export function positionenAusText(text) {
     // Vor der Menge steht die Nummer. Eine fuehrende Positionsziffer faellt
     // weg, sonst waere "1" der Artikel und nicht die Zeilennummer.
     const woerter = zeile.slice(0, letzte.index).trim().split(/\s+/).filter(Boolean);
-    if (woerter.length > 1 && /^\d{1,3}[.)]?$/.test(woerter[0])) woerter.shift();
-    const code = woerter.find(siehtAusWieNummer);
-    if (!code) return;
+
+    // Die Positionsnummer am Zeilenanfang faellt weg - und zwar in jeder
+    // Laenge. Grosshaendler drucken sie fuenfstellig ("00010", "00020"), und
+    // die alte Regel liess nur bis zu drei Stellen fallen. Dadurch wurde aus
+    // "00010 33803088 ..." die Positionsnummer als Artikelnummer gelesen,
+    // im Betrieb genau so gesehen.
+    if (woerter.length > 1 && /^\d{1,6}[.)]?$/.test(woerter[0])) woerter.shift();
+
+    // Fliesstext ist keine Positionszeile. Auf einem echten Beleg stehen
+    // unter den Positionen Lieferbedingungen, Gerichtsstand und
+    // Verpackungshinweise; darin kommen Zahlen und lange Nummern vor. Eine
+    // Positionszeile hat ihre Nummer vorn, nicht irgendwo im Satz.
+    const stelle = woerter.findIndex(siehtAusWieNummer);
+    if (stelle < 0 || stelle > 1) return;
+    const code = woerter[stelle];
 
     gefunden.push({
       line: nummer + 1,
