@@ -4,6 +4,26 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Drei von vier Einstellungsreitern waren halb so breit wie der vierte
+  (Fassung 0.44.30).** Der Einstellungsbereich ist auf breiten Schirmen ein
+  zweispaltiges Raster; alle Tafeln laufen über beide Spalten — bis auf drei,
+  die ausdrücklich nur eine Spalte belegten. Der Kommentar daneben nannte den
+  Grund: „Die drei Verwaltungsbereiche liegen gleichrangig nebeneinander." Das
+  stimmte einmal. Seit die Einstellungen Reiter haben, ist immer genau einer
+  davon zu sehen, und eine einzelne Tafel im zweispaltigen Raster nimmt die
+  halbe Breite und lässt die andere Hälfte leer. Gemessen bei 1280 Bildpunkten:
+  Arbeitskonten 500, Feiertage 500, Zeitregeln 500 — und „Mein Konto" 1016,
+  weil es die Regel nie trug. Jetzt sind es vier mal 1016, und die Jahreskonten
+  haben wieder Platz für Name, Personalnummer, Urlaub, Abbau und Stand in einer
+  Zeile.
+- **Eine Unterzeile zu viel auf der Baustellenseite (Fassung 0.44.30).** Über
+  der Seite stand „Aktive und archivierte Baustellen durchsuchen und
+  bearbeiten." und direkt darunter „Baustellen direkt anlegen oder gesammelt
+  aus Excel übernehmen." — zwei graue Zeilen übereinander, von denen die zweite
+  etwas ankündigte, das erst hinter einem Knopf beginnt. Der Hinweis auf den
+  Excel-Import ist nicht verlorengegangen, sondern dorthin gezogen, wo der
+  Import auch steht: in das Formular „Baustelle anlegen".
+
 - **Drei Filter der Plantafel waren am Telefon nicht zu erreichen (Fassung
   0.44.29).** Die Filterleiste stand auf fünf festen Spalten zu je mindestens
   112 Bildpunkten — 560 Bildpunkte in einer Leiste, die auf dem Telefon 328

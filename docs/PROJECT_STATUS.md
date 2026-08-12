@@ -1,7 +1,7 @@
 # Projektstatus
 
 Stand: 11.08.2026
-Technischer Stand: V0.44.29
+Technischer Stand: V0.44.30
 
 - Rückgabe von der Baustelle ins Lager auch für den Monteur (0.44.23);
   Baustelle zu Baustelle bleibt Vorarbeitersache; PWA-Speicher
@@ -13,6 +13,12 @@ Technischer Stand: V0.44.29
   PWA-Speicher `schaefchen-online-v104`
 
 ## Abgeschlossen
+
+- Einstellungen in voller Breite: Arbeitskonten, Feiertage und Zeitregeln
+  belegten im zweispaltigen Raster nur eine Spalte (500 statt 1016 Bildpunkte),
+  obwohl die Reiter immer nur eine Tafel zeigen; Baustellenseite ohne zweite
+  Unterzeile, der Excel-Hinweis steht jetzt im Anlegeformular;
+  PWA-Speicher `schaefchen-online-v112`
 
 - Filterleiste der Plantafel bricht um statt abgeschnitten zu werden: Baustelle,
   Projektleiter und Planstatus waren am Telefon hinter dem Bildrand und durch
