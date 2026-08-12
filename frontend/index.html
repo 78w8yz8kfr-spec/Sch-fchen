@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.27">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.27">
-    <script type="module" src="./app.js?v=0.44.27"></script>
-    <script src="./version.js?v=0.44.27" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.28">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.28">
+    <script type="module" src="./app.js?v=0.44.28"></script>
+    <script src="./version.js?v=0.44.28" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.27</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.28</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -1475,8 +1475,10 @@
             </section>
 
             <section id="assignment-planning-shell" class="planning-shell-direct">
+              <!-- Ohne zweite Unterzeile: über der Seite steht schon
+                   „Einsätze manuell oder aus Excel planen." Zweimal fast
+                   dasselbe zu sagen, kostet Platz und sagt nichts dazu. -->
               <div id="assignment-planning-content" class="planning-group">
-                <p class="planning-intro">Wochenübersicht, einzelne Zuweisung und Excel-Import an einem Ort.</p>
                 <div class="planning-view-bar">
                   <nav class="page-tabs planning-view-tabs" aria-label="Zeitraum der Einsatzplanung">
                     <button id="planning-week-tab" class="page-tab page-tab--active" type="button">Wochenplan</button>
@@ -2734,8 +2736,14 @@
               <ul id="document-list" class="document-list" aria-label="Zentrale Dokumente"></ul>
             </details>
 
-            <details id="assignment-panel" class="admin-panel" open>
-              <summary>Einsätze anlegen</summary>
+            <!-- Zugeklappt, obwohl es das Kernformular der Seite ist: offen
+                 schob es die Plantafel um neunhundert Bildpunkte nach oben
+                 aus dem Bild und stand da, auch wenn gar nichts angelegt
+                 werden sollte. Aufgemacht wird es vom Knopf „Neuer Einsatz",
+                 der ohnehin schon in der Leiste steht und bisher nur zu einem
+                 Formular sprang, das immer offen war. -->
+            <details id="assignment-panel" class="admin-panel">
+              <summary>Einsatz anlegen — einzeln oder aus Excel</summary>
               <form id="assignment-form" class="admin-form" novalidate>
                 <label for="assignment-employee">Hauptmitarbeiter</label>
                 <select id="assignment-employee" required></select>
