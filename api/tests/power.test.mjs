@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 
 import { createPool, withTenantTransaction } from "../src/database.mjs";
+import { handleDeviceRequest } from "../src/devices.mjs";
 import {
   FI_FRIST_TAGE,
   PRUEFFRIST_TAGE,
   ampel,
+  fiHinweis,
   handlePowerRequest,
   naechsterTermin,
   tageBis
@@ -32,6 +34,45 @@ test("die beiden Fristen sind verschieden lang", () => {
   assert.equal(naechsterTermin("2026-08-12", FI_FRIST_TAGE), "2026-09-11");
   assert.equal(naechsterTermin("2026-08-12", PRUEFFRIST_TAGE), "2026-11-10");
   assert.equal(naechsterTermin(null, FI_FRIST_TAGE), null);
+});
+
+test("Der Hinweis kommt am Tag der Fälligkeit, nicht davor", () => {
+  const verteiler = { id: "a1", name: "Verteiler 63A", inventoryNumber: "BV-001" };
+  const mit = (letzter) => fiHinweis({ ...verteiler, rcdTestedOn: letzter }, "2026-08-12");
+
+  // Zuletzt am 13.07. gedrückt, fällig am 12.08. — also heute.
+  assert.equal(mit("2026-07-13").typ, "rcd_test_due");
+  assert.match(mit("2026-07-13").titel, /heute fällig/);
+
+  // Einen Tag später wäre es noch nicht so weit. Ein Hinweis, der vier Wochen
+  // vorher käme, wäre bis zum Termin längst weggeklickt.
+  assert.equal(mit("2026-07-14"), null);
+
+  const spaet = mit("2026-07-01");
+  assert.equal(spaet.typ, "rcd_test_overdue");
+  assert.match(spaet.text, /fällig war der 31\.07\.2026/);
+});
+
+test("Ein nie geprüfter Verteiler mahnt monatlich, nicht täglich", () => {
+  // Ohne ersten Test gibt es keinen Termin, den man fortschreiben könnte — die
+  // Pflicht besteht trotzdem. Der Monat ist ihr Takt und zugleich der
+  // Schlüssel, der aus einer täglichen Mahnung eine monatliche macht.
+  const ohne = (heute) => fiHinweis(
+    { id: "a1", name: "Verteiler", inventoryNumber: "BV-001", rcdTestedOn: null }, heute
+  );
+  assert.equal(ohne("2026-08-12").schluessel, ohne("2026-08-30").schluessel);
+  assert.notEqual(ohne("2026-08-12").schluessel, ohne("2026-09-01").schluessel);
+  assert.match(ohne("2026-08-12").titel, /steht aus/);
+});
+
+test("Jeder Termin bekommt seinen eigenen Schlüssel", () => {
+  // Sonst entstünde bei jedem Blick in die Glocke ein neuer Hinweis — oder
+  // nach dem ersten Termin nie wieder einer.
+  const fuer = (letzter, heute) => fiHinweis(
+    { id: "a1", name: "V", inventoryNumber: "BV-001", rcdTestedOn: letzter }, heute
+  ).schluessel;
+  assert.equal(fuer("2026-07-13", "2026-08-12"), fuer("2026-07-13", "2026-08-12"));
+  assert.notEqual(fuer("2026-07-13", "2026-08-12"), fuer("2026-08-13", "2026-09-12"));
 });
 
 test("Tage werden über Monatsgrenzen richtig gezählt", () => {
@@ -69,6 +110,19 @@ function aufrufen(pool, context, method, pfad, body, today) {
   return withTenantTransaction(pool, context, (client) => handlePowerRequest({
     request: anfrage(method, body),
     url: new URL(`http://intern${pfad}`),
+    client,
+    context,
+    today
+  }));
+}
+
+// Die Hinweise laufen über die Geräteverwaltung: ein Verteiler ist ein Gerät,
+// und die Glocke oben rechts ist eine. Der Weg über den echten Endpunkt prüft
+// deshalb mit, dass beide Bereiche zusammenhängen.
+function hinweiseAbrufen(pool, context, today) {
+  return withTenantTransaction(pool, context, (client) => handleDeviceRequest({
+    request: anfrage("GET"),
+    url: new URL("http://intern/api/v1/devices/notifications"),
     client,
     context,
     today
@@ -316,6 +370,96 @@ integrationTest("Baustromverteiler: Fristen, FI-Test und Zählerstände", async 
       body.readings.map((zeile) => zeile.constructionSiteName),
       ["Neubau West", "Neubau Ost"],
       "Jede Ablesung behält die Baustelle, auf der abgelesen wurde"
+    );
+  });
+
+  await t.test("der fällige FI-Test meldet sich beim zuständigen Vorarbeiter", async () => {
+    // Der Vorarbeiter bekommt den Hinweis und nicht das Büro: er steht auf dem
+    // Platz und kann die Taste drücken. Ein Hinweis im Büro wäre eine
+    // Nachricht an jemanden, der daraufhin telefonieren müsste.
+    const kunde = (await ownerPool.query(
+      `INSERT INTO customers (company_id, customer_type, company_name, status)
+       VALUES ($1, 'company', 'Wohnbau', 'active') RETURNING id`,
+      [firma]
+    )).rows[0].id;
+    const projekt = (await ownerPool.query(
+      `INSERT INTO projects (company_id, customer_id, name, status)
+       VALUES ($1, $2, 'Wohnblock', 'active') RETURNING id`,
+      [firma, kunde]
+    )).rows[0].id;
+    const baustelle = (await ownerPool.query(
+      `INSERT INTO construction_sites (company_id, project_id, name, status)
+       VALUES ($1, $2, 'Wohnblock Süd', 'active') RETURNING id`,
+      [firma, projekt]
+    )).rows[0].id;
+
+    const chef = (await ownerPool.query(
+      `INSERT INTO users (company_id, personnel_number, first_name, last_name)
+       VALUES ($1, $2, 'Vera', 'Vorarbeiterin') RETURNING id`,
+      [firma, `VA-${kennung}`]
+    )).rows[0].id;
+    await ownerPool.query(
+      `INSERT INTO user_roles (company_id, user_id, role_id)
+       SELECT $1, $2, id FROM roles WHERE company_id = $1 AND role_key = 'foreman'`,
+      [firma, chef]
+    );
+    await ownerPool.query(
+      `INSERT INTO site_supervisors (
+         company_id, construction_site_id, user_id, valid_from, status, is_primary
+       ) VALUES ($1, $2, $3, '2026-01-01', 'active', TRUE)`,
+      [firma, baustelle, chef]
+    );
+
+    const bau = (await ownerPool.query(
+      `INSERT INTO devices (
+         company_id, inventory_number, name, category_id,
+         assigned_construction_site_id, created_by_user_id
+       ) VALUES ($1, 'BV-003', 'Baustromverteiler 125A', $2, $3, $4) RETURNING id`,
+      [firma, kategorie.id, baustelle, nutzer]
+    )).rows[0].id;
+    // Zuletzt am 13.07. gedrückt: fällig ist heute, am 12.08.
+    await ownerPool.query(
+      `INSERT INTO power_rcd_tests (company_id, device_id, tested_on, tested_by_user_id, result)
+       VALUES ($1, $2, '2026-07-13', $3, 'passed')`,
+      [firma, bau, nutzer]
+    );
+
+    // Der Monteur ruft seine Hinweise ab — der Hinweis entsteht trotzdem für
+    // die Vorarbeiterin, denn er hängt an der Baustelle und nicht am Leser.
+    await hinweiseAbrufen(apiPool, context, heute);
+
+    const beiIhr = await ownerPool.query(
+      `SELECT notification_type, title, message FROM device_notifications
+       WHERE company_id = $1 AND recipient_user_id = $2 AND device_id = $3`,
+      [firma, chef, bau]
+    );
+    assert.equal(beiIhr.rowCount, 1, "Die Vorarbeiterin bekommt genau einen Hinweis");
+    assert.equal(beiIhr.rows[0].notification_type, "rcd_test_due");
+    assert.match(beiIhr.rows[0].title, /heute fällig/);
+    assert.match(beiIhr.rows[0].message, /BV-003/);
+
+    const beimMonteur = await ownerPool.query(
+      `SELECT 1 FROM device_notifications
+       WHERE company_id = $1 AND recipient_user_id = $2 AND device_id = $3`,
+      [firma, nutzer, bau]
+    );
+    assert.equal(beimMonteur.rowCount, 0, "Wer nachsieht, bekommt nicht fremde Hinweise");
+
+    // Zweimal nachsehen ergibt nicht zwei Hinweise.
+    await hinweiseAbrufen(apiPool, context, heute);
+    const nochmal = await ownerPool.query(
+      `SELECT COUNT(*)::INTEGER AS anzahl FROM device_notifications
+       WHERE company_id = $1 AND recipient_user_id = $2 AND device_id = $3`,
+      [firma, chef, bau]
+    );
+    assert.equal(nochmal.rows[0].anzahl, 1, "Derselbe Termin meldet sich nur einmal");
+
+    // Und sie findet ihn auch in ihrer eigenen Glocke wieder.
+    const ihre = await hinweiseAbrufen(apiPool, { companyId: firma, userId: chef }, heute);
+    assert.ok(
+      ihre.body.notifications.some((eintrag) => eintrag.type === "rcd_test_due"
+        && eintrag.device.inventoryNumber === "BV-003"),
+      "Der Hinweis steht in der Glocke der Vorarbeiterin"
     );
   });
 });

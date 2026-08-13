@@ -406,6 +406,12 @@ export function createPowerModule({ root, requestJson, showToast }) {
       if (!enabled) return;
       await laden();
     },
+    /** Direkt in die Akte eines Verteilers - fuer den Weg aus einem Hinweis. */
+    async oeffneVerteiler(id) {
+      if (!enabled) return;
+      await laden();
+      await oeffnen(id);
+    },
     clear() {
       enabled = false;
       verteiler = [];

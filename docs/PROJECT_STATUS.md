@@ -1,10 +1,18 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.36
+Technischer Stand: V0.44.37
 
 
 ## Abgeschlossen
+
+- **Der fällige FI-Test meldet sich von selbst** (Fassung 0.44.37, Migrationen
+  145 und 146). Empfänger ist der aktive Bauleiter der Baustelle, auf der der
+  Verteiler steht — er kann die Taste drücken, das Büro könnte nur
+  telefonieren. Der Hinweis kommt am Tag der Fälligkeit, danach einmal als
+  „überfällig"; ein nie geprüfter Verteiler meldet sich monatlich. Er steht in
+  der Glocke der Geräteverwaltung und führt angetippt in den Baustrombereich,
+  wo der Knopf zum Bestätigen steht. PWA-Speicher `schaefchen-online-v119`
 
 - **Baustromverteiler mit eigenem Bereich** (Fassung 0.44.36, Migrationen 143
   und 144). Vier Fragen der Baustelle an einer Stelle: abgelaufene Prüfung nach

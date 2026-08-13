@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { toString as qrToString } from "qrcode";
 import { loadCompanyModules } from "./company-modules.mjs";
+import { ensureRcdNotifications } from "./power.mjs";
 import { InputError, readJson, validateId } from "./validation.mjs";
 
 export const DEVICE_MODULE_KEY = "devices";
@@ -1999,6 +2000,14 @@ async function ensureInspectionNotifications(client, context) {
 
 async function notifications(client, context) {
   await ensureInspectionNotifications(client, context);
+  // Der faellige FI-Test eines Baustromverteilers gehoert in dieselbe Glocke:
+  // ein Verteiler ist ein Geraet, und zwei Glocken waeren eine zu viel. Die
+  // Frist selbst rechnet der Baustrombereich, weil sie dort hingehoert.
+  await ensureRcdNotifications(
+    client, context,
+    context.deviceToday || new Date().toISOString().slice(0, 10),
+    { manager: await canManage(client, context) }
+  );
   const result = await client.query(
     `SELECT notification.id,notification.notification_type,notification.title,
             notification.message,notification.created_at,notification.read_at,

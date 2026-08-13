@@ -388,6 +388,135 @@ async function ablesungErfassen(client, context, deviceId, body, heute) {
   };
 }
 
+/**
+ * Der Monat ohne Tag - "2026-08".
+ *
+ * Gebraucht fuer den Verteiler, der noch nie geprueft wurde: er hat keinen
+ * Termin, den man fortschreiben koennte, aber die Pflicht besteht trotzdem.
+ * Der Monat ist ihr Takt, und er ist zugleich der Schluessel, der aus einer
+ * taeglichen Mahnung eine monatliche macht.
+ */
+function monat(datum) {
+  return String(datum).slice(0, 7);
+}
+
+/** Aus 2026-08-12 wird 12.08.2026 - der Hinweis wird gelesen, nicht geparst. */
+function datumText(iso) {
+  const [jahr, monatTeil, tag] = String(iso).split("-");
+  return `${tag}.${monatTeil}.${jahr}`;
+}
+
+/**
+ * Wer den Hinweis bekommt, und was darin steht.
+ *
+ * Der zustaendige Vorarbeiter ist der aktive Bauleiter der Baustelle, auf der
+ * der Verteiler steht - der als "hauptverantwortlich" gefuehrte zuerst. Er
+ * bekommt den Hinweis und nicht die Geraeteverwaltung, weil er derjenige ist,
+ * der die Taste druecken kann: der Verteiler steht bei ihm auf dem Platz, und
+ * ein Hinweis im Buero waere eine Nachricht an jemanden, der daraufhin
+ * telefonieren muesste.
+ *
+ * Steht ein Verteiler auf keiner Baustelle - im Hof, auf dem Wagen -, gibt es
+ * keinen Vorarbeiter. Dann faellt der Hinweis der Geraeteverwaltung zu. Ein
+ * Hinweis, den niemand bekommt, ist keiner, und die Frist laeuft trotzdem.
+ */
+export function fiHinweis(verteiler, heute) {
+  const letzter = verteiler.rcdTestedOn;
+  const faellig = naechsterTermin(letzter, FI_FRIST_TAGE);
+
+  // Noch nie gedrueckt: kein Termin, aber eine Pflicht. Einmal im Monat
+  // erinnern - taeglich waere Laerm, und Laerm liest niemand.
+  if (!faellig) {
+    return {
+      typ: "rcd_test_due",
+      titel: `${verteiler.name}: FI-Test steht aus`,
+      text: `${verteiler.inventoryNumber} wurde noch nie mit der Prüftaste geprüft.`,
+      schluessel: `rcd:never:${verteiler.id}:${monat(heute)}`
+    };
+  }
+
+  const tage = tageBis(heute, faellig);
+  if (tage > 0) return null;
+
+  return tage === 0
+    ? {
+      typ: "rcd_test_due",
+      titel: `${verteiler.name}: FI-Test heute fällig`,
+      text: `${verteiler.inventoryNumber} · Prüftaste drücken, zuletzt am ${datumText(letzter)}.`,
+      schluessel: `rcd:due:${verteiler.id}:${faellig}`
+    }
+    : {
+      typ: "rcd_test_overdue",
+      titel: `${verteiler.name}: FI-Test überfällig`,
+      text: `${verteiler.inventoryNumber} · fällig war der ${datumText(faellig)}.`,
+      schluessel: `rcd:overdue:${verteiler.id}:${faellig}`
+    };
+}
+
+/**
+ * Die faelligen FI-Tests als Hinweise in die Glocke legen.
+ *
+ * Laeuft mit, wenn jemand seine Hinweise abruft - dieselbe Stelle, an der auch
+ * die Prueftermine der Geraete entstehen. Schäfchen hat keinen Dienst, der
+ * nachts durchlaeuft; der Hinweis entsteht deshalb, sobald ihn jemand abholen
+ * koennte. Der Eindeutigkeitsschluessel traegt den Termin, also entsteht er
+ * pro Termin genau einmal, egal wie oft jemand nachsieht.
+ */
+export async function ensureRcdNotifications(client, context, heute, { manager = false } = {}) {
+  const faellig = await client.query(
+    `SELECT geraet.id, geraet.name, geraet.inventory_number,
+            fi.tested_on AS rcd_tested_on,
+            vorarbeiter.user_id AS foreman_user_id
+     FROM devices AS geraet
+     JOIN device_categories AS art
+       ON art.company_id = geraet.company_id AND art.id = geraet.category_id
+     LEFT JOIN LATERAL (
+       SELECT tested_on FROM power_rcd_tests
+       WHERE company_id = geraet.company_id AND device_id = geraet.id
+       ORDER BY tested_on DESC, created_at DESC LIMIT 1
+     ) AS fi ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT user_id FROM site_supervisors
+       WHERE company_id = geraet.company_id
+         AND construction_site_id = geraet.assigned_construction_site_id
+         AND status = 'active'
+       -- Der hauptverantwortliche zuerst; gibt es keinen, der zuletzt
+       -- eingeteilte. Wer heute auf dem Platz steht, ist gemeint.
+       ORDER BY is_primary DESC, valid_from DESC
+       LIMIT 1
+     ) AS vorarbeiter ON TRUE
+     WHERE geraet.company_id = $1 AND art.category_key = $2
+       AND geraet.retired_at IS NULL AND geraet.status <> 'retired'`,
+    [context.companyId, KATEGORIE]
+  );
+
+  for (const zeile of faellig.rows) {
+    const empfaenger = zeile.foreman_user_id || (manager ? context.userId : null);
+    if (!empfaenger) continue;
+
+    const hinweis = fiHinweis({
+      id: zeile.id,
+      name: zeile.name,
+      inventoryNumber: zeile.inventory_number,
+      rcdTestedOn: zeile.rcd_tested_on
+        ? new Date(zeile.rcd_tested_on).toISOString().slice(0, 10)
+        : null
+    }, heute);
+    if (!hinweis) continue;
+
+    await client.query(
+      `INSERT INTO device_notifications (
+         company_id, recipient_user_id, device_id, notification_type, title, message, source_key
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (company_id, recipient_user_id, source_key) DO NOTHING`,
+      [
+        context.companyId, empfaenger, zeile.id,
+        hinweis.typ, hinweis.titel, hinweis.text, hinweis.schluessel
+      ]
+    );
+  }
+}
+
 export async function handlePowerRequest({ request, url, client, context, today }) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/power")) return null;
