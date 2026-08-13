@@ -4,6 +4,29 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Bedienelemente am Telefon sind gross genug für den Daumen (Fassung
+  0.44.38).** Der Browser hat bei 420 Pixeln Breite jedes bedienbare Element in
+  allen neun Bereichen vermessen: **zwölf lagen unter 44 Pixeln** — dem Maß, das
+  Apple und Google seit Jahren gleichlautend nennen. Die Pfeile der Plantafel
+  standen bei 34, das Auswahlkästchen im Gerätebestand bei 19, die Jahresauswahl
+  bei 36, der Wochenwechsel bei 40, der Verweis „Zur Woche" bei 32, das
+  Schnellmenü bei 40 und die Leisten über den Listen bei 42. Alle stammen aus
+  Regeln, die für die Maus geschrieben waren und am Telefon einfach mitgalten —
+  der Zeiger trifft 34 Pixel, der Daumen nicht, erst recht nicht mit Handschuh
+  und im Stehen. Das Kästchen bleibt sichtbar klein (24 Pixel) und bekommt
+  ringsum Luft, statt als Klotz in der Liste zu stehen: 24 plus zweimal 10
+  ergeben dieselbe Trefferfläche, ohne dass die Zeile aufgeht. **Am Rechner
+  bleibt alles unverändert** — dort ist knapp und ruhig richtig. Nach der
+  Änderung meldet dieselbe Messung null Treffer.
+
+- **„Neuer Einsatz" steht wieder im Bild (Fassung 0.44.38).** In der
+  Einsatzplanung lag die Hauptaktion des Bereichs am Telefon außerhalb des
+  sichtbaren Bereichs: die Reihe [Heute] [Drucken] [Neuer Einsatz] war 467 Pixel
+  breit und endete bei 310. Sie war seitlich verschiebbar, aber nichts am
+  Bildrand sagte das. Jetzt bricht sie um und zeigt alle drei Knöpfe. Der Fehler
+  bestand vorher und ist beim Nachmessen aufgefallen, nicht durch diese Fassung
+  entstanden.
+
 - **Der fällige FI-Test meldet sich beim zuständigen Vorarbeiter (Fassung
   0.44.37).** Bisher musste jemand von sich aus in den Baustrombereich sehen,
   um zu merken, dass die Prüftaste fällig ist. Jetzt bekommt der aktive
