@@ -1891,3 +1891,12 @@ body:has(#vde-app) main {
     scroll-behavior: auto;
   }
 }
+
+/* Am Schreibtisch hat Baustrom einen eigenen Eintrag in der Seitenleiste.
+   Zwei Wege zum selben Ort sind einer zu viel - die Karten sind deshalb der
+   schmalen Ansicht vorbehalten, genau wie im Bild besprochen. */
+@media (min-width: 1080px) {
+  .area-switch {
+    display: none;
+  }
+}

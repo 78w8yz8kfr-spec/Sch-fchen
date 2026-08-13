@@ -55,6 +55,7 @@ import {
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
+import { handlePowerRequest } from "./power.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -201,7 +202,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.35";
+export const APPLICATION_VERSION = "0.44.36";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -10477,6 +10478,25 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           })
         );
         if (handled?.document) return inlineDocument(response, handled.document);
+        if (handled) return json(response, handled.status, handled.body);
+      }
+
+      // Baustromverteiler haengen an der Geraeteverwaltung und bekommen
+      // deshalb keine eigene Freigabe - nur einen eigenen Weg, weil ihre
+      // beiden Fristen und die Zaehlerstaende sonst im Geraetemodul
+      // untergingen.
+      if (url.pathname.startsWith("/api/v1/power")) {
+        const handled = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => handlePowerRequest({
+            request,
+            url,
+            client,
+            context,
+            today: localDate(new Date().toISOString(), config.timeZone)
+          })
+        );
         if (handled) return json(response, handled.status, handled.body);
       }
 

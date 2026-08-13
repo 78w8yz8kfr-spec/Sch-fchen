@@ -1,6 +1,6 @@
 {
   "name": "schaefchen-api",
-  "version": "0.44.35",
+  "version": "0.44.36",
   "private": true,
   "type": "module",
   "engines": {

@@ -1,10 +1,21 @@
 # Projektstatus
 
-Stand: 11.08.2026
-Technischer Stand: V0.44.35
+Stand: 13.08.2026
+Technischer Stand: V0.44.36
 
 
 ## Abgeschlossen
+
+- **Baustromverteiler mit eigenem Bereich** (Fassung 0.44.36, Migrationen 143
+  und 144). Vier Fragen der Baustelle an einer Stelle: abgelaufene Prüfung nach
+  DGUV V3, fälliger FI-Test, Zählerstand, Standort. Die Liste sortiert nach
+  Dringlichkeit, jede Zeile trägt die Farbe ihrer schlimmeren Frist. Der
+  monatliche Tastendruck steht in einer eigenen Tabelle und verschiebt den
+  vierteljährlichen Prüftermin nicht. Zählerstände tragen Anlass und Baustelle
+  und laufen nur vorwärts. Am Telefon eine Karte unter „Maschinen & Geräte",
+  am Rechner ein eigener Punkt in der Seitenleiste; angelegt werden Verteiler
+  weiterhin in der Geräteverwaltung mit der Kategorie „Baustromverteiler".
+  PWA-Speicher `schaefchen-online-v118`
 
 - **Die Lagerverwaltung ist abgeschafft** (Fassung 0.44.35, Migrationen 141
   und 142). Sie kam mit 0.44.11 und wuchs über vierundzwanzig Fassungen:

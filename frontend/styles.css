@@ -9309,3 +9309,143 @@ body.hat-fassungshinweis {
   color: var(--brand, #e30613);
   font-weight: 700;
 }
+
+/* ---------------------------------------------------------------------------
+   Baustromverteiler
+   ---------------------------------------------------------------------------
+
+   Der Bereichswechsel als Karten: dieselbe Sprache wie die Gruppenkacheln der
+   schmalen Ansicht - Symbol links, fetter Name daneben, der aktive Bereich
+   hell hinterlegt mit rotem Rand. Zwei je Zeile, solange Platz ist.
+
+   Am Schreibtisch fallen die Karten weg: dort hat Baustrom einen eigenen
+   Eintrag in der Leiste, und zwei Wege zum selben Ort sind einer zu viel. */
+
+.area-switch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.area-switch__card {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.area-switch__card svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.area-switch__card--active {
+  border-color: var(--brand);
+  background: var(--brand-soft, #fdecee);
+  color: var(--brand);
+}
+
+.area-switch__card:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.power-list, .power-detail, .power-form { display: grid; gap: 12px; }
+
+/* Derselbe Kopf wie bei den Geraeten: der Bereich steht daneben und soll sich
+   nicht wie eine andere Anwendung anfuehlen. */
+.power-heading h1, .power-heading p { margin: 0; }
+.power-heading h1 {
+  margin-top: 3px;
+  font-size: clamp(1.55rem, 4vw, 2.1rem);
+  letter-spacing: -0.035em;
+}
+.power-heading__intro {
+  margin-top: 7px !important;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.power-rows { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+/* Die Zeile traegt eine Farbe, nicht zwei: die schlimmere der beiden Fristen
+   entscheidet. Ein Verteiler mit abgelaufener Pruefung ist rot, auch wenn die
+   Prueftaste gestern gedrueckt wurde. */
+.power-row {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.power-row:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.power-row--schlecht { border-left-color: var(--ui-danger, #c62828); }
+.power-row--knapp { border-left-color: var(--ui-warning, #ef6c00); }
+.power-row--unbekannt { border-left-color: var(--muted); }
+.power-row--gut { border-left-color: var(--ui-success, #2e7d32); }
+
+.power-row__name { font-weight: 800; }
+.power-row__meta { color: var(--muted); font-size: 0.78rem; }
+.power-row__terms { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
+.power-row__meter { color: var(--muted); font-size: 0.76rem; }
+.power-row__meter--fehlt { font-style: italic; }
+
+.power-term { font-size: 0.78rem; }
+.power-term strong { margin-right: 5px; font-weight: 750; }
+.power-term--schlecht { color: var(--ui-danger, #c62828); }
+.power-term--knapp { color: var(--ui-warning, #ef6c00); }
+.power-term--unbekannt { color: var(--muted); }
+.power-term--gut { color: var(--ui-success, #2e7d32); }
+
+.power-terms { display: grid; gap: 6px; }
+.power-detail__name { margin: 0; }
+.power-detail__meta { margin: 0; color: var(--muted); font-size: 0.82rem; }
+.power-subhead { margin: 10px 0 0; font-size: 0.9rem; }
+.power-hint { margin: 0; color: var(--muted); font-size: 0.78rem; }
+/* Beide Vorgaenge sind gleich wichtig und werden mit Handschuhen bedient:
+   sie teilen sich die Zeile zu gleichen Teilen, statt dass einer die volle
+   Breite nimmt und der andere daneben schrumpft. */
+.power-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.power-actions > .button { flex: 1 1 160px; }
+.power-empty { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.power-error {
+  margin: 0; padding: 8px 10px; border-radius: 8px;
+  color: var(--ui-danger, #c62828); background: var(--ui-danger-soft, #fdecee); font-size: 0.86rem;
+}
+
+.power-records { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.power-records li {
+  display: grid; gap: 2px; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: 12px; font-size: 0.8rem;
+}
+.power-records li > span:nth-child(2) { color: var(--muted); font-size: 0.76rem; }
+.power-records__note { color: var(--muted); font-style: italic; }
+.power-records__item--schlecht { border-color: var(--ui-danger, #c62828); }
+
+.power-field { display: grid; gap: 5px; font-size: 0.82rem; font-weight: 700; }
+.power-field__optional { color: var(--muted); font-weight: 500; }
+.power-field input, .power-field select {
+  min-height: 44px; padding: 0 10px;
+  border: 1px solid var(--line-strong, var(--line)); border-radius: 10px;
+  background: var(--surface); color: var(--ink); font: inherit; font-weight: 500;
+}
