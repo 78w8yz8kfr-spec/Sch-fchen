@@ -4,6 +4,30 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Baustromverteiler haben einen eigenen Bereich (Fassung 0.44.36).** Er
+  beantwortet nicht „welche Verteiler haben wir" — das steht in der Geräteliste
+  —, sondern die vier Fragen, die auf der Baustelle täglich anstehen: welche
+  Prüfung ist abgelaufen, wo muss diesen Monat die Prüftaste gedrückt werden,
+  was steht auf dem Zähler, und wo steht welcher Verteiler. Die Liste sortiert
+  deshalb nach Dringlichkeit statt nach Nummer, und jede Zeile trägt die Farbe
+  ihrer schlimmeren Frist. **Zwei Fristen, nicht eine**: der monatliche Druck
+  auf die Prüftaste ist keine Prüfung nach DGUV V3 — er ersetzt die
+  vierteljährliche Prüfung durch die Elektrofachkraft nicht und darf ihren
+  Termin nicht verschieben. Migration 143 führt ihn deshalb in einer eigenen
+  Tabelle und nicht in `device_inspections`, wo eine Zeile die Fälligkeit des
+  Geräts neu setzen würde. **Zählerstände** tragen ihren Anlass (Aufstellen,
+  Zwischenablesung, Abbau) und die Baustelle, auf der abgelesen wurde: ein
+  Verteiler wandert im Jahr über mehrere Baustellen, und die Rechnung von
+  Baustelle drei darf sich nicht ändern, weil er inzwischen woanders steht. Ein
+  Stand unter dem vorigen wird abgewiesen statt stillschweigend gebucht — ein
+  Zähler läuft vorwärts, und eine negative Menge fiele sonst erst dem Kunden
+  auf. **Am Telefon** steht der Bereich als Karte unter „Maschinen & Geräte",
+  weil ein Verteiler für den Monteur ein Gerät ist und die Leiste unten keinen
+  Platz für einen weiteren Eintrag hat; **am Rechner** als eigener Punkt in der
+  Seitenleiste. Angelegt werden Verteiler weiterhin in der Geräteverwaltung mit
+  der Kategorie „Baustromverteiler" — der neue Bereich legt nichts an und führt
+  keine zweiten Stammdaten. PWA-Speicher `schaefchen-online-v118`.
+
 - **Die Lagerverwaltung ist abgeschafft (Fassung 0.44.35).** Sie kam mit
   0.44.11 und wuchs über vierundzwanzig Fassungen: Artikelstamm, Lagerplätze,
   Bewegungsjournal mit Bestandsfortschreibung, Strichcodes und Etiketten,

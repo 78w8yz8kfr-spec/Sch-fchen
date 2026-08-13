@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.35";
-import { serverIsNewer } from "./core/versions.js?v=0.44.35";
+} from "./core/work-time.js?v=0.44.36";
+import { serverIsNewer } from "./core/versions.js?v=0.44.36";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.35";
+} from "./core/sync-queue.js?v=0.44.36";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.35";
+} from "./core/permissions.js?v=0.44.36";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -40,9 +40,10 @@ import {
   restoreState,
   serializeState,
   storageKey
-} from "./core/state-store.js?v=0.44.35";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.35";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
+} from "./core/state-store.js?v=0.44.36";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.36";
+import { createPowerModule } from "./core/power-module.js?v=0.44.36";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.36";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -500,6 +501,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     navCustomers: document.querySelector("#nav-customers"),
     navVehicles: document.querySelector("#nav-vehicles"),
     navDevices: document.querySelector("#nav-devices"),
+    navPower: document.querySelector("#nav-power"),
+    powerModuleRoot: document.querySelector("#power-module"),
+    areaSwitchPower: document.querySelector("#area-switch-power"),
+    areaSwitchDevicesBack: document.querySelector("#area-switch-devices-back"),
     navDocuments: document.querySelector("#nav-documents"),
     navAnalytics: document.querySelector("#nav-analytics"),
     navMore: document.querySelector("#nav-more"),
@@ -1171,6 +1176,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     onNotificationsChanged: () => renderNotifications()
   });
 
+  // Baustromverteiler sind Geraete, aber ihre beiden Fristen und die
+  // Zaehlerstaende gingen in der Geraeteliste unter. Deshalb ein eigener,
+  // schmaler Bereich - der nichts anlegt, sondern nur zeigt, was heute
+  // ansteht.
+  const powerModule = createPowerModule({
+    root: elements.powerModuleRoot,
+    requestJson,
+    showToast
+  });
+
 
   // Liste kommt deshalb aus seinem Tagesplan und nicht aus dem Baustellenstamm:
   // wer auf der Grundschule arbeitet, soll dort nicht das Rathaus suchen.
@@ -1353,7 +1368,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.35",
+          "X-Schaefchen-Version": "0.44.36",
           ...options.headers
         }
       });
@@ -1388,7 +1403,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.35`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.36`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1410,7 +1425,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.35" }
+        headers: { "X-Schaefchen-Version": "0.44.36" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1457,7 +1472,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.35 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.36 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1562,6 +1577,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
     elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
     deviceModule.setEnabled(!elements.navDevices.hidden);
+    // Baustrom haengt an derselben Freigabe: ein Verteiler ist ein Geraet.
+    elements.navPower.hidden = elements.navDevices.hidden;
+    powerModule.setEnabled(!elements.navPower.hidden);
     elements.navReports.hidden = !planner
       || !(moduleEnabled("assembly_reports") || moduleEnabled("site_daily_reports"));
     elements.navInspections.hidden = !planner || !vdeModuleEnabled();
@@ -1624,6 +1642,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     elements.loginForm.hidden = false;
     clearPlannerData();
     deviceModule.clear();
+    powerModule.clear();
     configureModeCopy();
     applyLoginCompanyIdentity();
     document.title = "Schäfchen";
@@ -2818,7 +2837,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.35";
+  const EIGENE_FASSUNG = "0.44.36";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2857,7 +2876,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.35". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.36". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6847,7 +6866,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.35" }
+        headers: { "X-Schaefchen-Version": "0.44.36" }
       });
       if (response.ok) {
         await cache.put(
@@ -9810,9 +9829,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
   // Alle Eintraege der Leiste, nicht nur die alten fuenf: eine feste Liste war
   // mit jedem neuen Bereich eine Zeile, die man vergessen kann - dann blieb
   // der aktive Eintrag unmarkiert.
+  // Der zweite Knopf ist die Vertretung am Telefon: dort gibt es fuer manchen
+  // Bereich keinen eigenen Eintrag, und dann leuchtet der Eintrag der Gruppe,
+  // unter der er steht. Am Rechner gilt sie nicht - "Baustrom" und
+  // "Maschinen & Geräte" teilen sich dort denselben Knopf, und beide
+  // gleichzeitig hervorzuheben sagt dem Leser, er stehe an zwei Stellen.
   function activateNavigation(activeButton, mobileActiveButton = null) {
+    const amTelefon = !window.matchMedia("(min-width: 1080px)").matches;
     [...elements.bottomNav.querySelectorAll(".nav-item")].forEach((button) => {
-      const active = button === activeButton || button === mobileActiveButton;
+      const active = button === activeButton
+        || (amTelefon && button === mobileActiveButton);
       button.classList.toggle("nav-item--active", active);
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
@@ -9982,6 +10008,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
       customers: elements.navCustomers,
       vehicles: elements.navVehicles,
       devices: elements.navDevices,
+      power: elements.navPower,
       documents: elements.navDocuments,
       inspections: elements.navInspections,
       analytics: elements.navAnalytics,
@@ -9999,6 +10026,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
       employees: elements.navMobileBusiness,
       vehicles: elements.navMobileBusiness,
       devices: elements.navDevices,
+      power: elements.navDevices,
       analytics: elements.navMore
     }[pane] || null;
     activateNavigation(activeButton, mobileActiveButton);
@@ -10023,6 +10051,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
       customers: "Kunden",
       vehicles: "Fahrzeuge",
       devices: "Maschinen & Geräte",
+      power: "Baustrom",
       documents: "Dokumentablage",
       inspections: "Prüfprotokolle",
       analytics: "Arbeitszeit-Auswertung",
@@ -10960,6 +10989,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
       announcementsState = [];
       employeeSiteState = null;
       deviceModule.clear();
+    powerModule.clear();
     }
     session = sessionView;
     cachedUserId = session.user.id;
@@ -13536,6 +13566,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.35";
     showDashboardPane("vehicles");
     void refreshVehicles();
   });
+  elements.navPower.addEventListener("click", () => {
+    showDashboardPane("power");
+    void powerModule.refresh();
+  });
+  // Auf dem Telefon fuehrt die Karte unter "Geraete" hierher und zurueck.
+  elements.areaSwitchPower.addEventListener("click", () => elements.navPower.click());
+  elements.areaSwitchDevicesBack.addEventListener("click", () => elements.navDevices.click());
   elements.navDevices.addEventListener("click", () => {
     showDashboardPane("devices");
     void deviceModule.refresh();

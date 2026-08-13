@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.35">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.35">
-    <script type="module" src="./app.js?v=0.44.35"></script>
-    <script src="./version.js?v=0.44.35" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.36">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.36">
+    <script type="module" src="./app.js?v=0.44.36"></script>
+    <script src="./version.js?v=0.44.36" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -144,7 +144,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.35</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.36</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -1333,7 +1333,39 @@
 
           <section id="devices-section" class="section devices-section" data-dashboard-pane="devices"
                    aria-label="Maschinen und Geräte" hidden>
+            <!-- Auf dem Telefon steht Baustrom unter „Geräte“: dort sucht ihn
+                 der Monteur, weil ein Verteiler für ihn ein Gerät ist. Am
+                 Schreibtisch hat er einen eigenen Eintrag in der Leiste, denn
+                 dort wird er als eigener Bestand geführt. Diese Karten
+                 erscheinen deshalb nur in der schmalen Ansicht. -->
+            <nav class="area-switch" aria-label="Bereich wählen">
+              <button id="area-switch-devices" class="area-switch__card area-switch__card--active" type="button"
+                      aria-current="page">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
+                <span>Maschinen &amp; Geräte</span>
+              </button>
+              <button id="area-switch-power" class="area-switch__card" type="button">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+                <span>Baustrom</span>
+              </button>
+            </nav>
             <div id="device-module"></div>
+          </section>
+
+          <section id="power-section" class="section power-section" data-dashboard-pane="power"
+                   aria-label="Baustromverteiler" hidden>
+            <nav class="area-switch" aria-label="Bereich wählen">
+              <button id="area-switch-devices-back" class="area-switch__card" type="button">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
+                <span>Maschinen &amp; Geräte</span>
+              </button>
+              <button id="area-switch-power-active" class="area-switch__card area-switch__card--active" type="button"
+                      aria-current="page">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+                <span>Baustrom</span>
+              </button>
+            </nav>
+            <div id="power-module"></div>
           </section>
 
           <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>
@@ -3132,6 +3164,10 @@
           <button id="nav-devices" class="nav-item" type="button" hidden data-kurz="Geräte" data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
             <span>Maschinen &amp; Geräte</span>
+          </button>
+          <button id="nav-power" class="nav-item nav-item--desktop" type="button" hidden data-kurz="Baustrom" data-nav-group="business">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+            <span>Baustrom</span>
           </button>
 
           <p class="nav-group-label" data-nav-group-label="control">Steuerung</p>
