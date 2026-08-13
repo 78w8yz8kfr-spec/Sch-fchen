@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.36";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.37";
 let qrScannerLibraryPromise = null;
 
 export const DEVICE_QR_SHEET_LAYOUT = Object.freeze({
@@ -433,7 +433,10 @@ export function createDeviceModule({
   createClientId,
   getSession,
   navigate,
-  onNotificationsChanged = () => {}
+  onNotificationsChanged = () => {},
+  // Ein Hinweis zum FI-Test fuehrt nicht ins Geraeteblatt: dort steht der
+  // Knopf nicht, mit dem er sich erledigen laesst. Er fuehrt in den Baustrom.
+  openPowerDistributor = null
 }) {
   root.innerHTML = html;
   const q = (selector) => root.querySelector(selector);
@@ -785,6 +788,10 @@ export function createDeviceModule({
           await requestJson(`./api/v1/devices/notifications/${encodeURIComponent(item.id)}/read`, { method: "POST" });
           item.readAt = new Date().toISOString();
           onNotificationsChanged();
+        }
+        if (item.type?.startsWith("rcd_test") && openPowerDistributor) {
+          openPowerDistributor(item.device.id);
+          return;
         }
         const device = devices.find((candidate) => candidate.id === item.device.id);
         if (device) void openDetail(device);
@@ -1942,7 +1949,7 @@ export function createDeviceModule({
   function druckseite(popup, titel, stildatei) {
     popup.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">`
       + `<title>${titel}</title>`
-      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.36">`
+      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.37">`
       + `</head><body></body></html>`);
   }
 

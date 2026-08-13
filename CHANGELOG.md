@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der fällige FI-Test meldet sich beim zuständigen Vorarbeiter (Fassung
+  0.44.37).** Bisher musste jemand von sich aus in den Baustrombereich sehen,
+  um zu merken, dass die Prüftaste fällig ist. Jetzt bekommt der aktive
+  Bauleiter der Baustelle, auf der der Verteiler steht, einen Hinweis — der als
+  hauptverantwortlich geführte zuerst. **Er und nicht das Büro**: er steht auf
+  dem Platz und kann die Taste drücken, ein Hinweis im Büro wäre eine Nachricht
+  an jemanden, der daraufhin telefonieren müsste. Steht ein Verteiler auf keiner
+  Baustelle — im Hof, auf dem Wagen —, gibt es keinen Vorarbeiter, und der
+  Hinweis fällt der Geräteverwaltung zu; ein Hinweis, den niemand bekommt, wäre
+  keiner. **Am Tag der Fälligkeit**, nicht vier Wochen vorher: ein Hinweis mit
+  Vorlauf wäre bis zum Termin längst weggeklickt. Danach einmal als
+  „überfällig". Ein Verteiler, der noch nie geprüft wurde, hat keinen Termin,
+  den man fortschreiben könnte — er meldet sich einmal im Monat, dem Takt der
+  Pflicht. Der Eindeutigkeitsschlüssel trägt den Termin, also entsteht pro
+  Termin genau ein Hinweis, egal wie oft jemand nachsieht. Er steht **in
+  derselben Glocke** wie die Prüftermine der Geräte — ein Verteiler ist ein
+  Gerät, und zwei Glocken wären eine zu viel; Migration 145 erweitert nur die
+  Liste erlaubter Arten in `device_notifications`. Angetippt führt der Hinweis
+  **in den Baustrombereich und nicht ins Geräteblatt**: dort steht der Knopf,
+  mit dem er sich erledigen lässt. PWA-Speicher `schaefchen-online-v119`.
+
 - **Baustromverteiler haben einen eigenen Bereich (Fassung 0.44.36).** Er
   beantwortet nicht „welche Verteiler haben wir" — das steht in der Geräteliste
   —, sondern die vier Fragen, die auf der Baustelle täglich anstehen: welche
