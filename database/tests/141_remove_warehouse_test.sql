@@ -36,9 +36,33 @@ BEGIN
         RAISE EXCEPTION 'Es stehen noch % Lagerfunktionen', uebrig;
     END IF;
 
-    -- 3. Das Modul ist aus dem Katalog verschwunden.
-    IF EXISTS (SELECT 1 FROM module_catalog WHERE module_key = 'warehouse') THEN
-        RAISE EXCEPTION 'Der Modulschlüssel warehouse steht noch im Katalog';
+    -- 3. Kein nutzbares Lagermodul mehr.
+    --
+    --    Geprueft wird "nicht aktiv" und nicht "nicht vorhanden": auf einer
+    --    frischen Datenbank verschwindet der Katalogeintrag, im Betrieb wird
+    --    er stillgelegt. Der Unterschied ist kein Zufall - im Betrieb zeigt
+    --    der Verlauf der Modulfreigaben darauf, und der ist Firmengeschichte.
+    --    Fuer die App laeuft beides aufs selbe hinaus: `isSwitchable()` fuehrt
+    --    nur Module mit `status = 'active'`.
+    --
+    --    Die erste Fassung dieser Pruefung verlangte "nicht vorhanden". Sie
+    --    war auf einer frischen Datenbank gruen und im Betrieb unerfuellbar -
+    --    und weil die Migration dort abbrach, blieb die Auslieferung stehen.
+    IF EXISTS (
+        SELECT 1 FROM module_catalog
+        WHERE module_key = 'warehouse' AND status <> 'retired'
+    ) THEN
+        RAISE EXCEPTION 'Das Lagermodul steht noch nutzbar im Katalog';
+    END IF;
+
+    -- Und keine Firma hat es noch freigeschaltet.
+    IF EXISTS (
+        SELECT 1 FROM company_module_entitlements AS freigabe
+        JOIN module_catalog AS katalog ON katalog.id = freigabe.module_id
+        WHERE katalog.module_key = 'warehouse'
+          AND freigabe.entitlement_status <> 'inactive'
+    ) THEN
+        RAISE EXCEPTION 'Eine Firma hat das Lager noch freigeschaltet';
     END IF;
 
     -- 4. Keine aktive Lageristenrolle mehr. Die Rolle selbst bleibt

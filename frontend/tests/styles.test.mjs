@@ -254,3 +254,44 @@ test("Bedienelemente sind gross genug zum Antippen", async () => {
   assert.ok(hoehe(".week-navigation__today") >= 40);
   assert.ok(hoehe(".platform-announcement__dismiss") >= 40);
 });
+
+// Der Fehler, den dieser Test verhindert, ist nicht "jemand baut absichtlich
+// ein winziges Knoepfchen". Er ist: eine Regel wird fuer die Maus geschrieben -
+// 34 Pixel sind am Rechner ruhig und richtig - und gilt am Telefon einfach mit.
+// Genau so standen die Pfeile der Plantafel bei 34, der Wochenwechsel bei 40
+// und die Jahresauswahl bei 36. Am Zeiger faellt das nicht auf, am Daumen
+// schon, und im Stylesheet sieht man es nur, wenn man danach sucht.
+test("Am Telefon bleibt kein Daumenziel unter 44 Pixeln", async () => {
+  const daumenziele = [
+    ".week-button",
+    ".avatar-button",
+    ".week-navigation__today",
+    ".admin-year-select",
+    ".quick-access__menu button",
+    ".entity-toolbar > .button"
+  ];
+  const befunde = [];
+
+  for (const datei of stylesheets) {
+    const css = await readFile(resolve(frontendDirectory, datei), "utf8");
+    for (const regel of leseRegeln(css)) {
+      // Nur Regeln, die ausschliesslich am Telefon gelten. Was ohne
+      // Medienabfrage dasteht, gilt auch am Rechner und darf klein sein,
+      // solange eine spaetere Telefonregel es anhebt - genau das prueft der
+      // Browserlauf, und der Test daneben faengt die Umkehrung ab.
+      const nurSchmal = regel.umgebung?.startsWith("media")
+        && regel.umgebung.includes("max-width");
+      if (!nurSchmal) continue;
+      if (!daumenziele.some((ziel) => regel.selektor.includes(ziel))) continue;
+
+      for (const name of ["width", "height", "min-height", "min-width"]) {
+        const wert = regel.eigenschaften.get(name);
+        if (!wert || !wert.endsWith("px")) continue;
+        if (Number.parseFloat(wert) >= 44) continue;
+        befunde.push(`${datei}:${regel.zeile} "${regel.selektor} { ${name}: ${wert} }"`);
+      }
+    }
+  }
+
+  assert.deepEqual(befunde, [], `Zu kleine Tippziele:\n${befunde.join("\n")}`);
+});

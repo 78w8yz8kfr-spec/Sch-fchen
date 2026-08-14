@@ -133,11 +133,51 @@ UPDATE roles
 SET status = 'inactive', deactivated_at = CURRENT_TIMESTAMP
 WHERE role_key = 'warehouse_manager' AND status = 'active';
 
--- Die Freigaben der Firmen dagegen verschwinden ganz: ein Modul, das es
--- nicht mehr gibt, kann niemand mehr gebucht haben.
-DELETE FROM company_module_entitlements
-WHERE module_id IN (SELECT id FROM module_catalog WHERE module_key = 'warehouse');
+-- Die Freigaben der Firmen werden abgeschaltet, nicht geloescht - aus dem
+-- gleichen Grund wie bei der Rolle daneben.
+--
+-- Zuerst stand hier ein DELETE. Auf einer frischen Datenbank lief das durch:
+-- dort hat nie eine Firma das Lager gebucht, also gibt es nichts, was darauf
+-- zeigt. Im Betrieb schon - und `company_module_entitlement_history` haelt
+-- fest, wer wann welches Modul freigeschaltet hat, mit einem Fremdschluessel
+-- auf die Freigabe selbst. Das DELETE lief dort in genau diesen Schluessel
+-- und brach ab.
+--
+-- Weil `render-start.sh` alle Migrationen mit ON_ERROR_STOP anwendet und bei
+-- Fehler abbricht, startete der Behaelter danach nicht mehr. Render liess die
+-- letzte laufende Fassung stehen, und der Betrieb blieb auf 0.44.34 - drei
+-- Auslieferungen lang, ohne dass eine Pruefung angeschlagen haette.
+--
+-- Wer wann welches Modul hatte, ist Firmengeschichte und keine Eigenschaft
+-- des Lagers. Sie bleibt stehen.
+UPDATE company_module_entitlements
+SET entitlement_status = 'inactive',
+    included_in_plan = FALSE,
+    change_reason = 'Lagerverwaltung abgeschafft'
+WHERE module_id IN (SELECT id FROM module_catalog WHERE module_key = 'warehouse')
+  AND entitlement_status <> 'inactive';
 
-DELETE FROM module_catalog WHERE module_key = 'warehouse';
+-- Eine Freigabe, auf die kein Verlauf zeigt, gab es nie wirklich. Sie darf
+-- weg - das haelt eine Neuanlage sauber, die mit dem Lager nie zu tun hatte.
+DELETE FROM company_module_entitlements AS freigabe
+WHERE freigabe.module_id IN (SELECT id FROM module_catalog WHERE module_key = 'warehouse')
+  AND NOT EXISTS (
+    SELECT 1 FROM company_module_entitlement_history AS verlauf
+    WHERE verlauf.entitlement_id = freigabe.id
+  );
+
+-- Und derselbe Gedanke fuer den Katalogeintrag: zeigt nichts mehr darauf,
+-- verschwindet er; sonst wird er stillgelegt. `status = 'retired'` ist dafuer
+-- vorgesehen, und `isSwitchable()` blendet solche Module in der App aus - der
+-- Bereich ist damit ebenso verschwunden wie bei einem geloeschten Eintrag.
+DELETE FROM module_catalog AS katalog
+WHERE katalog.module_key = 'warehouse'
+  AND NOT EXISTS (
+    SELECT 1 FROM company_module_entitlements AS freigabe
+    WHERE freigabe.module_id = katalog.id
+  );
+
+UPDATE module_catalog SET status = 'retired'
+WHERE module_key = 'warehouse' AND status <> 'retired';
 
 COMMIT;

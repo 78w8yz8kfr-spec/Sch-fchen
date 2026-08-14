@@ -1645,6 +1645,57 @@ body:has(#vde-app) main {
 /* Tablet und Mobil ------------------------------------------------------ */
 
 @media (max-width: 1079px) {
+  /* TIPPZIELE
+   *
+   * Am Telefon wird mit dem Daumen bedient, oft mit Handschuh und auf einer
+   * Baustelle im Stehen. Ein Ziel unter 44 Pixeln trifft man dabei nicht
+   * sicher - das ist keine Geschmacksfrage, sondern das Mass, das Apple und
+   * Google seit Jahren gleichlautend nennen.
+   *
+   * Gemessen hat der Browser bei 420 Pixeln Breite: die Pfeile der Plantafel
+   * standen bei 34, der Wochenwechsel bei 40, die Jahresauswahl bei 36, das
+   * Auswahlkaestchen im Geraetebestand bei 19. Alle vier Groessen stammen aus
+   * Regeln, die fuer die Maus gedacht waren und am Telefon einfach
+   * mitgalten - der Zeiger trifft 34 Pixel, der Daumen nicht.
+   *
+   * Am Rechner bleibt alles, wie es war: dort ist knapp und ruhig richtig.
+   */
+  .admin-week__header .week-button,
+  .week-navigation .week-button,
+  .avatar-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .week-navigation__today,
+  .admin-year-select,
+  .planning-board-toolbar :where(select, input),
+  /* Das Schnellmenue der Startseite und die Leiste ueber jeder Liste: beide
+     werden im Gehen bedient, beide standen bei 40 beziehungsweise 42. */
+  .quick-access__menu button,
+  /* Ausgeschrieben und nicht in :where(): das zaehlt mit Spezifitaet null und
+     verliert gegen die bestehende Regel `.entity-toolbar > .button`. */
+  .entity-toolbar > .button,
+  .entity-toolbar input,
+  .entity-toolbar select,
+  .entity-search input,
+  /* Die Uebersichtskarte setzt ihren Verweis auf 32 Pixel zurueck; er ist
+     der Weg von der Startseite in die Woche und wird oft getippt. */
+  .overview-card > .text-button,
+  .button {
+    min-height: 44px;
+  }
+
+  /* Ein Kaestchen von 44 Pixeln waere ein Klotz in einer Liste. Es bleibt
+     deshalb sichtbar klein, bekommt aber ringsum Luft: 24 plus zweimal 10
+     ergeben die geforderten 44, ohne dass die Zeile aufgeht - und nebenbei
+     verhindert der Abstand, dass man beim Zielen die Nachbarzeile erwischt. */
+  input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    margin: 10px;
+  }
+
   .page-heading {
     display: grid;
     gap: 12px;
@@ -1736,8 +1787,12 @@ body:has(#vde-app) main {
     align-items: stretch;
   }
 
+  /* Umbrechen statt seitwaerts schieben: die Reihe war breiter als das
+     Telefon, und ausgerechnet "Neuer Einsatz" - die Hauptaktion des Bereichs -
+     lag ausserhalb. Wischen haette es geholt, aber nichts am Bildrand sagte,
+     dass dort noch etwas steht. Zwei Zeilen kosten 44 Pixel und zeigen alles. */
   .planning-view-actions {
-    overflow-x: auto;
+    flex-wrap: wrap;
     padding: 0 0 10px;
   }
 }
@@ -1751,8 +1806,8 @@ body:has(#vde-app) main {
   }
 
   .avatar-button {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border: 0;
     border-radius: 14px;
     background: var(--ui-brand-soft);

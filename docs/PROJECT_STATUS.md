@@ -1,10 +1,27 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.37
+Technischer Stand: V0.44.39
 
 
 ## Abgeschlossen
+
+- **Auslieferung repariert** (Fassung 0.44.39, Migration 148). Der Betrieb
+  stand auf 0.44.34, während vier Fassungen grün gemergt waren: Migration 141
+  löschte Modulfreigaben, auf die im Betrieb der Freigabeverlauf zeigt, brach
+  am Fremdschlüssel ab und riss den Containerstart mit. Freigaben werden jetzt
+  stillgelegt statt gelöscht. Eine neue CI-Vorbelegung stellt eine Datenbank
+  mit Vorgeschichte her, damit derselbe Fehler hier auffällt und nicht dort.
+  PWA-Speicher `schaefchen-online-v121`
+
+- **Tippziele am Telefon durchgehend 44 Pixel** (Fassung 0.44.38, Migration
+  147). Gemessen wurde im Browser bei 420 Pixeln Breite über alle neun
+  Bereiche: zwölf Elemente lagen darunter, jetzt keines mehr. Betroffen waren
+  Plantafelpfeile (34), Auswahlkästchen (19), Jahresauswahl (36),
+  Wochenwechsel (40), Schnellmenü (40) und Listenleisten (42) — alles Regeln
+  für die Maus, die am Telefon mitgalten. Am Rechner unverändert. Dabei
+  aufgefallen und behoben: „Neuer Einsatz" lag in der Einsatzplanung außerhalb
+  des Bildes. PWA-Speicher `schaefchen-online-v120`
 
 - **Der fällige FI-Test meldet sich von selbst** (Fassung 0.44.37, Migrationen
   145 und 146). Empfänger ist der aktive Bauleiter der Baustelle, auf der der
