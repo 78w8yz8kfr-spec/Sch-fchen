@@ -4,6 +4,32 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die Auslieferung läuft wieder (Fassung 0.44.39).** Der Betrieb blieb auf
+  **0.44.34** stehen, während hier 0.44.35 bis 0.44.38 grün durchliefen und
+  gemergt wurden. Aufgefallen ist es nicht durch eine Prüfung, sondern weil
+  jemand hingesehen hat. Ursache: Migration 141 hat beim Abschaffen der
+  Lagerverwaltung die Modulfreigaben der Firmen **gelöscht**. Auf einer
+  frischen Datenbank läuft das durch — dort hat nie eine Firma ein Modul
+  gebucht, also zeigt kein Verlaufseintrag darauf. Im Betrieb zeigte einer
+  darauf: `company_module_entitlement_history` hält fest, wer wann welches
+  Modul freigeschaltet hat, mit einem Fremdschlüssel auf die Freigabe selbst.
+  Das DELETE lief in genau diesen Schlüssel und brach ab. Weil
+  `render-start.sh` alle Migrationen mit `ON_ERROR_STOP` anwendet und bei
+  Fehler abbricht, startete der Behälter nicht mehr, und Render ließ die letzte
+  laufende Fassung stehen — jede weitere Auslieferung lief in dieselbe Wand.
+  **Jetzt werden Freigaben stillgelegt statt gelöscht** und der Katalogeintrag
+  auf `retired` gesetzt; für die App ist das dasselbe, weil `isSwitchable()`
+  nur aktive Module führt. Wer wann welches Modul hatte, bleibt stehen —
+  Firmengeschichte, wie schon bei der Rolle „Lagerist" nebenan.
+
+- **Der CI-Lauf kennt jetzt eine Datenbank mit Vorgeschichte (Fassung
+  0.44.39).** Die Prüfung wendet die Migrationen zweimal an — einmal auf leer,
+  dann auf den Stand der Vorbelegungen —, aber unter den Vorbelegungen war
+  keine mit gebuchten Modulen. Genau deshalb war hier alles grün, während im
+  Betrieb nichts ankam. Die neue Vorbelegung stellt den Katalogeintrag des
+  Lagers samt Freigabe und Verlauf wieder her: mit der alten Fassung von
+  Migration 141 bricht der zweite Durchgang genauso ab wie damals der Betrieb.
+
 - **Die Bedienelemente am Telefon sind gross genug für den Daumen (Fassung
   0.44.38).** Der Browser hat bei 420 Pixeln Breite jedes bedienbare Element in
   allen neun Bereichen vermessen: **zwölf lagen unter 44 Pixeln** — dem Maß, das
