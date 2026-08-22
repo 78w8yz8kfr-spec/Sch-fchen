@@ -46,7 +46,7 @@ SET row_security = off
 AS $$
 DECLARE
     bucket security_rate_limits%ROWTYPE;
-    current_time TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    bucket_now TIMESTAMPTZ := CURRENT_TIMESTAMP;
 BEGIN
     IF target_scope IS NULL OR target_scope !~ '^[a-z][a-z0-9_]{1,39}$' THEN
         RAISE EXCEPTION 'Ungültiger Rate-Limit-Bereich' USING ERRCODE = '22023';
@@ -65,19 +65,19 @@ BEGIN
         target_scope,
         target_subject_hash,
         1,
-        current_time + make_interval(secs => window_seconds)
+        bucket_now + make_interval(secs => window_seconds)
     )
     ON CONFLICT (scope, subject_hash) DO UPDATE
     SET attempt_count = CASE
-            WHEN limits.window_ends_at <= current_time THEN 1
+            WHEN limits.window_ends_at <= bucket_now THEN 1
             ELSE limits.attempt_count + 1
         END,
         window_ends_at = CASE
-            WHEN limits.window_ends_at <= current_time
-                THEN current_time + make_interval(secs => window_seconds)
+            WHEN limits.window_ends_at <= bucket_now
+                THEN bucket_now + make_interval(secs => window_seconds)
             ELSE limits.window_ends_at
         END,
-        updated_at = current_time
+        updated_at = bucket_now
     RETURNING limits.* INTO bucket;
 
     -- Alte, nicht erneut verwendete HMAC-Buckets werden ohne eigenen
@@ -88,7 +88,7 @@ BEGIN
         WHERE ctid IN (
             SELECT ctid
             FROM security_rate_limits
-            WHERE window_ends_at < current_time - INTERVAL '1 day'
+            WHERE window_ends_at < bucket_now - INTERVAL '1 day'
             ORDER BY window_ends_at
             LIMIT 100
         );
@@ -99,7 +99,7 @@ BEGIN
         bucket.attempt_count,
         GREATEST(
             1,
-            CEIL(EXTRACT(EPOCH FROM (bucket.window_ends_at - current_time)))::INTEGER
+            CEIL(EXTRACT(EPOCH FROM (bucket.window_ends_at - bucket_now)))::INTEGER
         );
 END;
 $$;
