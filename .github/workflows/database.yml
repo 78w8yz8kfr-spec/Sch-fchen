@@ -160,6 +160,7 @@ jobs:
           docker build --file database/backup/Dockerfile --tag schaefchen-backup:test database/backup
 
           docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
             --volume "$drill_directory/repository:/repository" \
             --volume "$drill_directory/password:/run/secrets/restic_password:ro" \
             --env PGHOST="$POSTGRES_HOST" \
@@ -176,6 +177,7 @@ jobs:
           createdb --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" \
             --username="$POSTGRES_USER" schaefchen_restore_drill
           docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
             --volume "$drill_directory/repository:/repository" \
             --volume "$drill_directory/password:/run/secrets/restic_password:ro" \
             --env PGHOST="$POSTGRES_HOST" \
