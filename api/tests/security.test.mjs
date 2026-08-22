@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  clientIp,
   createSessionToken,
+  DatabaseRateLimiter,
   hashSessionToken,
   LoginRateLimiter,
   parseCookies,
@@ -45,6 +47,57 @@ test("Login-Sperre greift nach fünf Fehlern und kann zurückgesetzt werden", ()
   assert.equal(limiter.isBlocked(key, 200), true);
   limiter.clear(key);
   assert.equal(limiter.isBlocked(key, 200), false);
+});
+
+test("allgemeine Schranken besitzen getrennte Bereiche und eine Wartezeit", () => {
+  const limiter = new LoginRateLimiter();
+  const key = limiter.key("127.0.0.1", "Benutzer");
+  assert.equal(limiter.consume("login", key, { maximum: 2, windowMs: 1000 }, 100).allowed, true);
+  assert.equal(limiter.consume("login", key, { maximum: 2, windowMs: 1000 }, 200).allowed, true);
+  const blocked = limiter.consume("login", key, { maximum: 2, windowMs: 1000 }, 300);
+  assert.equal(blocked.allowed, false);
+  assert.equal(blocked.retryAfterSeconds, 1);
+  assert.equal(limiter.consume("upload", key, { maximum: 1, windowMs: 1000 }, 300).allowed, true);
+  limiter.clearBucket("login", key);
+  assert.equal(limiter.consume("login", key, { maximum: 2, windowMs: 1000 }, 400).allowed, true);
+});
+
+test("Datenbank-Schranken speichern nur einen HMAC und nutzen atomare Funktionen", async () => {
+  const calls = [];
+  const limiter = new DatabaseRateLimiter({
+    secret: "unit-test-rate-limit-secret-at-least-32-characters",
+    execute: async (callback) => callback({
+      async query(text, parameters) {
+        calls.push({ text, parameters });
+        return { rows: [{ allowed: false, attempt_count: 6, retry_after_seconds: 42 }] };
+      }
+    })
+  });
+  const key = limiter.key("203.0.113.9", "F-000001", "M-17");
+  assert.match(key, /^[0-9a-f]{64}$/);
+  assert.doesNotMatch(key, /203|000001|M-17/);
+  const result = await limiter.consume("company_login_identity", key, {
+    maximum: 5,
+    windowMs: 900000
+  });
+  assert.deepEqual(result, { allowed: false, attemptCount: 6, retryAfterSeconds: 42 });
+  assert.match(calls[0].text, /api_consume_security_rate_limit/);
+  assert.deepEqual(calls[0].parameters, ["company_login_identity", key, 5, 900]);
+  await limiter.clearBucket("company_login_identity", key);
+  assert.match(calls[1].text, /api_clear_security_rate_limit/);
+});
+
+test("Weiterleitungsadressen gelten nur hinter ausdrücklich vertrauten Proxys", () => {
+  const request = {
+    headers: { "x-forwarded-for": "198.51.100.4" },
+    socket: { remoteAddress: "::ffff:127.0.0.1" }
+  };
+  assert.equal(clientIp(request, 0), "127.0.0.1");
+  assert.equal(clientIp(request, 1), "198.51.100.4");
+  assert.equal(clientIp({
+    headers: { "x-forwarded-for": "nicht-eine-adresse" },
+    socket: { remoteAddress: "127.0.0.1" }
+  }, 1), "127.0.0.1");
 });
 
 test("Einrichtungsschlüssel werden zeitkonstant verglichen", () => {

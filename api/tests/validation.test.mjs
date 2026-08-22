@@ -450,11 +450,25 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
     category: "delivery_note",
     fileName: "Lieferschein.jpg",
     mimeType: "image/jpeg",
-    contentBase64: Buffer.from("Bildinhalt").toString("base64"),
+    contentBase64: Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x42, 0x69, 0x6c, 0x64, 0xff, 0xd9
+    ]).toString("base64"),
     constructionSiteId: "22222222-2222-4222-8222-222222222222"
   });
   assert.equal(deliveryNote.category, "delivery_note");
   assert.equal(deliveryNote.mimeType, "image/jpeg");
+
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Umbenannte Binärdatei",
+      category: "photo",
+      fileName: "Foto.jpg",
+      mimeType: "image/jpeg",
+      contentBase64: Buffer.from("kein JPEG").toString("base64"),
+      constructionSiteId: "22222222-2222-4222-8222-222222222222"
+    }),
+    /Dateiinhalt/
+  );
 
   assert.throws(
     () => validateDocumentUpload({

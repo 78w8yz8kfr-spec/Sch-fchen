@@ -11,6 +11,22 @@ function integer(name, fallback, minimum, maximum) {
   return value;
 }
 
+function boolean(name, fallback = false) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  throw new Error(`${name} muss true oder false sein.`);
+}
+
+function oneOf(name, fallback, values) {
+  const value = process.env[name]?.trim() || fallback;
+  if (!values.includes(value)) {
+    throw new Error(`${name} muss einen der Werte ${values.join(", ")} besitzen.`);
+  }
+  return value;
+}
+
 export function loadConfig() {
   const missing = REQUIRED.filter((name) => !process.env[name]?.trim());
   if (!process.env.DATABASE_URL && (!process.env.POSTGRES_HOST || !process.env.POSTGRES_DB)) {
@@ -33,7 +49,13 @@ export function loadConfig() {
   const timeZone = process.env.APP_TIME_ZONE || "Europe/Berlin";
   new Intl.DateTimeFormat("de-DE", { timeZone }).format(new Date());
 
+  const deploymentEnvironment = oneOf(
+    "APP_ENVIRONMENT",
+    "development",
+    ["development", "test", "demo", "staging", "production"]
+  );
   const production = process.env.NODE_ENV === "production";
+  const handlesRealData = deploymentEnvironment === "production";
   const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null;
   const setupToken = process.env.INITIAL_SETUP_TOKEN?.trim() || null;
   if (setupToken && setupToken.length < 24) {
@@ -43,17 +65,51 @@ export function loadConfig() {
   if (platformSetupToken && platformSetupToken.length < 24) {
     throw new Error("PLATFORM_SETUP_TOKEN muss mindestens 24 Zeichen lang sein.");
   }
+  const rateLimitSecret = process.env.SECURITY_RATE_LIMIT_SECRET?.trim()
+    || (handlesRealData ? null : "schaefchen-development-rate-limit-secret");
+  if (!rateLimitSecret || rateLimitSecret.length < 32) {
+    throw new Error("SECURITY_RATE_LIMIT_SECRET muss mindestens 32 Zeichen lang sein.");
+  }
+
+  const trustedProxyHops = integer("API_TRUSTED_PROXY_HOPS", 0, 0, 5);
+  const databaseSslMode = oneOf(
+    "API_DB_SSL_MODE",
+    handlesRealData ? "verify-full" : "disable",
+    ["disable", "require", "verify-full"]
+  );
+  const databaseSslCa = process.env.API_DB_SSL_CA?.replace(/\\n/g, "\n") || undefined;
+  const uploadScanRequired = boolean("UPLOAD_SCAN_REQUIRED", handlesRealData);
+  const uploadScanHost = process.env.UPLOAD_SCAN_HOST?.trim() || null;
+
+  if (handlesRealData && allowedOrigin.protocol !== "https:") {
+    throw new Error("API_ALLOWED_ORIGIN muss in der Produktionsumgebung HTTPS verwenden.");
+  }
+  if (handlesRealData && databaseSslMode === "disable") {
+    throw new Error("API_DB_SSL_MODE darf in der Produktionsumgebung nicht disable sein.");
+  }
+  if (handlesRealData && (!uploadScanRequired || !uploadScanHost)) {
+    throw new Error("Produktionsuploads benötigen UPLOAD_SCAN_REQUIRED=true und UPLOAD_SCAN_HOST.");
+  }
 
   return Object.freeze({
     port: integer("API_PORT", 3000, 1, 65535),
     allowedOrigin: allowedOrigin.origin,
+    deploymentEnvironment,
     timeZone,
     sessionTtlSeconds: integer("SESSION_TTL_SECONDS", 28800, 900, 86400),
-    cookieSecure: production || process.env.API_COOKIE_SECURE === "true",
+    cookieSecure: production || handlesRealData || boolean("API_COOKIE_SECURE", false),
+    trustedProxyHops,
+    rateLimitSecret,
     initialCompanyNumber: process.env.INITIAL_COMPANY_NUMBER || "F-000001",
     initialSetupToken: setupToken,
     platformSetupToken,
     staticDirectory: process.env.STATIC_DIRECTORY || null,
+    uploadScanner: Object.freeze({
+      required: uploadScanRequired,
+      host: uploadScanHost,
+      port: integer("UPLOAD_SCAN_PORT", 3310, 1, 65535),
+      timeoutMs: integer("UPLOAD_SCAN_TIMEOUT_MS", 15000, 1000, 60000)
+    }),
     database: {
       host: databaseUrl?.hostname || process.env.POSTGRES_HOST,
       port: databaseUrl ? Number(databaseUrl.port || 5432) : integer("POSTGRES_PORT", 5432, 1, 65535),
@@ -63,7 +119,11 @@ export function loadConfig() {
       max: integer("API_DB_POOL_SIZE", 10, 1, 50),
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
-      application_name: "schaefchen_api"
+      application_name: "schaefchen_api",
+      ssl: databaseSslMode === "disable" ? false : {
+        rejectUnauthorized: databaseSslMode === "verify-full",
+        ...(databaseSslCa ? { ca: databaseSslCa } : {})
+      }
     }
   });
 }

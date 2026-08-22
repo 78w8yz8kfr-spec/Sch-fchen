@@ -1,6 +1,6 @@
 COMPOSE := docker compose --env-file .env
 
-.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-api-role db-seed db-test api-up api-test api-coverage backup restore backup-restore-test frontend-test frontend-serve
+.PHONY: check-env dev-up dev-init dev-down dev-reset db-migrate db-api-role db-seed db-test api-up api-test api-coverage backup restore backup-local-dev restore-local-dev backup-restore-test frontend-test frontend-serve
 
 check-env:
 	@test -f .env || (echo "Fehler: .env fehlt. Zuerst 'cp .env.example .env' ausführen." && exit 1)
@@ -50,14 +50,28 @@ dev-down: check-env
 dev-reset: check-env
 	$(COMPOSE) down --volumes
 
-backup: check-env
+backup:
+	@echo "Abbruch: Der alte Klartext-Backup-Befehl ist deaktiviert."
+	@echo "Produktion: docs/BACKUP_RESTORE_RUNBOOK.md verwenden."
+	@echo "Nur lokal: make backup-local-dev CONFIRM=PLAINTEXT_LOCAL_BACKUP"
+	@exit 2
+
+restore:
+	@echo "Abbruch: Ein Restore in die aktive Datenbank ist nicht mehr der Standardweg."
+	@echo "Restore-Drill: docs/BACKUP_RESTORE_RUNBOOK.md verwenden."
+	@echo "Nur lokal: make restore-local-dev FILE=... CONFIRM=OVERWRITE_LOCAL_DATABASE"
+	@exit 2
+
+backup-local-dev: check-env
+	@test "$(CONFIRM)" = "PLAINTEXT_LOCAL_BACKUP" || (echo "Fehler: Nur für lokale Testdaten CONFIRM=PLAINTEXT_LOCAL_BACKUP setzen." && exit 1)
 	@mkdir -p backups
 	@file="backups/schaefchen_$$(date +%Y%m%d_%H%M%S).dump"; \
 	$(COMPOSE) exec -T postgres sh -c 'pg_dump --format=custom --no-owner --username="$$POSTGRES_USER" --dbname="$$POSTGRES_DB"' > "$$file"; \
-	echo "Backup erstellt: $$file"
+	echo "Unverschlüsseltes lokales Testbackup erstellt: $$file"
 
-restore: check-env
-	@test -n "$(FILE)" || (echo "Fehler: make restore FILE=backups/datei.dump" && exit 1)
+restore-local-dev: check-env
+	@test "$(CONFIRM)" = "OVERWRITE_LOCAL_DATABASE" || (echo "Fehler: CONFIRM=OVERWRITE_LOCAL_DATABASE fehlt." && exit 1)
+	@test -n "$(FILE)" || (echo "Fehler: make restore-local-dev FILE=backups/datei.dump CONFIRM=OVERWRITE_LOCAL_DATABASE" && exit 1)
 	@test -f "$(FILE)" || (echo "Fehler: Datei $(FILE) nicht gefunden." && exit 1)
 	$(COMPOSE) exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --username="$$POSTGRES_USER" --dbname="$$POSTGRES_DB"' < "$(FILE)"
 

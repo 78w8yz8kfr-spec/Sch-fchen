@@ -4,8 +4,9 @@ import {
   withPlatformSessionTransaction,
   withPlatformTransaction
 } from "./database.mjs";
-import { hashPassword, verifyPassword } from "./password.mjs";
+import { createTemporaryPassword, hashPassword, verifyPassword } from "./password.mjs";
 import {
+  clientIp,
   createSessionToken,
   hashSessionToken,
   parseCookies,
@@ -37,6 +38,7 @@ const KNOWN_PLATFORM_PERMISSIONS = new Set([
   "versions.manage", "announcements.manage", "backups.manage",
   "privacy.manage", "audit.read", "settings.manage"
 ]);
+const CLIENT_IP = Symbol("schaefchenClientIp");
 
 function json(response, status, body, headers = {}) {
   const encoded = JSON.stringify(body);
@@ -203,9 +205,17 @@ async function validatedSettingValue(client, key, value) {
 }
 
 function requestIp(request) {
-  const forwarded = request.headers["x-forwarded-for"];
-  const candidate = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null;
-  return candidate || request.socket?.remoteAddress || null;
+  const value = request[CLIENT_IP] || clientIp(request, 0);
+  return value === "unknown" ? null : value;
+}
+
+async function consumeRateLimit(limiter, scope, key, limits, message, code) {
+  const outcome = await limiter.consume(scope, key, limits);
+  if (!outcome.allowed) {
+    throw new InputError(message, 429, code, {
+      retryAfterSeconds: outcome.retryAfterSeconds
+    });
+  }
 }
 
 function requestAppVersion(request) {
@@ -244,7 +254,8 @@ function publicRegistration(value) {
 
 const AUDIT_REDACTED_KEYS = new Set([
   "password_hash", "passwordHash", "token_hash", "tokenHash",
-  "invitation_token_hash", "invitationTokenHash", "setupToken"
+  "invitation_token_hash", "invitationTokenHash", "setupToken",
+  "temporaryPassword"
 ]);
 
 function sanitizeAuditState(value) {
@@ -370,7 +381,16 @@ async function setupStatus(pool) {
   });
 }
 
-async function createPlatformSuperadmin(pool, config, body) {
+async function createPlatformSuperadmin(pool, config, limiter, request, body) {
+  const rateKey = limiter.key(requestIp(request), "platform-setup");
+  await consumeRateLimit(
+    limiter,
+    "platform_setup",
+    rateKey,
+    { maximum: 5, windowMs: 15 * 60 * 1000 },
+    "Zu viele Einrichtungsversuche. Bitte später erneut versuchen.",
+    "setup_rate_limited"
+  );
   if (!config.platformSetupToken || !secretsEqual(body.setupToken, config.platformSetupToken)) {
     throw new InputError("Der Plattform-Einrichtungsschlüssel ist ungültig.", 403, "setup_forbidden");
   }
@@ -379,7 +399,7 @@ async function createPlatformSuperadmin(pool, config, body) {
   const email = requiredText(body.email, "E-Mail-Adresse", 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputError("Die E-Mail-Adresse ist ungültig.");
   const passwordHash = await hashPassword(body.password);
-  return withPlatformTransaction(pool, async (client) => {
+  const account = await withPlatformTransaction(pool, async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('platform-initial-setup', 0))");
     const count = await client.query("SELECT COUNT(*)::INTEGER AS count FROM platform_users");
     if (count.rows[0].count !== 0) {
@@ -413,15 +433,31 @@ async function createPlatformSuperadmin(pool, config, body) {
     );
     return publicValue(account.rows[0]);
   });
+  await limiter.clearBucket("platform_setup", rateKey);
+  return account;
 }
 
 async function login(pool, config, limiter, request, body) {
   const email = requiredText(body.email, "E-Mail-Adresse", 254).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
-  const rateKey = limiter.key(requestIp(request) || "unknown", "platform", email);
-  if (limiter.isBlocked(rateKey)) {
-    throw new InputError("Zu viele fehlgeschlagene Anmeldeversuche.", 429, "login_rate_limited");
-  }
+  const rateKey = limiter.key(requestIp(request), "platform", email);
+  const ipKey = limiter.key(requestIp(request), "platform-login");
+  await consumeRateLimit(
+    limiter,
+    "platform_login_ip",
+    ipKey,
+    { maximum: 30, windowMs: 15 * 60 * 1000 },
+    "Zu viele Anmeldeversuche von diesem Anschluss.",
+    "login_rate_limited"
+  );
+  await consumeRateLimit(
+    limiter,
+    "platform_login_identity",
+    rateKey,
+    { maximum: 5, windowMs: 15 * 60 * 1000 },
+    "Zu viele fehlgeschlagene Anmeldeversuche.",
+    "login_rate_limited"
+  );
   const lookup = await withPlatformTransaction(
     pool,
     (client) => client.query(
@@ -444,10 +480,9 @@ async function login(pool, config, limiter, request, body) {
         [row.platform_user_id]
       ));
     }
-    limiter.fail(rateKey);
     throw new InputError("E-Mail-Adresse oder Passwort ist falsch.", 401, "login_failed");
   }
-  limiter.clear(rateKey);
+  await limiter.clearBucket("platform_login_identity", rateKey);
   const token = createSessionToken();
   const tokenHash = hashSessionToken(token);
   const result = await withPlatformTransaction(pool, async (client) => {
@@ -1188,6 +1223,7 @@ async function accountAction(client, context, permissions, request, accountId, b
   );
   if (before.rowCount !== 1) throw new InputError("Das Benutzerkonto wurde nicht gefunden.", 404, "account_not_found");
   const account = before.rows[0];
+  let temporaryPassword = null;
   if (action === "unlock") {
     if (account.status !== "active") {
       throw new InputError("Ein deaktiviertes oder archiviertes Konto kann nicht als Sperrfall entsperrt werden.", 409, "account_not_locked");
@@ -1228,7 +1264,24 @@ async function accountAction(client, context, permissions, request, accountId, b
        WHERE company_id = $3 AND user_id = $1 AND revoked_at IS NULL`,
       [accountId, `platform_${action}`, account.company_id]
     );
-    if (action !== "end_sessions") {
+    if (action === "reset_password") {
+      if (account.status !== "active") {
+        throw new InputError(
+          "Ein deaktiviertes oder archiviertes Konto kann kein neues Startpasswort erhalten.",
+          409,
+          "password_reset_inactive"
+        );
+      }
+      temporaryPassword = createTemporaryPassword();
+      const passwordHash = await hashPassword(temporaryPassword);
+      await client.query(
+        `UPDATE users
+         SET password_hash = $2, must_change_password = TRUE,
+             failed_login_attempts = 0, locked_until = NULL
+         WHERE id = $1`,
+        [accountId, passwordHash]
+      );
+    } else if (action === "resend_invitation") {
       await client.query("UPDATE users SET must_change_password = TRUE WHERE id = $1", [accountId]);
     }
   } else if (action === "reassign_company") {
@@ -1261,7 +1314,10 @@ async function accountAction(client, context, permissions, request, accountId, b
     companyId: after.rows[0]?.company_id || account.company_id,
     oldState: account, newState: after.rows[0] || { sessionsEnded: true }, reason
   });
-  return publicValue(after.rows[0] || account);
+  return {
+    ...publicValue(after.rows[0] || account),
+    ...(temporaryPassword ? { temporaryPassword } : {})
+  };
 }
 
 async function listPlans(client) {
@@ -2026,13 +2082,20 @@ async function supportContext(client, context, permissions, request, accessId) {
 export function createPlatformHandler({ pool, config, limiter }) {
   return async function handlePlatformRequest(request, response, url) {
     if (!url.pathname.startsWith("/api/v1/platform")) return false;
+    request[CLIENT_IP] = clientIp(request, config.trustedProxyHops);
 
     if (request.method === "GET" && url.pathname === "/api/v1/platform/setup") {
       json(response, 200, { setup: await setupStatus(pool) });
       return true;
     }
     if (request.method === "POST" && url.pathname === "/api/v1/platform/setup") {
-      const account = await createPlatformSuperadmin(pool, config, await readJson(request));
+      const account = await createPlatformSuperadmin(
+        pool,
+        config,
+        limiter,
+        request,
+        await readJson(request)
+      );
       json(response, 201, { account });
       return true;
     }
@@ -2044,6 +2107,17 @@ export function createPlatformHandler({ pool, config, limiter }) {
         })
       });
       return true;
+    }
+
+    if (["POST", "PATCH", "DELETE", "PUT"].includes(request.method)) {
+      await consumeRateLimit(
+        limiter,
+        "platform_write_ip",
+        limiter.key(requestIp(request), "platform-write"),
+        { maximum: 300, windowMs: 5 * 60 * 1000 },
+        "Zu viele Plattformänderungen von diesem Anschluss. Bitte kurz warten.",
+        "write_rate_limited"
+      );
     }
 
     const result = await authenticated(pool, request, async (client, context, permissions) => {

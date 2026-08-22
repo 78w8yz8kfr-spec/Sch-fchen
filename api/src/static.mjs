@@ -18,14 +18,18 @@ const CONTENT_TYPES = new Map([
 ]);
 
 const SECURITY_HEADERS = Object.freeze({
-  "Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; manifest-src 'self'; media-src 'self' blob:; script-src 'self'; style-src 'self'; worker-src 'self' blob:",
+  "Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'self' blob:; img-src 'self' data: blob:; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self' blob:",
   // Die Kamera bleibt auf Schäfchens eigene Herkunft begrenzt und benötigt
   // zusätzlich weiterhin die ausdrückliche Freigabe des Benutzers. Fremde
   // Frames erhalten wegen frame-ancestors 'none' keinen Zugriff.
   "Permissions-Policy": "camera=(self), geolocation=(), microphone=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
   "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000",
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY"
+  "X-Frame-Options": "DENY",
+  "X-Permitted-Cross-Domain-Policies": "none"
 });
 
 // sameOriginFrame: erlaubt, dass die App diese Antwort in einem eigenen

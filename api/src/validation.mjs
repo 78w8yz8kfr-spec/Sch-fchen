@@ -1,3 +1,5 @@
+import { fileSignatureMatches } from "./file-signatures.mjs";
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ENTRY_TYPES = new Set([
@@ -124,10 +126,11 @@ const HOLIDAY_FEDERAL_STATES = new Set([
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 
 export class InputError extends Error {
-  constructor(message, status = 400, code = "invalid_request") {
+  constructor(message, status = 400, code = "invalid_request", details = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    this.retryAfterSeconds = details.retryAfterSeconds ?? null;
   }
 }
 
@@ -899,6 +902,13 @@ export function validateDocumentUpload(body) {
       "document_too_large"
     );
   }
+  if (!fileSignatureMatches(content, mimeType)) {
+    throw new InputError(
+      "Der Dateiinhalt stimmt nicht mit dem angegebenen Dateityp überein.",
+      415,
+      "document_signature_mismatch"
+    );
+  }
 
   const customerId = optionalUuid(body.customerId, "Kunde");
   const projectId = optionalUuid(body.projectId, "Projekt");
@@ -1600,7 +1610,7 @@ function legacyOriginalPdf(value) {
     content.toString("base64") !== contentBase64
     || content.length < 5
     || content.length > MAXIMUM_DOCUMENT_BYTES
-    || content.subarray(0, 5).toString("ascii") !== "%PDF-"
+    || !fileSignatureMatches(content, "application/pdf")
   ) {
     throw new InputError(
       "Die VDE-Original-PDF ist ungültig oder größer als 5 MB.",
@@ -1793,7 +1803,7 @@ function signaturePng(value, label) {
     content.toString("base64") !== contentBase64
     || content.length < 50
     || content.length > 500000
-    || !content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    || !fileSignatureMatches(content, "image/png")
   ) {
     throw new InputError(`${label} ist ungültig oder zu groß.`);
   }

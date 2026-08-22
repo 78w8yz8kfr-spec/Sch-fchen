@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hashPassword, verifyPassword } from "../src/password.mjs";
+import { createTemporaryPassword, hashPassword, verifyPassword } from "../src/password.mjs";
 
 test("scrypt-Hash verifiziert nur das richtige Passwort", async () => {
   const hash = await hashPassword("Sicheres-Testpasswort-2026!");
   assert.match(hash, /^scrypt\$16384\$8\$1\$/);
   assert.equal(await verifyPassword("Sicheres-Testpasswort-2026!", hash), true);
   assert.equal(await verifyPassword("Falsches Passwort", hash), false);
+});
+
+test("Einmal-Startpasswörter sind zufällig und erfüllen die Passwortregeln", async () => {
+  const first = createTemporaryPassword();
+  const second = createTemporaryPassword();
+  assert.notEqual(first, second);
+  assert.match(first, /[A-Za-z]/);
+  assert.match(first, /\d/);
+  assert.ok(first.length >= 24);
+  assert.equal(await verifyPassword(first, await hashPassword(first)), true);
 });
 
 test("ungültige oder überteuerte Hashparameter werden sicher abgewiesen", async () => {
