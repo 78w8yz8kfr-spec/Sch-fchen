@@ -12,15 +12,17 @@ import {
 } from "./database.mjs";
 import { hashPassword, verifyPassword } from "./password.mjs";
 import {
+  clientIp,
   createSessionToken,
+  DatabaseRateLimiter,
   hashSessionToken,
-  LoginRateLimiter,
   parseCookies,
   secretsEqual,
   SESSION_COOKIE,
   sessionCookie
 } from "./security.mjs";
 import { securityHeaders, serveStatic } from "./static.mjs";
+import { createUploadScanner } from "./malware-scan.mjs";
 import {
   buildAssignmentImportPreview,
   normalizeImportText,
@@ -202,7 +204,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.39";
+export const APPLICATION_VERSION = "0.45.0";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -323,12 +325,16 @@ async function createInitialAdmin(pool, config, limiter, request, body) {
     throw new InputError("Die Ersteinrichtung ist serverseitig nicht freigeschaltet.", 503, "setup_unavailable");
   }
   const input = validateInitialSetup(body);
-  const key = limiter.key(clientIp(request), "setup", config.initialCompanyNumber);
-  if (limiter.isBlocked(key)) {
-    throw new InputError("Zu viele Einrichtungsversuche. Bitte später erneut versuchen.", 429, "rate_limited");
-  }
+  const key = limiter.key(
+    clientIp(request, config.trustedProxyHops),
+    "setup",
+    config.initialCompanyNumber
+  );
+  await consumeRateLimit(limiter, "company_setup", key, {
+    maximum: 5,
+    windowMs: 15 * 60 * 1000
+  }, "Zu viele Einrichtungsversuche. Bitte später erneut versuchen.");
   if (!secretsEqual(input.setupToken, config.initialSetupToken)) {
-    limiter.fail(key);
     throw new InputError("Der Einrichtungsschlüssel ist falsch.", 401, "invalid_setup_token");
   }
 
@@ -352,15 +358,11 @@ async function createInitialAdmin(pool, config, limiter, request, body) {
       ]
     );
   });
-  limiter.clear(key);
+  await limiter.clearBucket("company_setup", key);
   return {
     companyNumber: config.initialCompanyNumber,
     personnelNumber: input.personnelNumber
   };
-}
-
-function clientIp(request) {
-  return request.socket.remoteAddress || "unknown";
 }
 
 function clientAppVersion(request) {
@@ -537,10 +539,17 @@ function adminWorkDayDto(day) {
 
 async function createLogin(pool, config, limiter, request, body) {
   const input = validateLogin(body);
-  const key = limiter.key(clientIp(request), input.companyNumber, input.personnelNumber);
-  if (limiter.isBlocked(key)) {
-    throw new InputError("Zu viele Anmeldeversuche. Bitte später erneut versuchen.", 429, "rate_limited");
-  }
+  const ip = clientIp(request, config.trustedProxyHops);
+  const key = limiter.key(ip, input.companyNumber.toLowerCase(), input.personnelNumber.toLowerCase());
+  const ipKey = limiter.key(ip, "company-login");
+  await consumeRateLimit(limiter, "company_login_ip", ipKey, {
+    maximum: 30,
+    windowMs: 15 * 60 * 1000
+  }, "Zu viele Anmeldeversuche von diesem Anschluss. Bitte später erneut versuchen.");
+  await consumeRateLimit(limiter, "company_login_identity", key, {
+    maximum: 5,
+    windowMs: 15 * 60 * 1000
+  }, "Zu viele Anmeldeversuche. Bitte später erneut versuchen.");
 
   const account = await withApiTransaction(pool, async (client) => {
     const lookup = await client.query(
@@ -561,11 +570,10 @@ async function createLogin(pool, config, limiter, request, body) {
         )
       );
     }
-    limiter.fail(key);
     throw new InputError("Firmennummer, Personalnummer oder Passwort ist falsch.", 401, "invalid_credentials");
   }
 
-  limiter.clear(key);
+  await limiter.clearBucket("company_login_identity", key);
   const token = createSessionToken();
   const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + config.sessionTtlSeconds * 1000);
@@ -2598,7 +2606,8 @@ async function createVdeInspection(
   context,
   input,
   accessDate,
-  originalPdf = null
+  originalPdf = null,
+  uploadScanner = null
 ) {
   const siteContext = await getVdeSiteContext(
     client,
@@ -2628,6 +2637,10 @@ async function createVdeInspection(
       ),
       idempotent: true
     };
+  }
+
+  if (originalPdf && uploadScanner) {
+    await uploadScanner.scan(originalPdf.content);
   }
 
   const inspectorUserId = await resolveVdeInspector(
@@ -2751,7 +2764,8 @@ async function completeVdeInspection(
   inspectionId,
   input,
   accessDate,
-  staticDirectory
+  staticDirectory,
+  uploadScanner = null
 ) {
   const current = await getVdeInspectionRecord(client, context, inspectionId);
   const siteContext = await getVdeSiteContext(
@@ -2782,6 +2796,7 @@ async function completeVdeInspection(
       "row_version_conflict"
     );
   }
+  if (uploadScanner) await uploadScanner.scan(input.inspectorSignatureData);
 
   const completedAt = new Date().toISOString();
   const company = siteContext.companySnapshot;
@@ -5442,14 +5457,23 @@ async function storeDocument(client, context, input) {
   return { document: await getDocumentRecord(client, context, documentId), reused };
 }
 
-async function createDocument(client, context, input) {
+async function createDocument(client, context, input, uploadScanner = null) {
   const roles = await requirePlanner(client, context);
   await requireDocumentTargetAccess(client, context, input, roles);
+  if (uploadScanner) await uploadScanner.scan(input.content);
   return storeDocument(client, context, input);
 }
 
-async function createSitePhoto(client, context, constructionSiteId, date, input) {
+async function createSitePhoto(
+  client,
+  context,
+  constructionSiteId,
+  date,
+  input,
+  uploadScanner
+) {
   await requireSiteWorkspaceAccess(client, context, constructionSiteId, date);
+  await uploadScanner.scan(input.content);
   return storeDocument(client, context, input);
 }
 
@@ -6481,7 +6505,14 @@ async function reviseMobileSiteReport(client, context, reportId, input) {
   return getSiteReportRecord(client, context, reportId);
 }
 
-async function finalizeSiteReport(client, context, reportId, input, staticDirectory) {
+async function finalizeSiteReport(
+  client,
+  context,
+  reportId,
+  input,
+  staticDirectory,
+  uploadScanner = null
+) {
   const roles = await requirePlanner(client, context);
   await requireScopedEntitySiteAccess(client, context, "site_reports", reportId, roles);
   const result = await client.query(
@@ -6522,6 +6553,10 @@ async function finalizeSiteReport(client, context, reportId, input, staticDirect
   }
   if (Number(row.row_version) !== input.rowVersion) {
     throw new InputError("Der Bericht wurde bereits geändert. Bitte neu laden.", 409, "row_version_conflict");
+  }
+  if (uploadScanner) {
+    await uploadScanner.scan(input.employeeSignatureData);
+    await uploadScanner.scan(input.customerSignatureData);
   }
 
   const finalizedAt = new Date().toISOString();
@@ -10292,8 +10327,43 @@ async function recordUnhandledPlatformError(pool, request, requestId, error) {
   });
 }
 
-export function createApp({ pool, config, limiter = new LoginRateLimiter(), logger = console }) {
-  const platformHandler = createPlatformHandler({ pool, config, limiter });
+function rateLimitInputError(message, outcome, code = "rate_limited") {
+  return new InputError(message, 429, code, {
+    retryAfterSeconds: outcome.retryAfterSeconds
+  });
+}
+
+async function consumeRateLimit(limiter, scope, key, limits, message, code = "rate_limited") {
+  const outcome = await limiter.consume(scope, key, limits);
+  if (!outcome.allowed) throw rateLimitInputError(message, outcome, code);
+  return outcome;
+}
+
+function isUploadRequest(method, pathname) {
+  if (method !== "POST") return false;
+  return pathname === "/api/v1/admin/documents"
+    || pathname === "/api/v1/vde/imports"
+    || /^\/api\/v1\/construction-sites\/[^/]+\/photos$/.test(pathname)
+    || /^\/api\/v1\/admin\/devices\/[^/]+\/photo$/.test(pathname)
+    || /^\/api\/v1\/devices\/[^/]+\/defects$/.test(pathname)
+    || /^\/api\/v1\/vde\/inspections\/[^/]+\/complete$/.test(pathname)
+    || /^\/api\/v1\/admin\/site-reports\/[^/]+\/finalize$/.test(pathname)
+    || /^\/api\/v1\/admin\/(?:assignment|site)-imports(?:\/preview)?$/.test(pathname);
+}
+
+export function createApp({
+  pool,
+  config,
+  limiter = null,
+  uploadScanner = null,
+  logger = console
+}) {
+  const effectiveLimiter = limiter || new DatabaseRateLimiter({
+    execute: (callback) => withApiTransaction(pool, callback),
+    secret: config.rateLimitSecret || "schaefchen-integration-rate-limit-secret"
+  });
+  const effectiveUploadScanner = uploadScanner || createUploadScanner(config.uploadScanner);
+  const platformHandler = createPlatformHandler({ pool, config, limiter: effectiveLimiter });
   let runtimeCache = { validUntil: 0, value: null };
   const runtimeState = async () => {
     const now = Date.now();
@@ -10387,12 +10457,24 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/setup") {
-        const account = await createInitialAdmin(pool, config, limiter, request, await readJson(request));
+        const account = await createInitialAdmin(
+          pool,
+          config,
+          effectiveLimiter,
+          request,
+          await readJson(request)
+        );
         return json(response, 201, { created: true, account });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/session") {
-        const { token, view } = await createLogin(pool, config, limiter, request, await readJson(request));
+        const { token, view } = await createLogin(
+          pool,
+          config,
+          effectiveLimiter,
+          request,
+          await readJson(request)
+        );
         return json(response, 201, { session: view }, {
           "Set-Cookie": sessionCookie(token, { secure: config.cookieSecure, maxAge: config.sessionTtlSeconds })
         });
@@ -10403,6 +10485,28 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         throw new InputError("Anmeldung erforderlich.", 401, "unauthorized");
       }
       const tokenHash = hashSessionToken(token);
+
+      if (["POST", "PATCH", "DELETE"].includes(request.method)) {
+        const requestIp = clientIp(request, config.trustedProxyHops);
+        await consumeRateLimit(
+          effectiveLimiter,
+          "company_write_ip",
+          effectiveLimiter.key(requestIp, "company-write"),
+          { maximum: 600, windowMs: 5 * 60 * 1000 },
+          "Zu viele Änderungen von diesem Anschluss. Bitte kurz warten.",
+          "write_rate_limited"
+        );
+        if (isUploadRequest(request.method, url.pathname)) {
+          await consumeRateLimit(
+            effectiveLimiter,
+            "company_upload_ip",
+            effectiveLimiter.key(requestIp, "company-upload"),
+            { maximum: 50, windowMs: 60 * 60 * 1000 },
+            "Zu viele Dateiübertragungen von diesem Anschluss. Bitte später erneut versuchen.",
+            "upload_rate_limited"
+          );
+        }
+      }
 
       if (request.method === "GET" && url.pathname === "/api/v1/session") {
         const view = await withSessionTransaction(pool, tokenHash, sessionView);
@@ -10473,6 +10577,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             url,
             client,
             context,
+            uploadScanner: effectiveUploadScanner,
             allowedOrigin: config.allowedOrigin,
             today: localDate(new Date().toISOString(), config.timeZone)
           })
@@ -10702,7 +10807,8 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             context,
             input,
             vdeAccessDate(),
-            input.originalPdf
+            input.originalPdf,
+            effectiveUploadScanner
           )
         );
         return json(
@@ -10733,7 +10839,8 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             inspectionId,
             input,
             vdeAccessDate(),
-            config.staticDirectory
+            config.staticDirectory,
+            effectiveUploadScanner
           )
         );
         return json(response, 200, { inspection });
@@ -10933,7 +11040,14 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const created = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => createSitePhoto(client, context, constructionSiteId, date, input)
+          (client, context) => createSitePhoto(
+            client,
+            context,
+            constructionSiteId,
+            date,
+            input,
+            effectiveUploadScanner
+          )
         );
         return json(response, 201, created);
       }
@@ -11239,7 +11353,14 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const siteReport = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => finalizeSiteReport(client, context, reportId, input, config.staticDirectory)
+          (client, context) => finalizeSiteReport(
+            client,
+            context,
+            reportId,
+            input,
+            config.staticDirectory,
+            effectiveUploadScanner
+          )
         );
         return json(response, 200, { siteReport });
       }
@@ -11249,7 +11370,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const created = await withReadySession(
           pool,
           tokenHash,
-          (client, context) => createDocument(client, context, input)
+          (client, context) => createDocument(client, context, input, effectiveUploadScanner)
         );
         return json(response, 201, created);
       }
@@ -11278,8 +11399,9 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports/preview") {
-        await withReadySession(pool, tokenHash, requirePlanner);
+        await withReadySession(pool, tokenHash, requireFullPlanner);
         const { workbook, mappings } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        await effectiveUploadScanner.scan(workbook);
         const plan = await parseAssignmentWorkbook(workbook);
         const preview = await withReadySession(
           pool,
@@ -11290,8 +11412,9 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/assignment-imports") {
-        await withReadySession(pool, tokenHash, requirePlanner);
+        await withReadySession(pool, tokenHash, requireFullPlanner);
         const { fileName, workbook, mappings } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        await effectiveUploadScanner.scan(workbook);
         const plan = await parseAssignmentWorkbook(workbook);
         const result = await withReadySession(
           pool,
@@ -11302,8 +11425,9 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/site-imports/preview") {
-        await withReadySession(pool, tokenHash, requirePlanner);
+        await withReadySession(pool, tokenHash, requireFullPlanner);
         const { workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        await effectiveUploadScanner.scan(workbook);
         const plan = await parseSiteWorkbook(workbook);
         const preview = await withReadySession(
           pool,
@@ -11314,8 +11438,9 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/site-imports") {
-        await withReadySession(pool, tokenHash, requirePlanner);
+        await withReadySession(pool, tokenHash, requireFullPlanner);
         const { workbook } = validateAssignmentImportPayload(await readJson(request, 2_100_000));
+        await effectiveUploadScanner.scan(workbook);
         const plan = await parseSiteWorkbook(workbook);
         const result = await withReadySession(
           pool,
@@ -11849,7 +11974,15 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       return json(response, 404, { error: { code: "not_found", message: "Endpunkt nicht gefunden." }, requestId });
     } catch (error) {
       if (error instanceof InputError) {
-        return json(response, error.status, { error: { code: error.code, message: error.message }, requestId });
+        const headers = error.retryAfterSeconds
+          ? { "Retry-After": String(error.retryAfterSeconds) }
+          : {};
+        return json(
+          response,
+          error.status,
+          { error: { code: error.code, message: error.message }, requestId },
+          headers
+        );
       }
       logger.error?.({ requestId, error: error?.message }, "API-Anfrage fehlgeschlagen");
       await recordUnhandledPlatformError(pool, request, requestId, error).catch((recordError) => {

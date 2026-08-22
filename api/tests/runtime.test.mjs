@@ -22,6 +22,10 @@ test("Browser-Sicherheitsregeln erlauben nur Schäfchens eigene QR-Kamera", () =
   assert.match(headers["Content-Security-Policy"], /worker-src 'self' blob:/);
   assert.match(headers["Content-Security-Policy"], /img-src 'self' data: blob:/);
   assert.match(headers["Content-Security-Policy"], /frame-ancestors 'none'/);
+  assert.match(headers["Content-Security-Policy"], /object-src 'none'/);
+  assert.equal(headers["Cross-Origin-Opener-Policy"], "same-origin");
+  assert.equal(headers["Cross-Origin-Resource-Policy"], "same-origin");
+  assert.equal(headers["Strict-Transport-Security"], "max-age=31536000");
 });
 
 // Der Barcode-Leser des Lagers ist die erste ausgelieferte .mjs-Datei. Fehlt

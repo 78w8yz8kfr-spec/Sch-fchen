@@ -1,4 +1,5 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 
 export const SESSION_COOKIE = "schaefchen_session";
 export const PLATFORM_SESSION_COOKIE = "schaefchen_platform_session";
@@ -16,6 +17,35 @@ export function secretsEqual(received, expected) {
   const receivedHash = createHash("sha256").update(received, "utf8").digest();
   const expectedHash = createHash("sha256").update(expected, "utf8").digest();
   return timingSafeEqual(receivedHash, expectedHash);
+}
+
+function normalizedIp(value) {
+  if (typeof value !== "string") return null;
+  let candidate = value.trim();
+  if (candidate.startsWith("[") && candidate.endsWith("]")) {
+    candidate = candidate.slice(1, -1);
+  }
+  if (candidate.toLowerCase().startsWith("::ffff:") && isIP(candidate.slice(7)) === 4) {
+    candidate = candidate.slice(7);
+  }
+  return isIP(candidate) ? candidate.toLowerCase() : null;
+}
+
+// X-Forwarded-For darf nur ausgewertet werden, wenn die Zahl der eigenen
+// vorgeschalteten Proxys ausdrücklich bekannt ist. So kann ein direkter
+// Client keine beliebige Adresse in die Sperr- und Auditlogik einschleusen.
+export function clientIp(request, trustedProxyHops = 0) {
+  const remote = normalizedIp(request.socket?.remoteAddress) || "unknown";
+  if (!Number.isInteger(trustedProxyHops) || trustedProxyHops < 1) return remote;
+
+  const forwarded = request.headers?.["x-forwarded-for"];
+  if (typeof forwarded !== "string" || forwarded.length > 2048) return remote;
+  const addresses = forwarded.split(",").map(normalizedIp);
+  if (addresses.length > 20 || addresses.some((address) => !address)) return remote;
+
+  const chain = [...addresses, remote];
+  const clientIndex = chain.length - 1 - trustedProxyHops;
+  return clientIndex >= 0 ? chain[clientIndex] : remote;
 }
 
 export function parseCookies(header = "") {
@@ -69,8 +99,8 @@ export class LoginRateLimiter {
     this.failures = new Map();
   }
 
-  key(ip, companyNumber, personnelNumber) {
-    return `${ip}|${companyNumber.toLowerCase()}|${personnelNumber.toLowerCase()}`;
+  key(...parts) {
+    return parts.map((part) => String(part ?? "").toLowerCase()).join("|");
   }
 
   isBlocked(key, now = Date.now()) {
@@ -94,5 +124,79 @@ export class LoginRateLimiter {
 
   clear(key) {
     this.failures.delete(key);
+  }
+
+  consume(scope, key, {
+    maximum = this.maximumFailures,
+    windowMs = this.windowMs
+  } = {}, now = Date.now()) {
+    const bucketKey = `${scope}|${key}`;
+    const current = this.failures.get(bucketKey);
+    const entry = !current || current.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : current;
+    entry.count += 1;
+    this.failures.set(bucketKey, entry);
+    return {
+      allowed: entry.count <= maximum,
+      attemptCount: entry.count,
+      retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - now) / 1000))
+    };
+  }
+
+  clearBucket(scope, key) {
+    this.failures.delete(`${scope}|${key}`);
+  }
+}
+
+export class DatabaseRateLimiter {
+  constructor({ execute, secret }) {
+    if (typeof execute !== "function") throw new TypeError("execute muss eine Funktion sein.");
+    if (typeof secret !== "string" || secret.length < 32) {
+      throw new TypeError("Das Rate-Limit-Geheimnis muss mindestens 32 Zeichen lang sein.");
+    }
+    this.execute = execute;
+    this.secret = secret;
+  }
+
+  key(...parts) {
+    const hmac = createHmac("sha256", this.secret);
+    for (const part of parts) {
+      const value = String(part ?? "");
+      hmac.update(String(Buffer.byteLength(value, "utf8")));
+      hmac.update(":");
+      hmac.update(value, "utf8");
+      hmac.update("|");
+    }
+    return hmac.digest("hex");
+  }
+
+  async consume(scope, key, { maximum, windowMs }) {
+    if (!/^[a-z][a-z0-9_]{1,39}$/.test(scope)) throw new TypeError("Ungültiger Rate-Limit-Bereich.");
+    if (!/^[0-9a-f]{64}$/.test(key)) throw new TypeError("Ungültiger Rate-Limit-Schlüssel.");
+    if (!Number.isInteger(maximum) || maximum < 1 || maximum > 10000) {
+      throw new TypeError("Ungültige Rate-Limit-Obergrenze.");
+    }
+    const windowSeconds = Math.ceil(windowMs / 1000);
+    if (!Number.isInteger(windowSeconds) || windowSeconds < 1 || windowSeconds > 86400) {
+      throw new TypeError("Ungültiges Rate-Limit-Zeitfenster.");
+    }
+    const result = await this.execute((client) => client.query(
+      "SELECT allowed, attempt_count, retry_after_seconds FROM api_consume_security_rate_limit($1,$2,$3,$4)",
+      [scope, key, maximum, windowSeconds]
+    ));
+    const row = result.rows[0];
+    return {
+      allowed: Boolean(row?.allowed),
+      attemptCount: Number(row?.attempt_count || 0),
+      retryAfterSeconds: Math.max(1, Number(row?.retry_after_seconds || 1))
+    };
+  }
+
+  async clearBucket(scope, key) {
+    await this.execute((client) => client.query(
+      "SELECT api_clear_security_rate_limit($1,$2)",
+      [scope, key]
+    ));
   }
 }

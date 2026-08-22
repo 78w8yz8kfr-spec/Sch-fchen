@@ -152,7 +152,7 @@ make db-seed      # Entwicklungsdaten einspielen
 make db-test      # SQL-Abnahmetests ausführen
 make api-test     # API-Unit-Tests ausführen
 make api-up       # API bauen und starten
-make backup       # Datenbank-Dump unter backups/ erzeugen
+make backup-local-dev CONFIRM=PLAINTEXT_LOCAL_BACKUP # nur lokale Testdaten
 make backup-restore-test # vollständigen Dump und Restore prüfen
 make dev-down     # Container stoppen
 make frontend-test # PWA lokal prüfen
@@ -183,6 +183,13 @@ Sicherheitsgrenze und die Endpunkte der API stehen in
 [`docs/API_SECURITY.md`](docs/API_SECURITY.md). Die Trennung und Bedienung der
 Plattformverwaltung steht in
 [`docs/PLATFORM_ADMINISTRATION.md`](docs/PLATFORM_ADMINISTRATION.md). Der
+verbindliche Sicherheitsbetrieb, der verschlüsselte Backup-/Restore-Ablauf,
+die Umgebungstrennung und der TOM-Entwurf stehen in
+[`docs/SECURITY_OPERATIONS.md`](docs/SECURITY_OPERATIONS.md),
+[`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md),
+[`docs/BACKUP_RESTORE_RUNBOOK.md`](docs/BACKUP_RESTORE_RUNBOOK.md),
+[`docs/ENVIRONMENTS_AND_RELEASE_GATES.md`](docs/ENVIRONMENTS_AND_RELEASE_GATES.md)
+und [`docs/DATA_PROTECTION_TOMS.md`](docs/DATA_PROTECTION_TOMS.md). Der
 Korrektur- und Mitarbeiter-Lebenszyklus ist in
 [`docs/TIME_CORRECTIONS_AND_EMPLOYEE_LIFECYCLE.md`](docs/TIME_CORRECTIONS_AND_EMPLOYEE_LIFECYCLE.md)
 dokumentiert. Die verbindliche fachliche Grundlage steht in

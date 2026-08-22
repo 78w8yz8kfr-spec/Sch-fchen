@@ -1,10 +1,23 @@
 # Projektstatus
 
-Stand: 13.08.2026
-Technischer Stand: V0.44.39
+Stand: 22.08.2026
+Technischer Stand: V0.45.0
 
 
 ## Abgeschlossen
+
+- **Technischer Sicherheitsbetrieb gehärtet** (Fassung 0.45.0, Migrationen
+  149 und 150). Login, Einrichtung, Schreiben und Uploads besitzen gestufte,
+  neustartfeste PostgreSQL-Schranken mit HMAC-Kennungen; Proxy-Adressen werden
+  nur aus einer festgelegten Vertrauenskette übernommen. Dateien werden gegen
+  echte Signatur und sichere OOXML-Struktur geprüft, Produktionsuploads
+  zusätzlich fail-closed mit ClamAV. Der Plattformreset erzeugt ein nur einmal
+  sichtbares Startpasswort, widerruft Sitzungen und erzwingt den Wechsel.
+  Produktionskonfigurationen verlangen HTTPS, DB-TLS, getrenntes Geheimnis und
+  Pflichtscanner. Restic-Sicherung und getrennter Restore-Drill sind
+  reproduzierbar und Teil der CI; das Bedrohungsmodell weist Kontrollen und
+  verbleibende externe Risiken ausdrücklich aus. PWA-Speicher
+  `schaefchen-online-v122`
 
 - **Auslieferung repariert** (Fassung 0.44.39, Migration 148). Der Betrieb
   stand auf 0.44.34, während vier Fassungen grün gemergt waren: Migration 141
@@ -468,14 +481,14 @@ Technischer Stand: V0.44.39
 
 ## Noch zu prüfen
 
-- grüne GitHub-CI des exakten V0.42.0-Commits einschließlich Migrationen
-  039–044, SQL-Tests und PostgreSQL-Integration
 - reale iPhone-, Android-, Chrome-, Edge- und vollständige Offline-Abnahme
 - Last- und Datenmengentest mit 10.000 Mitarbeitern und mehrjährigen Buchungen
-- freigegebene Zielplattform, getrennte Staging-/Produktionsumgebungen,
-  dauerhafte Backups, PITR, Wiederherstellungsprobe und Alarmierung
-- Upload-Schadsoftwareprüfung, Rate Limits, Passwortzurücksetzung und
-  dokumentierter Admin-Notzugang
+- freigegebene Zielplattform und tatsächlich getrennte Staging-/Produktion;
+  die Konfigurationsgates und Vorlagen sind vorhanden, die Betreiberabnahme nicht
+- bezahltes Provider-PITR, externer Backup-Speicher, monatlich gemessene
+  Wiederherstellungsprobe und Alarmierung; Skripte und CI-Probe sind vorhanden
+- erreichbarer Produktionsscanner, Signaturmonitoring, unabhängiger
+  Penetrationstest und abgenommener Admin-Notzugangsprozess
 - externe Datenschutz-, AVV-, TOM-, Impressums- und Vertragsprüfung
 - vierwöchiger Pilot sowie Onboarding-, Support-, Störungs-, Preis- und
   Lizenzprozess
@@ -489,11 +502,11 @@ solange der reale Nachweis fehlt.
 
 ## Nächster Entwicklungsschritt
 
-Nach grüner V0.42.0-CI folgt der Fahrplan-Schritt V0.50. Die VDE-Integration ist
-bereits technisch vorhanden; deshalb wird V0.50 als formale
-Integrationsabnahme genutzt: gemeinsamer Vertrag, Rollen- und
-Deaktivierungsgrenzen, V15-Migration, Messdatenhistorie und zentrale
-Abschlussdokumente werden gegen die Fahrplanmatrix geschlossen.
+Vor echten Firmendaten folgt die reale Betriebsabnahme der V0.45.0: getrennte
+Staging- und Produktionsressourcen, bezahltes PITR, externe verschlüsselte
+Sicherung, gemessener Monatsdrill, Monitoring, Penetrationstest und rechtliche
+Freigabe. Erst ein tatsächlicher Nachweis schließt die Tickets 15, 16, 17 und
+19; die vorhandenen technischen Bausteine allein tun das bewusst nicht.
 
 Parallel bleiben die Produktions-, Geräte-, Last-, Rechts- und Pilot-Gates
 verbindlich offen. Sie dürfen vor echten Betriebsdaten beziehungsweise V1.0

@@ -3,6 +3,7 @@ import { toString as qrToString } from "qrcode";
 import { loadCompanyModules } from "./company-modules.mjs";
 import { ensureRcdNotifications } from "./power.mjs";
 import { InputError, readJson, validateId } from "./validation.mjs";
+import { fileSignatureMatches } from "./file-signatures.mjs";
 
 export const DEVICE_MODULE_KEY = "devices";
 
@@ -1709,18 +1710,40 @@ async function qrDocument(client, context, deviceId, allowedOrigin) {
 
 function decodeImage(dataUrl) {
   if (!dataUrl) return null;
-  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
   if (!match) throw new InputError("Das Foto muss JPEG, PNG oder WebP sein.");
+  if (match[2].length % 4 !== 0) {
+    throw new InputError("Der Bildinhalt ist ungültig.");
+  }
   const content = Buffer.from(match[2], "base64");
+  if (content.toString("base64") !== match[2]) {
+    throw new InputError("Der Bildinhalt ist ungültig.");
+  }
   if (!content.length || content.length > 3_000_000) {
     throw new InputError("Das Foto darf höchstens 3 MB groß sein.", 413, "device_photo_too_large");
+  }
+  if (!fileSignatureMatches(content, match[1])) {
+    throw new InputError(
+      "Der Bildinhalt stimmt nicht mit dem angegebenen Dateityp überein.",
+      415,
+      "device_photo_signature_mismatch"
+    );
   }
   return { mimeType: match[1], content, sha256: createHash("sha256").update(content).digest("hex") };
 }
 
-async function storeImage(client, context, deviceId, kind, dataUrl, defectId = null) {
+async function storeImage(
+  client,
+  context,
+  deviceId,
+  kind,
+  dataUrl,
+  defectId = null,
+  uploadScanner = null
+) {
   const image = decodeImage(dataUrl);
   if (!image) return null;
+  if (uploadScanner) await uploadScanner.scan(image.content);
   const result = await client.query(
     `INSERT INTO device_images (
        company_id,device_id,defect_id,image_kind,mime_type,size_bytes,sha256_hex,content,uploaded_by_user_id
@@ -1748,7 +1771,7 @@ async function deviceImage(client, context, deviceId) {
   };
 }
 
-async function reportDefect(client, context, deviceId, input) {
+async function reportDefect(client, context, deviceId, input, uploadScanner) {
   const locked = await lockDevice(client, context, deviceId);
   if (locked.status === "retired") {
     throw new InputError(
@@ -1761,7 +1784,15 @@ async function reportDefect(client, context, deviceId, input) {
      ) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,reported_at`,
     [context.companyId, deviceId, context.userId, input.description, input.severity, input.usable]
   );
-  const imageId = await storeImage(client, context, deviceId, "defect", input.photoDataUrl, defect.rows[0].id);
+  const imageId = await storeImage(
+    client,
+    context,
+    deviceId,
+    "defect",
+    input.photoDataUrl,
+    defect.rows[0].id,
+    uploadScanner
+  );
   await client.query(
     `UPDATE devices SET condition_key=$3,status=$4
      WHERE company_id=$1 AND id=$2`,
@@ -2098,11 +2129,17 @@ async function createLocation(client, context, body) {
   return result.rows[0];
 }
 
-async function uploadProfilePhoto(client, context, deviceId, body) {
+async function uploadProfilePhoto(client, context, deviceId, body, uploadScanner) {
   await requireManager(client, context);
   await loadDevice(client, context, deviceId);
   const imageId = await storeImage(
-    client, context, deviceId, "device", requiredText(body.dataUrl, "Foto", 4_100_000)
+    client,
+    context,
+    deviceId,
+    "device",
+    requiredText(body.dataUrl, "Foto", 4_100_000),
+    null,
+    uploadScanner
   );
   await audit(client, context, deviceId, "device_photo_added", null, { imageId }, "Gerätefoto aktualisiert");
   return { imageId, photoUrl: `./api/v1/devices/${deviceId}/photo` };
@@ -2278,7 +2315,15 @@ async function updateSettings(client, context, body) {
   return result.rows[0];
 }
 
-export async function handleDeviceRequest({ request, url, client, context, allowedOrigin, today }) {
+export async function handleDeviceRequest({
+  request,
+  url,
+  client,
+  context,
+  allowedOrigin,
+  today,
+  uploadScanner = null
+}) {
   const path = url.pathname;
   if (!path.startsWith("/api/v1/devices") && !path.startsWith("/api/v1/admin/devices")) {
     return null;
@@ -2431,7 +2476,11 @@ export async function handleDeviceRequest({ request, url, client, context, allow
   const adminPhotoMatch = /^\/api\/v1\/admin\/devices\/([^/]+)\/photo$/.exec(path);
   if (request.method === "POST" && adminPhotoMatch) {
     return { status: 201, body: { photo: await uploadProfilePhoto(
-      client, context, validateId(adminPhotoMatch[1], "Geräte-ID"), await readJson(request, 4_200_000)
+      client,
+      context,
+      validateId(adminPhotoMatch[1], "Geräte-ID"),
+      await readJson(request, 4_200_000),
+      uploadScanner
     ) } };
   }
   const adminInspectionMatch = /^\/api\/v1\/admin\/devices\/([^/]+)\/inspections$/.exec(path);
@@ -2487,7 +2536,8 @@ export async function handleDeviceRequest({ request, url, client, context, allow
   if (request.method === "POST" && defectMatch) {
     return { status: 201, body: { defect: await reportDefect(
       client, context, validateId(defectMatch[1], "Geräte-ID"),
-      validateDefectInput(await readJson(request, 4_200_000))
+      validateDefectInput(await readJson(request, 4_200_000)),
+      uploadScanner
     ) } };
   }
   const deviceMatch = /^\/api\/v1\/devices\/([^/]+)$/.exec(path);

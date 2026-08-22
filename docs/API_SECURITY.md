@@ -1,7 +1,7 @@
 # API-Sicherheitsgrenze
 
-Stand: 01.08.2026
-Technischer Stand: V0.42.0
+Stand: 22.08.2026
+Technischer Stand: V0.45.0
 
 Die API ist die einzige erlaubte Verbindung zwischen PWA und PostgreSQL. Die
 öffentliche GitHub-Pages-Adresse bleibt eine lokale Demo. Im Online-Betrieb
@@ -17,7 +17,7 @@ keinen Mandanten und keinen Logo-Schlüssel selbst. Solange noch kein Benutzer
 existiert, kann `api_create_initial_admin` genau ein Konto mit der aktiven
 Admin-Systemrolle anlegen. Der API-Endpunkt verlangt zusätzlich einen
 mindestens 24 Zeichen langen geheimen Einrichtungsschlüssel, vergleicht ihn
-zeitkonstant und begrenzt Fehlversuche. Das Passwort wird vor der
+zeitkonstant und begrenzt Fehlversuche in PostgreSQL. Das Passwort wird vor der
 Datenbanktransaktion mit `scrypt` gehasht.
 
 ## Anmeldung und Sitzung
@@ -44,14 +44,31 @@ Passwörter haben das Format
 `scrypt$N$r$p$salt-base64url$hash-base64url`. Zulässige Parameter sind begrenzt,
 damit manipulierte Hashes keine unkontrollierte Rechen- oder Speicherlast
 auslösen. Fehlende Benutzer werden mit demselben Hashverfahren geprüft und
-erhalten dieselbe Fehlermeldung wie falsche Passwörter. Nach fünf Fehlern wird
+erhalten dieselbe Fehlermeldung wie falsche Passwörter. Nach fünf Versuchen wird
 die Kombination aus Netzwerkadresse, Firma und Personalnummer vorübergehend
-gesperrt.
+gesperrt; zusätzlich gilt eine Anschlussgrenze gegen Kennungs-Spraying. Die
+Schlüssel werden mit einem umgebungseigenen HMAC pseudonymisiert und die
+Buckets atomar in PostgreSQL geführt. Sie gelten damit auch nach Neustart und
+über mehrere API-Instanzen.
 
 Ein erfolgreicher Login erzeugt 32 kryptografisch zufällige Bytes. In
 `user_sessions` wird nur deren SHA-256-Hash gespeichert. Der Browser erhält das
 Original als `HttpOnly`, `SameSite=Strict` und in Produktion `Secure` gesetztes
 Cookie. Abmeldung widerruft die Sitzung; ein Hartlöschen ist nicht erlaubt.
+
+Schreib- und Uploadpfade besitzen getrennte Anschlussgrenzen. Eine 429-Antwort
+nennt `Retry-After`. `X-Forwarded-For` wird nur entsprechend der ausdrücklich
+konfigurierten Zahl eigener Proxys ausgewertet; ohne diese Vertrauenskette
+entscheidet die unmittelbare TCP-Gegenstelle.
+
+## Dateiuploads
+
+Endung und Browser-MIME allein reichen nicht. Vor dem Speichern prüft die API
+kanonische Base64-Daten, Größe, tatsächliche Signatur und bei OOXML die sichere
+ZIP-Struktur. Makroprojekte, ActiveX und eingebettete Fremdobjekte werden
+abgewiesen. Danach folgt die ClamAV-Prüfung. Für
+`APP_ENVIRONMENT=production` sind Scanner und fail-closed-Betrieb zwingend;
+bei Ausfall wird nichts gespeichert.
 
 ## Plattformanmeldung und Laufzeitgrenze
 

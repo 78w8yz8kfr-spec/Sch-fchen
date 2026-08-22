@@ -1,6 +1,6 @@
 # Schäfchen Online bereitstellen
 
-Technischer Stand: V0.23.0
+Technischer Stand: V0.45.0
 
 Das Firmenlogo von Schaaf Elektro stammt unverändert aus dem bestehenden
 VDE-Prüfprotokoll. Es wird im Login und App-Kopfbereich getrennt vom
@@ -52,11 +52,12 @@ erscheint anschließend in allen passenden Ebenen und wird nicht kopiert.
 Unterstützt werden PDF, Bilder, Text, XLSX und DOCX bis 5 MB. Vor größeren
 produktiven Dateimengen muss der vorbereitete Objektspeicher aktiviert werden.
 
-Die Produktionsvorlage in `render.yaml` startet die PWA, die API und PostgreSQL
-unter einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere
-HttpOnly-Sitzungscookie und die Offline-Synchronisation auch auf dem Handy.
+Die Demo-Vorlage in `render.yaml` startet die PWA, die API und PostgreSQL unter
+einer gemeinsamen HTTPS-Adresse. Dadurch funktionieren das sichere
+HttpOnly-Sitzungscookie und die Offline-Synchronisation auch auf dem Handy. Sie
+trägt ausdrücklich `APP_ENVIRONMENT=demo` und ist keine Produktionsfreigabe.
 
-## Einmalige Bereitstellung über Render
+## Einmalige Demo-Bereitstellung über Render
 
 1. Bei [Render](https://dashboard.render.com/) anmelden und GitHub verbinden.
 2. **New +** und danach **Blueprint** wählen.
@@ -80,11 +81,14 @@ diesen Weg nicht angelegt werden.
 
 ## Betriebshinweise
 
-Die Vorlage nutzt zum gefahrlosen Ausprobieren zunächst die kostenlosen
+Die Vorlage nutzt zum gefahrlosen Ausprobieren die kostenlosen
 Render-Tarife. Kostenlose PostgreSQL-Datenbanken laufen nach 30 Tagen ab und
-sind nicht für echte Betriebsdaten gedacht. Vor produktiver Nutzung müssen
-deshalb Datenbank und Webdienst auf bezahlte Tarife umgestellt sowie Backups
-und ein Lösch-/Aufbewahrungskonzept eingerichtet werden.
+sind nicht für echte Betriebsdaten gedacht. Vor produktiver Nutzung reicht ein
+Tarifwechsel nicht: eigene geschützte Staging-/Produktionsumgebungen,
+bezahltes PITR, externer verschlüsselter Backup-Speicher, Pflichtscanner,
+Monitoring und das freigegebene Lösch-/Aufbewahrungskonzept sind Gates.
+Verbindlich sind [`ENVIRONMENTS_AND_RELEASE_GATES.md`](ENVIRONMENTS_AND_RELEASE_GATES.md)
+und [`BACKUP_RESTORE_RUNBOOK.md`](BACKUP_RESTORE_RUNBOOK.md).
 
 Render stellt für Webdienste verwaltetes TLS bereit. Beim Start werden alle
 Migrationen idempotent ausgeführt, die eingeschränkte API-Datenbankrolle

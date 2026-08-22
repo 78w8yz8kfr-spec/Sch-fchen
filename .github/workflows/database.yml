@@ -135,3 +135,55 @@ jobs:
           --env POSTGRES_USER
           postgres:17-alpine
           sh /scripts/verify-backup-restore.sh
+
+      - name: Verschlüsseltes Backup und getrennten Restore-Drill prüfen
+        env:
+          PGPASSWORD: ci_only_password
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: schaefchen
+          POSTGRES_USER: schaefchen
+        run: |
+          set -Eeuo pipefail
+          drill_directory=$(mktemp -d)
+          cleanup() {
+            dropdb --if-exists --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" schaefchen_restore_drill
+            rm -rf "$drill_directory"
+          }
+          trap cleanup EXIT
+
+          mkdir -p "$drill_directory/repository"
+          chmod 0777 "$drill_directory/repository"
+          printf '%s\n' 'ci-only-restic-password-with-32-chars' > "$drill_directory/password"
+          chmod 0444 "$drill_directory/password"
+          docker build --file database/backup/Dockerfile --tag schaefchen-backup:test database/backup
+
+          docker run --rm --network host \
+            --volume "$drill_directory/repository:/repository" \
+            --volume "$drill_directory/password:/run/secrets/restic_password:ro" \
+            --env PGHOST="$POSTGRES_HOST" \
+            --env PGPORT="$POSTGRES_PORT" \
+            --env PGDATABASE="$POSTGRES_DB" \
+            --env PGUSER="$POSTGRES_USER" \
+            --env PGPASSWORD \
+            --env RESTIC_REPOSITORY=/repository \
+            --env RESTIC_PASSWORD_FILE=/run/secrets/restic_password \
+            --env BACKUP_INIT_REPOSITORY=true \
+            --env BACKUP_CHECK_SUBSET=100% \
+            schaefchen-backup:test run-encrypted-backup.sh
+
+          createdb --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" \
+            --username="$POSTGRES_USER" schaefchen_restore_drill
+          docker run --rm --network host \
+            --volume "$drill_directory/repository:/repository" \
+            --volume "$drill_directory/password:/run/secrets/restic_password:ro" \
+            --env PGHOST="$POSTGRES_HOST" \
+            --env PGPORT="$POSTGRES_PORT" \
+            --env PGDATABASE=schaefchen_restore_drill \
+            --env PGUSER="$POSTGRES_USER" \
+            --env PGPASSWORD \
+            --env RESTIC_REPOSITORY=/repository \
+            --env RESTIC_PASSWORD_FILE=/run/secrets/restic_password \
+            --env RESTORE_CONFIRMATION=RESTORE_DRILL \
+            schaefchen-backup:test run-restore-drill.sh

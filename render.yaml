@@ -14,6 +14,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Dieser kostenlose Dienst bleibt eine Vorführung und darf keine echten
+      # Firmendaten aufnehmen. Eine reale Umgebung nutzt eine eigene,
+      # geschützte Render-Umgebung und APP_ENVIRONMENT=production.
+      - key: APP_ENVIRONMENT
+        value: demo
       - key: API_PORT
         value: 10000
       - key: STATIC_DIRECTORY
@@ -26,6 +31,14 @@ services:
         value: schaefchen_api_login
       - key: API_DB_PASSWORD
         generateValue: true
+      - key: API_DB_SSL_MODE
+        value: require
+      - key: API_TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: SECURITY_RATE_LIMIT_SECRET
+        generateValue: true
+      - key: UPLOAD_SCAN_REQUIRED
+        value: "false"
       - key: INITIAL_COMPANY_NUMBER
         value: F-000001
       - key: INITIAL_SETUP_TOKEN

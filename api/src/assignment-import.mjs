@@ -1,4 +1,5 @@
 import { readSheet } from "read-excel-file/node";
+import { fileSignatureMatches } from "./file-signatures.mjs";
 import { InputError } from "./validation.mjs";
 
 const MAX_WORKBOOK_BYTES = 1_500_000;
@@ -181,16 +182,24 @@ export function validateAssignmentImportPayload(body) {
   if (
     typeof body.contentBase64 !== "string"
     || body.contentBase64.length < 4
+    || body.contentBase64.length % 4 !== 0
     || body.contentBase64.length > Math.ceil(MAX_WORKBOOK_BYTES * 4 / 3) + 8
     || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.contentBase64)
   ) {
     throw new InputError("Die Excel-Datei ist ungültig oder zu groß.");
   }
   const workbook = Buffer.from(body.contentBase64, "base64");
-  if (workbook.length === 0 || workbook.length > MAX_WORKBOOK_BYTES) {
+  if (
+    workbook.toString("base64") !== body.contentBase64
+    || workbook.length === 0
+    || workbook.length > MAX_WORKBOOK_BYTES
+  ) {
     throw new InputError("Die Excel-Datei darf höchstens 1,5 MB groß sein.");
   }
-  if (workbook[0] !== 0x50 || workbook[1] !== 0x4b) {
+  if (!fileSignatureMatches(
+    workbook,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  )) {
     throw new InputError("Die ausgewählte Datei ist keine gültige .xlsx-Datei.");
   }
   validateWorkbookArchive(workbook);

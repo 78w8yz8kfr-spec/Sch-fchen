@@ -23,6 +23,7 @@ integrationTest("Alleiniger Mitarbeiter bleibt bei Rückkehr berichtsverantwortl
     initialCompanyNumber: "F-000001",
     initialSetupToken: "CI-SETUP-TOKEN-2026-ONLY-TEST",
     platformSetupToken: "CI-PLATFORM-SETUP-2026-ONLY-TEST",
+    rateLimitSecret: `site-foreman-rate-limit-secret-${process.pid}-${Date.now()}`,
     staticDirectory: process.cwd(),
     database: {
       host: process.env.POSTGRES_HOST,

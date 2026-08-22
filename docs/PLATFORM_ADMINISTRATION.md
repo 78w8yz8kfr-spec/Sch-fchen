@@ -1,7 +1,7 @@
 # Plattformverwaltung
 
-Stand: 01.08.2026
-Technischer Stand: V0.42.0
+Stand: 22.08.2026
+Technischer Stand: V0.45.0
 
 Dieses Dokument beschreibt die verbindliche Grenze zwischen der
 firmenbezogenen Schäfchen-Anwendung und der Plattformverwaltung. Die
@@ -100,6 +100,13 @@ Deaktivieren, E-Mail-Korrektur, Firmenwechsel, Einladungsaktionen,
 Passwortzurücksetzung und Sitzungswiderruf verlangen jeweils ein explizites
 Aktionsobjekt, Begründung und Audit-Eintrag.
 
+Bei einer Passwortzurücksetzung erzeugt ausschließlich der Server ein
+zufälliges Einmal-Startpasswort. Er speichert nur dessen scrypt-Hash, widerruft
+alle bestehenden Sitzungen und setzt den verpflichtenden Erstwechsel. Der
+Klartext erscheint genau in der Aktionsantwort, nicht im Audit und nicht in
+späteren Listen. Ein inaktives oder archiviertes Konto wird durch den Reset
+nicht reaktiviert.
+
 ## Supportmodus
 
 Ein Supportzugriff ist kein Firmenbeitritt. Er verlangt Firma, Grundcode,
@@ -146,7 +153,9 @@ Ein manueller Backupaufruf erzeugt einen protokollierten, eindeutig
 adressierbaren Auftrag mit Umfang und Status `queued`. Der Infrastruktur-Worker
 führt ihn außerhalb des Webprozesses aus und schreibt Ort, Integritätsstatus,
 Größe, Ende oder Fehler in denselben Datensatz. Die vorhandenen
-Backup-/Restore-Skripte und CI-Abnahme bleiben die ausführende Referenz.
+verschlüsselten Restic-Backup-/Restore-Skripte und die CI-Abnahme bleiben die
+ausführende Referenz. Der reale Monatsdrill und Provider-PITR werden nach
+[`BACKUP_RESTORE_RUNBOOK.md`](BACKUP_RESTORE_RUNBOOK.md) nachgewiesen.
 
 Wiederherstellungen werden zuerst vorbereitet. Ausführen darf nur ein zweites
 berechtigtes Plattformkonto nach passendem Bestätigungstext; dieselbe Person

@@ -4,6 +4,44 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Sicherheitsbetrieb statt Neustart-Schutzattrappe (Fassung 0.45.0).** Die
+  bisherige Login-Schranke lebte nur im Speicher eines einzelnen Prozesses;
+  Neustart oder zweite Instanz setzten sie zurück. Jetzt zählen atomare
+  PostgreSQL-Buckets je Anschluss und Kennung, gespeichert nur als HMAC. Setup,
+  Plattformlogin, Schreib- und Uploadpfade besitzen eigene Grenzen und 429
+  nennt die Wartezeit. `X-Forwarded-For` gilt nur hinter der ausdrücklich
+  angegebenen Zahl eigener Proxys.
+
+- **Dateiinhalt wird geprüft, nicht nur sein Etikett (Fassung 0.45.0).** PDF,
+  Bilder, Text und Office-Dateien müssen zu ihrer Signatur passen; OOXML mit
+  Makroprojekt, ActiveX, eingebettetem Fremdobjekt oder auffälliger
+  Containerstruktur wird abgewiesen. Danach prüft ClamAV per Stream. In einer
+  echten Produktionsumgebung ist er Pflicht und sein Ausfall blockiert den
+  Upload. Größen-, MIME- und Zuordnungsprüfung bleiben zusätzlich bestehen.
+
+- **Passwortreset setzt nun wirklich ein Passwort zurück (Fassung 0.45.0).**
+  Vorher wurden nur Sitzungen beendet und `must_change_password` gesetzt; wer
+  sein Passwort vergessen hatte, kam damit weiterhin nicht hinein. Der Server
+  erzeugt jetzt ein zufälliges, nur einmal angezeigtes Startpasswort, speichert
+  allein den scrypt-Hash, löscht Sperrzähler, widerruft alle Sitzungen und
+  verlangt nach der normalen Anmeldung den sofortigen Wechsel. Audit und
+  Listen enthalten den Klartext nie.
+
+- **Demo kann nicht still zur Produktion umetikettiert werden (Fassung
+  0.45.0).** `APP_ENVIRONMENT=production` verlangt HTTPS, sichere Cookies,
+  PostgreSQL-TLS, eigenes Rate-Limit-Geheimnis und Pflichtscanner. Das aktuelle
+  kostenlose Render-Blueprint ist ausdrücklich `demo`; getrennte Vorlagen und
+  Gates beschreiben Staging und Produktion. Für Sicherungen gibt es ein
+  Restic-verschlüsseltes Streaming-Backup ohne Klartextdump und einen
+  geschützten Restore-Drill mit RTO-Messung; die CI führt beides aus. Bezahltes
+  PITR, externer Speicher, Monatsnachweis, Monitoring, Penetrationstest und
+  Rechtsfreigabe bleiben reale Freigabegates. Die alten Standardbefehle für
+  unverschlüsselten Dump und Restore brechen nun ab; lokale Testdaten verlangen
+  ausdrücklich benannte Ziele und Bestätigung. Ein versioniertes
+  Bedrohungsmodell ordnet Angriffe, Kontrollen, Negativtests und verbleibende
+  externe Risiken zu. PWA-Speicher
+  `schaefchen-online-v122`.
+
 - **Die Auslieferung läuft wieder (Fassung 0.44.39).** Der Betrieb blieb auf
   **0.44.34** stehen, während hier 0.44.35 bis 0.44.38 grün durchliefen und
   gemergt wurden. Aufgefallen ist es nicht durch eine Prüfung, sondern weil

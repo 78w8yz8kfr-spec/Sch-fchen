@@ -5,6 +5,13 @@ const scrypt = promisify(scryptCallback);
 const DEFAULTS = Object.freeze({ N: 16384, r: 8, p: 1, keyLength: 32 });
 const FORMAT = /^scrypt\$(\d+)\$(\d+)\$(\d+)\$([A-Za-z0-9_-]+)\$([A-Za-z0-9_-]+)$/;
 
+export function createTemporaryPassword() {
+  // Der zufällige Anteil besitzt 144 Bit Entropie. Der feste Abschluss stellt
+  // unabhängig von der Base64url-Ausgabe Buchstaben, Zahl und Sonderzeichen
+  // für dieselbe Richtlinie sicher, die beim ersten Wechsel gilt.
+  return `${randomBytes(18).toString("base64url")}Aa7!`;
+}
+
 function options(N, r, p) {
   return { N, r, p, maxmem: Math.max(32 * 1024 * 1024, 128 * N * r + 1024 * 1024) };
 }

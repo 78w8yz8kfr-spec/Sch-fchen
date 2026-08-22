@@ -110,7 +110,7 @@
   async function request(path, options = {}) {
     const headers = {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      "X-Schaefchen-Version": "0.44.39",
+      "X-Schaefchen-Version": "0.45.0",
       ...(supportMode?.id ? { "X-Support-Access-Id": supportMode.id } : {}),
       ...(options.headers || {})
     };
@@ -648,7 +648,7 @@
     elements.actionForm.querySelector('button[type="submit"]').hidden = false;
     elements.actionTitle.textContent = `${account.firstName} ${account.lastName} verwalten`;
     const actions = can("accounts.manage")
-      ? [["unlock", "Konto entsperren"], ["disable", "Benutzer deaktivieren"], ["end_sessions", "Alle Sitzungen beenden"], ["reset_password", "Passwortzurücksetzung auslösen"], ["revoke_invitation", "Offene Einladung widerrufen"], ["resend_invitation", "Einladung erneut senden"], ["correct_email", "E-Mail korrigieren"], ["reassign_company", "Anderer Firma zuordnen"]]
+      ? [["unlock", "Konto entsperren"], ["disable", "Benutzer deaktivieren"], ["end_sessions", "Alle Sitzungen beenden"], ["reset_password", "Neues Einmal-Startpasswort erzeugen"], ["revoke_invitation", "Offene Einladung widerrufen"], ["resend_invitation", "Einladung erneut senden"], ["correct_email", "E-Mail korrigieren"], ["reassign_company", "Anderer Firma zuordnen"]]
       : [["unlock", "Konto entsperren"]];
     elements.actionFields.replaceChildren(
       field("action", "Aktion", "text", actions),
@@ -811,7 +811,7 @@
     else if (kind === "version") await request("versions", { method: "POST", body: JSON.stringify({ ...data, rolloutPercent: Number(data.rolloutPercent), mandatoryUpdate: data.mandatoryUpdate === "true", knownIssues: textList(data.knownIssues), databaseMigrations: textList(data.databaseMigrations) }) });
     else if (kind === "backup") await request("backups", { method: "POST", body: JSON.stringify({ ...data, companyId: data.companyId || null }) });
     else if (kind === "privacy") await request("privacy", { method: "POST", body: JSON.stringify({ ...data, companyId: data.companyId || null, userId: data.userId || null, recoveryDeadline: data.recoveryDeadline || null }) });
-    else if (kind === "account") await request(`accounts/${encodeURIComponent(actionContext.account.id)}/actions`, { method: "POST", body: JSON.stringify({ ...data, email: data.email || null, companyId: data.companyId || null }) });
+    else if (kind === "account") return request(`accounts/${encodeURIComponent(actionContext.account.id)}/actions`, { method: "POST", body: JSON.stringify({ ...data, email: data.email || null, companyId: data.companyId || null }) });
     else if (kind === "platform_role") await request(`roles/${encodeURIComponent(actionContext.item.id)}`, { method: "PATCH", body: JSON.stringify({ permissions: textList(data.permissions), confirmation: data.confirmation, rowVersion: actionContext.item.rowVersion, reason: data.reason }) });
     else if (kind === "registration") return request(`registrations/${encodeURIComponent(actionContext.registration.id)}`, { method: "PATCH", body: JSON.stringify({ ...data, rowVersion: actionContext.registration.rowVersion, trialDays: Number(data.trialDays), expiresInDays: Number(data.expiresInDays) }) });
     else if (kind === "support_edit") await request(`support/tickets/${encodeURIComponent(actionContext.item.id)}`, { method: "PATCH", body: JSON.stringify({ ...data, rowVersion: actionContext.item.rowVersion, assigneeId: data.assigneeId || null }) });
@@ -849,6 +849,35 @@
     elements.actionFields.replaceChildren(wrapper, copy);
     elements.actionForm.querySelector('button[type="submit"]').hidden = true;
     elements.actionMessage.textContent = "Die Einladung wurde erzeugt. Dieser Schlüssel wird nur jetzt vollständig angezeigt.";
+  }
+
+  function showTemporaryPassword(account) {
+    const wrapper = field(
+      "temporaryPasswordResult",
+      "Einmaliges Startpasswort",
+      "text",
+      null,
+      account.temporaryPassword
+    );
+    const input = wrapper.querySelector("input");
+    input.readOnly = true;
+    input.autocomplete = "off";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "platform-button platform-button--quiet";
+    copy.textContent = "Startpasswort kopieren";
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(account.temporaryPassword);
+        elements.actionMessage.textContent = "Startpasswort kopiert. Es wird nicht erneut angezeigt.";
+      } catch {
+        input.select();
+        elements.actionMessage.textContent = "Bitte das markierte Startpasswort jetzt kopieren.";
+      }
+    });
+    elements.actionFields.replaceChildren(wrapper, copy);
+    elements.actionForm.querySelector('button[type="submit"]').hidden = true;
+    elements.actionMessage.textContent = "Alle bisherigen Sitzungen sind beendet. Das Startpasswort wird nur jetzt angezeigt und muss beim ersten Anmelden geändert werden.";
   }
 
   // Was der neue Kunde braucht, um sich anzumelden. Ohne diese Anzeige musste
@@ -1104,8 +1133,18 @@
     catch (error) { elements.message.textContent = error.message; return; }
     clearSupportMode();
   });
-  elements.actionClose.addEventListener("click", () => elements.actionDialog.close());
-  elements.actionDialog.addEventListener("cancel", (event) => { event.preventDefault(); elements.actionDialog.close(); });
+  function closeActionDialog() {
+    // Einmalige Schlüssel und Startpasswörter bleiben nach dem Schließen nicht
+    // unsichtbar im DOM liegen.
+    elements.actionFields.replaceChildren();
+    elements.actionMessage.textContent = "";
+    elements.actionDialog.close();
+  }
+  elements.actionClose.addEventListener("click", closeActionDialog);
+  elements.actionDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeActionDialog();
+  });
   elements.actionForm.addEventListener("submit", async (event) => {
     event.preventDefault(); elements.actionMessage.textContent = "Aktion wird validiert und protokolliert …";
     try {
@@ -1120,7 +1159,12 @@
         await loadCurrentView();
         return;
       }
-      elements.actionDialog.close(); await loadCurrentView();
+      if (result?.account?.temporaryPassword) {
+        showTemporaryPassword(result.account);
+        await loadCurrentView();
+        return;
+      }
+      closeActionDialog(); await loadCurrentView();
     }
     catch (error) { elements.actionMessage.textContent = error.message; }
   });

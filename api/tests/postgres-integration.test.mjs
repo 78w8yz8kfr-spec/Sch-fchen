@@ -48,6 +48,14 @@ function nextBusinessDate(date) {
   return value.toISOString().slice(0, 10);
 }
 
+function testJpeg(label) {
+  return Buffer.concat([
+    Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+    Buffer.from(label, "utf8"),
+    Buffer.from([0xff, 0xd9])
+  ]);
+}
+
 integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktionieren mit PostgreSQL", async (t) => {
   const suffix = Date.now().toString(36).toUpperCase();
   const personnelNumber = `API-${suffix}`;
@@ -102,6 +110,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     initialCompanyNumber: companyNumber,
     initialSetupToken: "CI-SETUP-TOKEN-2026-ONLY-TEST",
     platformSetupToken: "CI-PLATFORM-SETUP-2026-ONLY-TEST",
+    rateLimitSecret: `integration-rate-limit-secret-${suffix}-separate`,
     staticDirectory: frontendDirectory,
     database
   };
@@ -1452,7 +1461,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
         category: "report",
         fileName: `Papierbericht-${suffix}.jpg`,
         mimeType: "image/jpeg",
-        contentBase64: Buffer.from(`JPEG-Test-${suffix}`).toString("base64"),
+        contentBase64: testJpeg(`JPEG-Test-${suffix}`).toString("base64"),
         constructionSiteId: structuredSite.id
       })
     });
@@ -1905,7 +1914,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       (document) => document.id === completedVdeInspection.finalDocumentId
     ));
 
-    const sitePhotoContent = Buffer.from(`JPEG-Baustellenfoto-${suffix}`);
+    const sitePhotoContent = testJpeg(`JPEG-Baustellenfoto-${suffix}`);
     const sitePhotoUploadResponse = await fetch(
       `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/photos?date=${assignmentDate}`,
       {
@@ -3201,7 +3210,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
           title: `Monteurfoto ${suffix}`,
           fileName: `Monteurfoto-${suffix}.jpg`,
           mimeType: "image/jpeg",
-          contentBase64: Buffer.from(`JPEG-Monteurfoto-${suffix}`).toString("base64")
+          contentBase64: testJpeg(`JPEG-Monteurfoto-${suffix}`).toString("base64")
         })
       }
     );
@@ -3235,7 +3244,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
           title: "Unzulässiges Fremdfoto",
           fileName: "Fremdfoto.jpg",
           mimeType: "image/jpeg",
-          contentBase64: Buffer.from("JPEG-Fremdfoto").toString("base64")
+          contentBase64: testJpeg("JPEG-Fremdfoto").toString("base64")
         })
       }
     );
@@ -6202,6 +6211,49 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(endEmployeeSessionsResponse.status, 200, await endEmployeeSessionsResponse.clone().text());
     const employeeSessionAfterEnd = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: employeeCookie } });
     assert.equal(employeeSessionAfterEnd.status, 401);
+
+    const resetPasswordResponse = await fetch(
+      `${baseUrl}/api/v1/platform/accounts/${employee.id}/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          action: "reset_password",
+          reason: "Sicheren Einmal-Reset im Integrationstest prüfen"
+        })
+      }
+    );
+    assert.equal(resetPasswordResponse.status, 200, await resetPasswordResponse.clone().text());
+    const resetAccount = (await resetPasswordResponse.json()).account;
+    assert.equal(resetAccount.mustChangePassword, true);
+    assert.match(resetAccount.temporaryPassword, /^[A-Za-z0-9_-]{24}Aa7!$/);
+    assert.equal(Object.hasOwn(resetAccount, "passwordHash"), false);
+
+    const oldPasswordAfterReset = await fetch(`${baseUrl}/api/v1/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+      body: JSON.stringify({ companyNumber, personnelNumber: employeePersonnelNumber, password: employeePassword })
+    });
+    assert.equal(oldPasswordAfterReset.status, 401);
+    const resetLogin = await fetch(`${baseUrl}/api/v1/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+      body: JSON.stringify({
+        companyNumber,
+        personnelNumber: employeePersonnelNumber,
+        password: resetAccount.temporaryPassword
+      })
+    });
+    assert.equal(resetLogin.status, 201, await resetLogin.clone().text());
+    employeeCookie = resetLogin.headers.get("set-cookie").split(";", 1)[0];
+    employeePassword = "Montage-Nach-Reset-2026!";
+    const resetPasswordChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+      body: JSON.stringify({ newPassword: employeePassword })
+    });
+    assert.equal(resetPasswordChange.status, 200, await resetPasswordChange.clone().text());
+    assert.equal((await resetPasswordChange.json()).session.user.mustChangePassword, false);
 
     // Registrierungseinladungen: erneuter Versand, Freigabe und Ablehnung.
     const secondRegistrationResponse = await fetch(`${baseUrl}/api/v1/platform/registrations`, {
