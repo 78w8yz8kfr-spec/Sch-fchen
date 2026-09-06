@@ -3,6 +3,16 @@
 Stand: 22.08.2026
 Technischer Stand: V0.45.0
 
+## Ergänzung 06.09.2026: kostenlose Testumgebung vorbereitet
+
+Separates Render-Free-/Neon-Free-Profil mit geprüftem TLS, kleinem API-Pool,
+getrennten Rollen und ausgeschalteten automatischen Deployments. Die
+Konfigurationsprüfung besitzt zehn lokale Tests und einen CI-Schritt.
+Keine Alt-Datenbank wurde verändert, keine Providerumstellung ausgeführt.
+Siehe `FREE_DEMO_HOSTING.md` für Datenrettung, Einrichtung, Kontingente und
+die noch offenen Betriebs-/Vertragsnachweise. Basis ist der weiterhin
+gesondert zu integrierende Sicherheits-PR #70; heutige UI-Arbeit bleibt separat.
+
 
 ## Abgeschlossen
 

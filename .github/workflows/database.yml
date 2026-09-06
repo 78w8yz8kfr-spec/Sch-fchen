@@ -45,6 +45,9 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
 
+      - name: Kostenlose Neon-Testkonfiguration prüfen
+        run: node --test deploy/free-demo.test.mjs
+
       - name: Render-ähnlichen Datenbankeigentümer prüfen
         env:
           PGPASSWORD: ci_only_password
