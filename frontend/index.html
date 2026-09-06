@@ -3169,7 +3169,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 16v-4l2-5h11l3 5h2v4"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/><path d="M9.5 16.5h5"/></svg>
             <span>Fahrzeuge</span>
           </button>
-          <button id="nav-devices" class="nav-item" type="button" hidden data-kurz="Geräte" data-nav-group="business">
+          <button id="nav-devices" class="nav-item nav-item--desktop" type="button" hidden data-kurz="Geräte" data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
             <span>Maschinen &amp; Geräte</span>
           </button>
@@ -3191,6 +3191,9 @@
       </section>
     </main>
 
-    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+      <span id="toast-message"></span>
+      <button type="button" id="toast-dismiss" class="toast__dismiss" aria-label="Meldung schließen" hidden>&times;</button>
+    </div>
   </body>
 </html>

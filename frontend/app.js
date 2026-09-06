@@ -990,7 +990,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     siteQrLink: document.querySelector("#site-qr-link"),
     siteQrCopy: document.querySelector("#site-qr-copy"),
     siteQrClose: document.querySelector("#site-qr-close"),
-    toast: document.querySelector("#toast")
+    toast: document.querySelector("#toast"),
+    toastMessage: document.querySelector("#toast-message"),
+    toastDismiss: document.querySelector("#toast-dismiss")
   };
 
   // Die Tageslage stand am Fuss der Einsatzplanung, unter der Plantafel und
@@ -1388,14 +1390,41 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     });
   }
 
-  function showToast(message) {
+  // Eine Meldung, die nach 3,6 Sekunden verschwindet, ist fuer "gespeichert"
+  // richtig - der Nutzer hat gerade selbst gehandelt und schaut noch hin. Ein
+  // Fehler kommt dagegen oft ungefragt, waehrend die schwache Verbindung auf
+  // der Baustelle laengst am naechsten Vorgang arbeitet: ohne "persistent"
+  // waere die Meldung schon weg, bevor jemand sie liest, und der zweite
+  // Fehlversuch ueberschreibt sie endgueltig. persistent=true haelt sie an,
+  // bis wer sie wegtippt.
+  function showToast(message, { persistent = false } = {}) {
     window.clearTimeout(toastTimer);
-    elements.toast.textContent = message;
+    elements.toastMessage.textContent = message;
     elements.toast.hidden = false;
+    elements.toast.classList.toggle("toast--persistent", persistent);
+    elements.toastDismiss.hidden = !persistent;
+    // role="status" meldet sich hoeflich zwischen anderen Ansagen - fuer eine
+    // Meldung, die absichtlich stehen bleibt, muesste eine Sprachausgabe sie
+    // sonst verpassen, wenn sie gerade woanders liest. role="alert" (implizit
+    // aria-live="assertive") unterbricht und wird nur fuer diesen Fall
+    // gesetzt; die uebliche Bestaetigung bleibt "status", wie es fuer eine
+    // kurze, unaufdringliche Meldung gehoert.
+    elements.toast.setAttribute("role", persistent ? "alert" : "status");
+    elements.toast.setAttribute("aria-live", persistent ? "assertive" : "polite");
+    if (persistent) return;
     toastTimer = window.setTimeout(() => {
       elements.toast.hidden = true;
     }, 3600);
   }
+
+  function showErrorToast(message) {
+    showToast(message, { persistent: true });
+  }
+
+  elements.toastDismiss.addEventListener("click", () => {
+    window.clearTimeout(toastTimer);
+    elements.toast.hidden = true;
+  });
 
   async function requestJson(path, options = {}) {
     let response;
@@ -1453,7 +1482,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     try {
       await downloadFile(path, fileName);
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
     }
   }
 
@@ -1612,6 +1641,15 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     // eine Tuer, hinter der drei leere Listen stehen.
     elements.navWorktimes.hidden = !planner;
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
+    // Der Gerätebestand stand frueher direkt in der Hauptleiste, obwohl
+    // Baustrom - unten mit exakt derselben Freigabe - schon immer hinter
+    // "Betrieb" wartete. Ein Monteur oeffnet die Zeiterfassung mehrmals
+    // taeglich und den Gerätebestand hoechstens ein paar Mal die Woche, wenn
+    // er ein Geraet ausleiht oder zurueckgibt: das seltene Ziel nahm der
+    // haeufig gebrauchten Leiste den Platz weg (siehe Kompakt-Zaehlung unten).
+    // Deshalb traegt der Knopf in index.html jetzt "nav-item--desktop" wie
+    // Baustrom auch - erreichbar bleibt er ueber "Betrieb", nur nicht mehr
+    // als eigene Kachel in der Hauptleiste.
     elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
     deviceModule.setEnabled(!elements.navDevices.hidden);
     // Baustrom haengt an derselben Freigabe: ein Verteiler ist ein Geraet.
@@ -2321,7 +2359,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           await refreshAdmin();
           showToast(nextStatus === "active" ? "Dokument wieder aktiviert." : "Dokument archiviert.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           statusButton.disabled = false;
         }
@@ -2347,7 +2385,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             ? "Dokument ist mobil nicht mehr sichtbar."
             : "Dokument ist für zugewiesene Mitarbeiter mobil freigegeben.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           mobileButton.disabled = false;
         }
@@ -2374,7 +2412,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             ? "Offline-Markierung entfernt."
             : "Dokument wird beim Öffnen der Baustelle für Offline vorgemerkt.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           offlineButton.disabled = false;
         }
@@ -2552,7 +2590,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           await refreshAdmin();
           showToast(next === "done" ? "Aufgabe erledigt." : "Aufgabenstatus aktualisiert.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           action.disabled = false;
         }
@@ -2608,7 +2646,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             await refreshAdmin();
             showToast("Materialstatus aktualisiert.");
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
           } finally {
             action.disabled = false;
           }
@@ -2871,7 +2909,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       );
       showToast("PDF-Vorschau erstellt · noch nicht freigegeben.");
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
     }
   }
 
@@ -4509,7 +4547,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       } else if (lauf === vehicleListLauf) {
         // Ein abgeschaltetes Modul ist kein Fehler, den man melden muesste:
         // der Eintrag in der Leiste steht dann ohnehin nicht da.
-        if (error.status !== 404) showToast(error.message);
+        if (error.status !== 404) showErrorToast(error.message);
         // 404 heisst "Modul aus" - dafuer gibt es schon eine leere Liste ohne
         // Fehlertext. Alles andere bleibt sichtbar gescheitert.
         vehicleListStatus = error.status === 404 ? "ready" : "failed";
@@ -5212,7 +5250,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             await refreshAdmin(adminState.date);
             showToast("Teamvorlage archiviert · bestehende Einsätze bleiben erhalten.");
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
           }
         });
         actions.append(archive);
@@ -5882,7 +5920,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             dayRow.append(details);
             entriesAction.textContent = "Schließen";
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
           } finally {
             entriesAction.disabled = false;
           }
@@ -5916,7 +5954,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
               );
             } catch (error) {
               action.disabled = false;
-              showToast(error.message);
+              showErrorToast(error.message);
             }
           });
           actions.append(action);
@@ -6014,7 +6052,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             : "Zeitkorrektur abgelehnt · Originalzeit bleibt bestehen.");
           await Promise.all([refreshAdmin(), refreshLiveData(), refreshWeekData()]);
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
           approve.disabled = false;
           reject.disabled = false;
         }
@@ -6140,7 +6178,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
               refreshAdminTimeAccounts()
             ]);
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
             actions.querySelectorAll("button").forEach((button) => { button.disabled = false; });
           }
         };
@@ -6301,7 +6339,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           showToast("Mitarbeiter reaktiviert · Anmeldung und Planung sind wieder möglich.");
           await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
           reactivate.disabled = false;
         }
       });
@@ -6862,7 +6900,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       renderDashboardLoading();
       renderAdminListsLoading();
       if (error.status === 401) showLogin();
-      else if (!error.network) showToast(error.message);
+      else if (!error.network) showErrorToast(error.message);
     } finally {
       window.clearTimeout(adminOverviewUhr);
       adminOverviewDauert = false;
@@ -6901,7 +6939,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       try {
         uebernommeneId = await applySelectedSite(siteId);
       } catch (error) {
-        showToast(error.network
+        showErrorToast(error.network
           ? "Ohne Verbindung lässt sich die Baustelle nicht übernehmen."
           : "Diese Baustelle ist dir heute nicht zugewiesen.");
         return;
@@ -7086,7 +7124,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       showToast(nextStatus === "done" ? "Aufgabe erledigt." : "Aufgabenstatus aktualisiert.");
     } catch (error) {
       if (error.status === 401) showLogin();
-      else showToast(error.message);
+      else showErrorToast(error.message);
       button.disabled = false;
     }
   }
@@ -7513,7 +7551,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       showDashboardPane("site");
     } catch (error) {
       if (error.status === 401) showLogin();
-      else showToast(error.message);
+      else showErrorToast(error.message);
     } finally {
       elements.assignmentDetails.disabled = false;
       elements.assignmentDetailsLabel.textContent = "Baustellenakte";
@@ -7666,7 +7704,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       showToast("Materialstand aktualisiert.");
     } catch (error) {
       if (error.status === 401) showLogin();
-      else showToast(error.message);
+      else showErrorToast(error.message);
       button.disabled = false;
     }
   }
@@ -8200,7 +8238,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
         const behandlung = classifySyncError(error);
         if (behandlung.vermerken) report.syncError = error.message;
         if (behandlung.anmeldenNoetig) showLogin();
-        showToast(syncErrorMessage(behandlung.grund, error.message));
+        showErrorToast(syncErrorMessage(behandlung.grund, error.message));
         reportSyncFailed = true;
         break;
       }
@@ -8221,7 +8259,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
         const behandlung = classifySyncError(error);
         if (behandlung.vermerken) entry.syncError = error.message;
         if (behandlung.anmeldenNoetig) showLogin();
-        showToast(syncErrorMessage(behandlung.grund, error.message));
+        showErrorToast(syncErrorMessage(behandlung.grund, error.message));
         break;
       }
       saveState();
@@ -8744,7 +8782,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
               refreshAdminTimeAccounts()
             ]);
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
             cancel.disabled = !navigator.onLine;
           }
         });
@@ -9874,7 +9912,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           renderPlatformAnnouncements();
         } catch (error) {
           dismiss.disabled = false;
-          showToast(error.message);
+          showErrorToast(error.message);
         }
       });
       article.append(copy, dismiss);
@@ -9890,7 +9928,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       renderPlatformAnnouncements();
     } catch (error) {
       if (error.status === 401) showLogin();
-      else if (!error.network) showToast(error.message);
+      else if (!error.network) showErrorToast(error.message);
     }
   }
 
@@ -11193,7 +11231,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       render();
     } catch (error) {
       if (error.status === 401) showLogin();
-      else if (!error.network) showToast(error.message);
+      else if (!error.network) showErrorToast(error.message);
     }
   }
 
@@ -13210,7 +13248,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       window.localStorage.removeItem(ONLINE_STORAGE_KEY);
       showLogin();
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
     }
   });
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);

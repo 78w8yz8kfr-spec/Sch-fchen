@@ -5449,10 +5449,17 @@ select:focus-visible {
 
 .bottom-nav--planner .nav-item,
 .bottom-nav--compact .nav-item {
-  padding-right: 2px;
-  padding-left: 2px;
+  padding-right: 4px;
+  padding-left: 4px;
   border-radius: 12px;
-  font-size: 0.58rem;
+  /* 0.58rem (rund 9,3px) bei 2px Innenabstand war die Ausweichloesung fuer zu
+     viele Ziele in der Leiste - am Telefon, mit Handschuh, im Stehen nicht
+     mehr zu lesen. Die zu seltenen Ziele wandern jetzt stattdessen unter
+     "Betrieb"/"Mehr" (siehe updateNavigationVisibility in app.js), aber
+     selbst wenn hier noch fuenf Ziele stehen, darf die Schrift nicht kleiner
+     werden als die kleinste Schriftgroesse, die sonst im Designsystem als
+     noch lesbar gilt (--ui-text-xs, siehe design-system.css). */
+  font-size: var(--ui-text-xs, 0.68rem);
 }
 
 .bottom-nav--planner .nav-item svg,
@@ -5500,11 +5507,36 @@ select:focus-visible {
   margin: 0 auto;
   padding: 13px 16px;
   border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #fff;
   background: rgba(17, 17, 17, 0.96);
   box-shadow: 0 15px 35px rgba(17, 17, 17, 0.22);
   font-size: 0.79rem;
+}
+
+#toast-message {
+  flex: 1 1 auto;
   text-align: center;
+}
+
+/* Nur eine Fehlermeldung (siehe showErrorToast in app.js) bekommt den
+   Schliessen-Knopf zu sehen; die uebliche Bestaetigung verschwindet weiter
+   von selbst und braucht keine Bedienung. */
+.toast__dismiss {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .platform-admin-link {
