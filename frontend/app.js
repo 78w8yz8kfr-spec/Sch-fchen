@@ -36,10 +36,12 @@ import {
   carriedOverMessage,
   initialState as freshState,
   normalizeCompanyNumber,
+  persistState,
   rememberedCompany,
   restoreState,
   serializeState,
-  storageKey
+  storageKey,
+  withoutReplaceableCache
 } from "./core/state-store.js?v=0.44.39";
 import { createDeviceModule } from "./core/device-management.js?v=0.44.39";
 import { createPowerModule } from "./core/power-module.js?v=0.44.39";
@@ -1203,6 +1205,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     root: elements.deviceModuleRoot,
     requestJson,
     showToast,
+    showErrorToast,
     createClientId: createClientEntryId,
     getSession: () => session,
     navigate: (pane) => showDashboardPane(pane),
@@ -1319,15 +1322,49 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   function saveState() {
-    try {
-      window.localStorage.setItem(storageKey(demoMode), JSON.stringify(serializeState(state, {
-        assignments,
-        userId: session?.user.id || cachedUserId,
-        demoMode
-      })));
-    } catch {
-      showToast("Lokaler Speicher ist in diesem Browser blockiert.");
+    const nutzlast = serializeState(state, {
+      assignments,
+      userId: session?.user.id || cachedUserId,
+      demoMode
+    });
+    const ergebnis = persistState(window.localStorage, storageKey(demoMode), nutzlast);
+    if (ergebnis.ok) return;
+
+    if (!ergebnis.quota) {
+      // Der Speicher ist grundsaetzlich nicht nutzbar (z.B. Privatmodus ohne
+      // Website-Daten oder eine vom Browser gesperrte Herkunft). Ein zweiter
+      // Versuch mit weniger Inhalt wuerde daran nichts aendern.
+      showErrorToast(
+        "Lokaler Speicher ist in diesem Browser blockiert. Zeitbuchungen und " +
+        "Berichte werden erst gesichert, wenn wieder eine Verbindung besteht " +
+        "- diesen Tab bis dahin bitte nicht schließen."
+      );
+      return;
     }
+
+    // Der Speicher ist voll. Die Baustellenakte (state.siteWorkspace) ist bei
+    // Verbindung jederzeit neu ladbar und meist der groesste Teil des
+    // Standes - sie weicht deshalb zuerst. Zeitbuchungen und Berichtsentwuerfe
+    // bleiben unangetastet, denn sie sind die einzige Kopie der Arbeit.
+    const verkleinerteNutzlast = withoutReplaceableCache(nutzlast);
+    if (verkleinerteNutzlast !== nutzlast) {
+      const zweiterVersuch = persistState(window.localStorage, storageKey(demoMode), verkleinerteNutzlast);
+      if (zweiterVersuch.ok) {
+        showErrorToast(
+          "Lokaler Speicher war voll: die Baustellenakte wurde vorübergehend " +
+          "verworfen und lädt bei Verbindung neu. Zeitbuchungen und Berichte " +
+          "sind gesichert - bitte bald Speicherplatz freigeben."
+        );
+        return;
+      }
+    }
+
+    showErrorToast(
+      "Lokaler Speicher ist voll. Neue Zeitbuchungen und Berichtsentwürfe " +
+      "werden nicht gesichert, bis Platz frei ist - diesen Tab jetzt nicht " +
+      "schließen und Speicherplatz freigeben (z. B. Website-Daten anderer " +
+      "Seiten löschen oder ein anderes Gerät verwenden)."
+    );
   }
 
   // Die zuletzt benutzte Firma bleibt auf dem Geraet. Ein Monteur soll seine

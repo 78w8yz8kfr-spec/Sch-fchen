@@ -430,6 +430,12 @@ export function createDeviceModule({
   root,
   requestJson,
   showToast,
+  // Eine Meldung, die nach 3,6 Sekunden verschwindet, passt fuer eine
+  // Bestaetigung - der Monteur hat gerade selbst gehandelt und schaut noch
+  // hin. Ein Fehlschlag aus dem Server (catch(error)) darf dagegen nicht
+  // verschwinden, bevor er gelesen wurde: showErrorToast bleibt stehen, bis
+  // wer sie wegtippt.
+  showErrorToast,
   createClientId,
   getSession,
   navigate,
@@ -1510,7 +1516,9 @@ export function createDeviceModule({
             method: "POST", body: JSON.stringify({ dataUrl: await fileDataUrl(photo) })
           });
         } catch (error) {
-          showToast(`Gerät gespeichert; Foto konnte nicht übernommen werden: ${error.message}`);
+          // Das Geraet ist bereits gespeichert; ohne stehenbleibende Meldung
+          // waere der Fehlschlag beim Foto leicht zu uebersehen.
+          showErrorToast(`Gerät gespeichert; Foto konnte nicht übernommen werden: ${error.message}`);
         }
       }
       elements.editorDialog.close();
@@ -1608,7 +1616,7 @@ export function createDeviceModule({
           );
           renderSetDetail(body.set);
           await refresh();
-        } catch (error) { showToast(error.message); }
+        } catch (error) { showErrorToast(error.message); }
       });
       row.append(open, remove);
       list.append(row);
@@ -1637,7 +1645,7 @@ export function createDeviceModule({
         );
         renderSetDetail(body.set);
         await refresh();
-      } catch (error) { showToast(error.message); }
+      } catch (error) { showErrorToast(error.message); }
     });
     const actions = document.createElement("div");
     actions.className = "device-dialog__actions";
@@ -1807,7 +1815,7 @@ export function createDeviceModule({
           elements.detailDialog.close();
           showToast("Reparatur abgeschlossen · Gerät wieder bewertet.");
           await refresh();
-        } catch (error) { showToast(error.message); }
+        } catch (error) { showErrorToast(error.message); }
       });
     }
     const historySection = document.createElement("section"); historySection.className = "device-detail__history";
@@ -1876,7 +1884,7 @@ export function createDeviceModule({
       await refresh();
       void openDetail(devices.find((item) => item.id === selected.id) || selected);
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
       if (error.code === "device_transfer_conflict") await refresh();
     }
   }
@@ -1997,7 +2005,7 @@ export function createDeviceModule({
         article.append(qr, strong, number); sheet.append(article);
       });
       popup.document.close(); popup.focus(); popup.print();
-    } catch (error) { popup?.close(); showToast(error.message); }
+    } catch (error) { popup?.close(); showErrorToast(error.message); }
   }
 
   function stopCamera() {
@@ -2312,7 +2320,7 @@ export function createDeviceModule({
       if (elements.detailDialog.open) {
         void openDetail(devices.find((item) => item.id === selected.id) || selected);
       }
-    } catch (error) { showToast(error.message); }
+    } catch (error) { showErrorToast(error.message); }
   });
   window.addEventListener("online", () => void syncQueue());
   window.addEventListener("offline", renderSyncState);

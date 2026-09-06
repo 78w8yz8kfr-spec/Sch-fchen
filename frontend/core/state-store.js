@@ -13,6 +13,57 @@ export function storageKey(demoMode) {
   return demoMode ? DEMO_STORAGE_KEY : ONLINE_STORAGE_KEY;
 }
 
+// Woran ein voller Speicher zu erkennen ist.
+//
+// Browser sind sich uneinig, wie sie "kein Platz mehr" melden. Chrome, Edge
+// und aktuelles Firefox werfen eine DOMException mit dem Namen
+// "QuotaExceededError". Firefox nannte denselben Zustand frueher (vor der
+// Standardisierung des Namens) "NS_ERROR_DOM_QUOTA_REACHED" und traegt dort
+// zusaetzlich einen alten DOM-Fehlercode: 22 ist der generische
+// DOMException-Code fuer diesen Fall, 1014 der Firefox-eigene Nachfolgecode.
+// Wer nur den einen aktuellen Namen prueft, haelt auf manchen Geraeten einen
+// vollen Speicher faelschlich fuer "blockiert" - und der Monteur erfaehrt nie,
+// dass Platz schaffen das eigentliche Problem loesen wuerde.
+const QUOTA_ERROR_NAMEN = new Set(["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"]);
+const QUOTA_ERROR_CODES = new Set([22, 1014]);
+
+export function istSpeicherVollFehler(error) {
+  if (!error) return false;
+  if (QUOTA_ERROR_NAMEN.has(error.name)) return true;
+  if (QUOTA_ERROR_CODES.has(error.code)) return true;
+  return false;
+}
+
+// Was im Zustand ersetzbar ist, wenn der Speicher voll ist.
+//
+// state.siteWorkspace ist ein vom Server geladener Schnappschuss der
+// Baustellenakte (Team, Berichte, Notizen fuer die aktuell geoeffnete
+// Baustelle) - er laesst sich bei Verbindung jederzeit neu abrufen und ist
+// oft der groesste Teil des gespeicherten Standes. events, reports und
+// reportDraft sind dagegen die einzige Kopie der Arbeit, solange sie nicht
+// beim Server ist. Ist der Speicher voll, weicht deshalb zuerst die Akte,
+// niemals eine Buchung oder ein Bericht.
+export function withoutReplaceableCache(state) {
+  if (!state?.siteWorkspace) return state;
+  return { ...state, siteWorkspace: null };
+}
+
+// Schreibt den Zustand in den uebergebenen Speicher und unterscheidet, warum
+// ein Fehlschlag passiert ist.
+//
+// Der Speicher wird als Parameter uebergeben statt fest window.localStorage
+// zu verwenden: nur so laesst sich in einem reinen Modultest ein voller oder
+// blockierter Speicher nachstellen, ohne den echten Browser-Speicher
+// anzufassen oder eine DOM-Umgebung zu brauchen.
+export function persistState(storage, key, payload) {
+  try {
+    storage.setItem(key, JSON.stringify(payload));
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, quota: istSpeicherVollFehler(error) };
+  }
+}
+
 // Die Firmennummer entscheidet, bei welcher Firma die Anmeldung landet. Jede
 // Firma arbeitet vollstaendig getrennt, dieselbe Personalnummer kann es also
 // mehrfach geben. Getippt wird die Nummer selten, deshalb nimmt die App die

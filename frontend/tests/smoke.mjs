@@ -32,8 +32,9 @@ const [html, styles, designSystem, app, worker, refreshHtml, refreshScript, mani
 ]);
 
 const manifest = JSON.parse(manifestSource);
-const [deviceManagement, qrScannerVendor, qrScannerWorker] = await Promise.all([
+const [deviceManagement, powerModule, qrScannerVendor, qrScannerWorker] = await Promise.all([
   readFrontendFile("core/device-management.js"),
+  readFrontendFile("core/power-module.js"),
   readFrontendFile("vendor/qr-scanner.min.js"),
   readFrontendFile("vendor/qr-scanner-worker.min.js")
 ]);
@@ -696,6 +697,13 @@ assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
 assert.match(app, /createDeviceModule/);
 assert.match(app, /deviceModule\.handleDeepLink\(\)/);
+// Ohne diese Weiterleitung faellt jeder Fehlerpfad im Geraetemodul auf das
+// fluechtige showToast zurueck, sobald showErrorToast dort fehlt.
+assert.match(
+  app,
+  /const deviceModule = createDeviceModule\(\{[\s\S]{0,200}showErrorToast,/,
+  "app.js reicht showErrorToast nicht an das Geraetemodul weiter"
+);
 assert.match(styles, /\.device-scanner__camera/);
 assert.match(deviceManagement, /import\(QR_SCANNER_MODULE_URL\)/);
 assert.match(deviceManagement, /preferredCamera: "environment"/);
@@ -712,9 +720,59 @@ assert.ok(deviceManagement.includes('querySelector("input:invalid, select:invali
 assert.match(deviceManagement, /showToast\(message\)/);
 assert.match(deviceManagement, /Aktuellen Besitzer zuordnen/);
 assert.match(deviceManagement, /QR-Druckbogen für dieses Set/);
+
+// Eine Meldung, die nach 3,6 Sekunden verschwindet, ist fuer eine Bestaetigung
+// richtig, aber nicht fuer einen Fehlschlag: der Monteur hat ihn oft nicht
+// selbst ausgeloest und sieht ihn sonst nie. Fehlerpfade (catch(error)) rufen
+// deshalb showErrorToast, nicht das fluechtige showToast. Beide Module
+// bekommen showErrorToast getrennt uebergeben - dieselbe Pruefung faengt also
+// auch ab, wenn nur eines der beiden nachgezogen wird.
+assert.match(
+  deviceManagement,
+  /export function createDeviceModule\(\{[\s\S]{0,400}showErrorToast/,
+  "device-management.js nimmt showErrorToast nicht mehr als eigene Abhaengigkeit entgegen"
+);
+for (const stelle of deviceManagement.matchAll(/catch \(error\) \{[^}]*\}/g)) {
+  assert.doesNotMatch(
+    stelle[0],
+    /\bshowToast\(/,
+    `Ein Fehlerpfad in device-management.js zeigt noch die fluechtige Meldung: ${stelle[0]}`
+  );
+}
+// power-module.js meldet Fehler bislang gar nicht ueber einen Toast, sondern
+// zeigt sie eingebettet im Panel an (role="alert", ohne Zeitschaltung - siehe
+// detailAnsicht). Das ist bereits stehenbleibend; diese Pruefung haelt fest,
+// dass kein Fehlerpfad nachtraeglich doch auf das fluechtige showToast
+// umsteigt.
+for (const stelle of powerModule.matchAll(/catch \(error\) \{[^}]*\}/g)) {
+  assert.doesNotMatch(
+    stelle[0],
+    /\bshowToast\(/,
+    `Ein Fehlerpfad in power-module.js zeigt die fluechtige Meldung statt der eingebetteten: ${stelle[0]}`
+  );
+}
 assert.match(qrScannerVendor, /qr-scanner-worker\.min\.js/);
 assert.match(qrScannerWorker, /export const createWorker/);
 assert.match(styles, /\.device-settings__form/);
+
+// Ein voller Speicher (QuotaExceededError) ist keine Blockade: der eine loest
+// sich von selbst, sobald Platz frei ist, der andere gar nicht. saveState()
+// muss deshalb ueber state-store.js gehen, das genau diese Unterscheidung
+// trifft (siehe state-store.test.mjs) - ein eigener, pauschaler try/catch in
+// app.js wuerde beide Faelle wieder gleich behandeln.
+assert.match(app, /persistState\(window\.localStorage, storageKey\(demoMode\), nutzlast\)/);
+assert.doesNotMatch(
+  app,
+  /window\.localStorage\.setItem\(storageKey\(demoMode\)/,
+  "saveState() schreibt wieder direkt statt ueber persistState() aus state-store.js"
+);
+// Eine Meldung ueber verlorene Arbeit darf nicht nach 3,6 Sekunden verschwinden.
+assert.match(app, /function saveState\(\) \{[\s\S]{0,1600}showErrorToast/);
+assert.doesNotMatch(
+  app,
+  /function saveState\(\) \{[\s\S]{0,1600}\bshowToast\(/,
+  "saveState() meldet einen Fehlschlag noch ueber das fluechtige showToast"
+);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
