@@ -48,6 +48,16 @@ function nextBusinessDate(date) {
   return value.toISOString().slice(0, 10);
 }
 
+// Wochenbeginn (Montag) zu einem Datum - spiegelt mondayFor aus app.mjs, denn
+// GET /api/v1/time-changes/:weekStart verlangt wie /api/v1/work-weeks/:weekStart
+// einen Montag.
+function mondayFor(date) {
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekday = value.getUTCDay() || 7;
+  value.setUTCDate(value.getUTCDate() - weekday + 1);
+  return value.toISOString().slice(0, 10);
+}
+
 integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktionieren mit PostgreSQL", async (t) => {
   const suffix = Date.now().toString(36).toUpperCase();
   const personnelNumber = `API-${suffix}`;
@@ -6837,6 +6847,151 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const finalAudit = (await finalAuditResponse.json()).audit;
     assert.ok(finalAudit.some((entry) => entry.action === "company.create"));
     assert.ok(finalAudit.some((entry) => entry.action === "privacy.completed"));
+  });
+
+  await t.test("Eigene Zeitänderungen einsehen (Einsicht ohne Stimmrecht)", async () => {
+    // Betreiberauftrag: "Der Monteur darf es nicht genehmigen, sieht aber
+    // welche Zeiten das Büro geändert hat." GET /api/v1/time-changes/:weekStart
+    // (siehe getOwnTimeChanges in app.mjs) ist deshalb rein lesend und liefert
+    // ausschließlich Vorgänge des angemeldeten Mitarbeiters selbst.
+    async function createInstaller(personnelNumber, firstName, lastName) {
+      const temporaryPassword = "Zeitaenderung-Einsicht-2026!";
+      const created = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({
+          personnelNumber, firstName, lastName, role: "installer", temporaryPassword
+        })
+      });
+      assert.equal(created.status, 201, await created.clone().text());
+      const login = await fetch(`${baseUrl}/api/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+        body: JSON.stringify({ companyNumber, personnelNumber, password: temporaryPassword })
+      });
+      assert.equal(login.status, 201);
+      const employeeCookie = login.headers.get("set-cookie").split(";", 1)[0];
+      const passwordChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+        body: JSON.stringify({ newPassword: `${temporaryPassword}-Neu` })
+      });
+      assert.equal(passwordChange.status, 200);
+      return employeeCookie;
+    }
+
+    async function bookClockInOut(employeeCookie) {
+      const clockInAt = new Date(Date.now() - 6000).toISOString();
+      const clockOutAt = new Date(Date.now() - 4000).toISOString();
+      for (const [entryType, recordedAt] of [["clock_in", clockInAt], ["clock_out", clockOutAt]]) {
+        const booking = await fetch(`${baseUrl}/api/v1/time-entries`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+          body: JSON.stringify({ clientEntryId: randomUUID(), entryType, recordedAt, clientCreatedAt: recordedAt })
+        });
+        assert.equal(booking.status, 201, await booking.clone().text());
+      }
+      const workDate = localDate(clockInAt, config.timeZone);
+      const dayResponse = await fetch(`${baseUrl}/api/v1/work-days/${workDate}`, {
+        headers: { Cookie: employeeCookie }
+      });
+      assert.equal(dayResponse.status, 200, await dayResponse.clone().text());
+      const day = (await dayResponse.json()).workDay;
+      return { workDate, clockIn: day.entries[0] };
+    }
+
+    // Zwei eigenständige Mitarbeiter, damit sich die Personengrenze prüfen
+    // lässt: der eine bekommt eine Bürokorrektur, der andere darf davon
+    // nichts sehen.
+    const betroffenerCookie = await createInstaller(`ETC-A-${suffix}`, "Ines", "Einsicht");
+    const fremderCookie = await createInstaller(`ETC-B-${suffix}`, "Frank", "Fremd");
+
+    const betroffen = await bookClockInOut(betroffenerCookie);
+    const fremd = await bookClockInOut(fremderCookie);
+
+    // Das Büro (plannerCookie: reine dispatch_office-Rolle, kein Admin, siehe
+    // "Firmenkonten, Rollen und Berechtigungen") berichtigt den Arbeitsbeginn
+    // des ersten Mitarbeiters. Der Tag ist offen, die Änderung wirkt daher
+    // sofort ("applied") und trägt Vorher-/Nachher-Wert sowie Begründung.
+    const correctedAt = new Date(new Date(betroffen.clockIn.recordedAt).valueOf() + 1000).toISOString();
+    const officeReason = "Arbeitsbeginn wurde vom Büro im Integrationstest berichtigt (Einsichtstest)";
+    const officeEdit = await fetch(`${baseUrl}/api/v1/admin/time-entries/${betroffen.clockIn.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({
+        clientChangeId: randomUUID(),
+        expectedRecordedAt: betroffen.clockIn.recordedAt,
+        recordedAt: correctedAt,
+        workDate: betroffen.workDate,
+        reason: officeReason
+      })
+    });
+    assert.equal(officeEdit.status, 200, await officeEdit.clone().text());
+    const officeOperation = (await officeEdit.json()).operation;
+    assert.equal(officeOperation.status, "applied");
+
+    const betroffenerWeekStart = mondayFor(betroffen.workDate);
+
+    // 1. Der betroffene Mitarbeiter sieht die Änderung samt Vorher-/
+    // Nachher-Wert, Begründung, betroffenem Arbeitstag und dass es das Büro
+    // war, nicht er selbst.
+    const ownView = await fetch(`${baseUrl}/api/v1/time-changes/${betroffenerWeekStart}`, {
+      headers: { Cookie: betroffenerCookie }
+    });
+    assert.equal(ownView.status, 200, await ownView.clone().text());
+    const ownOperations = (await ownView.json()).timeChanges.operations;
+    const visibleOperation = ownOperations.find((entry) => entry.id === officeOperation.id);
+    assert.ok(visibleOperation, "Der Mitarbeiter muss die Büro-Änderung an seiner eigenen Zeit sehen");
+    assert.equal(visibleOperation.action, "edit_entry");
+    assert.equal(visibleOperation.status, "applied");
+    assert.equal(visibleOperation.effective, true);
+    assert.equal(visibleOperation.reason, officeReason);
+    assert.equal(visibleOperation.initiatedBy, "office");
+    assert.equal(visibleOperation.changes.length, 1);
+    assert.equal(visibleOperation.changes[0].workDate, betroffen.workDate);
+    assert.equal(visibleOperation.changes[0].oldValue.recordedAt, betroffen.clockIn.recordedAt);
+    assert.equal(visibleOperation.changes[0].newValue.recordedAt, correctedAt);
+
+    // 2. Wichtigster Test: der andere Mitarbeiter sieht diese Änderung nicht -
+    // weder über seine eigene Wochenabfrage noch, falls seine Woche zufällig
+    // dieselbe Kalenderwoche trifft, über die des betroffenen Mitarbeiters.
+    const fremderWeekStart = mondayFor(fremd.workDate);
+    const foreignOwnWeekView = await fetch(`${baseUrl}/api/v1/time-changes/${fremderWeekStart}`, {
+      headers: { Cookie: fremderCookie }
+    });
+    assert.equal(foreignOwnWeekView.status, 200, await foreignOwnWeekView.clone().text());
+    assert.ok(
+      !(await foreignOwnWeekView.json()).timeChanges.operations.some((entry) => entry.id === officeOperation.id),
+      "Ein Mitarbeiter darf die Zeitänderung eines anderen Mitarbeiters nicht sehen"
+    );
+    const foreignSameWeekView = await fetch(`${baseUrl}/api/v1/time-changes/${betroffenerWeekStart}`, {
+      headers: { Cookie: fremderCookie }
+    });
+    assert.equal(foreignSameWeekView.status, 200, await foreignSameWeekView.clone().text());
+    assert.ok(
+      !(await foreignSameWeekView.json()).timeChanges.operations.some((entry) => entry.id === officeOperation.id),
+      "Auch bei gleicher Kalenderwoche darf ein fremder Vorgang nicht erscheinen"
+    );
+
+    // 3. Der Endpunkt bietet keinen Weg, etwas zu genehmigen oder zu ändern:
+    // weder ein Schreibzugriff auf den Lesepfad selbst noch über den
+    // eigentlichen Genehmigungsweg, der Verwaltungsrollen vorbehalten bleibt.
+    const writeAttempt = await fetch(`${baseUrl}/api/v1/time-changes/${betroffenerWeekStart}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: betroffenerCookie },
+      body: JSON.stringify({ decision: "approved" })
+    });
+    assert.equal(writeAttempt.status, 404, "Für /api/v1/time-changes darf kein Schreibzugriff existieren");
+
+    const approvalAttempt = await fetch(
+      `${baseUrl}/api/v1/admin/time-change-operations/${officeOperation.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: betroffenerCookie },
+        body: JSON.stringify({ decision: "approved" })
+      }
+    );
+    assert.equal(approvalAttempt.status, 403, "Der Monteur darf den Vorgang nicht selbst genehmigen");
   });
 
   await t.test("Abmeldung und Sitzungsende", async () => {

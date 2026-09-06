@@ -9313,6 +9313,155 @@ async function existingTimeChange(client, companyId, userId, clientChangeId, exp
   return timeChangeOperationDto(operation.rows[0], items.rows);
 }
 
+function timeChangeItemViewDto(item) {
+  const oldWorkDate = item.old_work_date ? databaseDate(item.old_work_date) : null;
+  const newWorkDate = item.new_work_date ? databaseDate(item.new_work_date) : null;
+  return {
+    id: item.id,
+    action: item.item_action,
+    // Der Arbeitstag, den die Buchung vor der Änderung betraf. Bei einer
+    // Ungültigmarkierung ist das zugleich der einzige betroffene Tag.
+    workDate: oldWorkDate || newWorkDate,
+    // Nur gesetzt, wenn der Arbeitsblock auf einen anderen Tag verschoben
+    // wurde - sonst sind Quell- und Zieltag identisch und ein zweites Feld
+    // würde nur denselben Tag doppelt zeigen.
+    movedToWorkDate: newWorkDate && oldWorkDate && newWorkDate !== oldWorkDate ? newWorkDate : null,
+    oldValue: item.old_value || null,
+    newValue: item.new_value || null
+  };
+}
+
+// Lesezugriff für den Monteur auf die eigene Zeitänderungshistorie
+// (Betreiberauftrag: "Der Monteur darf es nicht genehmigen, sieht aber
+// welche Zeiten das Büro geändert hat"). Einsicht ohne Stimmrecht - deshalb
+// ausschließlich SELECT-Anweisungen, kein Schreibzugriff, keine Möglichkeit
+// zu genehmigen oder abzulehnen. Firma und Mitarbeiter kommen wie bei
+// getWorkDay/getWorkWeek ausnahmslos aus der Sitzung (context), niemals aus
+// einem Anfrageparameter - ein Mitarbeiter kann so grundsätzlich keine
+// fremde Firma und keinen fremden Kollegen erfragen. Der Zeitraum folgt
+// exakt dem Muster von getWorkWeek/GET /api/v1/work-weeks/:weekStart
+// (Montag als Wochenbeginn, sieben Tage).
+async function getOwnTimeChanges(client, context, weekStart) {
+  const start = new Date(`${weekStart}T00:00:00Z`);
+  if (start.getUTCDay() !== 1) {
+    throw new InputError("Der Wochenbeginn muss ein Montag sein.", 400, "invalid_week_start");
+  }
+  const weekEnd = addUtcDays(weekStart, 6);
+
+  // Nur die eigenen Arbeitstage der angefragten Woche kommen als Filter in
+  // Frage. Ohne diese Einschränkung über den Mandanten und den Mitarbeiter
+  // hinaus könnte kein Vorgang eines anderen Mitarbeiters durchrutschen, denn
+  // die folgende Abfrage bindet ohnehin schon an operation.user_id = eigene
+  // ID - diese Liste liefert zusätzlich den Wochenfilter.
+  const ownDays = await client.query(
+    `SELECT id FROM work_days
+     WHERE company_id = $1 AND user_id = $2 AND work_date BETWEEN $3 AND $4`,
+    [context.companyId, context.userId, weekStart, weekEnd]
+  );
+  if (ownDays.rowCount === 0) {
+    return { weekStart, weekEnd, operations: [] };
+  }
+  const ownDayIds = ownDays.rows.map((day) => day.id);
+
+  // Sicherheitsregeln 1 und 2: company_id und user_id kommen ausschließlich
+  // aus context, niemals aus der Anfrage. operation.user_id ist laut Schema
+  // (time_change_operations_user_fkey) immer der Mitarbeiter, dessen Zeit
+  // geändert wurde - der Filter liefert deshalb ausnahmslos eigene Vorgänge.
+  // Zusätzlich muss mindestens ein betroffener Arbeitstag (Quelle oder Ziel)
+  // in der angefragten Woche liegen, sonst würden auch weit zurückliegende
+  // Vorgänge auf jeder Wochenabfrage erneut erscheinen.
+  const operations = await client.query(
+    `SELECT DISTINCT operation.*,
+            CASE WHEN requester.id IS NULL THEN NULL
+                 ELSE requester.first_name || ' ' || requester.last_name
+            END AS requested_by_name,
+            CASE WHEN reviewer.id IS NULL THEN NULL
+                 ELSE reviewer.first_name || ' ' || reviewer.last_name
+            END AS reviewed_by_name
+     FROM time_change_operations AS operation
+     JOIN time_change_items AS item
+       ON item.company_id = operation.company_id AND item.operation_id = operation.id
+     LEFT JOIN users AS requester
+       ON requester.company_id = operation.company_id
+      AND requester.id = operation.requested_by_user_id
+     LEFT JOIN users AS reviewer
+       ON reviewer.company_id = operation.company_id
+      AND reviewer.id = operation.reviewed_by_user_id
+     WHERE operation.company_id = $1
+       AND operation.user_id = $2
+       AND (
+         NULLIF(item.old_value->>'workDayId', '')::UUID = ANY($3::UUID[])
+         OR NULLIF(item.new_value->>'workDayId', '')::UUID = ANY($3::UUID[])
+       )
+     ORDER BY operation.requested_at DESC`,
+    [context.companyId, context.userId, ownDayIds]
+  );
+  if (operations.rowCount === 0) {
+    return { weekStart, weekEnd, operations: [] };
+  }
+
+  const operationIds = operations.rows.map((row) => row.id);
+  // Der betroffene Arbeitstag jeder Einzeländerung wird erst hier aufgelöst,
+  // und zwar bewusst ohne erneute Firmen-/Mitarbeiterprüfung: work_days.id ist
+  // ein serverseitig erzeugter Primärschlüssel, den alleine diese Anwendung in
+  // old_value/new_value eingetragen hat (siehe editTimeEntry/deleteTimeEntry
+  // weiter oben), niemals ein Anfragewert. Ein Vorgang eines anderen
+  // Mitarbeiters ist zu diesem Zeitpunkt bereits ausgeschlossen.
+  const items = await client.query(
+    `SELECT item.*, old_day.work_date AS old_work_date, new_day.work_date AS new_work_date
+     FROM time_change_items AS item
+     LEFT JOIN work_days AS old_day
+       ON old_day.company_id = item.company_id
+      AND old_day.id = NULLIF(item.old_value->>'workDayId', '')::UUID
+     LEFT JOIN work_days AS new_day
+       ON new_day.company_id = item.company_id
+      AND new_day.id = NULLIF(item.new_value->>'workDayId', '')::UUID
+     WHERE item.company_id = $1 AND item.operation_id = ANY($2::UUID[])
+     ORDER BY item.created_at, item.id`,
+    [context.companyId, operationIds]
+  );
+  const itemsByOperation = new Map();
+  for (const item of items.rows) {
+    const list = itemsByOperation.get(item.operation_id) || [];
+    list.push(timeChangeItemViewDto(item));
+    itemsByOperation.set(item.operation_id, list);
+  }
+
+  return {
+    weekStart,
+    weekEnd,
+    operations: operations.rows.map((operation) => ({
+      id: operation.id,
+      action: operation.action,
+      reason: operation.reason,
+      status: operation.status,
+      // "pending" und "approved"/"applied" sind für den Monteur zwei
+      // unterschiedliche Dinge: bei "pending" liegen alte und neue Werte nur
+      // als Antrag vor, seine tatsächliche Zeit ist unverändert; erst
+      // "applied" oder "approved" ist bereits wirksam gebuchte Zeit. Ein
+      // einzelnes Feld macht diesen Unterschied für die Oberfläche
+      // unmissverständlich, ohne dass sie die vier Statuswerte selbst
+      // interpretieren muss. "rejected" bleibt sichtbar (Historie wird
+      // erhalten), gilt aber ebenfalls nicht als wirksam.
+      effective: operation.status === "applied" || operation.status === "approved",
+      // Kein Genehmigungsfeld, keine Aktionslinks: die Ansicht ist rein
+      // lesend, dieselbe Entscheidung (genehmigen/ablehnen) bleibt exklusiv
+      // PATCH /api/v1/admin/time-change-operations/:id und damit
+      // requireFullPlanner vorbehalten.
+      requestedAt: new Date(operation.requested_at).toISOString(),
+      reviewedAt: operation.reviewed_at ? new Date(operation.reviewed_at).toISOString() : null,
+      requestedByName: operation.requested_by_name,
+      reviewedByName: operation.reviewed_by_name,
+      // requested_by_user_id ist bei einer Selbstkorrektur immer der
+      // Mitarbeiter selbst (operation.user_id); jeder andere Bearbeiter kann
+      // nur über das Büro/eine Planungsrolle entstanden sein, siehe
+      // editTimeEntry/deleteTimeEntry (administrator-Fall) weiter oben.
+      initiatedBy: operation.requested_by_user_id === operation.user_id ? "employee" : "office",
+      changes: itemsByOperation.get(operation.id) || []
+    }))
+  };
+}
+
 async function editableTimeEntry(client, context, entryId, administrator) {
   if (administrator) await requireFullPlanner(client, context);
   const result = await client.query(
@@ -11752,6 +11901,17 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => getWorkWeek(client, context, weekStart)
         );
         return json(response, 200, { week });
+      }
+
+      const ownTimeChangesMatch = /^\/api\/v1\/time-changes\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+      if (request.method === "GET" && ownTimeChangesMatch) {
+        const weekStart = validateWorkDate(ownTimeChangesMatch[1]);
+        const timeChanges = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getOwnTimeChanges(client, context, weekStart)
+        );
+        return json(response, 200, { timeChanges });
       }
 
       const assignmentMatch = /^\/api\/v1\/site-assignments\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
