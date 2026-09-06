@@ -9478,9 +9478,17 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
     || (!administrator && ownCorrectionNeedsReview(
       policy, databaseDate(original.work_date), timeZone
     ));
-  if (lockedDay && administrator) {
-    await requireEmployeeLifecycleAdministrator(client, context);
-  }
+  // Keine eigene Rollenprüfung mehr für den freigegebenen/abgerechneten Tag:
+  // Für administrator=true verlangen lockTimeEntryStream und editableTimeEntry
+  // weiter oben bereits requireFullPlanner, bevor wir überhaupt hier ankommen.
+  // Admin, Geschäftsführung und Büro/Disposition dürfen also ohnehin schon
+  // korrigieren – und bei lockedDay entsteht wegen "controlled" oben in jedem
+  // Fall ein Antrag mit Vorher-/Nachher-Stand und Pflichtgrund, nie eine stille
+  // Direktänderung. Dieselben Rollen genehmigen ihn anschließend über
+  // reviewTimeChangeOperation. Eine engere Prüfung hier (früher
+  // requireEmployeeLifecycleAdministrator, gedacht für das Entfernen und
+  // Reaktivieren von Mitarbeitern) wäre nicht nur sachfremd in der Meldung,
+  // sondern auch wirkungslos: der Zugriff ist zu diesem Zeitpunkt längst geklärt.
 
   const dayIds = [...new Set([original.work_day_id, targetDay.id])];
   const allEntries = await effectiveEntriesForDays(
@@ -9673,7 +9681,17 @@ async function deleteTimeEntry(client, context, entryId, input, timeZone, admini
     || (!administrator && ownCorrectionNeedsReview(
       policy, databaseDate(original.work_date), timeZone
     ));
-  if (lockedDay && administrator) await requireEmployeeLifecycleAdministrator(client, context);
+  // Keine eigene Rollenprüfung mehr für den freigegebenen/abgerechneten Tag:
+  // Für administrator=true verlangen lockTimeEntryStream und editableTimeEntry
+  // weiter oben bereits requireFullPlanner, bevor wir überhaupt hier ankommen.
+  // Admin, Geschäftsführung und Büro/Disposition dürfen also ohnehin schon
+  // löschen – und bei lockedDay entsteht wegen "controlled" oben in jedem Fall
+  // ein Antrag mit Vorher-/Nachher-Stand und Pflichtgrund, nie eine stille
+  // Direktänderung. Dieselben Rollen genehmigen ihn anschließend über
+  // reviewTimeChangeOperation. Eine engere Prüfung hier (früher
+  // requireEmployeeLifecycleAdministrator, gedacht für das Entfernen und
+  // Reaktivieren von Mitarbeitern) wäre nicht nur sachfremd in der Meldung,
+  // sondern auch wirkungslos: der Zugriff ist zu diesem Zeitpunkt längst geklärt.
   if (!controlled) {
     await client.query(
       `UPDATE work_days SET status = 'open'

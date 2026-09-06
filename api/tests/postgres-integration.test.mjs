@@ -4417,6 +4417,138 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal((await dayAfterOfficeDelete.json()).workDay.entries.length, 0);
   });
 
+  await t.test("Büro-Korrektur an freigegebenem und abgerechnetem Arbeitstag", async () => {
+    // Berechtigungsänderung: editTimeEntry und deleteTimeEntry prüften
+    // beim gesperrten Tag bislang requireEmployeeLifecycleAdministrator - eine
+    // Funktion für das Entfernen und Reaktivieren von Mitarbeitern, die hier eine
+    // sachfremde Meldung auswarf und auf admin/managing_director verengte. Der
+    // Nutzer hat entschieden: Auch eine reine Büro-/Dispositionsrolle darf einen
+    // bereits freigegebenen oder abgerechneten Tag korrigieren - es entsteht dabei
+    // ohnehin immer ein Antrag mit Status "pending", nie eine stille
+    // Direktänderung. plannerCookie gehört genau dieser Rolle (dispatch_office,
+    // siehe "Firmenkonten, Rollen und Berechtigungen") ohne admin und ohne
+    // managing_director; dieser Test belegt die Öffnung für beide betroffenen
+    // Funktionen.
+    async function lockableEmployeeWorkDay(personnelNumber) {
+      const temporaryPassword = "Buero-Sperrfrist-2026!";
+      const created = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({
+          personnelNumber,
+          firstName: "Lena",
+          lastName: "Sperrfrist",
+          role: "installer",
+          temporaryPassword
+        })
+      });
+      assert.equal(created.status, 201, await created.clone().text());
+
+      const login = await fetch(`${baseUrl}/api/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+        body: JSON.stringify({ companyNumber, personnelNumber, password: temporaryPassword })
+      });
+      assert.equal(login.status, 201);
+      const employeeSessionCookie = login.headers.get("set-cookie").split(";", 1)[0];
+      const passwordChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: employeeSessionCookie },
+        body: JSON.stringify({ newPassword: "Buero-Sperrfrist-2026-Neu!" })
+      });
+      assert.equal(passwordChange.status, 200);
+
+      const clockInAt = new Date(Date.now() - 8000).toISOString();
+      const clockOutAt = new Date(Date.now() - 5000).toISOString();
+      for (const [entryType, recordedAt] of [["clock_in", clockInAt], ["clock_out", clockOutAt]]) {
+        const booking = await fetch(`${baseUrl}/api/v1/time-entries`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: employeeSessionCookie },
+          body: JSON.stringify({
+            clientEntryId: randomUUID(),
+            entryType,
+            recordedAt,
+            clientCreatedAt: recordedAt
+          })
+        });
+        assert.equal(booking.status, 201, await booking.clone().text());
+      }
+
+      const lockableWorkDate = localDate(clockInAt, config.timeZone);
+      const dayResponse = await fetch(`${baseUrl}/api/v1/work-days/${lockableWorkDate}`, {
+        headers: { Cookie: employeeSessionCookie }
+      });
+      assert.equal(dayResponse.status, 200, await dayResponse.clone().text());
+      const day = (await dayResponse.json()).workDay;
+      assert.equal(day.entries.length, 2);
+      assert.equal(day.entries[0].entryType, "clock_in");
+      assert.equal(day.entries[1].entryType, "clock_out");
+
+      const approved = await fetch(`${baseUrl}/api/v1/admin/work-days/${day.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ decision: "approved" })
+      });
+      assert.equal(approved.status, 200, await approved.clone().text());
+      assert.equal((await approved.json()).workDay.status, "approved");
+
+      return { workDate: lockableWorkDate, workDayId: day.id, clockIn: day.entries[0], clockOut: day.entries[1] };
+    }
+
+    // Freigegebener Tag: das Büro (ohne admin/managing_director) berichtigt den
+    // Arbeitsbeginn. lockedDay ist hier bereits durch den Status "approved"
+    // erfüllt, also entsteht statt einer sofortigen Änderung ein Antrag.
+    const releasedDay = await lockableEmployeeWorkDay(`LOCKA-${suffix}`);
+    const releasedEdit = await fetch(
+      `${baseUrl}/api/v1/admin/time-entries/${releasedDay.clockIn.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: releasedDay.clockIn.recordedAt,
+          recordedAt: new Date(new Date(releasedDay.clockIn.recordedAt).valueOf() + 1000).toISOString(),
+          workDate: releasedDay.workDate,
+          reason: "Büro korrigiert den Arbeitsbeginn an einem bereits freigegebenen Tag"
+        })
+      }
+    );
+    assert.equal(releasedEdit.status, 200, await releasedEdit.clone().text());
+    const releasedEditResult = await releasedEdit.json();
+    assert.equal(releasedEditResult.idempotent, false);
+    assert.equal(releasedEditResult.operation.status, "pending");
+    assert.equal(releasedEditResult.operation.action, "edit_entry");
+
+    // Abgerechneter Tag: erst freigeben, dann abrechnen (wie im Büroalltag),
+    // anschließend entfernt dieselbe Büro-/Dispositionsrolle den Feierabend.
+    const billedDay = await lockableEmployeeWorkDay(`LOCKB-${suffix}`);
+    const locked = await fetch(`${baseUrl}/api/v1/admin/work-days/${billedDay.workDayId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+      body: JSON.stringify({ decision: "locked" })
+    });
+    assert.equal(locked.status, 200, await locked.clone().text());
+    assert.equal((await locked.json()).workDay.status, "locked");
+
+    const billedDelete = await fetch(
+      `${baseUrl}/api/v1/admin/time-entries/${billedDay.clockOut.id}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: billedDay.clockOut.recordedAt,
+          reason: "Büro entfernt den Feierabend an einem bereits abgerechneten Tag"
+        })
+      }
+    );
+    assert.equal(billedDelete.status, 200, await billedDelete.clone().text());
+    const billedDeleteResult = await billedDelete.json();
+    assert.equal(billedDeleteResult.idempotent, false);
+    assert.equal(billedDeleteResult.operation.status, "pending");
+    assert.equal(billedDeleteResult.operation.action, "delete_entry");
+  });
+
   await t.test("Wählbare Regel für eigene Zeitkorrekturen", async () => {
     // Voreinstellung ist die geprüfte Variante: eine eigene Korrektur wird zum
     // Antrag und wirkt erst nach Freigabe durch das Büro.
