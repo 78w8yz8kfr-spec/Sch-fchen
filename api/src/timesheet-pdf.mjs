@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { pdfSafeText } from "./pdf-text.mjs";
 
 const A4 = [595.28, 841.89];
 const RED = rgb(0.89, 0.02, 0.08);
@@ -70,8 +71,11 @@ function groupEmployees(workDays) {
   return [...groups.values()];
 }
 
+// Erst absichern, dann messen: font.widthOfTextAtSize() wirft für Zeichen
+// außerhalb von Latin-1 dieselbe Ausnahme wie beim Zeichnen, deshalb muss
+// der Text schon vor dem Umbruch bereinigt sein (z.B. Baustellennamen).
 function wrapText(text, font, size, width, maxLines = Number.POSITIVE_INFINITY) {
-  const words = String(text || "-").trim().split(/\s+/).filter(Boolean);
+  const words = pdfSafeText(text || "-").trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return ["-"];
   const lines = [];
   let line = words.shift();
@@ -133,6 +137,12 @@ export async function buildTimesheetPdf({
   document.setCreator("Schäfchen");
   document.setProducer("Schäfchen");
 
+  // Einziger Zeichenpfad dieser Funktion: alle Textausgaben laufen hier
+  // durch, damit kein Aufruf den Zeichenschutz vergessen kann.
+  function drawText(page, text, options) {
+    page.drawText(pdfSafeText(text), options);
+  }
+
   function drawFooter(page, employeeName) {
     page.drawLine({
       start: { x: margin, y: 33 },
@@ -140,7 +150,7 @@ export async function buildTimesheetPdf({
       thickness: 0.6,
       color: LINE
     });
-    page.drawText(
+    drawText(page,
       `${employeeName} · Erstellt aus freigegebenen Schäfchen-Zeitdaten`,
       { x: margin, y: 19, size: 7, font: regular, color: MUTED }
     );
@@ -151,14 +161,14 @@ export async function buildTimesheetPdf({
     pages.push({ page, employeeName: employee.employeeName });
     drawFooter(page, employee.employeeName);
 
-    page.drawText(companyName || "Schäfchen", {
+    drawText(page, companyName || "Schäfchen", {
       x: margin,
       y: A4[1] - 48,
       size: 13,
       font: bold,
       color: INK
     });
-    page.drawText(continuation ? "STUNDENZETTEL · FORTSETZUNG" : "STUNDENZETTEL", {
+    drawText(page, continuation ? "STUNDENZETTEL · FORTSETZUNG" : "STUNDENZETTEL", {
       x: 306,
       y: A4[1] - 48,
       size: continuation ? 12 : 17,
@@ -166,7 +176,7 @@ export async function buildTimesheetPdf({
       color: INK
     });
     if (!continuation) {
-      page.drawText("FREIGEGEBEN", {
+      drawText(page, "FREIGEGEBEN", {
         x: 474,
         y: A4[1] - 67,
         size: 7.5,
@@ -180,14 +190,14 @@ export async function buildTimesheetPdf({
       thickness: 1,
       color: RED
     });
-    page.drawText(employee.employeeName, {
+    drawText(page, employee.employeeName, {
       x: margin,
       y: A4[1] - 103,
       size: 14,
       font: bold,
       color: INK
     });
-    page.drawText(
+    drawText(page,
       `Personalnummer ${employee.personnelNumber} · ${germanDate(from)} bis ${germanDate(to)}`,
       { x: margin, y: A4[1] - 120, size: 8.5, font: regular, color: MUTED }
     );
@@ -207,8 +217,8 @@ export async function buildTimesheetPdf({
     values.forEach(([label, minutes], index) => {
       const x = margin + index * (width + gap);
       page.drawRectangle({ x, y: y - 43, width, height: 43, color: SOFT });
-      page.drawText(label, { x: x + 9, y: y - 15, size: 7.5, font: regular, color: MUTED });
-      page.drawText(`${duration(minutes)} h`, { x: x + 9, y: y - 32, size: 11, font: bold, color: INK });
+      drawText(page, label, { x: x + 9, y: y - 15, size: 7.5, font: regular, color: MUTED });
+      drawText(page, `${duration(minutes)} h`, { x: x + 9, y: y - 32, size: 11, font: bold, color: INK });
     });
     return y - 58;
   }
@@ -217,7 +227,7 @@ export async function buildTimesheetPdf({
     page.drawRectangle({ x: margin, y: y - 23, width: contentWidth, height: 23, color: INK });
     let x = margin;
     tableColumns.forEach((column) => {
-      page.drawText(column.label, {
+      drawText(page, column.label, {
         x: x + 4,
         y: y - 15,
         size: 7,
@@ -256,7 +266,7 @@ export async function buildTimesheetPdf({
     tableColumns.forEach((column) => {
       const lines = column.key === "sites" ? siteLines : [String(values[column.key] || "-")];
       lines.forEach((line, index) => {
-        page.drawText(line, {
+        drawText(page, line, {
           x: x + 4,
           y: y - 15 - index * 9,
           size: 7,
@@ -279,14 +289,14 @@ export async function buildTimesheetPdf({
       thickness: 0.7,
       color: MUTED
     });
-    page.drawText("Datum, Unterschrift Mitarbeiter", {
+    drawText(page, "Datum, Unterschrift Mitarbeiter", {
       x: margin,
       y: lineY - 12,
       size: 7,
       font: regular,
       color: MUTED
     });
-    page.drawText("Datum, Prüfung / Büro", {
+    drawText(page, "Datum, Prüfung / Büro", {
       x: A4[0] - margin - lineWidth,
       y: lineY - 12,
       size: 7,
@@ -298,7 +308,7 @@ export async function buildTimesheetPdf({
   if (employees.length === 0) {
     const employee = { employeeName: "Keine Stundenzettel", personnelNumber: "-", days: [] };
     const { page, y } = addEmployeePage(employee);
-    page.drawText("Im gewählten Zeitraum sind keine passenden Arbeitstage vorhanden.", {
+    drawText(page, "Im gewählten Zeitraum sind keine passenden Arbeitstage vorhanden.", {
       x: margin,
       y,
       size: 10,
@@ -327,14 +337,14 @@ export async function buildTimesheetPdf({
       ({ page, y } = addEmployeePage(employee, true));
     }
     page.drawRectangle({ x: margin, y: y - 34, width: contentWidth, height: 34, color: SOFT });
-    page.drawText("GESAMT", { x: margin + 8, y: y - 21, size: 8, font: bold, color: INK });
+    drawText(page, "GESAMT", { x: margin + 8, y: y - 21, size: 8, font: bold, color: INK });
     [
       ["Arbeit", totals.workMinutes, 205],
       ["Pause", totals.breakMinutes, 330],
       ["Fahrt", totals.travelMinutes, 445]
     ].forEach(([label, minutes, x]) => {
-      page.drawText(label, { x, y: y - 17, size: 7, font: regular, color: MUTED });
-      page.drawText(`${duration(minutes)} h`, {
+      drawText(page, label, { x, y: y - 17, size: 7, font: regular, color: MUTED });
+      drawText(page, `${duration(minutes)} h`, {
         x,
         y: y - 28,
         size: 9,
@@ -348,7 +358,7 @@ export async function buildTimesheetPdf({
   const pageCount = pages.length;
   pages.forEach(({ page }, index) => {
     const label = `Seite ${index + 1} von ${pageCount}`;
-    page.drawText(label, {
+    drawText(page, label, {
       x: A4[0] - margin - regular.widthOfTextAtSize(label, 7),
       y: 19,
       size: 7,

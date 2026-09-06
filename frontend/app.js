@@ -324,6 +324,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     hoursOverviewBody: document.querySelector("#hours-overview-body"),
     hoursOverviewMessage: document.querySelector("#hours-overview-message"),
     hoursOverviewExport: document.querySelector("#hours-overview-export"),
+    timeAccountSearchField: document.querySelector("#time-account-search-field"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
     timeAccountAdminMessage: document.querySelector("#time-account-admin-message"),
     timeAccountProfileForm: document.querySelector("#time-account-profile-form"),
@@ -1102,6 +1103,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   let selectedEmployeeId = null;
   // Die Fahrzeuge des Fuhrparks und das gerade bearbeitete.
   let vehicleState = [];
+  // Laeuft das Laden gerade, dauert es laenger, oder ist es gescheitert? Ohne
+  // diese Unterscheidung sah eine noch nicht geladene Fahrzeugliste genauso
+  // aus wie ein leerer Fuhrpark - dasselbe Problem wie bei der
+  // Betriebsuebersicht, siehe adminOverviewStatus.
+  let vehicleListStatus = "idle";
+  let vehicleListDauert = false;
+  let vehicleListUhr = null;
   let editingVehicleId = null;
   let editingVehicleRowVersion = null;
   let apprenticeGapState = [];
@@ -1121,6 +1129,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   let weekState = null;
   let absenceState = [];
   let timeAccountState = null;
+  // Laeuft das eigene Jahreskonto gerade, dauert es laenger, oder ist es
+  // gescheitert? Ohne diese Unterscheidung stand "wird geladen" auch dann noch
+  // da, wenn der Server laengst mit einem Fehler geantwortet hatte - man
+  // wartete auf etwas, das nie mehr kommt. Siehe adminOverviewStatus.
+  let timeAccountFetchStatus = "idle";
+  let timeAccountFetchDauert = false;
+  let timeAccountFetchUhr = null;
   let timeAccountsState = null;
   let timeCorrectionPolicyState = null;
   // Die Verwaltung wertet ein Kalenderjahr aus. Frueher folgte sie der
@@ -2002,6 +2017,29 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     list.append(head);
   }
 
+  // Solange die Betriebsuebersicht fehlt, ist eine leere Verwaltungsliste
+  // nicht von "keine Eintraege" zu unterscheiden - fuer die Startseite loeste
+  // renderDashboardLoading genau dieses Problem. Wer per Seitenleiste direkt
+  // in "Kunden" oder "Mitarbeiter" springt, bevor die erste Antwort da ist,
+  // bekam bisher gar nichts zu sehen: die Funktion brach mit
+  // "if (!adminState) return;" ab, ohne die Liste je anzufassen.
+  function renderAdminListPlaceholder(
+    list,
+    gegenstand,
+    gescheitert,
+    dauert,
+    klasse = "admin-list__empty"
+  ) {
+    const zeile = document.createElement("li");
+    zeile.className = klasse;
+    zeile.textContent = gescheitert
+      ? `${gegenstand} konnten nicht geladen werden.`
+      : dauert
+        ? "Das dauert länger als üblich. Der Server läuft vielleicht gerade erst an."
+        : `${gegenstand} werden geladen …`;
+    list.replaceChildren(zeile);
+  }
+
   // meta darf eine Zeichenkette sein oder eine Liste von Zellen.
   //
   // Als Liste stehen die Angaben am Rechner in Spalten unter einer Kopfzeile -
@@ -2202,7 +2240,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   function renderDocumentList() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.documentList,
+        "Dokumente",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const query = elements.documentSearch.value.trim().toLocaleLowerCase("de-DE");
     const status = elements.documentStatusFilter.value;
     const documents = adminState.documents.filter((document) => (
@@ -3218,6 +3263,23 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     elements.dashboardLoadingRetry.hidden = !gescheitert && !adminOverviewDauert;
   }
 
+  // Dieselbe Luecke wie bei der Startseite betrifft sechs Verwaltungslisten:
+  // wer direkt in "Kunden" oder "Mitarbeiter" springt, bevor die erste Antwort
+  // da ist, sah bislang nichts, weil renderAdmin() bei fehlender
+  // Betriebsuebersicht komplett abbrach und die einzelnen Listen nie
+  // aufgerufen wurden. Deshalb werden sie hier - wie renderDashboardLoading -
+  // direkt aus refreshAdmin() angestossen und zeigen sich selbst als "laedt".
+  // Ist die Uebersicht schon da, ist hier nichts zu tun: renderAdmin()
+  // zeichnet die Listen dann laengst mit echten Daten.
+  function renderAdminListsLoading() {
+    if (adminState) return;
+    renderDocumentList();
+    renderReportCenter();
+    renderCustomerOverview();
+    renderInspectionOverview();
+    renderEmployeeList();
+  }
+
   function renderDashboardMetrics() {
     const zeigen = Boolean(adminState) && canPlan() && !demoMode;
     elements.dashboardMetrics.hidden = !zeigen || currentDashboardPane !== "start";
@@ -3427,7 +3489,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   function renderReportCenter() {
-    if (!adminState) return;
+    if (!adminState) {
+      elements.reportCenterMissingList.replaceChildren();
+      return renderAdminListPlaceholder(
+        elements.reportCenterList,
+        "Berichte",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert,
+        "site-module-list__empty"
+      );
+    }
     populateReportCenterFilters();
     const allReports = reportCenterReports();
     const missing = reportCenterMissingAssignments();
@@ -4191,7 +4262,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // in Schaefchen keine Rechnungsstellung - eine Spalte mit erfundenen
   // Betraegen waere schlimmer als keine.
   function renderCustomerOverview() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.customerOverviewList,
+        "Kunden",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const query = elements.customerSearchField.value.trim().toLocaleLowerCase("de-DE");
     const kunden = adminState.customers
       .filter((customer) => customerStatusGroup(customer.status) === "active")
@@ -4258,6 +4336,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
 
   function renderVehicleList() {
     if (!elements.vehicleList) return;
+    if (vehicleListStatus !== "ready") {
+      return renderAdminListPlaceholder(
+        elements.vehicleList,
+        "Fahrzeuge",
+        vehicleListStatus === "failed",
+        vehicleListDauert
+      );
+    }
     const query = elements.vehicleSearchField.value.trim().toLocaleLowerCase("de-DE");
     const fahrzeuge = (vehicleState || []).filter((fahrzeug) => !query || [
       fahrzeug.licencePlate, fahrzeug.label, fahrzeug.assignedUserName,
@@ -4369,18 +4455,36 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   async function refreshVehicles() {
     if (!canPlan() || demoMode || !moduleEnabled("fleet")) {
       vehicleState = [];
+      vehicleListStatus = "ready";
       renderVehicleList();
       return;
     }
+    vehicleListStatus = "loading";
+    vehicleListDauert = false;
+    window.clearTimeout(vehicleListUhr);
+    vehicleListUhr = window.setTimeout(() => {
+      if (vehicleListStatus !== "loading") return;
+      vehicleListDauert = true;
+      renderVehicleList();
+    }, 8000);
+    renderVehicleList();
     try {
       const body = await requestJson("./api/v1/admin/vehicles");
       vehicleState = body.vehicles;
+      vehicleListStatus = "ready";
       renderVehicleList();
     } catch (error) {
       if (error.status === 401) showLogin();
       // Ein abgeschaltetes Modul ist kein Fehler, den man melden muesste: der
       // Eintrag in der Leiste steht dann ohnehin nicht da.
       else if (error.status !== 404) showToast(error.message);
+      // 404 heisst "Modul aus" - dafuer gibt es schon eine leere Liste ohne
+      // Fehlertext. Alles andere bleibt sichtbar gescheitert.
+      vehicleListStatus = error.status === 404 ? "ready" : "failed";
+      renderVehicleList();
+    } finally {
+      window.clearTimeout(vehicleListUhr);
+      vehicleListDauert = false;
     }
   }
 
@@ -4388,7 +4492,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // der Akte der einzelnen Baustelle zu finden - wer wissen wollte, was noch
   // offen ist, musste jede Baustelle einzeln aufmachen.
   function renderInspectionOverview() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.inspectionOverviewList,
+        "Prüfprotokolle",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const query = elements.inspectionSearchField.value.trim().toLocaleLowerCase("de-DE");
     const selectedSiteId = elements.inspectionSiteFilter.value || "all";
     const selectedStatus = elements.inspectionStatusFilter.value || "draft";
@@ -6028,7 +6139,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // sucht. Personalnummer und Arbeitskonto bleiben in der rechten Detailakte;
   // E-Mail und Telefon müssen dagegen schon beim Überfliegen erreichbar sein.
   function renderEmployeeList() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.employeeList,
+        "Mitarbeiter",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const projectScoped = Boolean(adminState.projectScopeRestricted);
     const search = elements.employeeSearchField.value.trim().toLocaleLowerCase("de-DE");
     const roleFilter = elements.employeeRoleFilter.value;
@@ -6688,8 +6806,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       if (adminOverviewStatus !== "loading") return;
       adminOverviewDauert = true;
       renderDashboardLoading();
+      renderAdminListsLoading();
     }, 8000);
     renderDashboardLoading();
+    renderAdminListsLoading();
     try {
       const body = await requestJson(`./api/v1/admin/overview?date=${encodeURIComponent(date)}`);
       adminState = body.overview;
@@ -6703,6 +6823,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       // laede sie noch. Ohne Ende.
       adminOverviewStatus = "failed";
       renderDashboardLoading();
+      renderAdminListsLoading();
       if (error.status === 401) showLogin();
       else if (!error.network) showToast(error.message);
     } finally {
@@ -8694,9 +8815,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       elements.nextHolidayCard.hidden = true;
       elements.timeAccountBalance.textContent = "±00:00";
       elements.timeAccountBalance.className = "time-account-balance";
-      elements.timeAccountStatus.textContent = navigator.onLine
-        ? "Jahreskonto wird geladen …"
-        : "Das Jahreskonto ist offline gerade nicht verfügbar.";
+      elements.timeAccountStatus.textContent = !navigator.onLine
+        ? "Das Jahreskonto ist offline gerade nicht verfügbar."
+        : timeAccountFetchStatus === "failed"
+          ? "Das Jahreskonto konnte nicht geladen werden."
+          : timeAccountFetchDauert
+            ? "Das dauert länger als üblich. Der Server läuft vielleicht gerade erst an."
+            : "Jahreskonto wird geladen …";
       elements.timeAccountTargetWork.textContent = "00:00 / 00:00";
       elements.timeAccountVacationRemaining.textContent = "0 Tage";
       elements.timeAccountVacationPending.textContent = "0 Tage";
@@ -9101,13 +9226,22 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       elements.timeAccountAdminList.append(empty);
       return;
     }
-    if (overview.accounts.length === 0) {
+    // Ab 20-30 Mitarbeitern ist die Liste sonst nur noch Scrollen - dieselbe
+    // Suche wie bei Kunden, Fahrzeugen, Mitarbeitern und Prüfprotokollen.
+    const query = elements.timeAccountSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const accounts = overview.accounts.filter((account) => (
+      !query || [account.employeeName, account.personnelNumber]
+        .filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query)
+    ));
+    if (accounts.length === 0) {
       const empty = document.createElement("li");
       empty.className = "absence-list__empty";
-      empty.textContent = "Noch keine aktiven Mitarbeiter vorhanden.";
+      empty.textContent = query
+        ? "Kein Jahreskonto passt zur Suche."
+        : "Noch keine aktiven Mitarbeiter vorhanden.";
       elements.timeAccountAdminList.append(empty);
     } else {
-      overview.accounts.forEach((account) => {
+      accounts.forEach((account) => {
         const item = document.createElement("li");
         const copy = document.createElement("div");
         const title = document.createElement("strong");
@@ -10875,6 +11009,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   async function refreshTimeAccountData() {
     if (demoMode) {
       timeAccountState = null;
+      timeAccountFetchStatus = "idle";
       renderTimeAccount();
       return;
     }
@@ -10883,10 +11018,20 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       return;
     }
     const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    timeAccountFetchStatus = "loading";
+    timeAccountFetchDauert = false;
+    window.clearTimeout(timeAccountFetchUhr);
+    timeAccountFetchUhr = window.setTimeout(() => {
+      if (timeAccountFetchStatus !== "loading") return;
+      timeAccountFetchDauert = true;
+      renderTimeAccount();
+    }, 8000);
+    renderTimeAccount();
     try {
       const body = await requestJson(`./api/v1/time-account?year=${requestedYear}`);
       if (requestedYear !== Number(selectedWeekStart.slice(0, 4))) return;
       timeAccountState = body.timeAccount;
+      timeAccountFetchStatus = "ready";
       elements.timeAccountMessage.textContent = "";
       renderTimeAccount();
     } catch (error) {
@@ -10896,6 +11041,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           ? "Das Stundenkonto konnte gerade nicht aktualisiert werden."
           : error.message;
       }
+      // Ohne diese Zeile stand "wird geladen" stehen, obwohl der Fehler oben
+      // laengst gemeldet ist - der Text und die Meldung widersprachen sich.
+      timeAccountFetchStatus = "failed";
+      renderTimeAccount();
+    } finally {
+      window.clearTimeout(timeAccountFetchUhr);
+      timeAccountFetchDauert = false;
     }
   }
 
@@ -13654,6 +13806,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }
   });
   elements.customerSearchField.addEventListener("input", renderCustomerOverview);
+  elements.timeAccountSearchField.addEventListener("input", renderAdminTimeAccounts);
   elements.inspectionSearchField.addEventListener("input", renderInspectionOverview);
   elements.inspectionSiteFilter.addEventListener("change", renderInspectionOverview);
   elements.inspectionStatusFilter.addEventListener("change", renderInspectionOverview);

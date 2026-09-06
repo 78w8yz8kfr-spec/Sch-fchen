@@ -1452,7 +1452,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
         category: "report",
         fileName: `Papierbericht-${suffix}.jpg`,
         mimeType: "image/jpeg",
-        contentBase64: Buffer.from(`JPEG-Test-${suffix}`).toString("base64"),
+        contentBase64: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from(`JPEG-Test-${suffix}`)]).toString("base64"),
         constructionSiteId: structuredSite.id
       })
     });
@@ -1905,7 +1905,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       (document) => document.id === completedVdeInspection.finalDocumentId
     ));
 
-    const sitePhotoContent = Buffer.from(`JPEG-Baustellenfoto-${suffix}`);
+    const sitePhotoContent = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from(`JPEG-Baustellenfoto-${suffix}`)]);
     const sitePhotoUploadResponse = await fetch(
       `${baseUrl}/api/v1/construction-sites/${structuredSite.id}/photos?date=${assignmentDate}`,
       {
@@ -3201,7 +3201,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
           title: `Monteurfoto ${suffix}`,
           fileName: `Monteurfoto-${suffix}.jpg`,
           mimeType: "image/jpeg",
-          contentBase64: Buffer.from(`JPEG-Monteurfoto-${suffix}`).toString("base64")
+          contentBase64: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from(`JPEG-Monteurfoto-${suffix}`)]).toString("base64")
         })
       }
     );
@@ -3235,7 +3235,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
           title: "Unzulässiges Fremdfoto",
           fileName: "Fremdfoto.jpg",
           mimeType: "image/jpeg",
-          contentBase64: Buffer.from("JPEG-Fremdfoto").toString("base64")
+          contentBase64: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from("JPEG-Fremdfoto")]).toString("base64")
         })
       }
     );

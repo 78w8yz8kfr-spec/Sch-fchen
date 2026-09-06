@@ -8329,6 +8329,24 @@ body.hat-fassungshinweis {
   flex: 0 0 auto;
 }
 
+/* Ein Reiter verspricht "gleiche Seite, anderer Ausschnitt". "Korrekturen" und
+   "Arbeitskonto" in der Zeiterfassung brechen dieses Versprechen: sie wechseln
+   auf "Meine Woche". Damit das nicht wie ein normaler Reiter aussieht, bekommt
+   dieser hier die Farbe und Unterstreichung eines Verweises - das Pfeilzeichen
+   im Text und title/aria-label nennen das Ziel.
+   Die doppelte Klasse in den Selektoren ist noetig, weil design-system.css
+   nach dieser Datei geladen wird: bei gleicher Spezifitaet gewinnt sonst immer
+   die zuletzt geladene Regel, und die einfache Klasse allein bliebe wirkungslos. */
+.page-tab.page-tab--leaves {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.page-tab.page-tab--leaves:hover {
+  color: var(--brand);
+}
+
 .device-sync-state {
   padding: 11px 13px;
   border: 1px solid #d9c18f;

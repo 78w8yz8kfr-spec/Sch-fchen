@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DOCUMENT_UPLOAD_JSON_BYTE_LIMIT } from "../src/app.mjs";
 import {
   expectedNextTypes,
   localDate,
@@ -24,8 +25,10 @@ import {
   validateInitialPasswordChange,
   validateInitialSetup,
   validateLogin,
+  MAXIMUM_DOCUMENT_BYTES,
   validateMobileSiteReport,
   validateMobileSiteReportRevision,
+  readJson,
   validateProject,
   validateProjectUpdate,
   validatePlanningTeam,
@@ -450,7 +453,7 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
     category: "delivery_note",
     fileName: "Lieferschein.jpg",
     mimeType: "image/jpeg",
-    contentBase64: Buffer.from("Bildinhalt").toString("base64"),
+    contentBase64: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from("Bildinhalt")]).toString("base64"),
     constructionSiteId: "22222222-2222-4222-8222-222222222222"
   });
   assert.equal(deliveryNote.category, "delivery_note");
@@ -543,6 +546,151 @@ test("Dokumente werden typ-, größen- und zuordnungsbezogen geprüft", () => {
   assert.throws(
     () => validateDocumentStatusUpdate({ status: "deleted", rowVersion: 2 }),
     /Dokumentstatus/
+  );
+});
+
+// Der gemeldete Dateityp wurde bisher nur gegen die Dateiendung abgeglichen,
+// nie gegen den tatsächlichen Inhalt. Eine Datei, die "Foto.pdf" heißt und
+// application/pdf meldet, konnte beliebigen anderen Inhalt transportieren
+// und kam später unter genau diesem Content-Type wieder heraus.
+test("Der Dateiinhalt muss zur gemeldeten mimeType passen, nicht nur der Dateiname", () => {
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Falsch getarnt",
+      category: "plan",
+      fileName: "Plan.pdf",
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from("Das ist gar kein PDF").toString("base64"),
+      constructionSiteId: "22222222-2222-4222-8222-222222222222"
+    }),
+    /passt nicht zum gemeldeten Dateityp/
+  );
+
+  // Ein echtes PDF unter demselben Namen bleibt weiterhin erlaubt.
+  const document = validateDocumentUpload({
+    title: "Echtes PDF",
+    category: "plan",
+    fileName: "Plan.pdf",
+    mimeType: "application/pdf",
+    contentBase64: Buffer.from("%PDF-1.4\nInhalt").toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  });
+  assert.equal(document.mimeType, "application/pdf");
+
+  // JPEG, PNG und WebP haben je eine eigene Signatur.
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+  assert.equal(validateDocumentUpload({
+    title: "Bild", category: "photo", fileName: "Bild.png", mimeType: "image/png",
+    contentBase64: png.toString("base64"), constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }).mimeType, "image/png");
+  assert.throws(() => validateDocumentUpload({
+    title: "Falsches PNG", category: "photo", fileName: "Bild.png", mimeType: "image/png",
+    contentBase64: Buffer.from("Kein PNG-Header").toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }), /passt nicht zum gemeldeten Dateityp/);
+
+  const webp = Buffer.concat([
+    Buffer.from("RIFF", "ascii"), Buffer.from([0, 0, 0, 0]), Buffer.from("WEBP", "ascii")
+  ]);
+  assert.equal(validateDocumentUpload({
+    title: "Bild", category: "photo", fileName: "Bild.webp", mimeType: "image/webp",
+    contentBase64: webp.toString("base64"), constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }).mimeType, "image/webp");
+
+  // XLSX und DOCX sind beide ein ZIP-Archiv (PK) und lassen sich an der
+  // Signatur allein nicht auseinanderhalten - hier zählt nur, dass ein
+  // beliebiger anderer Inhalt (kein ZIP) unter beiden mimeTypes abgelehnt wird.
+  const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]);
+  assert.equal(validateDocumentUpload({
+    title: "Tabelle", category: "general", fileName: "Tabelle.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    contentBase64: zip.toString("base64"), constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }).mimeType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  assert.throws(() => validateDocumentUpload({
+    title: "Text als Tabelle getarnt", category: "general", fileName: "Tabelle.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    contentBase64: Buffer.from("Kein ZIP-Archiv").toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }), /passt nicht zum gemeldeten Dateityp/);
+
+  // text/plain hat keine Signatur: als Ersatz wird verlangt, dass der Inhalt
+  // gültiges, nullbyte-freies UTF-8 ist. Echter Text besteht die Prüfung,
+  // eine binäre Datei mit einem Nullbyte fällt durch.
+  assert.equal(validateDocumentUpload({
+    title: "Notiz", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
+    contentBase64: Buffer.from("Ganz normaler Text").toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }).mimeType, "text/plain");
+  assert.throws(() => validateDocumentUpload({
+    title: "Binär als Text getarnt", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
+    contentBase64: Buffer.from([0x41, 0x00, 0x42]).toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }), /passt nicht zum gemeldeten Dateityp/);
+});
+
+// inlineDocument() und attachment() setzen den Dateinamen ungeschützt in den
+// Content-Disposition-Kopf. Ein doppeltes Anführungszeichen war bisher nicht
+// verboten und hätte den Kopfwert verlassen können.
+test("Ein doppeltes Anführungszeichen im Dateinamen wird abgelehnt", () => {
+  assert.throws(
+    () => validateDocumentUpload({
+      title: "Angriff über den Dateinamen",
+      category: "general",
+      fileName: 'Foto".pdf',
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from("%PDF-1.4").toString("base64"),
+      customerId: "11111111-1111-4111-8111-111111111111"
+    }),
+    /Dateiname/
+  );
+});
+
+// macOS liefert Umlaute beim Hochladen oft in zerlegter Form (NFD: Buchstabe
+// plus eigener kombinierender Akzent). Ohne Normalisierung wäre ein so
+// hochgeladener Dateiname zeichenweise ein anderer String als derselbe Name
+// normal eingetippt - die Volltextsuche würde ihn nicht wiederfinden.
+test("Der Dateiname wird auf die zusammengesetzte Form (NFC) vereinheitlicht", () => {
+  const zerlegt = "Zähler.pdf"; // "Zähler.pdf" mit combining diaeresis
+  const zusammengesetzt = "Zähler.pdf";
+  assert.notEqual(zerlegt, zusammengesetzt, "Testdaten sollten sich als Zeichenkette unterscheiden");
+  const document = validateDocumentUpload({
+    title: "Zählerfoto",
+    category: "photo",
+    fileName: zerlegt,
+    mimeType: "application/pdf",
+    contentBase64: Buffer.from("%PDF-1.4").toString("base64"),
+    customerId: "11111111-1111-4111-8111-111111111111"
+  });
+  assert.equal(document.fileName, zusammengesetzt);
+});
+
+// readJson() begrenzt die rohe Anfrage separat von der fachlichen 5-MB-Grenze
+// für den Dateiinhalt. Ohne einen ausreichenden Aufschlag für Base64 (Faktor
+// 4/3) und die übrigen Felder im selben JSON-Dokument lief eine Datei nahe
+// der Grenze mit einem langen Titel in die technische Meldung "Die Anfrage
+// ist zu groß" statt in die gemeinte fachliche Meldung "höchstens 5 MB".
+test("Eine Datei über der 5-MB-Grenze mit langem Titel bekommt die fachliche Meldung, nicht payload_too_large", async () => {
+  const langerTitel = "Ausführlicher Titel für die Dokumentation ".repeat(4).slice(0, 200);
+  const inhalt = Buffer.alloc(MAXIMUM_DOCUMENT_BYTES + 1, 0x41); // 1 Byte über der Grenze
+  const body = JSON.stringify({
+    title: langerTitel,
+    category: "plan",
+    fileName: "Grosse-Datei.pdf",
+    mimeType: "application/pdf",
+    contentBase64: inhalt.toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  });
+  const request = {
+    headers: { "content-type": "application/json" },
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(body, "utf8");
+    }
+  };
+
+  const parsed = await readJson(request, DOCUMENT_UPLOAD_JSON_BYTE_LIMIT);
+  assert.throws(
+    () => validateDocumentUpload(parsed),
+    (error) => error.code === "document_too_large" && /höchstens 5 MB/.test(error.message)
   );
 });
 

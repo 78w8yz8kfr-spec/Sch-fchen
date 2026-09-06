@@ -274,8 +274,10 @@
             <nav class="page-tabs" aria-label="Bereiche der Zeiterfassung">
               <a class="page-tab page-tab--active" href="#workday-card">Aktueller Tag</a>
               <a class="page-tab" href="#timesheet-section">Einträge</a>
-              <button class="page-tab" type="button" data-open-week-view="requests">Korrekturen</button>
-              <button class="page-tab" type="button" data-open-week-view="account">Arbeitskonto</button>
+              <button class="page-tab page-tab--leaves" type="button" data-open-week-view="requests"
+                      title="Öffnet den Bereich „Meine Woche“" aria-label="Korrekturen – öffnet „Meine Woche“">Korrekturen ↗</button>
+              <button class="page-tab page-tab--leaves" type="button" data-open-week-view="account"
+                      title="Öffnet den Bereich „Meine Woche“" aria-label="Arbeitskonto – öffnet „Meine Woche“">Arbeitskonto ↗</button>
             </nav>
           </div>
 
@@ -2818,6 +2820,12 @@
               <p class="time-account-status">
                 Laufender Stand, Resturlaub und genehmigter Überstundenabbau je Mitarbeiter.
               </p>
+              <div class="entity-toolbar">
+                <label class="entity-search" for="time-account-search-field">
+                  <span>Jahreskonten durchsuchen</span>
+                  <input id="time-account-search-field" type="search" maxlength="120" placeholder="Name oder Personalnummer">
+                </label>
+              </div>
               <ul id="time-account-admin-list" class="time-account-admin-list" aria-label="Stundenkonten der Mitarbeiter"></ul>
               <form id="time-account-profile-form" class="time-account-admin-form" novalidate hidden>
                 <div class="admin-edit-heading">

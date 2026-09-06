@@ -1634,6 +1634,84 @@ assert.match(app, /adminOverviewStatus = "failed";\s*\n\s*renderDashboardLoading
 assert.match(app, /dashboardLoadingRetry\.addEventListener\("click"/);
 assert.match(styles, /\.dashboard-loading \{/);
 
+// Wer per Seitenleiste direkt in "Kunden" oder "Mitarbeiter" springt, bevor
+// die erste Antwort da ist, sah bislang nichts: renderDocumentList,
+// renderReportCenter, renderCustomerOverview, renderInspectionOverview,
+// renderEmployeeList und renderVehicleList brachen ohne Hinweis ab. Dieselbe
+// Loesung wie bei der Startseite (renderDashboardLoading) gilt jetzt auch fuer
+// diese sechs Listen.
+assert.match(app, /function renderAdminListPlaceholder\(/);
+assert.match(app, /function renderAdminListsLoading\(\) \{\s*\n\s*if \(adminState\) return;/);
+for (const [liste, gegenstand] of [
+  ["elements\\.documentList", "Dokumente"],
+  ["elements\\.customerOverviewList", "Kunden"],
+  ["elements\\.inspectionOverviewList", "Prüfprotokolle"],
+  ["elements\\.employeeList", "Mitarbeiter"]
+]) {
+  assert.match(
+    app,
+    new RegExp(`if \\(!adminState\\) \\{\\s*\\n\\s*return renderAdminListPlaceholder\\(\\s*\\n\\s*${liste},\\s*\\n\\s*"${gegenstand}",`),
+    `${gegenstand}: kein Ladehinweis, wenn die Betriebsuebersicht fehlt`
+  );
+}
+assert.match(
+  app,
+  /if \(!adminState\) \{\s*\n\s*elements\.reportCenterMissingList\.replaceChildren\(\);\s*\n\s*return renderAdminListPlaceholder\(\s*\n\s*elements\.reportCenterList,\s*\n\s*"Berichte",/
+);
+// Die Fahrzeugliste haengt nicht an der Betriebsuebersicht, sondern an einem
+// eigenen Ladezustand - derselbe Fehler war hier ohne "if (!adminState)"
+// versteckt: eine noch nicht geladene Liste war nicht von einem leeren
+// Fuhrpark zu unterscheiden.
+assert.match(app, /let vehicleListStatus = "idle";/);
+assert.match(
+  app,
+  /if \(vehicleListStatus !== "ready"\) \{\s*\n\s*return renderAdminListPlaceholder\(\s*\n\s*elements\.vehicleList,\s*\n\s*"Fahrzeuge",/
+);
+assert.match(app, /vehicleListStatus = error\.status === 404 \? "ready" : "failed";/);
+// refreshAdmin() stoesst die Platzhalter genauso an wie renderDashboardLoading
+// - sonst waeren sie erst erreichbar, wenn renderAdmin() bereits einmal
+// durchgelaufen ist, und genau das ist beim Direktsprung nicht der Fall.
+assert.match(app, /renderDashboardLoading\(\);\s*\n\s*renderAdminListsLoading\(\);\s*\n\s*try \{/);
+assert.match(
+  app,
+  /adminOverviewStatus = "failed";\s*\n\s*renderDashboardLoading\(\);\s*\n\s*renderAdminListsLoading\(\);/
+);
+
+// Das eigene Jahreskonto zeigte "wird geladen", auch wenn der Server laengst
+// mit einem Fehler geantwortet hatte - man wartete auf etwas, das nie kommt.
+assert.match(app, /let timeAccountFetchStatus = "idle";/);
+assert.match(
+  app,
+  /timeAccountFetchStatus === "failed"\s*\n\s*\? "Das Jahreskonto konnte nicht geladen werden\."/
+);
+assert.match(app, /timeAccountFetchStatus = "failed";\s*\n\s*renderTimeAccount\(\);/);
+
+// Ab 20-30 Mitarbeitern musste das Buero die Jahreskontenliste durchscrollen -
+// alle anderen Verwaltungslisten haben schon eine Suche.
+assert.match(html, /id="time-account-search-field"[^>]*placeholder="Name oder Personalnummer"/);
+assert.match(app, /timeAccountSearchField: document\.querySelector\("#time-account-search-field"\)/);
+assert.match(
+  app,
+  /const accounts = overview\.accounts\.filter\(\(account\) => \(\s*\n\s*!query \|\| \[account\.employeeName, account\.personnelNumber\]/
+);
+assert.match(app, /"Kein Jahreskonto passt zur Suche\."/);
+assert.match(app, /elements\.timeAccountSearchField\.addEventListener\("input", renderAdminTimeAccounts\)/);
+
+// Ein Reiter verspricht "gleiche Seite, anderer Ausschnitt". "Korrekturen" und
+// "Arbeitskonto" wechseln aber auf "Meine Woche" (siehe data-open-week-view) -
+// sie muessen deshalb wie ein Verweis aussehen, nicht wie ein Reiter.
+assert.match(
+  html,
+  /<button class="page-tab page-tab--leaves" type="button" data-open-week-view="requests"[\s\S]{0,200}Korrekturen ↗<\/button>/
+);
+assert.match(
+  html,
+  /<button class="page-tab page-tab--leaves" type="button" data-open-week-view="account"[\s\S]{0,200}Arbeitskonto ↗<\/button>/
+);
+assert.match(html, /aria-label="Korrekturen – öffnet „Meine Woche“"/);
+assert.match(html, /aria-label="Arbeitskonto – öffnet „Meine Woche“"/);
+assert.match(styles, /\.page-tab\.page-tab--leaves \{/);
+
 // Kunden und Baustellen fuehren nicht noch einmal eine sichtbare Projektliste.
 // Formulare und Schnittstellen fuer vorhandene technische Verknuepfungen
 // bleiben bestehen, damit keine Daten oder Altvertraege verloren gehen.

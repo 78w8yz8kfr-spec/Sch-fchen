@@ -506,3 +506,59 @@ test("Eine lange Mängelliste bleibt zusammen und steht vor den Messwerten", asy
   assert.ok(messwerteSeite > maengelSeiten.at(-1),
     `Die Messwerte stehen auf Seite ${messwerteSeite + 1} und damit vor dem Ende der Mängel`);
 });
+
+// Griechische Buchstaben, osteuropäische Sonderzeichen und Emoji liegen
+// außerhalb von WinAnsi (Latin-1). Ohne Zeichenschutz wirft pdf-lib dort eine
+// Ausnahme - und würde damit die Freigabe eines VDE-Prüfprotokolls scheitern
+// lassen, nur weil ein Kunden- oder Prüfername ein solches Zeichen enthält.
+test("Namen mit Ω, Ł und Emoji führen zu einem erzeugten Prüfprotokoll statt zu einer Ausnahme", async () => {
+  const signature = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64"
+  );
+  const pdf = await buildVdeInspectionPdf({
+    inspection: {
+      id: "11111111-1111-4111-8111-111111111111",
+      number: "SE-VDE-2026-00002",
+      name: "Erstprüfung Ω-Messstelle",
+      date: "2026-07-29"
+    },
+    protocol: {
+      schemaVersion: 1,
+      networkType: "TN-S",
+      nominalVoltage: "230/400 V",
+      inspectionKinds: { initial: true, recurring: false, alteration: false },
+      visualChecks: {},
+      incomingSupply: {},
+      circuitDirectoryIncluded: false,
+      detailedInsulationMeasurement: false,
+      distributions: [{
+        clientId: "uv-1",
+        name: "UV EG",
+        rcds: [],
+        directCircuits: [{
+          clientId: "circuit-1",
+          name: "Kreis mit Ω-Widerstand",
+          protectiveDevice: { type: "mcb", characteristic: "B", ratedCurrent: "16" },
+          measurements: { riso: "200", rpe: "0.2" },
+          note: "Geprüft von Şahin 😀"
+        }]
+      }],
+      testEquipment: {},
+      defects: "Keine Mängel.",
+      result: "ok",
+      nextInspectionDate: "2030-07-29"
+    },
+    company: { legalName: "Schaaf Elektro GmbH", displayName: "Schaaf Elektro GmbH" },
+    context: {
+      customerName: "Kunde Łukasz Đorđe",
+      inspectorName: "Prüferin mit Emoji 😀"
+    },
+    inspectorSignature: signature,
+    completedAt: "2026-07-29T16:30:00.000Z"
+  });
+
+  assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
+  const loaded = await PDFDocument.load(pdf);
+  assert.ok(loaded.getPageCount() >= 1);
+});

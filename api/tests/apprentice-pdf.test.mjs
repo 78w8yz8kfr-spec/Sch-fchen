@@ -238,3 +238,26 @@ test("Ein unlesbares Firmenlogo verhindert den Ausdruck nicht", async () => {
   assert.equal(document.getPageCount(), 1);
 });
 
+// Griechische Buchstaben, osteuropäische Sonderzeichen und Emoji liegen
+// außerhalb von WinAnsi (Latin-1). Ohne Zeichenschutz wirft pdf-lib dort eine
+// Ausnahme, sobald ein Azubi- oder Ausbildername oder eine eingetragene
+// Tätigkeit ein solches Zeichen enthält.
+test("Ein Berichtsheft mit Ω, Ł und Emoji in Namen und Tätigkeit wird trotzdem erzeugt", async () => {
+  const content = await blatt(
+    {
+      dailyEntries: [{
+        workDate: "2024-05-13",
+        activities: ["Isolationswiderstand mit 230 Ω geprüft 😀"],
+        absence: null,
+        workedMinutes: 465
+      }],
+      trainerSignatureName: "Şahin Yılmaz"
+    },
+    { name: "Łukasz Đorđe", occupation: "Elektroniker", trainingYear: 1 }
+  );
+
+  assert.equal(content.subarray(0, 5).toString("ascii"), "%PDF-");
+  const { document } = await seitenStroeme(content);
+  assert.ok(document.getPageCount() >= 1);
+});
+

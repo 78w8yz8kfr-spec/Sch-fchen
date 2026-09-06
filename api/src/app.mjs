@@ -60,6 +60,7 @@ import {
   expectedNextTypes,
   InputError,
   localDate,
+  MAXIMUM_DOCUMENT_BYTES,
   readJson,
   validateAbsenceDecision,
   validateAbsenceRequest,
@@ -177,6 +178,24 @@ const FEDERAL_STATE_NAMES = new Map([
   ["TH", "Thüringen"]
 ]);
 
+// readJson() begrenzt die rohe HTTP-Anfrage, MAXIMUM_DOCUMENT_BYTES dagegen
+// nur den entpackten Dateiinhalt - beide Grenzen sind aus Absicht
+// verschieden, und die JSON-Grenze muss großzügig genug sein, dass sie nie
+// vor der fachlichen Meldung "höchstens 5 MB" zuschlägt.
+//
+// Nachrechnung: Base64 macht aus n Byte ceil(n/3)*4 Byte, also aus den
+// erlaubten 5.000.000 Byte Dateiinhalt 6.666.668 Byte codierten Text. Im
+// selben JSON-Dokument stehen daneben noch Titel (bis 200 Zeichen), Dateiname
+// (bis 255), Dateityp (bis 120), Kategorie (bis 30) und bis zu drei UUIDs -
+// selbst mit durchgehend mehrbytigen Zeichen (bis zu 4 Byte je Zeichen) sind
+// das keine 10.000 Byte. Der Aufschlag von 1.000.000 Byte deckt das mit
+// hundertfacher Reserve ab (Platz auch fuer ein grosszuegig eingeruecktes
+// oder anderweitig aufgeblähtes JSON-Dokument), ohne selbst in die Naehe der
+// fachlichen Grenze zu kommen: eine Datei, die tatsaechlich groesser als
+// 5 MB ist, erreicht validateDocumentUpload() darum immer noch und bekommt
+// dort "hoechstens 5 MB" statt hier "Die Anfrage ist zu gross".
+export const DOCUMENT_UPLOAD_JSON_BYTE_LIMIT = Math.ceil(MAXIMUM_DOCUMENT_BYTES / 3) * 4 + 1_000_000;
+
 function json(response, status, body, headers = {}) {
   const encoded = JSON.stringify(body);
   response.writeHead(status, {
@@ -264,11 +283,22 @@ function attachment(response, document) {
   response.end(document.content);
 }
 
-function inlineDocument(response, document) {
+export function inlineDocument(response, document) {
+  // Derselbe sichere Kopfaufbau wie in attachment(): ein ASCII-Rückfallname
+  // im filename-Parameter (den alte Clients lesen) und der volle Name erst
+  // im RFC-5987-codierten filename*. Ohne das brach ein Dateiname mit einem
+  // doppelten Anführungszeichen (z.B. "Foto\".pdf") aus dem Attributwert aus.
+  const fallbackName = document.fileName
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "dokument";
+  const encodedName = encodeURIComponent(document.fileName).replace(/[!'()*]/g, (character) => (
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  ));
   response.writeHead(200, {
     "Content-Type": document.mimeType,
     "Content-Length": document.content.length,
-    "Content-Disposition": `inline; filename="${document.fileName}"`,
+    "Content-Disposition": `inline; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
     "Cache-Control": "private, max-age=300",
     ...securityHeaders()
   });
@@ -10922,7 +10952,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const date = validateWorkDate(
           url.searchParams.get("date") || localDate(new Date().toISOString(), config.timeZone)
         );
-        const body = await readJson(request, 7_000_000);
+        const body = await readJson(request, DOCUMENT_UPLOAD_JSON_BYTE_LIMIT);
         const input = validateDocumentUpload({
           ...body,
           category: "photo",
@@ -11245,7 +11275,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/documents") {
-        const input = validateDocumentUpload(await readJson(request, 7_000_000));
+        const input = validateDocumentUpload(await readJson(request, DOCUMENT_UPLOAD_JSON_BYTE_LIMIT));
         const created = await withReadySession(
           pool,
           tokenHash,

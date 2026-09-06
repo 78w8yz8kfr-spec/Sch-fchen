@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { pdfSafeText } from "./pdf-text.mjs";
 
 const A4 = [595.28, 841.89];
 const RED = rgb(0.75, 0.05, 0.08);
@@ -6,23 +7,6 @@ const INK = rgb(0.08, 0.08, 0.08);
 const MUTED = rgb(0.38, 0.38, 0.38);
 const LINE = rgb(0.84, 0.84, 0.84);
 const PALE = rgb(0.97, 0.97, 0.97);
-const PDF_TEXT_REPLACEMENTS = new Map([
-  ["€", "EUR"],
-  ["Ω", "Ohm"],
-  ["Δ", "Delta"],
-  ["µ", "u"],
-  ["–", "-"],
-  ["—", "-"],
-  ["„", "\""],
-  ["“", "\""],
-  ["”", "\""],
-  ["’", "'"],
-  ["→", "->"],
-  ["←", "<-"],
-  ["≤", "<="],
-  ["≥", ">="],
-  ["×", "x"]
-]);
 
 const VISUAL_CHECK_LABELS = {
   electric_shock_protection: "Schutz gegen elektrischen Schlag",
@@ -53,23 +37,6 @@ function value(value, suffix = "") {
   return value === null || value === undefined || value === ""
     ? "-"
     : `${value}${suffix}`;
-}
-
-function pdfSafeText(value) {
-  let safe = "";
-  for (const character of String(value ?? "")) {
-    const codePoint = character.codePointAt(0);
-    if (
-      character === "\n"
-      || (codePoint >= 32 && codePoint <= 126)
-      || (codePoint >= 160 && codePoint <= 255)
-    ) {
-      safe += character;
-    } else {
-      safe += PDF_TEXT_REPLACEMENTS.get(character) || "?";
-    }
-  }
-  return safe;
 }
 
 export function splitPdfWord(word, font, size, width) {
