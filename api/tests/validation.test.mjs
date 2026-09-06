@@ -577,6 +577,36 @@ test("Der Dateiinhalt muss zur gemeldeten mimeType passen, nicht nur der Dateina
   });
   assert.equal(document.mimeType, "application/pdf");
 
+  // Die PDF-Kennung muss nicht an Position 0 stehen: ein Mailtransport, eine
+  // Byte-Order-Mark oder ein führender Zeilenumbruch dürfen davorstehen -
+  // Acrobat selbst sucht sie innerhalb der ersten 1024 Byte. Eine Kundenrechnung
+  // mit ein paar Vorlaufbytes darf deshalb nicht plötzlich scheitern.
+  const pdfMitVorlauf = validateDocumentUpload({
+    title: "Rechnung mit Vorlauf",
+    category: "invoice",
+    fileName: "Rechnung.pdf",
+    mimeType: "application/pdf",
+    contentBase64: Buffer.concat([
+      Buffer.from([0xef, 0xbb, 0xbf]), // UTF-8-BOM
+      Buffer.from("\r\n%PDF-1.4\nInhalt", "latin1")
+    ]).toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  });
+  assert.equal(pdfMitVorlauf.mimeType, "application/pdf");
+  // Weit hinter dem Suchfenster zählt die Kennung dagegen nicht mehr -
+  // sonst würde ein "%PDF-" irgendwo tief in einem Fremdformat reichen.
+  assert.throws(() => validateDocumentUpload({
+    title: "Kennung zu weit hinten",
+    category: "invoice",
+    fileName: "Rechnung.pdf",
+    mimeType: "application/pdf",
+    contentBase64: Buffer.concat([
+      Buffer.alloc(2000, 0x20),
+      Buffer.from("%PDF-1.4", "latin1")
+    ]).toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }), /passt nicht zum gemeldeten Dateityp/);
+
   // JPEG, PNG und WebP haben je eine eigene Signatur.
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
   assert.equal(validateDocumentUpload({
@@ -613,24 +643,29 @@ test("Der Dateiinhalt muss zur gemeldeten mimeType passen, nicht nur der Dateina
     constructionSiteId: "22222222-2222-4222-8222-222222222222"
   }), /passt nicht zum gemeldeten Dateityp/);
 
-  // text/plain hat keine Signatur: als Ersatz wird verlangt, dass der Inhalt
-  // gültiges, nullbyte-freies UTF-8 ist. Echter Text besteht die Prüfung,
-  // ein Nullbyte oder eine ungültige UTF-8-Bytefolge fällt durch.
+  // text/plain hat keine Signatur: als Ersatz wird nur verlangt, dass keine
+  // Nullbytes vorkommen. Reines ASCII besteht die Prüfung.
   assert.equal(validateDocumentUpload({
     title: "Notiz", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
     contentBase64: Buffer.from("Ganz normaler Text").toString("base64"),
     constructionSiteId: "22222222-2222-4222-8222-222222222222"
   }).mimeType, "text/plain");
+  // Eine Textdatei muss kein UTF-8 sein: Windows-1252/ISO-8859-1 sind bei
+  // älteren Windows-Rechnern und Messgeräte-Exporten Alltag. "Maßband,
+  // Grüße" in Latin-1 kodiert (ß=0xDF, ü=0xFC) ist als Bytefolge kein
+  // gültiges UTF-8, aber eine ganz normale, echte Textdatei.
+  const iso88591Text = Buffer.from("Ma\xdfband, Gr\xfc\xdfe", "latin1");
+  assert.throws(() => new TextDecoder("utf-8", { fatal: true }).decode(iso88591Text),
+    undefined, "Testdaten sollten tatsächlich kein gültiges UTF-8 sein");
+  assert.equal(validateDocumentUpload({
+    title: "Messprotokoll", category: "general", fileName: "Messung.txt", mimeType: "text/plain",
+    contentBase64: iso88591Text.toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }).mimeType, "text/plain");
+  // Nur das Nullbyte - das gebräuchlichste Merkmal binärer Daten - fällt durch.
   assert.throws(() => validateDocumentUpload({
     title: "Binär als Text getarnt", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
     contentBase64: Buffer.from([0x41, 0x00, 0x42]).toString("base64"),
-    constructionSiteId: "22222222-2222-4222-8222-222222222222"
-  }), /passt nicht zum gemeldeten Dateityp/);
-  assert.throws(() => validateDocumentUpload({
-    title: "Ungültiges UTF-8 als Text getarnt", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
-    // 0xC3 verlangt ein Folgebyte - hier folgt keins, eine gültige
-    // UTF-8-Zeichenkette kann das nicht sein.
-    contentBase64: Buffer.from([0x41, 0xc3]).toString("base64"),
     constructionSiteId: "22222222-2222-4222-8222-222222222222"
   }), /passt nicht zum gemeldeten Dateityp/);
 });

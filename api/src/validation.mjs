@@ -92,19 +92,18 @@ function isZipArchive(content) {
 }
 
 // Klartext hat keine Signatur, an der man ihn erkennen koennte. Als Ersatz
-// wird verlangt, dass der Inhalt tatsaechlich wie Text aussieht: keine
-// Nullbytes (das gebraeuchlichste Merkmal binaerer Daten, in echtem Text
-// kommt es nicht vor) und eine gueltige UTF-8-Kodierung. Das erkennt keine
-// bewusste Faelschung, faengt aber die naheliegenden Faelle ab - ein Bild
-// oder eine ausfuehrbare Datei, die nur umbenannt wurde.
+// wird nur verlangt, dass keine Nullbytes vorkommen - das gebraeuchlichste
+// Merkmal binaerer Daten, in echtem Text kommt es nicht vor. Bewusst NICHT
+// verlangt wird gueltiges UTF-8: eine Textdatei muss kein UTF-8 sein. Sehr
+// viele echte Textdateien sind Windows-1252 oder ISO-8859-1 - aeltere
+// Windows-Rechner, Messgeraete-Exporte und so ziemlich jedes Programm von vor
+// UTF-8 schreiben so. "Maßband, Grüße" in Latin-1 kodiert waere mit einer
+// UTF-8-Pruefung eine gueltige Textdatei, die faelschlich abgelehnt wird -
+// jede Einbyte-Kodierung ist aber nullbytefrei und besteht diese Pruefung.
+// Das erkennt keine bewusste Faelschung, faengt aber die naheliegenden Faelle
+// ab - ein Bild oder eine ausfuehrbare Datei, die nur umbenannt wurde.
 function looksLikePlainText(content) {
-  if (content.includes(0x00)) return false;
-  try {
-    new TextDecoder("utf-8", { fatal: true }).decode(content);
-    return true;
-  } catch {
-    return false;
-  }
+  return !content.includes(0x00);
 }
 
 // Signaturpruefung ("Magic Bytes") je gemeldetem Dateityp. Der Client meldet
@@ -112,8 +111,21 @@ function looksLikePlainText(content) {
 // und der Inhalt kommt spaeter unter genau diesem Content-Type wieder heraus
 // - eine Datei, die "Foto.pdf" heisst und "application/pdf" meldet, koennte
 // sonst beliebigen anderen Inhalt transportieren.
+//
+// Bei PDF steht die Kennung nicht immer exakt an Position 0: die PDF-
+// Spezifikation selbst erlaubt Fuehrbytes, und Acrobat sucht die Kennung
+// deshalb innerhalb der ersten 1024 Byte statt nur am Anfang - ein
+// Mailtransport, eine Byte-Order-Mark oder ein fuehrender Zeilenumbruch
+// duerfen davorstehen. Dieselbe Grenze wird hier verwendet. Bei den uebrigen
+// Formaten gehoert die Kennung dagegen per Formatdefinition an Position 0
+// (PNG-, RIFF/WebP- und JPEG-Signatur) bzw. wird sie von den Office-
+// Programmen, die XLSX/DOCX erzeugen, immer dort geschrieben - fuer sie ist
+// eine Suche mit Vorlauf nicht noetig.
+const PDF_SIGNATURE_SEARCH_WINDOW = 1024;
 const DOCUMENT_SIGNATURES = new Map([
-  ["application/pdf", (content) => content.subarray(0, 5).toString("latin1") === "%PDF-"],
+  ["application/pdf", (content) => (
+    content.subarray(0, PDF_SIGNATURE_SEARCH_WINDOW).indexOf("%PDF-", 0, "latin1") !== -1
+  )],
   ["image/jpeg", (content) => (
     content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff
   )],
