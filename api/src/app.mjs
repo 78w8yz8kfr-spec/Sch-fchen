@@ -9375,9 +9375,12 @@ async function expectedTimeEditAction(client, context, entryId, input, administr
 }
 
 async function ensureEditableSite(client, context, userId, workDate, siteId, administrator) {
+  // Die Auswahlquelle (getTimeTrackingSiteOptions) zeigt Baustellen mit Status 'delayed' an,
+  // daher müssen wir sie beim Speichern auch akzeptieren – sonst wird dem Nutzer etwas
+  // zum Speichern angeboten, das die API selbst ablehnt.
   const site = await client.query(
     `SELECT id FROM construction_sites
-     WHERE company_id = $1 AND id = $2 AND status IN ('active','planned','on_hold')`,
+     WHERE company_id = $1 AND id = $2 AND status IN ('active','planned','on_hold','delayed')`,
     [context.companyId, siteId]
   );
   if (site.rowCount !== 1) {
@@ -9983,21 +9986,17 @@ async function createTimeEntryAddition(client, context, input, timeZone) {
     );
   }
 
-  const dayResult = await client.query(
-    `SELECT id, status
-     FROM work_days
-     WHERE company_id = $1 AND user_id = $2 AND work_date = $3
-     FOR UPDATE`,
-    [context.companyId, context.userId, input.workDate]
-  );
-  if (dayResult.rowCount !== 1) {
-    throw new InputError(
-      "Für diesen Tag existiert noch kein Stundenzettel.",
-      404,
-      "work_day_not_found"
-    );
-  }
-  const day = dayResult.rows[0];
+  // Ein vollstaendig vergessener Arbeitstag hat keine work_days-Zeile. Genau das ist
+  // der Fall, fuer den das Nachtragen da ist - und genau den hat diese Funktion
+  // frueher mit 404 abgewiesen, waehrend targetWorkDay nebenan und das normale
+  // Stempeln die Zeile bei Bedarf anlegen. Wer einen Tag komplett vergessen hatte,
+  // bekam ausgerechnet von der Nachtragefunktion "Fuer diesen Tag existiert noch
+  // kein Stundenzettel".
+  //
+  // Der Status der neuen Zeile kommt aus dem Spaltenvorgabewert 'open'
+  // (011_create_work_days.sql). Der Trigger work_days_before_write setzt ihn nicht,
+  // er raeumt bei 'open' nur die Zeitstempel ab.
+  const day = await targetWorkDay(client, context.companyId, context.userId, input.workDate);
 
   if (input.constructionSiteId) {
     await ensureOwnSiteAssignment(

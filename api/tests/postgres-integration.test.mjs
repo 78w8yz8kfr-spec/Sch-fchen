@@ -3666,6 +3666,49 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(secondClockInAddition.correctionKind, "addition");
     assert.equal(secondClockInAddition.status, "pending");
 
+    // Der komplett vergessene Tag: kein Kommen, kein Gehen, keine work_days-Zeile.
+    // Genau dieser Fall lief frueher in 404 "Fuer diesen Tag existiert noch kein
+    // Stundenzettel" - die Nachtragefunktion verweigerte ausgerechnet das
+    // Nachtragen. Der Tag liegt bewusst weit zurueck, damit er keinem anderen Test
+    // in dieser Datei in die Quere kommt.
+    //
+    // Der Test muss wiederholt gegen dieselbe Datenbank laufen: im zweiten Lauf
+    // existiert die Zeile aus dem ersten. Deshalb wird nicht geprueft, dass es sie
+    // vorher nicht gab, sondern dass die Ergaenzung in beiden Faellen durchgeht -
+    // der Rueckschritt (404 auf leerem Tag) faellt beim ersten Lauf auf, und der
+    // CI-Lauf beginnt immer leer.
+    const vergessenerTag = localDate(
+      new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(),
+      config.timeZone
+    );
+    const vergessenesKommen = await fetch(`${baseUrl}/api/v1/time-entry-additions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        workDate: vergessenerTag,
+        entryType: "clock_in",
+        recordedAt: new Date(`${vergessenerTag}T07:00:00Z`).toISOString(),
+        reason: "Arbeitsbeginn an einem komplett vergessenen Tag nachgetragen"
+      })
+    });
+    assert.equal(
+      vergessenesKommen.status,
+      201,
+      await vergessenesKommen.clone().text()
+    );
+
+    // Der Arbeitstag muss jetzt existieren - vorher gab es ihn nicht, und ohne ihn
+    // haette die Ergaenzung keinen Ort, an dem sie haengt.
+    const vergessenerTagDanach = await fetch(
+      `${baseUrl}/api/v1/work-days/${vergessenerTag}`,
+      { headers: { Cookie: cookie } }
+    );
+    assert.equal(
+      vergessenerTagDanach.status,
+      200,
+      await vergessenerTagDanach.clone().text()
+    );
+
     const pendingAdditionWorkDayResponse = await fetch(
       `${baseUrl}/api/v1/work-days/${workDate}`,
       { headers: { Cookie: cookie } }
