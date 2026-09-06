@@ -615,7 +615,7 @@ test("Der Dateiinhalt muss zur gemeldeten mimeType passen, nicht nur der Dateina
 
   // text/plain hat keine Signatur: als Ersatz wird verlangt, dass der Inhalt
   // gültiges, nullbyte-freies UTF-8 ist. Echter Text besteht die Prüfung,
-  // eine binäre Datei mit einem Nullbyte fällt durch.
+  // ein Nullbyte oder eine ungültige UTF-8-Bytefolge fällt durch.
   assert.equal(validateDocumentUpload({
     title: "Notiz", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
     contentBase64: Buffer.from("Ganz normaler Text").toString("base64"),
@@ -624,6 +624,13 @@ test("Der Dateiinhalt muss zur gemeldeten mimeType passen, nicht nur der Dateina
   assert.throws(() => validateDocumentUpload({
     title: "Binär als Text getarnt", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
     contentBase64: Buffer.from([0x41, 0x00, 0x42]).toString("base64"),
+    constructionSiteId: "22222222-2222-4222-8222-222222222222"
+  }), /passt nicht zum gemeldeten Dateityp/);
+  assert.throws(() => validateDocumentUpload({
+    title: "Ungültiges UTF-8 als Text getarnt", category: "general", fileName: "Notiz.txt", mimeType: "text/plain",
+    // 0xC3 verlangt ein Folgebyte - hier folgt keins, eine gültige
+    // UTF-8-Zeichenkette kann das nicht sein.
+    contentBase64: Buffer.from([0x41, 0xc3]).toString("base64"),
     constructionSiteId: "22222222-2222-4222-8222-222222222222"
   }), /passt nicht zum gemeldeten Dateityp/);
 });

@@ -24,8 +24,16 @@ Baustelle und Dokumentenverwaltung sichtbar.
 ## Erster Online-Stand
 
 - unterstützte Formate: PDF, JPEG, PNG, WebP, Text, XLSX und DOCX
+- der gemeldete Dateityp wird gegen den tatsächlichen Inhalt geprüft
+  (Signatur/„Magic Bytes"), nicht nur gegen Dateiendung und Client-Angabe;
+  XLSX und DOCX teilen sich als ZIP-Archive dieselbe Signatur und werden
+  bewusst nicht anhand des Archivinhalts weiter unterschieden
 - Lieferscheine sind bewusst auf JPEG-, PNG- oder WebP-Fotos begrenzt
 - maximale Dateigröße: 5 MB
+- Dateinamen werden vor dem Speichern auf NFC vereinheitlicht (macOS liefert
+  Umlaute beim Hochladen oft in zerlegter Form) und dürfen kein doppeltes
+  Anführungszeichen enthalten, da der Name ungeschützt in den
+  `Content-Disposition`-Kopf einfließt
 - Download ausschließlich nach gültiger Sitzung und Verwaltungsrollenprüfung
   oder nach tagesgenau geprüfter Baustellenzuweisung
 - Download immer als Anlage mit `nosniff` und ohne Browser-Cache
