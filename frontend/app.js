@@ -9553,7 +9553,12 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       });
       elements.weekStrip.append(item);
 
-      if (!workDay && !approvedAbsence) return;
+      // Ein vergessener Tag ist der einzige, der die Nachbuchung wirklich braucht,
+      // und bekam bisher als einziger keine Karte. Künftige Tage bleiben draußen,
+      // weil es dort nichts nachzutragen gibt und sieben leere Karten die Woche
+      // unübersichtlich machen würden.
+      const isPastOrToday = workDate <= localDateKey(today);
+      if (!workDay && !approvedAbsence && !isPastOrToday) return;
 
       const dayCard = document.createElement("section");
       const heading = document.createElement("div");
@@ -9674,15 +9679,6 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           dayCard.append(warnings);
         }
 
-        if (!demoMode) {
-          const addMissing = document.createElement("button");
-          addMissing.type = "button";
-          addMissing.className = "button button--quiet week-day-addition";
-          addMissing.textContent = "Fehlende Buchung ergänzen";
-          addMissing.addEventListener("click", () => void openTimeAdditionForm(workDate));
-          dayCard.append(addMissing);
-        }
-
         if (workflowStatus === "completed") {
           const stateNote = document.createElement("p");
           stateNote.className = "week-day-state week-day-state--approved";
@@ -9697,6 +9693,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           dayCard.append(stateNote);
         }
       }
+
+      if (!demoMode) {
+        const addMissing = document.createElement("button");
+        addMissing.type = "button";
+        addMissing.className = "button button--quiet week-day-addition";
+        addMissing.textContent = "Fehlende Buchung ergänzen";
+        addMissing.addEventListener("click", () => void openTimeAdditionForm(workDate));
+        dayCard.append(addMissing);
+      }
+
       elements.weekTimesheetList.append(dayCard);
     });
     if (elements.weekTimesheetList.childElementCount === 0) {

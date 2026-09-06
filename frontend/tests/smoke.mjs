@@ -1360,6 +1360,29 @@ assert.match(app, /renderWorkDayReviews/);
 assert.doesNotMatch(app, /Stundenzettel einreichen/);
 assert.match(app, /Automatisch im Büro sichtbar/);
 assert.match(app, /Fehlende Buchung ergänzen/);
+// Der Knopf "Fehlende Buchung ergänzen" muss außerhalb des else-Zweigs stehen,
+// damit er auf Tagen ohne Buchungen angezeigt wird. Wir prüfen das, indem wir
+// nach dem Muster suchen, bei dem der Knopf NACH dem schließenden Brace des
+// else-Zweigs und NACH dem stateNote-Code erscheint.
+const weekRenderSection = app.slice(
+  app.indexOf("const workflowStatus = workDay?.workflowStatus"),
+  app.indexOf("elements.weekTimesheetList.append(dayCard);",
+    app.indexOf("const workflowStatus = workDay?.workflowStatus")
+  )
+);
+assert.ok(
+  weekRenderSection.includes("dayCard.append(stateNote);") &&
+  weekRenderSection.indexOf("dayCard.append(stateNote);") <
+  weekRenderSection.indexOf("const addMissing = document.createElement"),
+  "Der Fehlende-Buchung-Knopf muss NACH dem else-Zweig und den stateNote-Blöcken stehen"
+);
+// Die Kartenbedingung zeigt auch Tage an, die heute oder in der Vergangenheit
+// liegen - das sind die, auf denen man eigentlich arbeitet und die darum
+// nachgebessert werden können müssen. Künftige Tage haben noch nichts zu korrigieren.
+assert.match(app, /const isPastOrToday = workDate <= localDateKey\(today\)/,
+  "Die Datumsprüfung für vergangene/heutige Tage fehlt");
+assert.match(app, /if \(!workDay && !approvedAbsence && !isPastOrToday\) return/,
+  "Die Kartenbedingung berücksichtigt nicht, dass vergangene Tage eine Karte brauchen");
 assert.match(app, /Abgerechnet · im persönlichen Export enthalten/);
 assert.doesNotMatch(app, /liveDuration\.textContent = formatMinutes\(times\.gross\)/);
 assert.doesNotMatch(app, /geolocation/i, "Die Demo darf keine GPS- oder Standortabfrage enthalten");
