@@ -1,5 +1,15 @@
 # Changelog
 
+## Vorbereitet – 06.09.2026
+
+- Optionales Render-Free-/Neon-Free-Testprofil ohne ablaufende Render-Datenbank;
+  vor dem Start geprüfte TLS-Konfiguration, direkter Migrationsendpunkt und
+  getrennte API-Rolle, kleine Verbindungspools und keine automatischen Deployments.
+- Zehn Konfigurations-/Negativtests, CI-Einbindung und Anleitung zur vorherigen
+  Datenrettung; keine bestehende Datenbank verändert und noch kein Provider-Rollout.
+- Vertragsabgleich dokumentiert: App-MFA, vollständiger Mandantenexport,
+  tatsächliche Löschung und externe Betriebsnachweise bleiben Freigabepunkte.
+
 Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]

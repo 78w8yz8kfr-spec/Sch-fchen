@@ -1,0 +1,54 @@
+# Optionales, getrenntes Testsystem. Keine Bestandsdatenbank ersetzen/loeschen.
+# Voraussetzung: Sicherheitsstand aus PR #70, siehe FREE_DEMO_HOSTING.md.
+services:
+  - type: web
+    name: schaefchen-neon-demo
+    runtime: docker
+    region: frankfurt
+    plan: free
+    branch: deploy/free-demo-contracts-2026-09-06
+    dockerfilePath: ./Dockerfile.production
+    dockerContext: .
+    dockerCommand: sh deploy/neon-demo-start.sh
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENVIRONMENT
+        value: demo
+      - key: API_PORT
+        value: 10000
+      - key: STATIC_DIRECTORY
+        value: /app/frontend
+      # Direkter Neon-Endpunkt, kein -pooler; Owner nur fuer Migrationen.
+      # Query: sslmode=verify-full&sslrootcert=system
+      - key: DATABASE_URL
+        sync: false
+      - key: API_DB_USER
+        value: schaefchen_api_login
+      - key: API_DB_PASSWORD
+        generateValue: true
+      - key: API_DB_SSL_MODE
+        value: verify-full
+      - key: API_DB_POOL_SIZE
+        value: "3"
+      - key: API_TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: SECURITY_RATE_LIMIT_SECRET
+        generateValue: true
+      - key: UPLOAD_SCAN_REQUIRED
+        value: "false"
+      - key: INITIAL_COMPANY_NUMBER
+        value: F-000001
+      - key: INITIAL_SETUP_TOKEN
+        sync: false
+      - key: PLATFORM_SETUP_TOKEN
+        sync: false
+      - key: SESSION_TTL_SECONDS
+        value: "28800"
+      - key: APP_TIME_ZONE
+        value: Europe/Berlin
+
+# Absichtlich keine Render-Postgres-Ressource: deren Free-Tarif laeuft ab.
