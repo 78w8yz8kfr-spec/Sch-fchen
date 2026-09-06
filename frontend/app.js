@@ -10237,17 +10237,34 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }[pane] || elements.navStart;
     const mobileActiveButton = {
       time: elements.navWeek,
-      apprentice: elements.navApprentice,
+      // "Azubi" steht mobil nur direkt in der Leiste, wenn app.js ihm die
+      // Klasse "nav-item--apprentice-mobile" gegeben hat (Azubi selbst, oder
+      // Ausbilder ohne Planungsrecht). Ein planender Ausbilder findet ihn
+      // stattdessen unter "Mehr" - fuer ihn muss deshalb "Mehr" leuchten,
+      // sonst zeigt die Leiste in seinem Bereich gar nichts an.
+      apprentice: elements.navApprentice.classList.contains("nav-item--apprentice-mobile")
+        ? elements.navApprentice
+        : elements.navMore,
       assignments: elements.navMobilePlanning,
       sites: elements.navMobilePlanning,
+      // Arbeitszeiten (Freigabe fuer andere) haengt an derselben Gruppe wie
+      // Einsatzplanung und Baustellen daneben - ohne diesen Eintrag leuchtete
+      // am Telefon in diesem Bereich gar nichts, weil der Desktop-Knopf dort
+      // "nav-item--desktop" traegt und unsichtbar ist.
+      worktimes: elements.navMobilePlanning,
       reports: elements.navMobileDocumentation,
       documents: elements.navMobileDocumentation,
       inspections: elements.navMobileDocumentation,
       customers: elements.navMobileBusiness,
       employees: elements.navMobileBusiness,
       vehicles: elements.navMobileBusiness,
-      devices: elements.navDevices,
-      power: elements.navDevices,
+      // Geraete und Baustrom haben mobil keinen eigenen Knopf mehr (beide
+      // tragen "nav-item--desktop", siehe applyNavigationAccess) - sichtbar
+      // ist dort nur die Gruppe "Betrieb". Zeigt die Markierung trotzdem auf
+      // den einzelnen, unsichtbaren Knopf, leuchtet in der Leiste gar nichts:
+      // markiert werden muss, was der Nutzer tatsaechlich sieht.
+      devices: elements.navMobileBusiness,
+      power: elements.navMobileBusiness,
       analytics: elements.navMore
     }[pane] || null;
     activateNavigation(activeButton, mobileActiveButton);

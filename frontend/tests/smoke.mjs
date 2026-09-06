@@ -1806,4 +1806,60 @@ for (const stand of ["planned", "ordered", "available", "used"]) {
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);
 
+// "devices" und "power" zeigten in mobileActiveButton frueher auf
+// elements.navDevices - richtig, solange der Knopf mobil sichtbar war. Als er
+// die Klasse "nav-item--desktop" bekam (Geraetebestand wandert unter
+// "Betrieb", siehe applyNavigationAccess), leuchtete am Telefon in beiden
+// Bereichen ploetzlich gar nichts mehr: die Markierung zeigte auf einen
+// Knopf, den es dort nicht gibt. Kein einziger der anderen Tests hat das
+// bemerkt, weil keiner die Ziel-Klasse jedes einzelnen Eintrags nachschlaegt.
+// Dieser Test tut genau das: er liest die Zuordnung aus app.js, loest jede
+// referenzierte "elements.xyz"-Kennung ueber die id-Zuordnung in index.html
+// auf und verlangt, dass mindestens ein referenzierter Knopf ohne
+// "nav-item--desktop" dasteht - der, der am Telefon tatsaechlich zu sehen
+// ist. (Der Azubi-Eintrag nennt zwei Knoepfe in einer Bedingung: einer davon
+// traegt "nav-item--desktop", der andere - "Mehr" - nicht. Das reicht.)
+const elementIdByName = new Map(
+  [...app.matchAll(/(\w+):\s*document\.querySelector\("#([\w-]+)"\)/g)]
+    .map(([, name, id]) => [name, id])
+);
+const mobileMapQuelltext = /const mobileActiveButton = \{([\s\S]*?)\}\[pane\] \|\| null;/.exec(app);
+assert.ok(mobileMapQuelltext, "Die mobile Aktivmarkierung (mobileActiveButton) fehlt in app.js");
+const ohneKommentare = mobileMapQuelltext[1].replace(/\/\/[^\n]*/g, "");
+const eintraege = ohneKommentare
+  .split(/,\n(?=\s*\w+:)/)
+  .map((zeile) => zeile.trim())
+  .filter(Boolean);
+assert.ok(eintraege.length >= 10, "Die mobile Aktivmarkierung wurde nicht vollstaendig erkannt");
+
+const klassenVonId = (id) => {
+  const beginn = html.indexOf(`id="${id}"`);
+  assert.ok(beginn !== -1, `#${id} fehlt in index.html`);
+  const tagStart = html.lastIndexOf("<", beginn);
+  const tagEnde = html.indexOf(">", beginn);
+  const tag = html.slice(tagStart, tagEnde + 1);
+  return /class="([^"]*)"/.exec(tag)?.[1] ?? "";
+};
+
+const befunde = [];
+for (const eintrag of eintraege) {
+  const [, bereich] = /^(\w+):/.exec(eintrag) ?? [];
+  assert.ok(bereich, `Eintrag ohne Bereichsnamen: ${eintrag}`);
+  const genannteKnoepfe = [...eintrag.matchAll(/elements\.(\w+)/g)].map((treffer) => treffer[1]);
+  assert.ok(genannteKnoepfe.length > 0, `${bereich}: kein Knopf referenziert`);
+  const erreichbarMobil = genannteKnoepfe.some((name) => {
+    const id = elementIdByName.get(name);
+    assert.ok(id, `${bereich}: elements.${name} ist keine bekannte id-Abfrage`);
+    return !klassenVonId(id).split(/\s+/).includes("nav-item--desktop");
+  });
+  if (!erreichbarMobil) {
+    befunde.push(`${bereich}: nur ${genannteKnoepfe.join(", ")} genannt - alle "nav-item--desktop"`);
+  }
+}
+assert.deepEqual(
+  befunde,
+  [],
+  `Mobile Aktivmarkierung zeigt auf einen am Telefon unsichtbaren Knopf:\n${befunde.join("\n")}`
+);
+
 console.log("PWA-Smoke-Test erfolgreich.");
