@@ -4,6 +4,28 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Zeitgrenzen und Prozessabsicherung (Fassung 0.44.41).** Zwei Lücken aus
+  der Durchsicht der Produktionsgrundlagen, die kein Release-Gate abdeckte und
+  die beide zum Stillstand führen können.
+
+  **Keine Abfrage lief bisher in eine Zeitgrenze.** Ohne `statement_timeout`
+  hält eine hängende Abfrage ihre Verbindung für immer. Der Pool hat zehn;
+  zehn solche Abfragen, und die API antwortet keiner Firma mehr. Das passiert
+  nicht durch einen Fehler, sondern durch Wachstum — ein Export über mehrere
+  Jahre Zeiterfassung wird irgendwann langsam, und ohne Grenze wird aus langsam
+  irgendwann endlos. Jetzt greift nach dreißig Sekunden eine Grenze, bewusst
+  großzügig: Excel-Import und Abschluss-PDF bleiben deutlich darunter.
+  Ebenso hielt ein tropfenweise sendender Client eine Verbindung beliebig lange
+  offen — dafür reicht ein Telefon mit einem Balken Empfang.
+
+  **Ein Fehler an einer ruhenden Poolverbindung beendete den Prozess.** Der
+  Verbindungspool meldet Fehler an Verbindungen, die gerade niemand benutzt —
+  etwa wenn die Datenbank eine ruhende Verbindung zurückstellt. Hörte dort
+  niemand zu, behandelte Node das als unbehandelte Ausnahme. Kein
+  Programmierfehler also, sondern ein banaler Netzwerkhänger, der bei nur einer
+  laufenden Instanz alle Anfragen mitriss. Jetzt wird er gemeldet, und der Pool
+  holt sich die Verbindung von allein zurück.
+
 - **Sicherheitsdurchsicht: nichts gefunden, zwei Lücken geschlossen (Fassung
   0.44.41).** Geprüft wurde, ob Zugangsdaten im Browser landen und ob der
   Anmelde-Endpunkt den üblichen Angriffen standhält. Beides ist sauber. Im

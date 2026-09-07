@@ -63,6 +63,19 @@ export function loadConfig() {
       max: integer("API_DB_POOL_SIZE", 10, 1, 50),
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
+      // Ohne Zeitgrenze haelt eine haengende Abfrage ihre Verbindung fuer
+      // immer. Der Pool hat zehn davon; zehn solche Abfragen, und die API
+      // antwortet keiner Firma mehr. Genau das passiert nicht durch einen
+      // Fehler, sondern durch Wachstum: ein Export ueber mehrere Jahre
+      // Zeiterfassung wird irgendwann langsam, und ohne Grenze wird aus
+      // langsam irgendwann endlos.
+      //
+      // Dreissig Sekunden sind bewusst grosszuegig. Der Excel-Wochenplanimport
+      // und die Abschluss-PDF mit vielen Fotos sind die laengsten bekannten
+      // Ablaeufe; sie bleiben deutlich darunter. Wer eine Abfrage baut, die
+      // laenger braucht, soll davon erfahren - eine halbe Minute Wartezeit ist
+      // fuer einen Monteur ohnehin keine brauchbare Antwort mehr.
+      statement_timeout: integer("API_DB_STATEMENT_TIMEOUT_MS", 30000, 1000, 600000),
       application_name: "schaefchen_api"
     }
   });
