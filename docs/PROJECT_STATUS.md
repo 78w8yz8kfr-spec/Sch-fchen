@@ -1,10 +1,23 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.40
+Technischer Stand: V0.44.41
 
 
 ## Abgeschlossen
+
+- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.41,
+  Migration 150). Keine Zugangsdaten im ausgelieferten Frontend, keine im
+  Git-Verlauf über alle 250 Commits, und der Anmelde-Endpunkt hält allen zehn
+  geprüften Punkten stand — scrypt mit Kostenparameter 16384, `timingSafeEqual`,
+  neues Sitzungsmerkmal je Anmeldung, HttpOnly mit SameSite=Strict,
+  Herkunftsprüfung vor jedem Routing, serverseitiger Widerruf beim Abmelden,
+  und bei unbekanntem Konto läuft die Passwortprüfung gegen einen
+  Platzhalter-Hash weiter, damit die Antwortzeit keine Kontenliste verrät.
+  Geschlossen wurden zwei Lücken ohne Schaden: Berichtsentwürfe überlebten das
+  Abmelden auf geteilten Geräten, und `.dockerignore` deckte `.env` nur im
+  Wurzelverzeichnis ab.
+  PWA-Speicher `schaefchen-online-v123`
 
 - **Zeitkorrektur wieder benutzbar, Dokumente und Speicherung gehärtet**
   (Fassung 0.44.40, Migration 149). Ein vergessener Arbeitstag war der einzige,
