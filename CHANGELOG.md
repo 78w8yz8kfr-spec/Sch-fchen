@@ -4,6 +4,32 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Grundlage für den DATEV-Lohnexport (Fassung 0.44.41, Migration 151).**
+  Stunden sollen an die Steuerkanzlei gehen. DATEV hat dafür zwei Lohnprodukte
+  — LODAS und Lohn und Gehalt — mit fast gleichen Datenzeilen, aber
+  unterschiedlichem Dateikopf; welches eine Firma nutzt, ist jetzt einstellbar.
+
+  Diese Fassung legt die Grundlage, **nicht die Datei**: Beraternummer,
+  Mandantennummer und die Zuordnung jeder Zeitart auf eine Lohnartennummer.
+  Diese Nummern sind nicht standardisiert — jede Kanzlei vergibt eigene, und
+  ohne sie ist jede erzeugte Datei wertlos. Deshalb gibt es **keine
+  Vorgabewerte**: eine ungepflegte Zuordnung bleibt sichtbar leer und wird den
+  Export blockieren, statt mit einer geratenen Nummer durchzulaufen. Eine
+  Datei, die richtig aussieht und falsche Lohnarten enthält, wird eingespielt —
+  das ist der teurere Fehler.
+
+  Eine geänderte Zuordnung überschreibt nicht, sondern löst die bisherige ab.
+  Eine Lohnart fließt in bereits abgerechnete Zeiträume ein; wird sie später
+  korrigiert, muss nachvollziehbar bleiben, mit welcher Nummer tatsächlich
+  exportiert wurde. Die Anwendungsrolle darf dort deshalb nur lesen und
+  einfügen — das Ablösen erledigt ein Auslöser.
+
+  Dazu eine Vorschau, die zeigt, was übermittelt würde, ohne eine Datei zu
+  erzeugen, und `docs/DATEV_EXPORT.md` als Formular für das Gespräch mit der
+  Kanzlei. Die Stundenwerte kommen unverändert aus den bereits berechneten
+  Spalten der Arbeitstage — keine zweite Rechnung, die auseinanderlaufen
+  könnte.
+
 - **Zeitgrenzen und Prozessabsicherung (Fassung 0.44.41).** Zwei Lücken aus
   der Durchsicht der Produktionsgrundlagen, die kein Release-Gate abdeckte und
   die beide zum Stillstand führen können.

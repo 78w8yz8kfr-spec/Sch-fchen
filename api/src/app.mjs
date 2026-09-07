@@ -56,6 +56,7 @@ import {
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
 import { handlePowerRequest } from "./power.mjs";
+import { handleDatevRequest } from "./datev.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -10755,6 +10756,19 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             context,
             today: localDate(new Date().toISOString(), config.timeZone)
           })
+        );
+        if (handled) return json(response, handled.status, handled.body);
+      }
+
+      // DATEV-Lohnschnittstelle, Stufe 1: Stammdaten, Lohnart-Zuordnung und
+      // die reine Vorschau. Kapselt seine Fachlogik in einem eigenen Modul
+      // wie Geräte und Baustromverteiler; die Sitzung wird trotzdem hier
+      // aufgelöst, aus demselben Grund.
+      if (url.pathname.startsWith("/api/v1/admin/datev")) {
+        const handled = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => handleDatevRequest({ request, url, client, context })
         );
         if (handled) return json(response, handled.status, handled.body);
       }
