@@ -3,6 +3,19 @@
 Stand: 13.08.2026
 Technischer Stand: V0.44.41
 
+## Hosting-Wiederanlauf 07.09.2026
+
+Der bestehende Render-Free-Webdienst ist vorhanden. Seine bisherige
+PostgreSQL-Ressource wird von Render mit 404 beantwortet; der alte Datenbankhost
+ist laut Startprotokoll nicht mehr auflösbar. Eine Datenrettung ist damit nicht
+nachgewiesen. Eine neue Neon-Free-Testdatenbank wird getrennt initialisiert.
+
+Die API-Konfiguration unterstützt dafür verifiziertes TLS, standardmäßig für
+Neon-Hosts und explizit über `API_DB_SSL_MODE=verify-full`. Der Wiederanlauf
+verwendet die aktuelle App-Fassung 0.44.41. Der weitergehende Sicherheits-PR #70
+bleibt eigenständig; diese TLS-Korrektur ist keine Produktionsfreigabe und
+kein Nachweis einer Wiederherstellung des alten Datenbestands.
+
 
 ## Abgeschlossen
 

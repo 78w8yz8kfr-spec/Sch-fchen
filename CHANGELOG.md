@@ -4,6 +4,12 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Neon-Anbindung für den kostenlosen Testbetrieb (07.09.2026).** Die API
+  verbindet sich mit Neon über TLS und prüft das Serverzertifikat. Andere
+  PostgreSQL-Anbieter können dieselbe Prüfung über `API_DB_SSL_MODE=verify-full`
+  einschalten. Die getrennten API-Zugangsdaten bleiben erhalten; die aktuellen
+  Funktionen aus 0.44.41 werden nicht durch einen älteren Branch ersetzt.
+
 - **Sicherheitsdurchsicht: nichts gefunden, zwei Lücken geschlossen (Fassung
   0.44.41).** Geprüft wurde, ob Zugangsdaten im Browser landen und ob der
   Anmelde-Endpunkt den üblichen Angriffen standhält. Beides ist sauber. Im
