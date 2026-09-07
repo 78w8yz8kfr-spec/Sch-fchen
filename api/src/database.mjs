@@ -16,8 +16,21 @@ export function companyLogoUrl(objectKey) {
   return `./assets/${segments.map(encodeURIComponent).join("/")}`;
 }
 
-export function createPool(databaseConfig) {
-  return new Pool(databaseConfig);
+export function createPool(databaseConfig, logger = console) {
+  const pool = new Pool(databaseConfig);
+  // Der Pool ist ein EventEmitter, und pg meldet darueber Fehler an
+  // Verbindungen, die gerade *niemand* benutzt - etwa wenn die verwaltete
+  // Datenbank eine ruhende Verbindung zurueckstellt. Hoert dort niemand zu,
+  // behandelt Node das als unbehandelte Ausnahme und beendet den Prozess.
+  //
+  // Das ist der unangenehmste Ausfall ueberhaupt: kein Programmierfehler,
+  // sondern ein banaler Netzwerkhaenger, und weil nur eine Instanz laeuft,
+  // reisst er alle laufenden Anfragen mit. Der Pool selbst holt sich die
+  // Verbindung von allein zurueck; zu tun ist nichts ausser hinzusehen.
+  pool.on("error", (error) => {
+    logger.error?.(`Pool-Verbindung meldete einen Fehler: ${error?.message}`);
+  });
+  return pool;
 }
 
 async function beginAsApi(client) {
