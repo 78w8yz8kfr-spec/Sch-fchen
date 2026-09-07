@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Wer eine Zeitkorrektur beantragt, genehmigt sie nicht mehr selbst (Fassung
+  0.44.40).** Bisher konnte dieselbe Person einen Korrekturantrag stellen und
+  ihn anschließend abnicken — bei einem abgerechneten Tag also allein über
+  bereits abgerechnete Zeit entscheiden. Beide Genehmigungswege verlangen jetzt
+  ein zweites berechtigtes Konto, nach demselben Muster, das die
+  Abwesenheitsfreigabe seit jeher verwendet. Auch der ältere Korrekturweg ist
+  mitgezogen, sonst wäre eine Hintertür offen geblieben.
+
+  **Zu beachten:** Ein Betrieb, der nur ein einziges berechtigtes Konto führt,
+  kann einen Antrag dieses Kontos nicht mehr genehmigen — die Ersteinrichtung
+  legt genau ein solches Konto an. Der Ausweg ist ein zweites Konto, nicht eine
+  Ausnahme in der Regel; die Fehlermeldung sagt das. Bei Abwesenheitsanträgen
+  besteht dieselbe Eigenschaft schon länger.
+
+- **Die Änderungsanzeige nennt die Baustelle beim Namen (Fassung 0.44.40).**
+  Bei einem Baustellenwechsel stand dort „Andere Baustelle", weil der Zugang
+  nur die Kennung lieferte und ein geratener Name schlechter gewesen wäre als
+  keiner. Jetzt kommen die Namen mit — auch für Baustellen, die längst
+  abgeschlossen sind. Eine Historie, die ihre eigenen Bezüge verliert, ist
+  keine.
+
 - **Vergessene Tage lassen sich wieder nachtragen (Fassung 0.44.40).** Wer
   einen Arbeitstag komplett vergessen hatte, kam an ihn nicht heran. Zwei
   Sperren lagen übereinander: die Wochenansicht zeichnete für einen Tag ohne

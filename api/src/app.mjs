@@ -9313,9 +9313,15 @@ async function existingTimeChange(client, companyId, userId, clientChangeId, exp
   return timeChangeOperationDto(operation.rows[0], items.rows);
 }
 
-function timeChangeItemViewDto(item) {
+// siteNameById löst die in oldValue/newValue enthaltene constructionSiteId zu
+// einem Anzeigenamen auf (siehe Aufrufer). Die Karte kommt bewusst als
+// Parameter herein statt hier selbst nachzuladen: die Baustellenliste gehört
+// company-weit zur Anfrage, nicht zu einer einzelnen Änderungszeile.
+function timeChangeItemViewDto(item, siteNameById = new Map()) {
   const oldWorkDate = item.old_work_date ? databaseDate(item.old_work_date) : null;
   const newWorkDate = item.new_work_date ? databaseDate(item.new_work_date) : null;
+  const oldSiteId = item.old_value?.constructionSiteId || null;
+  const newSiteId = item.new_value?.constructionSiteId || null;
   return {
     id: item.id,
     action: item.item_action,
@@ -9327,7 +9333,16 @@ function timeChangeItemViewDto(item) {
     // würde nur denselben Tag doppelt zeigen.
     movedToWorkDate: newWorkDate && oldWorkDate && newWorkDate !== oldWorkDate ? newWorkDate : null,
     oldValue: item.old_value || null,
-    newValue: item.new_value || null
+    newValue: item.new_value || null,
+    // Zusatzfelder neben oldValue/newValue statt darin: die Oberfläche soll
+    // weiterhin "Baustelle X" statt "Andere Baustelle" schreiben können,
+    // ohne dass sich das Vertragsformat von oldValue/newValue ändert. Bleibt
+    // eine Kennung ausnahmsweise unauflösbar (siteNameById kennt sie nicht),
+    // liefern wir bewusst kein Feld mit Platzhaltertext, sondern null - die
+    // Oberfläche entscheidet dann selbst, wie sie einen fehlenden Namen
+    // darstellt.
+    oldConstructionSiteName: oldSiteId ? siteNameById.get(oldSiteId) || null : null,
+    newConstructionSiteName: newSiteId ? siteNameById.get(newSiteId) || null : null
   };
 }
 
@@ -9420,10 +9435,33 @@ async function getOwnTimeChanges(client, context, weekStart) {
      ORDER BY item.created_at, item.id`,
     [context.companyId, operationIds]
   );
+  // Baustellennamen für die Anzeige nachladen (Betreiberauftrag: der
+  // Monteur soll "Baustelle X" statt nur "Andere Baustelle" lesen können).
+  // Der Mandantenfilter auf company_id gilt wie überall; ein WHERE auf den
+  // Baustellenstatus fehlt hier bewusst, denn eine abgeschlossene oder
+  // archivierte Baustelle wird laut AGENTS.md nicht hart gelöscht und muss
+  // in der eigenen Historie weiterhin benennbar bleiben.
+  const siteIds = [...new Set(
+    items.rows.flatMap((item) => [
+      item.old_value?.constructionSiteId,
+      item.new_value?.constructionSiteId
+    ]).filter(Boolean)
+  )];
+  const siteNameById = new Map();
+  if (siteIds.length > 0) {
+    const sites = await client.query(
+      "SELECT id, name FROM construction_sites WHERE company_id = $1 AND id = ANY($2::UUID[])",
+      [context.companyId, siteIds]
+    );
+    for (const site of sites.rows) {
+      siteNameById.set(site.id, site.name);
+    }
+  }
+
   const itemsByOperation = new Map();
   for (const item of items.rows) {
     const list = itemsByOperation.get(item.operation_id) || [];
-    list.push(timeChangeItemViewDto(item));
+    list.push(timeChangeItemViewDto(item, siteNameById));
     itemsByOperation.set(item.operation_id, list);
   }
 
@@ -9915,6 +9953,17 @@ async function reviewTimeChangeOperation(client, context, operationId, input) {
   if (operation.rowCount !== 1 || operation.rows[0].status !== "pending") {
     throw new InputError("Die kontrollierte Korrektur wurde nicht gefunden oder bereits entschieden.", 409, "time_change_not_pending");
   }
+  // Vier-Augen-Prinzip (Betreiberauftrag): wer den Korrekturantrag gestellt
+  // hat, darf ihn nicht selbst freigeben oder ablehnen - sonst genügt ein
+  // einziges Konto, um eine Zeitänderung unbeobachtet wirksam zu machen.
+  // Gleiches Muster wie bei reviewAbsenceRequest (management_review).
+  if (operation.rows[0].requested_by_user_id === context.userId) {
+    throw new InputError(
+      "Sie haben diese Korrektur selbst beantragt. Bitten Sie ein zweites berechtigtes Konto (Administration, Geschäftsführung oder Büro/Disposition), sie zu prüfen.",
+      403,
+      "time_change_two_person_rule"
+    );
+  }
   const items = await client.query(
     `SELECT * FROM time_change_items
      WHERE company_id = $1 AND operation_id = $2 ORDER BY created_at, id`,
@@ -10347,6 +10396,7 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
             correction.correction_reason,
             correction.created_at AS requested_at,
             correction.correction_status, correction.reviewed_at,
+            correction.entered_by_user_id,
             account.first_name || ' ' || account.last_name AS employee_name
      FROM time_entries AS correction
      LEFT JOIN time_entries AS original
@@ -10379,6 +10429,19 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
       "Diese zusammenhängende Änderung muss als vollständiger Korrekturvorgang geprüft werden.",
       409,
       "time_change_operation_review_required"
+    );
+  }
+  // Vier-Augen-Prinzip (Betreiberauftrag), auch auf dem älteren Korrekturweg:
+  // entered_by_user_id nennt hier den Antragsteller (createTimeEntryCorrection/
+  // -Addition/-Invalidation setzen es stets auf den anfragenden Benutzer).
+  // Ohne diese Prüfung bliebe genau diese Hintertür zum neueren
+  // reviewTimeChangeOperation offen. Gleiches Muster wie dort und bei
+  // reviewAbsenceRequest.
+  if (correction.entered_by_user_id === context.userId) {
+    throw new InputError(
+      "Sie haben diese Korrektur selbst beantragt. Bitten Sie ein zweites berechtigtes Konto (Administration, Geschäftsführung oder Büro/Disposition), sie zu prüfen.",
+      403,
+      "time_correction_two_person_rule"
     );
   }
   await client.query(

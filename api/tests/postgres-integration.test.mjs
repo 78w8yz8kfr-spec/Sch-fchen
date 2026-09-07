@@ -3728,6 +3728,29 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal(pendingAdditionWorkDay.entries.length, 4);
     assert.equal(pendingAdditionWorkDay.hasPendingCorrection, true);
 
+    // Vier-Augen-Prinzip (Betreiberauftrag): secondClockInAddition wurde mit
+    // Cookie: cookie beantragt (siehe oben, entered_by_user_id). Derselbe
+    // Zugang hat zwar die Administration-Rolle und dürfte den älteren
+    // Korrekturweg grundsätzlich prüfen, aber nicht den eigenen Antrag - genau
+    // die Hintertür, die reviewTimeChangeOperation schon verschließt.
+    const selfApprovalAttempt = await fetch(
+      `${baseUrl}/api/v1/admin/time-entry-corrections/${secondClockInAddition.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ decision: "approved" })
+      }
+    );
+    assert.equal(
+      selfApprovalAttempt.status,
+      403,
+      await selfApprovalAttempt.clone().text()
+    );
+    assert.equal(
+      (await selfApprovalAttempt.json()).error.code,
+      "time_correction_two_person_rule"
+    );
+
     const approveAdditionResponse = await fetch(
       `${baseUrl}/api/v1/admin/time-entry-corrections/${secondClockInAddition.id}`,
       {
@@ -4004,6 +4027,28 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const deleteOperation = (await deleteLockedBlockResponse.json()).operation;
     assert.equal(deleteOperation.status, "pending");
     assert.ok(deleteOperation.changes.length >= 2);
+
+    // Vier-Augen-Prinzip (Betreiberauftrag): deleteLockedBlockResponse wurde
+    // mit Cookie: cookie beantragt (requested_by_user_id), also darf genau
+    // dieser Zugang die eigene kontrollierte Korrektur nicht selbst
+    // freigeben - obwohl er als Administration ohne diese Prüfung dürfte.
+    const selfApprovalAttemptOperation = await fetch(
+      `${baseUrl}/api/v1/admin/time-change-operations/${deleteOperation.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ decision: "approved" })
+      }
+    );
+    assert.equal(
+      selfApprovalAttemptOperation.status,
+      403,
+      await selfApprovalAttemptOperation.clone().text()
+    );
+    assert.equal(
+      (await selfApprovalAttemptOperation.json()).error.code,
+      "time_change_two_person_rule"
+    );
 
     const approveDeleteOperation = await fetch(
       `${baseUrl}/api/v1/admin/time-change-operations/${deleteOperation.id}`,
@@ -6880,25 +6925,91 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       return employeeCookie;
     }
 
-    async function bookClockInOut(employeeCookie) {
-      const clockInAt = new Date(Date.now() - 6000).toISOString();
+    // arrivalSiteId ist optional: nur der betroffene Mitarbeiter bekommt eine
+    // Baustellenankunft/-abfahrt gebucht, denn nur an ihm wird unten der
+    // Baustellenwechsel samt Namensauflösung geprüft. Der fremde Mitarbeiter
+    // braucht dafür keine Baustelle.
+    async function bookClockInOut(employeeCookie, arrivalSiteId) {
+      const clockInAt = new Date(Date.now() - 8000).toISOString();
+      const siteArrivalAt = new Date(Date.now() - 6000).toISOString();
+      const siteDepartureAt = new Date(Date.now() - 5000).toISOString();
       const clockOutAt = new Date(Date.now() - 4000).toISOString();
-      for (const [entryType, recordedAt] of [["clock_in", clockInAt], ["clock_out", clockOutAt]]) {
+      const workDate = localDate(clockInAt, config.timeZone);
+
+      async function postEntry(entryType, recordedAt, constructionSiteId = null) {
         const booking = await fetch(`${baseUrl}/api/v1/time-entries`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Cookie: employeeCookie },
-          body: JSON.stringify({ clientEntryId: randomUUID(), entryType, recordedAt, clientCreatedAt: recordedAt })
+          body: JSON.stringify({
+            clientEntryId: randomUUID(), entryType, recordedAt, clientCreatedAt: recordedAt,
+            ...(constructionSiteId ? { constructionSiteId } : {})
+          })
         });
         assert.equal(booking.status, 201, await booking.clone().text());
       }
-      const workDate = localDate(clockInAt, config.timeZone);
+
+      await postEntry("clock_in", clockInAt);
+      if (arrivalSiteId) {
+        await postEntry("site_arrival", siteArrivalAt, arrivalSiteId);
+        // Wer als einziger Mitarbeiter auf einer Baustelle steht, wird laut
+        // reconcileAutomaticSiteForeman automatisch deren Vorarbeiter und muss
+        // vor dem Verlassen einen Baustellenbericht abgeben - sonst weist
+        // insertTimeEntry die anschließende site_departure-Buchung mit 409
+        // "site_report_required" ab (dasselbe Muster wie bei postForemanEntry
+        // weiter oben in dieser Datei, Zeile ~1133-1157).
+        const report = await fetch(`${baseUrl}/api/v1/site-reports`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: employeeCookie },
+          body: JSON.stringify({
+            clientReportId: randomUUID(),
+            constructionSiteId: arrivalSiteId,
+            reportType: "daily",
+            workDate,
+            sourceMode: "digital",
+            summary: "Tagesbericht aus dem Integrationstest (Einsichtstest)"
+          })
+        });
+        assert.equal(report.status, 201, await report.clone().text());
+        await postEntry("site_departure", siteDepartureAt, arrivalSiteId);
+      }
+      await postEntry("clock_out", clockOutAt);
+
       const dayResponse = await fetch(`${baseUrl}/api/v1/work-days/${workDate}`, {
         headers: { Cookie: employeeCookie }
       });
       assert.equal(dayResponse.status, 200, await dayResponse.clone().text());
       const day = (await dayResponse.json()).workDay;
-      return { workDate, clockIn: day.entries[0] };
+      return {
+        workDate,
+        clockIn: day.entries[0],
+        siteArrival: arrivalSiteId ? day.entries[1] : null
+      };
     }
+
+    // Zwei frische Baustellen ausschließlich für diesen Test: die eine ist
+    // die ursprüngliche Buchung, die andere das Ziel des Wechsels weiter
+    // unten. Eigene Baustellen statt geliehener Fixtures, damit dieser
+    // Testabschnitt unabhängig von an anderer Stelle vorgenommenen Umbenennungen
+    // bleibt (Tests bringen ihre Daten selbst mit, siehe AGENTS.md).
+    async function createSite(name) {
+      const response = await fetch(`${baseUrl}/api/v1/admin/construction-sites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          customerId: customer.id,
+          name,
+          installerShortText: "Für die Zeitänderungseinsicht angelegt",
+          street: "Einsichtweg",
+          houseNumber: "1",
+          postalCode: "12345",
+          city: "Teststadt"
+        })
+      });
+      assert.equal(response.status, 201, await response.clone().text());
+      return (await response.json()).site;
+    }
+    const siteA = await createSite(`Einsicht Baustelle A ${suffix}`);
+    const siteB = await createSite(`Einsicht Baustelle B ${suffix}`);
 
     // Zwei eigenständige Mitarbeiter, damit sich die Personengrenze prüfen
     // lässt: der eine bekommt eine Bürokorrektur, der andere darf davon
@@ -6906,7 +7017,7 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const betroffenerCookie = await createInstaller(`ETC-A-${suffix}`, "Ines", "Einsicht");
     const fremderCookie = await createInstaller(`ETC-B-${suffix}`, "Frank", "Fremd");
 
-    const betroffen = await bookClockInOut(betroffenerCookie);
+    const betroffen = await bookClockInOut(betroffenerCookie, siteA.id);
     const fremd = await bookClockInOut(fremderCookie);
 
     // Das Büro (plannerCookie: reine dispatch_office-Rolle, kein Admin, siehe
@@ -6992,6 +7103,51 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
       }
     );
     assert.equal(approvalAttempt.status, 403, "Der Monteur darf den Vorgang nicht selbst genehmigen");
+
+    // 4. Baustellenwechsel: Betreiberauftrag "der Monteur soll sehen, welche
+    // Baustelle" statt nur "Andere Baustelle". Das Büro verlegt Ankunft und
+    // Abfahrt des betroffenen Mitarbeiters von Baustelle A nach Baustelle B;
+    // die Einsicht muss zusätzlich zu den unveränderten constructionSiteId-
+    // Werten in oldValue/newValue die zugehörigen Namen mitliefern.
+    const siteMoveReason = "Baustellenwechsel im Integrationstest (Namensauflösung in der Einsicht)";
+    const siteMoveEdit = await fetch(
+      `${baseUrl}/api/v1/admin/time-entries/${betroffen.siteArrival.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({
+          clientChangeId: randomUUID(),
+          expectedRecordedAt: betroffen.siteArrival.recordedAt,
+          recordedAt: betroffen.siteArrival.recordedAt,
+          workDate: betroffen.workDate,
+          constructionSiteId: siteB.id,
+          reason: siteMoveReason
+        })
+      }
+    );
+    assert.equal(siteMoveEdit.status, 200, await siteMoveEdit.clone().text());
+    const siteMoveOperation = (await siteMoveEdit.json()).operation;
+    assert.equal(siteMoveOperation.action, "move_site");
+    assert.equal(siteMoveOperation.status, "applied");
+
+    const siteMoveView = await fetch(`${baseUrl}/api/v1/time-changes/${betroffenerWeekStart}`, {
+      headers: { Cookie: betroffenerCookie }
+    });
+    assert.equal(siteMoveView.status, 200, await siteMoveView.clone().text());
+    const siteMoveOperations = (await siteMoveView.json()).timeChanges.operations;
+    const visibleSiteMove = siteMoveOperations.find((entry) => entry.id === siteMoveOperation.id);
+    assert.ok(visibleSiteMove, "Der Mitarbeiter muss den Baustellenwechsel sehen");
+    // Ankunft und Abfahrt wandern gemeinsam (siehe TIME_CORRECTIONS_AND_
+    // EMPLOYEE_LIFECYCLE.md, "Historie statt Überschreiben") - beide Zeilen
+    // müssen dieselben aufgelösten Namen tragen, die bestehenden
+    // constructionSiteId-Werte in oldValue/newValue bleiben dabei unverändert.
+    assert.equal(visibleSiteMove.changes.length, 2);
+    for (const change of visibleSiteMove.changes) {
+      assert.equal(change.oldValue.constructionSiteId, siteA.id);
+      assert.equal(change.newValue.constructionSiteId, siteB.id);
+      assert.equal(change.oldConstructionSiteName, siteA.name);
+      assert.equal(change.newConstructionSiteName, siteB.name);
+    }
   });
 
   await t.test("Abmeldung und Sitzungsende", async () => {
