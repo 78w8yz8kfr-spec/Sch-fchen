@@ -4,6 +4,34 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Sicherheitsdurchsicht: nichts gefunden, zwei Lücken geschlossen (Fassung
+  0.44.41).** Geprüft wurde, ob Zugangsdaten im Browser landen und ob der
+  Anmelde-Endpunkt den üblichen Angriffen standhält. Beides ist sauber. Im
+  ausgelieferten Frontend steht kein Schlüssel und kein Sitzungsmerkmal;
+  `document.cookie` kommt dort **kein einziges Mal** vor, das HttpOnly-Cookie
+  bleibt für JavaScript also tatsächlich unsichtbar. Über alle 250 Commits des
+  Verlaufs wurde nie eine `.env`, ein Schlüssel oder ein Zertifikat
+  eingecheckt.
+
+  Der Anmelde-Endpunkt hält allen zehn geprüften Punkten stand. Der
+  bemerkenswerteste: Bei **unbekanntem** Konto läuft die Passwortprüfung
+  trotzdem, gegen einen Platzhalter-Hash mit denselben Kostenparametern. Ohne
+  das verriete die Antwortzeit, ob es ein Konto gibt — der übliche Weg, eine
+  Kontenliste zu erraten, ohne je ein Passwort zu treffen.
+
+  Geändert wurden zwei Lücken, die keine Lecks waren, aber welche hätten
+  werden können. **Berichtsentwürfe überlebten das Abmelden** — auf einem
+  geteilten Baustellengerät blieb ein halbfertiger Bautagesbericht samt
+  Personal-Einsatzzeiten im lokalen Speicher liegen, unsichtbar in der
+  Oberfläche, lesbar im Browserspeicher. Jetzt weichen sie beim Abmelden,
+  bewusst nur die des abgemeldeten Nutzers: ein Entwurf ist oft die einzige
+  Fassung eines noch nicht abgesendeten Berichts, und die unfertige Arbeit
+  eines Kollegen mitzureißen wäre schlimmer als das Problem. Und
+  **`.dockerignore` schützte nur das Wurzelverzeichnis**, während `.gitignore`
+  es rekursiv abdeckt; das Produktionsimage kopiert `frontend` und `deploy`
+  vollständig. Es lag keine `.env` darin — genau deshalb war es der richtige
+  Zeitpunkt.
+
 - **Wer eine Zeitkorrektur beantragt, genehmigt sie nicht mehr selbst (Fassung
   0.44.40).** Bisher konnte dieselbe Person einen Korrekturantrag stellen und
   ihn anschließend abnicken — bei einem abgerechneten Tag also allein über

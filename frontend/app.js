@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.40";
-import { serverIsNewer } from "./core/versions.js?v=0.44.40";
+} from "./core/work-time.js?v=0.44.41";
+import { serverIsNewer } from "./core/versions.js?v=0.44.41";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.40";
+} from "./core/sync-queue.js?v=0.44.41";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.40";
+} from "./core/permissions.js?v=0.44.41";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,20 +42,25 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.40";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.40";
-import { createPowerModule } from "./core/power-module.js?v=0.44.40";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.40";
+} from "./core/state-store.js?v=0.44.41";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.41";
+import { createPowerModule } from "./core/power-module.js?v=0.44.41";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.41";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.40";
+} from "./core/time-changes.js?v=0.44.41";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
   // Karten je Zelle der Plantafel, bevor der Rest zusammengefaltet wird.
   const PLANNING_CARDS_PER_CELL = 2;
   const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
+  // Praefix der Bericht-Entwuerfe im lokalen Speicher. Der volle Schluessel
+  // haengt zusaetzlich Baustelle und Aufnahmeart an (siehe
+  // siteReportDraftStorageKey) - beim Aufraeumen kennt man die aber nicht im
+  // Voraus, darum wird ueber alle Schluessel mit diesem Anfang gefiltert.
+  const SITE_REPORT_DRAFT_PREFIX = "schaefchen:site-report-draft:";
   const queryMode = new URLSearchParams(window.location.search).get("mode");
   const demoMode = queryMode === "demo" || (
     queryMode !== "live"
@@ -1480,7 +1485,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.40",
+          "X-Schaefchen-Version": "0.44.41",
           ...options.headers
         }
       });
@@ -1515,7 +1520,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.40`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.41`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1537,7 +1542,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.40" }
+        headers: { "X-Schaefchen-Version": "0.44.41" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1584,7 +1589,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.40 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.41 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2989,7 +2994,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.40";
+  const EIGENE_FASSUNG = "0.44.41";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3028,7 +3033,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.40". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.41". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -4118,7 +4123,7 @@ import {
 
   function siteReportDraftStorageKey(siteId, sourceMode) {
     const userId = session?.user?.id || cachedUserId || "demo";
-    return `schaefchen:site-report-draft:${userId}:${siteId}:${sourceMode}`;
+    return `${SITE_REPORT_DRAFT_PREFIX}${userId}:${siteId}:${sourceMode}`;
   }
 
   function readSiteReportDraft(siteId, sourceMode) {
@@ -4139,6 +4144,32 @@ import {
       if (adminState) renderReportCenter();
     } catch {
       // Ein blockierter Komfortspeicher darf den Bericht nicht blockieren.
+    }
+  }
+
+  // Beim Abmelden koennen mehrere Entwuerfe des scheidenden Nutzers liegen -
+  // eine Baustelle je Schluessel, dazu digital/gesprochen getrennt. Welche
+  // Baustellen das sind, weiss man an dieser Stelle nicht mehr; darum wird
+  // wie bei removeOfflineDocumentCachesExcept ueber alle vorhandenen
+  // Schluessel gefiltert statt ein bekanntes Trio aus Baustelle und
+  // Aufnahmeart abzufragen.
+  //
+  // Geloescht wird bewusst nur das Praefix DIESES Nutzers, nicht das aller
+  // Nutzer des Geraets: anders als der Dokumentencache (jederzeit erneut vom
+  // Server ladbar) ist ein Entwurf oft die einzige Fassung eines noch nicht
+  // abgesendeten Berichts. Ein Kollege, dessen eigener Entwurf zufaellig noch
+  // auf demselben Geraet liegt, soll ihn nicht verlieren, nur weil sich hier
+  // jemand anderes abmeldet - er bekommt ihn beim naechsten eigenen Anmelden
+  // wieder angezeigt und kann ihn dann bewusst fortsetzen oder verwerfen.
+  function removeSiteReportDraftsFor(userId) {
+    if (!userId) return;
+    const prefix = `${SITE_REPORT_DRAFT_PREFIX}${userId}:`;
+    try {
+      Object.keys(window.localStorage)
+        .filter((key) => key.startsWith(prefix))
+        .forEach((key) => window.localStorage.removeItem(key));
+    } catch {
+      // Ein blockierter Komfortspeicher darf die Abmeldung nicht verhindern.
     }
   }
 
@@ -7115,7 +7146,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.40" }
+        headers: { "X-Schaefchen-Version": "0.44.41" }
       });
       if (response.ok) {
         await cache.put(
@@ -13433,6 +13464,9 @@ import {
 
   elements.closePreview.addEventListener("click", async () => {
     if (demoMode) return showLogin();
+    // Vor dem Loeschen von session merken, wessen Entwuerfe gemeint sind -
+    // danach ist der Nutzer ueber session nicht mehr zu ermitteln.
+    const abgemeldeterNutzer = session?.user?.id || cachedUserId;
     try {
       await requestJson("./api/v1/session", { method: "DELETE" });
       session = null;
@@ -13443,6 +13477,7 @@ import {
       closeTimeAccountEditor();
       employeeSiteState = null;
       await removeOfflineDocumentCachesExcept();
+      removeSiteReportDraftsFor(abgemeldeterNutzer);
       cachedUserId = null;
       assignments = [];
       state = initialState();

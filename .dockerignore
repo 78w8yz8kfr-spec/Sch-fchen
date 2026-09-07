@@ -1,6 +1,13 @@
 .git
 .github
-.env
+# Muss rekursiv sein (**/): Docker wertet eine Zeile ohne dieses Praefix nur
+# gegen die Wurzel des Bau-Kontexts aus. Ohne "**/" schuetzte diese Zeile nur
+# eine .env direkt im Projektstamm - Dockerfile.production kopiert aber ganze
+# Ordner (COPY frontend, COPY deploy), und eine .env darin liefe unbemerkt
+# mit ins Image. Die Ausnahme fuer .env.example folgt .gitignore.
+**/.env
+**/.env.*
+!**/.env.example
 backups
 api/node_modules
 *.dump
