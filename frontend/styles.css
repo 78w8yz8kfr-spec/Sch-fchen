@@ -2798,6 +2798,90 @@ select:focus-visible {
   background: #f1f1f1;
 }
 
+/* Zeitänderungen des Büros (und eigene Anträge) auf der Tageskarte: reine
+   Einsicht, kein Genehmigen-Knopf. Die Farbe der Kennzeichnung entscheidet
+   zuerst, was der Monteur sieht - "nur beantragt" darf mit "bereits gebucht"
+   nie verwechselbar aussehen. */
+.week-day-changes {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 13px;
+}
+
+.week-day-changes__heading {
+  color: var(--muted);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.week-day-change {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fafafa;
+}
+
+.week-day-change__badge {
+  justify-self: start;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.week-day-change--effective .week-day-change__badge {
+  color: #176b45;
+  background: #e5f7ed;
+}
+
+.week-day-change--pending .week-day-change__badge {
+  color: #795400;
+  background: #fff5d6;
+}
+
+.week-day-change--rejected .week-day-change__badge {
+  color: #a1141d;
+  background: #fde7e9;
+}
+
+.week-day-change__summary {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.week-day-change__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.week-day-change__reason {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-style: italic;
+}
+
+.week-day-change__note {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.week-day-change--pending .week-day-change__note {
+  color: #795400;
+}
+
+.week-day-change--rejected .week-day-change__note {
+  color: #a1141d;
+}
+
 .work-day-review-list {
   gap: 12px;
   padding-top: 8px;

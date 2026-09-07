@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.39";
-import { serverIsNewer } from "./core/versions.js?v=0.44.39";
+} from "./core/work-time.js?v=0.44.40";
+import { serverIsNewer } from "./core/versions.js?v=0.44.40";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.39";
+} from "./core/sync-queue.js?v=0.44.40";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.39";
+} from "./core/permissions.js?v=0.44.40";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,10 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.39";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.39";
-import { createPowerModule } from "./core/power-module.js?v=0.44.39";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
+} from "./core/state-store.js?v=0.44.40";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.40";
+import { createPowerModule } from "./core/power-module.js?v=0.44.40";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.40";
+import {
+  groupTimeChangesByWorkDate,
+  operationDisplayStatus
+} from "./core/time-changes.js?v=0.44.40";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1138,6 +1142,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   let adminOverviewDauert = false;
   let adminOverviewUhr = null;
   let weekState = null;
+  // Zeitänderungen des Büros (und eigene Anträge) zur angezeigten Woche. Nur
+  // eine Zusatzinfo neben dem Stundenzettel - bleibt sie aus (kein Netz,
+  // Fehler, oder schlicht nichts geändert), zeigt die Woche trotzdem alles
+  // Nötige.
+  let timeChangesState = null;
   let absenceState = [];
   let timeAccountState = null;
   // Laeuft das eigene Jahreskonto gerade, dauert es laenger, oder ist es
@@ -1471,7 +1480,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.39",
+          "X-Schaefchen-Version": "0.44.40",
           ...options.headers
         }
       });
@@ -1506,7 +1515,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.39`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.40`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1528,7 +1537,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.39" }
+        headers: { "X-Schaefchen-Version": "0.44.40" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1575,7 +1584,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.39 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.40 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1766,6 +1775,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     deepLinkedSiteHandled = false;
     selectedWeekStart = currentWeekStart();
     weekState = null;
+    timeChangesState = null;
     elements.customerEditForm.hidden = true;
     elements.projectEditForm.hidden = true;
     elements.customerManagementPanel.hidden = true;
@@ -2979,7 +2989,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.39";
+  const EIGENE_FASSUNG = "0.44.40";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3018,7 +3028,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.39". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.40". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -7105,7 +7115,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.39" }
+        headers: { "X-Schaefchen-Version": "0.44.40" }
       });
       if (response.ok) {
         await cache.put(
@@ -8512,6 +8522,47 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }[type] || type;
   }
 
+  // Zeitänderungen des Büros (und eigene Anträge) für den Monteur.
+  //
+  // Welche Felder sich überhaupt unterscheiden, entscheidet core/time-changes.js
+  // (siehe groupTimeChangesByWorkDate/describeChange). Hier wird daraus nur
+  // noch ein Satz - mit den vorhandenen Formaten der App (timeFormatter,
+  // formatMinutes), nicht mit neu erfundenen.
+  const TIME_CHANGE_STATUS_LABEL = {
+    effective: "Bereits gebucht",
+    pending: "Nur beantragt · noch nicht gebucht",
+    rejected: "Abgelehnt · ohne Wirkung"
+  };
+
+  // Eine constructionSiteId sagt dem Monteur nichts - "andere Baustelle"
+  // reicht, um die Änderung einzuordnen, ohne eine Kennung zu zeigen.
+  function timeChangeFieldSentence(field) {
+    if (field.field === "recordedAt" && field.to) {
+      const to = timeFormatter.format(new Date(field.to));
+      const from = field.from ? timeFormatter.format(new Date(field.from)) : null;
+      return `Uhrzeit${from ? ` ${from} Uhr →` : ""} ${to} Uhr`;
+    }
+    if (field.field === "constructionSite") return "Andere Baustelle";
+    if (field.field === "travelMinutes" && field.to != null) {
+      const to = formatMinutes(field.to);
+      const from = field.from != null ? formatMinutes(field.from) : null;
+      return `Fahrzeit${from ? ` ${from} →` : ""} ${to}`;
+    }
+    if (field.field === "activityNote") {
+      return field.to ? `Notiz: ${field.to}` : "Notiz entfernt";
+    }
+    return null;
+  }
+
+  function timeChangeSummarySentence(change) {
+    const teile = [];
+    if (change.deleted) teile.push("Buchung gelöscht");
+    else if (change.added) teile.push("Buchung ergänzt");
+    else teile.push(...change.fields.map(timeChangeFieldSentence).filter(Boolean));
+    if (change.movedTo) teile.push(`verschoben auf ${shortDate(change.movedTo)}`);
+    return teile.length ? teile.join(" · ") : "Änderung ohne sichtbaren Unterschied";
+  }
+
   function localDateTimeInputValue(instant) {
     const date = new Date(instant);
     const offset = date.getTimezoneOffset() * 60_000;
@@ -9509,6 +9560,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     renderOverviewCards();
     renderDashboardMetrics();
 
+    // Bleibt aus, wenn nichts geändert wurde (der Normalfall) oder der Abruf
+    // gescheitert ist - dann liefert groupTimeChangesByWorkDate eine leere
+    // Zuordnung, und keine Tageskarte bekommt einen Änderungshinweis.
+    const timeChangesByDay = groupTimeChangesByWorkDate(timeChangesState?.operations);
+
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
       const approvedAbsence = approvedAbsenceForDate(workDate);
@@ -9680,6 +9736,59 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           absenceDayPartLabel(approvedAbsence.dayPart)
         } · verbindlich freigegeben`;
         dayCard.append(absenceBanner);
+      }
+
+      const dayChanges = timeChangesByDay.get(workDate) || [];
+      if (dayChanges.length) {
+        const changesBox = document.createElement("div");
+        changesBox.className = "week-day-changes";
+        const changesHeading = document.createElement("strong");
+        changesHeading.className = "week-day-changes__heading";
+        changesHeading.textContent = "Zeitänderungen";
+        changesBox.append(changesHeading);
+        dayChanges.forEach(({ operation, change }) => {
+          const displayStatus = operationDisplayStatus(operation);
+          const item = document.createElement("div");
+          const badge = document.createElement("span");
+          const summary = document.createElement("p");
+          const meta = document.createElement("p");
+          item.className = `week-day-change week-day-change--${displayStatus}`;
+          badge.className = "week-day-change__badge";
+          badge.textContent = TIME_CHANGE_STATUS_LABEL[displayStatus];
+          summary.className = "week-day-change__summary";
+          summary.textContent = timeChangeSummarySentence(change);
+          meta.className = "week-day-change__meta";
+          // "Büro" oder "Du" - genau diese Unterscheidung wollte der Betreiber
+          // sichtbar haben, unabhängig davon, wer am Ende geprüft hat.
+          const wer = operation.initiatedBy === "employee" ? "Du" : "Büro";
+          const wann = operation.requestedAt ? new Date(operation.requestedAt) : null;
+          meta.textContent = [
+            wer,
+            wann && `${wann.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })} · ${
+              timeFormatter.format(wann)
+            } Uhr`
+          ].filter(Boolean).join(" · ");
+          item.append(badge, summary, meta);
+          if (operation.reason) {
+            const reason = document.createElement("p");
+            reason.className = "week-day-change__reason";
+            reason.textContent = `Begründung: ${operation.reason}`;
+            item.append(reason);
+          }
+          const noteText = displayStatus === "pending"
+            ? "Deine gebuchte Zeit ist dadurch noch nicht verändert."
+            : displayStatus === "rejected"
+              ? "Der Antrag wurde abgelehnt und bleibt ohne Wirkung."
+              : "";
+          if (noteText) {
+            const note = document.createElement("p");
+            note.className = "week-day-change__note";
+            note.textContent = noteText;
+            item.append(note);
+          }
+          changesBox.append(item);
+        });
+        dayCard.append(changesBox);
       }
 
       if (!workDay?.entries?.length) {
@@ -10362,6 +10471,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   async function refreshWeekData() {
     if (demoMode) {
       weekState = null;
+      timeChangesState = null;
       elements.weekMessage.textContent = "";
       renderWeek();
       return;
@@ -10373,6 +10483,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }
     elements.weekMessage.textContent = "Stundenzettel wird geladen …";
     const requestedWeekStart = selectedWeekStart;
+    // Eigener, nicht blockierender Nebenlauf: Zeitänderungen sind eine
+    // Zusatzinfo zum Stundenzettel, keine Voraussetzung dafür. Scheitert
+    // dieser Abruf, bleibt der Stundenzettel selbst unberührt stehen.
+    void refreshTimeChangesData(requestedWeekStart);
     try {
       const body = await requestJson(`./api/v1/work-weeks/${requestedWeekStart}`);
       if (requestedWeekStart !== selectedWeekStart) return;
@@ -10388,6 +10502,27 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           : error.message;
       }
     }
+  }
+
+  // Zeitänderungen des Büros zur angezeigten Woche: reine Einsicht, siehe
+  // core/time-changes.js. Läuft absichtlich neben refreshWeekData statt darin
+  // verschachtelt - ein Fehler oder eine langsame Antwort hier darf weder den
+  // Stundenzettel verzögern noch dessen eigenen Fehlerzustand überschreiben.
+  async function refreshTimeChangesData(requestedWeekStart) {
+    if (demoMode || !navigator.onLine) return;
+    try {
+      const body = await requestJson(`./api/v1/time-changes/${requestedWeekStart}`);
+      if (requestedWeekStart !== selectedWeekStart) return;
+      timeChangesState = body.timeChanges;
+    } catch (error) {
+      if (requestedWeekStart !== selectedWeekStart) return;
+      if (error.status === 401) return showLogin();
+      // Kein Toast, keine Fehlermeldung: die Änderungshistorie ist eine
+      // Zusatzinfo. Bleibt sie aus, sieht die Woche genauso aus wie im
+      // Normalfall ohne jede Änderung.
+      timeChangesState = null;
+    }
+    renderWeek();
   }
 
   // Berichtsheft
@@ -11244,6 +11379,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   async function selectWeek(weekStart) {
     selectedWeekStart = weekStart;
     weekState = null;
+    timeChangesState = null;
     timeAccountState = null;
     timeAccountsState = null;
     closeTimeAccountEditor();
@@ -11296,6 +11432,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       assignments = [];
       adminState = null;
       weekState = null;
+      timeChangesState = null;
       absenceState = [];
       timeAccountState = null;
       timeAccountsState = null;

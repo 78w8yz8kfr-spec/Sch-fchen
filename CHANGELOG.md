@@ -4,6 +4,120 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Vergessene Tage lassen sich wieder nachtragen (Fassung 0.44.40).** Wer
+  einen Arbeitstag komplett vergessen hatte, kam an ihn nicht heran. Zwei
+  Sperren lagen übereinander: die Wochenansicht zeichnete für einen Tag ohne
+  Buchung gar keine Karte, und der Knopf „Fehlende Buchung ergänzen" stand im
+  Zweig für Tage, die schon Buchungen haben. Ausgerechnet der vergessene Tag —
+  der einzige, der das Nachtragen braucht — war der einzige ohne Weg dorthin.
+  Die Tageskachel oben wurde dabei sehr wohl gezeichnet; der Klick sprang auf
+  ein Element, das es für diesen Tag nicht gab, und es passierte sichtbar
+  nichts. Künftige Tage bleiben bewusst außen vor: dort gibt es nichts
+  nachzutragen, und sieben leere Karten je Woche wären das Gegenteil von
+  übersichtlich.
+
+- **Die Ergänzung legt den Stundenzettel an, statt ihn zu verlangen (Fassung
+  0.44.40).** `createTimeEntryAddition` suchte die Zeile in `work_days` und
+  brach mit „Für diesen Tag existiert noch kein Stundenzettel" ab. Ein Tag, an
+  dem nie gestempelt wurde, hat aber keine. Zwei Funktionen daneben machen es
+  richtig: das Bearbeiten legt sie bei Bedarf an, das normale Stempeln auch —
+  nur das Nachtragen nicht. Genau dort kamen die Fehlermeldungen her, über die
+  sich der Betrieb beschwert hat.
+
+- **Der Server schlägt keine Baustellen mehr vor, die er selbst ablehnt
+  (Fassung 0.44.40).** Die Auswahlliste im Korrekturdialog lieferte auch
+  Baustellen im Status `delayed`, die Speicherprüfung ließ nur `active`,
+  `planned` und `on_hold` zu und antwortete dann, die Baustelle sei „nicht
+  gefunden oder nicht aktiv". Der Monteur wählte also etwas aus, das die App
+  ihm selbst angeboten hatte. Der Vierklang mit `delayed` steht an zwölf
+  anderen Stellen; diese eine war der Ausreißer.
+
+- **Eine Meldung über Mitarbeiterlöschung stand bei einer Zeitkorrektur
+  (Fassung 0.44.40).** Wollte das Büro eine Zeit an einem freigegebenen Tag
+  berichtigen, las es: „Mitarbeiter dürfen nur durch Administration oder
+  Geschäftsführung entfernt oder reaktiviert werden." Dahinter stand eine
+  Funktion für den Mitarbeiter-Lebenszyklus, hier sachfremd mitbenutzt. Nach
+  Entscheidung des Betreibers dürfen Büro und Disposition das; damit prüft die
+  Stelle genau das, was zwei bis drei Zeilen darüber ohnehin schon geprüft
+  wurde, und ist ersatzlos entfallen. Bei gesperrtem Tag entsteht weiterhin
+  immer ein Antrag mit Vorher-/Nachher-Stand und Pflichtgrund, nie eine stille
+  Direktänderung.
+
+- **Der Monteur sieht, was das Büro an seinen Zeiten geändert hat (Fassung
+  0.44.40).** Die Historie wurde vollständig geführt, sehen konnte sie nur die
+  Verwaltung. Eine Historie, die der Betroffene nicht sehen kann, ist keine.
+  Auf der Tageskarte steht jetzt, was sich geändert hat, warum, durch wen und
+  wann — und vor allem, ob es **bereits gebucht** oder **nur beantragt** ist.
+  Wer einen Antrag für eine erfolgte Änderung hält, rechnet falsch. Abgelehnte
+  Vorgänge bleiben sichtbar und sind als wirkungslos gekennzeichnet.
+  Genehmigen kann der Monteur nichts: der Zugang kennt nur Lesen, ein
+  Schreibversuch trifft keine Route, und die Entscheidung bleibt bei der
+  Verwaltung.
+
+- **Voller Speicher kostet nicht mehr den Arbeitstag (Fassung 0.44.40).** War
+  der lokale Speicher voll, meldete die App „Lokaler Speicher ist in diesem
+  Browser blockiert" — der Browser blockiert aber nichts, der Platz ist alle —,
+  und der nicht übertragene Tagesstand war schlicht nicht gesichert. Wer danach
+  den Tab schloss, verlor die Arbeit. Voll wird jetzt von blockiert getrennt,
+  über vier Schreibweisen, weil die Browser sich nicht einig sind. Und es wird
+  gerettet statt nur gemeldet: die Baustellenakte ist ein Schnappschuss vom
+  Server und jederzeit neu ladbar, sie weicht zuerst. Buchungen und
+  Berichtsentwürfe bleiben — sie sind die einzige Kopie.
+
+- **Drei von vier PDF-Erzeugern brachen an einem einzigen Zeichen (Fassung
+  0.44.40).** Der VDE-Erzeuger hatte längst einen Schutz gegen Zeichen
+  außerhalb von Latin-1; Montagebericht, Stundenzettel und Azubi-Bericht hatten
+  ihn nicht. Ein **Ohm-Zeichen** in einer Bemerkung, ein Name wie „Łukasz" oder
+  „Şahin" — und die Freigabe scheiterte mit einem Serverfehler. Bei Montage-
+  und Bautagesberichten ist das eine rechtlich verbindliche Freigabe; sie darf
+  nicht an einem Buchstaben scheitern. Der vorhandene Schutz liegt jetzt in
+  einem gemeinsamen Modul und gilt für alle vier.
+
+- **Der gemeldete Dateityp wird geprüft, nicht geglaubt (Fassung 0.44.40).**
+  Ein Upload wurde nur an Endung und der Angabe des Browsers gemessen, der
+  Inhalt nie angesehen — und später mit genau diesem Typ wieder ausgeliefert.
+  Jetzt entscheidet die Signatur. Eine Textdatei muss dabei kein UTF-8 sein:
+  Windows-1252 ist bei älteren Bürorechnern und Messgeräte-Exporten Alltag,
+  geprüft wird auf Nullbytes. Und die PDF-Kennung darf einen Vorlauf haben, wie
+  ihn Mailtransport oder eine Byte-Order-Mark hinterlässt.
+
+- **Ein Dateiname konnte aus dem Download-Kopf ausbrechen (Fassung 0.44.40).**
+  Das doppelte Anführungszeichen war nicht verboten und wurde bei der Vorschau
+  ungeprüft in `Content-Disposition` gesetzt — die Schwesterfunktion zwei
+  Zeilen darüber machte es seit jeher richtig. Dateinamen werden außerdem
+  vereinheitlicht: macOS lädt Umlaute zerlegt hoch, wodurch die Volltextsuche
+  sie nicht fand.
+
+- **Sechs Verwaltungslisten sagen jetzt, dass sie laden (Fassung 0.44.40).**
+  Wer über die Seitenleiste direkt auf „Kunden" oder „Mitarbeiter" sprang,
+  bekam bei langsamer Verbindung eine leere Liste zu sehen und hielt sie für
+  kaputt. Die Startseite hatte genau dieses Problem schon gelöst; die sechs
+  Listen daneben nicht.
+
+- **Zwei Statusfarben waren zu hell zum Lesen (Fassung 0.44.40).** „Aktiv",
+  „Abgeschlossen" und „Büroprüfung" standen bei 4,11:1 und 4,21:1 gegen ihren
+  Hintergrund — bei knapp elf Pixeln Schriftgröße. Nötig sind 4,5:1. Jetzt sind
+  es 4,80. Ein neuer Test rechnet die Farbpaare nach und hat beim ersten Lauf
+  gleich zwei weitere Stellen gefunden, die in keiner Durchsicht standen.
+
+- **Die untere Leiste ordnet, statt zu schrumpfen (Fassung 0.44.40).** Ab fünf
+  Zielen wurde die Schrift auf rund neun Pixel verkleinert — mit Handschuh, im
+  Stehen, ist das nicht mehr lesbar. Der Gerätebestand stand als einziges Ziel
+  seiner Gruppe direkt in der Leiste, obwohl Baustrom mit derselben Freigabe
+  schon immer unter „Betrieb" lag; er wandert dorthin, und die Schrift bleibt
+  lesbar. Dabei fiel auf, dass die Markierung „hier bist du" für Geräte,
+  Baustrom, Arbeitszeiten und den planenden Ausbilder ins Leere zeigte. Ein
+  Test prüft das jetzt für alle sechzehn Bereiche.
+
+- **Fehlermeldungen verschwinden nicht mehr, bevor man sie gelesen hat (Fassung
+  0.44.40).** Alle Meldungen gingen nach 3,6 Sekunden und überschrieben sich
+  gegenseitig; auf der Baustelle mit schwacher Verbindung war die erste weg,
+  bevor jemand hinsah. Fehler bleiben jetzt stehen, bis man sie wegtippt, und
+  unterbrechen die Sprachausgabe — Bestätigungen gehen weiterhin von selbst. Im
+  Gerätemodul galt das bisher nicht; von 31 Meldungen dort sind sieben echte
+  Serverfehler und wurden umgestellt.
+
+
 - **Die Auslieferung läuft wieder (Fassung 0.44.39).** Der Betrieb blieb auf
   **0.44.34** stehen, während hier 0.44.35 bis 0.44.38 grün durchliefen und
   gemergt wurden. Aufgefallen ist es nicht durch eine Prüfung, sondern weil
