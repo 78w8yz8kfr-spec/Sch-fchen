@@ -35,6 +35,11 @@ export function loadConfig() {
 
   const production = process.env.NODE_ENV === "production";
   const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null;
+  const databaseSslMode = process.env.API_DB_SSL_MODE
+    || (databaseUrl?.hostname.endsWith(".neon.tech") ? "verify-full" : "disable");
+  if (!["disable", "verify-full"].includes(databaseSslMode)) {
+    throw new Error("API_DB_SSL_MODE muss disable oder verify-full sein.");
+  }
   const setupToken = process.env.INITIAL_SETUP_TOKEN?.trim() || null;
   if (setupToken && setupToken.length < 24) {
     throw new Error("INITIAL_SETUP_TOKEN muss mindestens 24 Zeichen lang sein.");
@@ -63,7 +68,8 @@ export function loadConfig() {
       max: integer("API_DB_POOL_SIZE", 10, 1, 50),
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
-      application_name: "schaefchen_api"
+      application_name: "schaefchen_api",
+      ssl: databaseSslMode === "verify-full" ? { rejectUnauthorized: true } : false
     }
   });
 }
