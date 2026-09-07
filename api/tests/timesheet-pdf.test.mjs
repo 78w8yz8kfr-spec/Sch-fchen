@@ -124,3 +124,26 @@ test("Auch unter Last bleibt jeder Strich auf dem Blatt", async () => {
     assert.deepEqual(daneben, [], `${name}: gezeichnet bei ${daneben.slice(0, 3).join(", ")}`);
   }
 });
+
+// Griechische Buchstaben, osteuropäische Sonderzeichen und Emoji liegen
+// außerhalb von WinAnsi (Latin-1). Ohne Zeichenschutz wirft pdf-lib dort eine
+// Ausnahme, sobald ein Mitarbeiter- oder Baustellenname ein solches Zeichen
+// enthält - und der Stundenzettel-Export scheitert komplett statt nur für
+// diese eine Zeile.
+test("Ein Stundenzettel mit Ω, Ł und Emoji in Namen und Baustelle wird trotzdem erzeugt", async () => {
+  const content = await buildTimesheetPdf({
+    companyName: "Schaaf Elektro GmbH",
+    from: "2026-07-27",
+    to: "2026-08-02",
+    workDays: [
+      day({
+        employeeName: "Łukasz Đorđe 😀",
+        siteNames: ["Baustelle mit 230 Ω Messstelle"]
+      })
+    ]
+  });
+
+  assert.equal(content.subarray(0, 5).toString("ascii"), "%PDF-");
+  const document = await PDFDocument.load(content);
+  assert.ok(document.getPageCount() >= 1);
+});

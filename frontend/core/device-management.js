@@ -1,5 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.39";
+const QR_SCANNER_MODULE_URL = "../vendor/qr-scanner.min.js?v=0.44.40";
 let qrScannerLibraryPromise = null;
 
 export const DEVICE_QR_SHEET_LAYOUT = Object.freeze({
@@ -430,6 +430,12 @@ export function createDeviceModule({
   root,
   requestJson,
   showToast,
+  // Eine Meldung, die nach 3,6 Sekunden verschwindet, passt fuer eine
+  // Bestaetigung - der Monteur hat gerade selbst gehandelt und schaut noch
+  // hin. Ein Fehlschlag aus dem Server (catch(error)) darf dagegen nicht
+  // verschwinden, bevor er gelesen wurde: showErrorToast bleibt stehen, bis
+  // wer sie wegtippt.
+  showErrorToast,
   createClientId,
   getSession,
   navigate,
@@ -1510,7 +1516,9 @@ export function createDeviceModule({
             method: "POST", body: JSON.stringify({ dataUrl: await fileDataUrl(photo) })
           });
         } catch (error) {
-          showToast(`Gerät gespeichert; Foto konnte nicht übernommen werden: ${error.message}`);
+          // Das Geraet ist bereits gespeichert; ohne stehenbleibende Meldung
+          // waere der Fehlschlag beim Foto leicht zu uebersehen.
+          showErrorToast(`Gerät gespeichert; Foto konnte nicht übernommen werden: ${error.message}`);
         }
       }
       elements.editorDialog.close();
@@ -1608,7 +1616,7 @@ export function createDeviceModule({
           );
           renderSetDetail(body.set);
           await refresh();
-        } catch (error) { showToast(error.message); }
+        } catch (error) { showErrorToast(error.message); }
       });
       row.append(open, remove);
       list.append(row);
@@ -1637,7 +1645,7 @@ export function createDeviceModule({
         );
         renderSetDetail(body.set);
         await refresh();
-      } catch (error) { showToast(error.message); }
+      } catch (error) { showErrorToast(error.message); }
     });
     const actions = document.createElement("div");
     actions.className = "device-dialog__actions";
@@ -1807,7 +1815,7 @@ export function createDeviceModule({
           elements.detailDialog.close();
           showToast("Reparatur abgeschlossen · Gerät wieder bewertet.");
           await refresh();
-        } catch (error) { showToast(error.message); }
+        } catch (error) { showErrorToast(error.message); }
       });
     }
     const historySection = document.createElement("section"); historySection.className = "device-detail__history";
@@ -1876,7 +1884,7 @@ export function createDeviceModule({
       await refresh();
       void openDetail(devices.find((item) => item.id === selected.id) || selected);
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
       if (error.code === "device_transfer_conflict") await refresh();
     }
   }
@@ -1949,7 +1957,7 @@ export function createDeviceModule({
   function druckseite(popup, titel, stildatei) {
     popup.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">`
       + `<title>${titel}</title>`
-      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.39">`
+      + `<link rel="stylesheet" href="${window.location.origin}/${stildatei}?v=0.44.40">`
       + `</head><body></body></html>`);
   }
 
@@ -1997,7 +2005,7 @@ export function createDeviceModule({
         article.append(qr, strong, number); sheet.append(article);
       });
       popup.document.close(); popup.focus(); popup.print();
-    } catch (error) { popup?.close(); showToast(error.message); }
+    } catch (error) { popup?.close(); showErrorToast(error.message); }
   }
 
   function stopCamera() {
@@ -2312,7 +2320,7 @@ export function createDeviceModule({
       if (elements.detailDialog.open) {
         void openDetail(devices.find((item) => item.id === selected.id) || selected);
       }
-    } catch (error) { showToast(error.message); }
+    } catch (error) { showErrorToast(error.message); }
   });
   window.addEventListener("online", () => void syncQueue());
   window.addEventListener("offline", renderSyncState);

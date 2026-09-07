@@ -1,10 +1,30 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.39
+Technischer Stand: V0.44.40
 
 
 ## Abgeschlossen
+
+- **Zeitkorrektur wieder benutzbar, Dokumente und Speicherung gehärtet**
+  (Fassung 0.44.40, Migration 149). Ein vergessener Arbeitstag war der einzige,
+  der das Nachtragen braucht — und der einzige ohne Weg dorthin: die
+  Wochenansicht zeichnete für ihn keine Karte, und der Ergänzen-Knopf stand im
+  Zweig für Tage mit Buchungen. Serverseitig brach `createTimeEntryAddition`
+  ab, weil für den Tag keine Zeile in `work_days` stand, während die
+  Nachbarfunktion `targetWorkDay` sie längst bei Bedarf anlegt. Die
+  Baustellenauswahl bot außerdem den Status `delayed` an, den die
+  Speicherprüfung ablehnte. Büro und Disposition dürfen freigegebene Tage nach
+  Entscheidung des Betreibers korrigieren; die sachfremde Meldung über
+  Mitarbeiterlöschung ist weg, ein Antrag mit Vorher-/Nachher-Stand entsteht
+  weiterhin immer. Der Monteur sieht die Änderungen an seinen Zeiten jetzt
+  lesend, mit klarer Trennung zwischen bereits gebucht und nur beantragt —
+  ohne jedes Genehmigungsrecht. Dazu: inhaltsbasierte Prüfung hochgeladener
+  Dateien statt Vertrauen auf Endung und Browserangabe, ein gemeinsamer Schutz
+  gegen Zeichen außerhalb von Latin-1 für alle vier PDF-Erzeuger, und ein
+  voller lokaler Speicher kostet nicht mehr den Arbeitstag: die neu ladbare
+  Baustellenakte weicht, Buchungen und Berichte bleiben.
+  PWA-Speicher `schaefchen-online-v122`
 
 - **Auslieferung repariert** (Fassung 0.44.39, Migration 148). Der Betrieb
   stand auf 0.44.34, während vier Fassungen grün gemergt waren: Migration 141

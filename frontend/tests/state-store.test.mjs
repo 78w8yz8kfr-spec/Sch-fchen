@@ -6,11 +6,14 @@ import {
   STATE_VERSION,
   carriedOverMessage,
   initialState,
+  istSpeicherVollFehler,
   normalizeCompanyNumber,
+  persistState,
   rememberedCompany,
   restoreState,
   serializeState,
-  storageKey
+  storageKey,
+  withoutReplaceableCache
 } from "../core/state-store.js";
 
 const HEUTE = "2026-08-04";
@@ -209,4 +212,87 @@ test("Gespeicherter und wiederhergestellter Stand passen zusammen", () => {
   const gespeichert = JSON.parse(JSON.stringify(serializeState(state, { assignments: [], userId: "u-1" })));
   const zurueck = restoreState(gespeichert, { today: HEUTE });
   assert.deepEqual(zurueck.state, state);
+});
+
+// Ein voller Speicher (QuotaExceededError) ist kein blockierter Speicher: der
+// eine loest sich, sobald Platz frei ist, der andere gar nicht. Der Fehlschlag
+// wird ausschliesslich am geworfenen Fehler erkannt - deshalb hier je Browser
+// nachgestellt, statt nur den heute gebraeuchlichen Namen zu pruefen.
+const quotaFehlerFaelle = [
+  ["aktuelles Chrome/Firefox", () => Object.assign(new Error("voll"), { name: "QuotaExceededError" })],
+  ["aelteres Firefox", () => Object.assign(new Error("voll"), { name: "NS_ERROR_DOM_QUOTA_REACHED" })],
+  ["generischer DOMException-Code", () => Object.assign(new Error("voll"), { name: "Error", code: 22 })],
+  ["Firefox-Nachfolgecode", () => Object.assign(new Error("voll"), { name: "Error", code: 1014 })]
+];
+
+for (const [beschreibung, erzeugeFehler] of quotaFehlerFaelle) {
+  test(`Speicher voll wird erkannt: ${beschreibung}`, () => {
+    assert.equal(istSpeicherVollFehler(erzeugeFehler()), true);
+  });
+}
+
+test("Ein blockierter Speicher gilt nicht als voll", () => {
+  // Privatmodus oder eine vom Browser gesperrte Herkunft werfen typischerweise
+  // einen SecurityError oder einen Fehler ganz ohne die Quote-Merkmale.
+  assert.equal(istSpeicherVollFehler(Object.assign(new Error("gesperrt"), { name: "SecurityError" })), false);
+  assert.equal(istSpeicherVollFehler(new Error("irgendein Fehler")), false);
+  assert.equal(istSpeicherVollFehler(null), false);
+  assert.equal(istSpeicherVollFehler(undefined), false);
+});
+
+// Ein Speicher-Doppel: verhaelt sich wie window.localStorage, wirft aber genau
+// den Fehler, den der Test vorgibt - so laesst sich ein voller oder
+// blockierter Speicher nachstellen, ohne einen echten Browser zu brauchen.
+const speicherDerWirft = (fehler) => ({
+  setItem() { throw fehler; }
+});
+const speicherDerSpeichert = () => {
+  const daten = new Map();
+  return { setItem: (schluessel, wert) => daten.set(schluessel, wert), gespeichert: daten };
+};
+
+test("Ein erfolgreicher Schreibvorgang meldet sich als ok", () => {
+  const speicher = speicherDerSpeichert();
+  const ergebnis = persistState(speicher, "schluessel", { events: [] });
+  assert.deepEqual(ergebnis, { ok: true });
+  assert.equal(speicher.gespeichert.get("schluessel"), JSON.stringify({ events: [] }));
+});
+
+test("Voller Speicher und blockierter Speicher werden unterschiedlich gemeldet", () => {
+  // Das ist der eigentliche Fehler aus Aufgabe 1: beide Faelle sahen bisher
+  // gleich aus, dabei loest sich nur der eine von selbst, sobald Platz frei
+  // ist - und nur beim vollen Speicher lohnt sich ein zweiter Versuch mit
+  // weniger Inhalt.
+  const voll = persistState(
+    speicherDerWirft(Object.assign(new Error("voll"), { name: "QuotaExceededError" })),
+    "schluessel",
+    { events: [] }
+  );
+  assert.deepEqual(voll, { ok: false, quota: true });
+
+  const blockiert = persistState(
+    speicherDerWirft(Object.assign(new Error("gesperrt"), { name: "SecurityError" })),
+    "schluessel",
+    { events: [] }
+  );
+  assert.deepEqual(blockiert, { ok: false, quota: false });
+});
+
+test("Die Baustellenakte ist ersetzbar, Buchungen und Berichte nicht", () => {
+  const stand = {
+    events: [buchung("e-1", true)],
+    reports: [bericht("r-1", true)],
+    reportDraft: { text: "Entwurf" },
+    siteWorkspace: { site: { id: "b-1" }, team: [{ id: "u-1" }] }
+  };
+  const verkleinert = withoutReplaceableCache(stand);
+  assert.equal(verkleinert.siteWorkspace, null);
+  assert.deepEqual(verkleinert.events, stand.events);
+  assert.deepEqual(verkleinert.reports, stand.reports);
+  assert.deepEqual(verkleinert.reportDraft, stand.reportDraft);
+});
+
+test("Ohne Baustellenakte gibt es nichts zu verkleinern", () => {
+  const stand = { events: [buchung("e-1", true)], siteWorkspace: null };
+  assert.equal(withoutReplaceableCache(stand), stand);
 });

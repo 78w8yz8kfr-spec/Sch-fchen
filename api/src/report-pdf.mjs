@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { pdfSafeText } from "./pdf-text.mjs";
 
 const A4 = [595.28, 841.89];
 const RED = rgb(0.89, 0.02, 0.08);
@@ -32,8 +33,11 @@ function hoursAndMinutes(minutes) {
   return `${hours}:${String(remainder).padStart(2, "0")} h`;
 }
 
+// Erst absichern, dann messen: font.widthOfTextAtSize() wirft dieselbe
+// Ausnahme wie page.drawText() für Zeichen außerhalb von Latin-1, also muss
+// der Text schon vor dem Umbruch bereinigt sein, nicht erst beim Zeichnen.
 function wrapText(text, font, size, width) {
-  const paragraphs = String(text || "-").replace(/\r/g, "").split("\n");
+  const paragraphs = pdfSafeText(text || "-").replace(/\r/g, "").split("\n");
   const lines = [];
   for (const paragraph of paragraphs) {
     const words = paragraph.trim().split(/\s+/).filter(Boolean);
@@ -99,9 +103,15 @@ export async function buildFinalReportPdf({
   const margin = 46;
   const contentWidth = A4[0] - margin * 2;
 
+  // Einziger Zeichenpfad dieser Funktion: alle Textausgaben laufen hier
+  // durch, damit kein Aufruf den Zeichenschutz vergessen kann.
+  function drawText(target, text, options) {
+    target.drawText(pdfSafeText(text), options);
+  }
+
   function footer() {
     page.drawLine({ start: { x: margin, y: 35 }, end: { x: A4[0] - margin, y: 35 }, thickness: 0.6, color: LINE });
-    page.drawText(`${preview ? "Vorschau" : "Unveränderliche PDF-Ausgabe"} - Bericht-ID ${report.id}`, {
+    drawText(page, `${preview ? "Vorschau" : "Unveränderliche PDF-Ausgabe"} - Bericht-ID ${report.id}`, {
       x: margin,
       y: 20,
       size: 7.5,
@@ -114,7 +124,7 @@ export async function buildFinalReportPdf({
     page = document.addPage(A4);
     y = A4[1] - margin;
     if (continuation) {
-      page.drawText(`${title} - Fortsetzung`, { x: margin, y, size: 11, font: bold, color: INK });
+      drawText(page, `${title} - Fortsetzung`, { x: margin, y, size: 11, font: bold, color: INK });
       y -= 24;
     }
     footer();
@@ -127,17 +137,17 @@ export async function buildFinalReportPdf({
   function section(label) {
     ensureSpace(34);
     y -= 8;
-    page.drawText(label.toUpperCase(), { x: margin, y, size: 8.5, font: bold, color: RED });
+    drawText(page, label.toUpperCase(), { x: margin, y, size: 8.5, font: bold, color: RED });
     y -= 10;
     page.drawLine({ start: { x: margin, y }, end: { x: A4[0] - margin, y }, thickness: 0.8, color: LINE });
     y -= 18;
   }
 
   function keyValue(label, value, x, width) {
-    page.drawText(label, { x, y, size: 8, font: bold, color: MUTED });
+    drawText(page, label, { x, y, size: 8, font: bold, color: MUTED });
     const lines = wrapText(value || "-", regular, 10, width);
     lines.slice(0, 3).forEach((line, index) => {
-      page.drawText(line, { x, y: y - 14 - index * 12, size: 10, font: regular, color: INK });
+      drawText(page, line, { x, y: y - 14 - index * 12, size: 10, font: regular, color: INK });
     });
   }
 
@@ -145,7 +155,7 @@ export async function buildFinalReportPdf({
     const lines = wrapText(text || "-", regular, 10, contentWidth);
     for (const line of lines) {
       ensureSpace(16);
-      page.drawText(line || " ", { x: margin, y, size: 10, font: regular, color: INK });
+      drawText(page, line || " ", { x: margin, y, size: 10, font: regular, color: INK });
       y -= 14;
     }
   }
@@ -162,11 +172,11 @@ export async function buildFinalReportPdf({
       height: logoImage.height * scale
     });
   } else {
-    page.drawText(company.displayName, { x: margin, y: y - 22, size: 15, font: bold, color: INK });
+    drawText(page, company.displayName, { x: margin, y: y - 22, size: 15, font: bold, color: INK });
   }
-  page.drawText(reportTypeLabel(report.reportType), { x: 330, y: y - 4, size: 20, font: bold, color: INK });
-  page.drawText(report.number, { x: 330, y: y - 24, size: 10, font: regular, color: MUTED });
-  page.drawText(preview ? "VORSCHAU" : "FREIGEGEBEN", {
+  drawText(page, reportTypeLabel(report.reportType), { x: 330, y: y - 4, size: 20, font: bold, color: INK });
+  drawText(page, report.number, { x: 330, y: y - 24, size: 10, font: regular, color: MUTED });
+  drawText(page, preview ? "VORSCHAU" : "FREIGEGEBEN", {
     x: preview ? 469 : 452,
     y: y - 45,
     size: 8,
@@ -196,14 +206,14 @@ export async function buildFinalReportPdf({
     section("Eingesetzte Mitarbeiter");
     for (const employee of personnel) {
       ensureSpace(20);
-      page.drawText(employee.name || "-", {
+      drawText(page, employee.name || "-", {
         x: margin,
         y,
         size: 10,
         font: regular,
         color: INK
       });
-      page.drawText(hoursAndMinutes(employee.minutes), {
+      drawText(page, hoursAndMinutes(employee.minutes), {
         x: A4[0] - margin - 65,
         y,
         size: 10,
@@ -277,14 +287,14 @@ export async function buildFinalReportPdf({
       height: customerSignature.height * customerScale
     });
   } else {
-    page.drawText("Noch nicht unterschrieben", {
+    drawText(page, "Noch nicht unterschrieben", {
       x: margin + 50,
       y: y - 40,
       size: 9,
       font: regular,
       color: MUTED
     });
-    page.drawText("Noch nicht unterschrieben", {
+    drawText(page, "Noch nicht unterschrieben", {
       x: 385,
       y: y - 40,
       size: 9,
@@ -293,14 +303,14 @@ export async function buildFinalReportPdf({
     });
   }
   y -= signatureHeight + 14;
-  page.drawText(signatures?.employee.name || "Mitarbeiter / Vorarbeiter", {
+  drawText(page, signatures?.employee.name || "Mitarbeiter / Vorarbeiter", {
     x: margin,
     y,
     size: 9.5,
     font: bold,
     color: INK
   });
-  page.drawText(signatures?.customer.name || "Auftraggeber / Kunde", {
+  drawText(page, signatures?.customer.name || "Auftraggeber / Kunde", {
     x: 335,
     y,
     size: 9.5,
@@ -308,17 +318,17 @@ export async function buildFinalReportPdf({
     color: INK
   });
   y -= 13;
-  page.drawText("Mitarbeiter / Vorarbeiter", { x: margin, y, size: 8, font: regular, color: MUTED });
-  page.drawText("Auftraggeber / Kunde", { x: 335, y, size: 8, font: regular, color: MUTED });
+  drawText(page, "Mitarbeiter / Vorarbeiter", { x: margin, y, size: 8, font: regular, color: MUTED });
+  drawText(page, "Auftraggeber / Kunde", { x: 335, y, size: 8, font: regular, color: MUTED });
   y -= 13;
-  page.drawText(preview ? "Unterschrift offen" : `Signiert: ${germanTimestamp(finalizedAt)}`, {
+  drawText(page, preview ? "Unterschrift offen" : `Signiert: ${germanTimestamp(finalizedAt)}`, {
     x: margin,
     y,
     size: 7.5,
     font: regular,
     color: MUTED
   });
-  page.drawText(preview ? "Unterschrift offen" : `Signiert: ${germanTimestamp(finalizedAt)}`, {
+  drawText(page, preview ? "Unterschrift offen" : `Signiert: ${germanTimestamp(finalizedAt)}`, {
     x: 335,
     y,
     size: 7.5,
@@ -335,7 +345,7 @@ export async function buildFinalReportPdf({
   ].filter(Boolean).join(" - ");
   ensureSpace(38);
   y -= 28;
-  page.drawText(companyLine, { x: margin, y, size: 7.5, font: regular, color: MUTED, maxWidth: contentWidth });
+  drawText(page, companyLine, { x: margin, y, size: 7.5, font: regular, color: MUTED, maxWidth: contentWidth });
 
   for (const [index, photo] of photos.entries()) {
     let image;
@@ -347,7 +357,7 @@ export async function buildFinalReportPdf({
       continue;
     }
     addPage();
-    page.drawText(`FOTO ${index + 1} VON ${photos.length}`, {
+    drawText(page, `FOTO ${index + 1} VON ${photos.length}`, {
       x: margin,
       y,
       size: 8.5,
@@ -355,7 +365,7 @@ export async function buildFinalReportPdf({
       color: RED
     });
     y -= 24;
-    page.drawText(photo.title || `Baustellenfoto ${index + 1}`, {
+    drawText(page, photo.title || `Baustellenfoto ${index + 1}`, {
       x: margin,
       y,
       size: 14,
@@ -378,7 +388,7 @@ export async function buildFinalReportPdf({
     });
     y -= height + 16;
     captionLines.forEach((line) => {
-      page.drawText(line || " ", {
+      drawText(page, line || " ", {
         x: margin,
         y,
         size: 9,

@@ -72,8 +72,75 @@ const DOCUMENT_MIME_TYPES = new Map([
   ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new Set(["xlsx"])],
   ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", new Set(["docx"])]
 ]);
-const MAXIMUM_DOCUMENT_BYTES = 5_000_000;
+export const MAXIMUM_DOCUMENT_BYTES = 5_000_000;
 const DELIVERY_NOTE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+// Ein ZIP-Archiv beginnt immer mit einer dieser drei Kennungen (normal,
+// leer oder ueber mehrere Teile gespannt). XLSX und DOCX sind beide nur ein
+// ZIP-Archiv mit einer bestimmten internen Struktur (Open Packaging
+// Conventions) - an der Signatur allein lassen sie sich deshalb nicht
+// auseinanderhalten. Das waere nur durch Lesen des Archivinhalts moeglich
+// (etwa eine Datei "word/document.xml" bzw. "xl/workbook.xml"). Das ist hier
+// bewusst nicht umgesetzt: Ziel dieser Pruefung ist, eine beliebige andere
+// Datei zu erkennen, die sich als Office-Dokument ausgibt - nicht, ein XLSX
+// von einem DOCX zu unterscheiden. Vertauschen beider faellt spaetestens
+// beim Oeffnen auf und macht dort keinen Schaden.
+function isZipArchive(content) {
+  return content.length >= 4
+    && content[0] === 0x50 && content[1] === 0x4b
+    && (content[2] === 0x03 || content[2] === 0x05 || content[2] === 0x07);
+}
+
+// Klartext hat keine Signatur, an der man ihn erkennen koennte. Als Ersatz
+// wird nur verlangt, dass keine Nullbytes vorkommen - das gebraeuchlichste
+// Merkmal binaerer Daten, in echtem Text kommt es nicht vor. Bewusst NICHT
+// verlangt wird gueltiges UTF-8: eine Textdatei muss kein UTF-8 sein. Sehr
+// viele echte Textdateien sind Windows-1252 oder ISO-8859-1 - aeltere
+// Windows-Rechner, Messgeraete-Exporte und so ziemlich jedes Programm von vor
+// UTF-8 schreiben so. "Maßband, Grüße" in Latin-1 kodiert waere mit einer
+// UTF-8-Pruefung eine gueltige Textdatei, die faelschlich abgelehnt wird -
+// jede Einbyte-Kodierung ist aber nullbytefrei und besteht diese Pruefung.
+// Das erkennt keine bewusste Faelschung, faengt aber die naheliegenden Faelle
+// ab - ein Bild oder eine ausfuehrbare Datei, die nur umbenannt wurde.
+function looksLikePlainText(content) {
+  return !content.includes(0x00);
+}
+
+// Signaturpruefung ("Magic Bytes") je gemeldetem Dateityp. Der Client meldet
+// mimeType und Dateiendung frei; ohne diese Pruefung wird ihm blind geglaubt,
+// und der Inhalt kommt spaeter unter genau diesem Content-Type wieder heraus
+// - eine Datei, die "Foto.pdf" heisst und "application/pdf" meldet, koennte
+// sonst beliebigen anderen Inhalt transportieren.
+//
+// Bei PDF steht die Kennung nicht immer exakt an Position 0: die PDF-
+// Spezifikation selbst erlaubt Fuehrbytes, und Acrobat sucht die Kennung
+// deshalb innerhalb der ersten 1024 Byte statt nur am Anfang - ein
+// Mailtransport, eine Byte-Order-Mark oder ein fuehrender Zeilenumbruch
+// duerfen davorstehen. Dieselbe Grenze wird hier verwendet. Bei den uebrigen
+// Formaten gehoert die Kennung dagegen per Formatdefinition an Position 0
+// (PNG-, RIFF/WebP- und JPEG-Signatur) bzw. wird sie von den Office-
+// Programmen, die XLSX/DOCX erzeugen, immer dort geschrieben - fuer sie ist
+// eine Suche mit Vorlauf nicht noetig.
+const PDF_SIGNATURE_SEARCH_WINDOW = 1024;
+const DOCUMENT_SIGNATURES = new Map([
+  ["application/pdf", (content) => (
+    content.subarray(0, PDF_SIGNATURE_SEARCH_WINDOW).indexOf("%PDF-", 0, "latin1") !== -1
+  )],
+  ["image/jpeg", (content) => (
+    content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff
+  )],
+  ["image/png", (content) => (
+    content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  )],
+  ["image/webp", (content) => (
+    content.length >= 12
+    && content.subarray(0, 4).toString("latin1") === "RIFF"
+    && content.subarray(8, 12).toString("latin1") === "WEBP"
+  )],
+  ["text/plain", looksLikePlainText],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", isZipArchive],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", isZipArchive]
+]);
 const SITE_TASK_PRIORITIES = new Set(["low", "normal", "high"]);
 const SITE_TASK_STATUSES = new Set(["open", "in_progress", "done", "archived"]);
 const SITE_MATERIAL_STATUSES = new Set(["planned", "ordered", "available", "used", "archived"]);
@@ -859,8 +926,17 @@ export function validateDocumentUpload(body) {
     throw new InputError("Die Dokumentart ist ungültig.");
   }
 
-  const fileName = text(body.fileName, "Dateiname", 1, 255);
-  if (/[\\/\u0000-\u001f\u007f]/.test(fileName)) {
+  // macOS liefert Umlaute beim Hochladen oft zerlegt (Grundbuchstabe plus
+  // eigener kombinierender Akzent, NFD) statt als ein Zeichen (NFC). Beide
+  // Formen sehen gleich aus, sind aber unterschiedliche Zeichenketten - ohne
+  // diese Vereinheitlichung fände die Volltextsuche einen so hochgeladenen
+  // Dateinamen nicht wieder, wenn jemand ihn normal eintippt.
+  const fileName = text(body.fileName, "Dateiname", 1, 255).normalize("NFC");
+  // Das doppelte Anführungszeichen ist so verboten wie Schrägstrich und
+  // Steuerzeichen: inlineDocument() und attachment() setzen den Dateinamen im
+  // Content-Disposition-Kopf in genau dieses Attribut, und ein Name wie
+  // Foto".pdf würde daraus ausbrechen und eigene Kopfparameter einschleusen.
+  if (/["\\/\u0000-\u001f\u007f]/.test(fileName)) {
     throw new InputError("Der Dateiname enthält unzulässige Zeichen.");
   }
   const extension = fileName.includes(".") ? fileName.split(".").at(-1).toLowerCase() : "";
@@ -897,6 +973,17 @@ export function validateDocumentUpload(body) {
       "Dokumente dürfen höchstens 5 MB groß sein.",
       413,
       "document_too_large"
+    );
+  }
+  // Der gemeldete Dateityp wird nicht blind uebernommen: der Inhalt muss zur
+  // gemeldeten mimeType passen. allowedExtensions oben stellt bereits sicher,
+  // dass mimeType ein bekannter Schluessel ist, DOCUMENT_SIGNATURES hat also
+  // immer einen Eintrag dafuer.
+  if (!DOCUMENT_SIGNATURES.get(mimeType)(content)) {
+    throw new InputError(
+      "Der Dateiinhalt passt nicht zum gemeldeten Dateityp.",
+      415,
+      "document_content_mismatch"
     );
   }
 

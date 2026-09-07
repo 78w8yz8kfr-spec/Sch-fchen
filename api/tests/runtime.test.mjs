@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareApplicationVersions } from "../src/app.mjs";
+import { compareApplicationVersions, inlineDocument } from "../src/app.mjs";
 import { securityHeaders } from "../src/static.mjs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -42,4 +42,27 @@ test("ausgelieferte .mjs-Dateien kommen als JavaScript beim Browser an", async (
   } finally {
     await new Promise((fertig) => server.close(fertig));
   }
+});
+
+// attachment() macht es vorbildlich: ASCII-Rückfallname im filename-Parameter
+// plus der volle Name im RFC-5987-codierten filename*. inlineDocument() setzte
+// den Dateinamen bisher ungeschützt in denselben Kopf - dieser Test belegt,
+// dass beide jetzt denselben sicheren Kopfaufbau verwenden.
+test("Die Dokumentvorschau baut denselben sicheren Content-Disposition-Kopf wie der Download", () => {
+  let geschriebeneHeader;
+  const response = {
+    writeHead(status, headers) {
+      geschriebeneHeader = headers;
+    },
+    end() {}
+  };
+  inlineDocument(response, {
+    fileName: "Zählerfoto Übergabe.pdf",
+    mimeType: "application/pdf",
+    content: Buffer.from("%PDF-1.4")
+  });
+  const disposition = geschriebeneHeader["Content-Disposition"];
+  assert.match(disposition, /^inline; filename="[A-Za-z0-9._-]+"; filename\*=UTF-8''/);
+  const encodedName = disposition.split("filename*=UTF-8''")[1];
+  assert.equal(decodeURIComponent(encodedName), "Zählerfoto Übergabe.pdf");
 });

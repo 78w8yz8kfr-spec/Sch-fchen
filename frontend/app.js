@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.39";
-import { serverIsNewer } from "./core/versions.js?v=0.44.39";
+} from "./core/work-time.js?v=0.44.40";
+import { serverIsNewer } from "./core/versions.js?v=0.44.40";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.39";
+} from "./core/sync-queue.js?v=0.44.40";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,21 +29,27 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.39";
+} from "./core/permissions.js?v=0.44.40";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
   carriedOverMessage,
   initialState as freshState,
   normalizeCompanyNumber,
+  persistState,
   rememberedCompany,
   restoreState,
   serializeState,
-  storageKey
-} from "./core/state-store.js?v=0.44.39";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.39";
-import { createPowerModule } from "./core/power-module.js?v=0.44.39";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
+  storageKey,
+  withoutReplaceableCache
+} from "./core/state-store.js?v=0.44.40";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.40";
+import { createPowerModule } from "./core/power-module.js?v=0.44.40";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.40";
+import {
+  groupTimeChangesByWorkDate,
+  operationDisplayStatus
+} from "./core/time-changes.js?v=0.44.40";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -324,6 +330,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     hoursOverviewBody: document.querySelector("#hours-overview-body"),
     hoursOverviewMessage: document.querySelector("#hours-overview-message"),
     hoursOverviewExport: document.querySelector("#hours-overview-export"),
+    timeAccountSearchField: document.querySelector("#time-account-search-field"),
     timeAccountAdminList: document.querySelector("#time-account-admin-list"),
     timeAccountAdminMessage: document.querySelector("#time-account-admin-message"),
     timeAccountProfileForm: document.querySelector("#time-account-profile-form"),
@@ -989,7 +996,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     siteQrLink: document.querySelector("#site-qr-link"),
     siteQrCopy: document.querySelector("#site-qr-copy"),
     siteQrClose: document.querySelector("#site-qr-close"),
-    toast: document.querySelector("#toast")
+    toast: document.querySelector("#toast"),
+    toastMessage: document.querySelector("#toast-message"),
+    toastDismiss: document.querySelector("#toast-dismiss")
   };
 
   // Die Tageslage stand am Fuss der Einsatzplanung, unter der Plantafel und
@@ -1102,6 +1111,20 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   let selectedEmployeeId = null;
   // Die Fahrzeuge des Fuhrparks und das gerade bearbeitete.
   let vehicleState = [];
+  // Laeuft das Laden gerade, dauert es laenger, oder ist es gescheitert? Ohne
+  // diese Unterscheidung sah eine noch nicht geladene Fahrzeugliste genauso
+  // aus wie ein leerer Fuhrpark - dasselbe Problem wie bei der
+  // Betriebsuebersicht, siehe adminOverviewStatus.
+  let vehicleListStatus = "idle";
+  let vehicleListDauert = false;
+  let vehicleListUhr = null;
+  // Laufnummer des zuletzt gestarteten Aufrufs von refreshVehicles - aus
+  // demselben Grund wie timeAccountFetchLauf. refreshVehicles haengt zwar an
+  // keinem wechselnden Parameter, wird aber an sechs Stellen aufgerufen (u. a.
+  // per Klick auf "Fahrzeuge"); zwei rasch aufeinanderfolgende Aufrufe koennen
+  // sich denselben Zeitgeber teilen und sich gegenseitig den "dauert laenger"-
+  // Hinweis wegnehmen, wenn der aeltere zuerst antwortet.
+  let vehicleListLauf = 0;
   let editingVehicleId = null;
   let editingVehicleRowVersion = null;
   let apprenticeGapState = [];
@@ -1119,8 +1142,29 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   let adminOverviewDauert = false;
   let adminOverviewUhr = null;
   let weekState = null;
+  // Zeitänderungen des Büros (und eigene Anträge) zur angezeigten Woche. Nur
+  // eine Zusatzinfo neben dem Stundenzettel - bleibt sie aus (kein Netz,
+  // Fehler, oder schlicht nichts geändert), zeigt die Woche trotzdem alles
+  // Nötige.
+  let timeChangesState = null;
   let absenceState = [];
   let timeAccountState = null;
+  // Laeuft das eigene Jahreskonto gerade, dauert es laenger, oder ist es
+  // gescheitert? Ohne diese Unterscheidung stand "wird geladen" auch dann noch
+  // da, wenn der Server laengst mit einem Fehler geantwortet hatte - man
+  // wartete auf etwas, das nie mehr kommt. Siehe adminOverviewStatus.
+  let timeAccountFetchStatus = "idle";
+  let timeAccountFetchDauert = false;
+  let timeAccountFetchUhr = null;
+  // Laufnummer des zuletzt gestarteten Aufrufs. Wechselt jemand das Jahr
+  // zweimal kurz hintereinander, laufen zwei Aufrufe gleichzeitig - ohne diese
+  // Nummer wuerde der aeltere beim Eintreffen seiner (dann veralteten) Antwort
+  // im eigenen "finally" den Zeitgeber des juengeren loeschen: der juengere
+  // verloere seine "dauert laenger"-Meldung ausgerechnet bei langsamer
+  // Verbindung. Jeder Aufruf merkt sich seine eigene Nummer und darf gemeinsam
+  // genutzten Zustand nur noch anfassen, solange sie mit dieser Variable
+  // uebereinstimmt.
+  let timeAccountFetchLauf = 0;
   let timeAccountsState = null;
   let timeCorrectionPolicyState = null;
   // Die Verwaltung wertet ein Kalenderjahr aus. Frueher folgte sie der
@@ -1170,6 +1214,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     root: elements.deviceModuleRoot,
     requestJson,
     showToast,
+    showErrorToast,
     createClientId: createClientEntryId,
     getSession: () => session,
     navigate: (pane) => showDashboardPane(pane),
@@ -1286,15 +1331,49 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   function saveState() {
-    try {
-      window.localStorage.setItem(storageKey(demoMode), JSON.stringify(serializeState(state, {
-        assignments,
-        userId: session?.user.id || cachedUserId,
-        demoMode
-      })));
-    } catch {
-      showToast("Lokaler Speicher ist in diesem Browser blockiert.");
+    const nutzlast = serializeState(state, {
+      assignments,
+      userId: session?.user.id || cachedUserId,
+      demoMode
+    });
+    const ergebnis = persistState(window.localStorage, storageKey(demoMode), nutzlast);
+    if (ergebnis.ok) return;
+
+    if (!ergebnis.quota) {
+      // Der Speicher ist grundsaetzlich nicht nutzbar (z.B. Privatmodus ohne
+      // Website-Daten oder eine vom Browser gesperrte Herkunft). Ein zweiter
+      // Versuch mit weniger Inhalt wuerde daran nichts aendern.
+      showErrorToast(
+        "Lokaler Speicher ist in diesem Browser blockiert. Zeitbuchungen und " +
+        "Berichte werden erst gesichert, wenn wieder eine Verbindung besteht " +
+        "- diesen Tab bis dahin bitte nicht schließen."
+      );
+      return;
     }
+
+    // Der Speicher ist voll. Die Baustellenakte (state.siteWorkspace) ist bei
+    // Verbindung jederzeit neu ladbar und meist der groesste Teil des
+    // Standes - sie weicht deshalb zuerst. Zeitbuchungen und Berichtsentwuerfe
+    // bleiben unangetastet, denn sie sind die einzige Kopie der Arbeit.
+    const verkleinerteNutzlast = withoutReplaceableCache(nutzlast);
+    if (verkleinerteNutzlast !== nutzlast) {
+      const zweiterVersuch = persistState(window.localStorage, storageKey(demoMode), verkleinerteNutzlast);
+      if (zweiterVersuch.ok) {
+        showErrorToast(
+          "Lokaler Speicher war voll: die Baustellenakte wurde vorübergehend " +
+          "verworfen und lädt bei Verbindung neu. Zeitbuchungen und Berichte " +
+          "sind gesichert - bitte bald Speicherplatz freigeben."
+        );
+        return;
+      }
+    }
+
+    showErrorToast(
+      "Lokaler Speicher ist voll. Neue Zeitbuchungen und Berichtsentwürfe " +
+      "werden nicht gesichert, bis Platz frei ist - diesen Tab jetzt nicht " +
+      "schließen und Speicherplatz freigeben (z. B. Website-Daten anderer " +
+      "Seiten löschen oder ein anderes Gerät verwenden)."
+    );
   }
 
   // Die zuletzt benutzte Firma bleibt auf dem Geraet. Ein Monteur soll seine
@@ -1357,14 +1436,41 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     });
   }
 
-  function showToast(message) {
+  // Eine Meldung, die nach 3,6 Sekunden verschwindet, ist fuer "gespeichert"
+  // richtig - der Nutzer hat gerade selbst gehandelt und schaut noch hin. Ein
+  // Fehler kommt dagegen oft ungefragt, waehrend die schwache Verbindung auf
+  // der Baustelle laengst am naechsten Vorgang arbeitet: ohne "persistent"
+  // waere die Meldung schon weg, bevor jemand sie liest, und der zweite
+  // Fehlversuch ueberschreibt sie endgueltig. persistent=true haelt sie an,
+  // bis wer sie wegtippt.
+  function showToast(message, { persistent = false } = {}) {
     window.clearTimeout(toastTimer);
-    elements.toast.textContent = message;
+    elements.toastMessage.textContent = message;
     elements.toast.hidden = false;
+    elements.toast.classList.toggle("toast--persistent", persistent);
+    elements.toastDismiss.hidden = !persistent;
+    // role="status" meldet sich hoeflich zwischen anderen Ansagen - fuer eine
+    // Meldung, die absichtlich stehen bleibt, muesste eine Sprachausgabe sie
+    // sonst verpassen, wenn sie gerade woanders liest. role="alert" (implizit
+    // aria-live="assertive") unterbricht und wird nur fuer diesen Fall
+    // gesetzt; die uebliche Bestaetigung bleibt "status", wie es fuer eine
+    // kurze, unaufdringliche Meldung gehoert.
+    elements.toast.setAttribute("role", persistent ? "alert" : "status");
+    elements.toast.setAttribute("aria-live", persistent ? "assertive" : "polite");
+    if (persistent) return;
     toastTimer = window.setTimeout(() => {
       elements.toast.hidden = true;
     }, 3600);
   }
+
+  function showErrorToast(message) {
+    showToast(message, { persistent: true });
+  }
+
+  elements.toastDismiss.addEventListener("click", () => {
+    window.clearTimeout(toastTimer);
+    elements.toast.hidden = true;
+  });
 
   async function requestJson(path, options = {}) {
     let response;
@@ -1374,7 +1480,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.39",
+          "X-Schaefchen-Version": "0.44.40",
           ...options.headers
         }
       });
@@ -1409,7 +1515,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.39`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.40`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1422,7 +1528,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     try {
       await downloadFile(path, fileName);
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
     }
   }
 
@@ -1431,7 +1537,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.39" }
+        headers: { "X-Schaefchen-Version": "0.44.40" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1478,7 +1584,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.39 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.40 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1581,6 +1687,15 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     // eine Tuer, hinter der drei leere Listen stehen.
     elements.navWorktimes.hidden = !planner;
     elements.navVehicles.hidden = !planner || !moduleEnabled("fleet");
+    // Der Gerätebestand stand frueher direkt in der Hauptleiste, obwohl
+    // Baustrom - unten mit exakt derselben Freigabe - schon immer hinter
+    // "Betrieb" wartete. Ein Monteur oeffnet die Zeiterfassung mehrmals
+    // taeglich und den Gerätebestand hoechstens ein paar Mal die Woche, wenn
+    // er ein Geraet ausleiht oder zurueckgibt: das seltene Ziel nahm der
+    // haeufig gebrauchten Leiste den Platz weg (siehe Kompakt-Zaehlung unten).
+    // Deshalb traegt der Knopf in index.html jetzt "nav-item--desktop" wie
+    // Baustrom auch - erreichbar bleibt er ueber "Betrieb", nur nicht mehr
+    // als eigene Kachel in der Hauptleiste.
     elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
     deviceModule.setEnabled(!elements.navDevices.hidden);
     // Baustrom haengt an derselben Freigabe: ein Verteiler ist ein Geraet.
@@ -1660,6 +1775,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     deepLinkedSiteHandled = false;
     selectedWeekStart = currentWeekStart();
     weekState = null;
+    timeChangesState = null;
     elements.customerEditForm.hidden = true;
     elements.projectEditForm.hidden = true;
     elements.customerManagementPanel.hidden = true;
@@ -2002,6 +2118,29 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     list.append(head);
   }
 
+  // Solange die Betriebsuebersicht fehlt, ist eine leere Verwaltungsliste
+  // nicht von "keine Eintraege" zu unterscheiden - fuer die Startseite loeste
+  // renderDashboardLoading genau dieses Problem. Wer per Seitenleiste direkt
+  // in "Kunden" oder "Mitarbeiter" springt, bevor die erste Antwort da ist,
+  // bekam bisher gar nichts zu sehen: die Funktion brach mit
+  // "if (!adminState) return;" ab, ohne die Liste je anzufassen.
+  function renderAdminListPlaceholder(
+    list,
+    gegenstand,
+    gescheitert,
+    dauert,
+    klasse = "admin-list__empty"
+  ) {
+    const zeile = document.createElement("li");
+    zeile.className = klasse;
+    zeile.textContent = gescheitert
+      ? `${gegenstand} konnten nicht geladen werden.`
+      : dauert
+        ? "Das dauert länger als üblich. Der Server läuft vielleicht gerade erst an."
+        : `${gegenstand} werden geladen …`;
+    list.replaceChildren(zeile);
+  }
+
   // meta darf eine Zeichenkette sein oder eine Liste von Zellen.
   //
   // Als Liste stehen die Angaben am Rechner in Spalten unter einer Kopfzeile -
@@ -2202,7 +2341,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   function renderDocumentList() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.documentList,
+        "Dokumente",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const query = elements.documentSearch.value.trim().toLocaleLowerCase("de-DE");
     const status = elements.documentStatusFilter.value;
     const documents = adminState.documents.filter((document) => (
@@ -2260,7 +2406,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           await refreshAdmin();
           showToast(nextStatus === "active" ? "Dokument wieder aktiviert." : "Dokument archiviert.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           statusButton.disabled = false;
         }
@@ -2286,7 +2432,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             ? "Dokument ist mobil nicht mehr sichtbar."
             : "Dokument ist für zugewiesene Mitarbeiter mobil freigegeben.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           mobileButton.disabled = false;
         }
@@ -2313,7 +2459,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             ? "Offline-Markierung entfernt."
             : "Dokument wird beim Öffnen der Baustelle für Offline vorgemerkt.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           offlineButton.disabled = false;
         }
@@ -2491,7 +2637,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           await refreshAdmin();
           showToast(next === "done" ? "Aufgabe erledigt." : "Aufgabenstatus aktualisiert.");
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
         } finally {
           action.disabled = false;
         }
@@ -2547,7 +2693,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             await refreshAdmin();
             showToast("Materialstatus aktualisiert.");
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
           } finally {
             action.disabled = false;
           }
@@ -2810,7 +2956,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       );
       showToast("PDF-Vorschau erstellt · noch nicht freigegeben.");
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
     }
   }
 
@@ -2843,7 +2989,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.39";
+  const EIGENE_FASSUNG = "0.44.40";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -2882,7 +3028,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.39". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.40". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -3218,6 +3364,23 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     elements.dashboardLoadingRetry.hidden = !gescheitert && !adminOverviewDauert;
   }
 
+  // Dieselbe Luecke wie bei der Startseite betrifft sechs Verwaltungslisten:
+  // wer direkt in "Kunden" oder "Mitarbeiter" springt, bevor die erste Antwort
+  // da ist, sah bislang nichts, weil renderAdmin() bei fehlender
+  // Betriebsuebersicht komplett abbrach und die einzelnen Listen nie
+  // aufgerufen wurden. Deshalb werden sie hier - wie renderDashboardLoading -
+  // direkt aus refreshAdmin() angestossen und zeigen sich selbst als "laedt".
+  // Ist die Uebersicht schon da, ist hier nichts zu tun: renderAdmin()
+  // zeichnet die Listen dann laengst mit echten Daten.
+  function renderAdminListsLoading() {
+    if (adminState) return;
+    renderDocumentList();
+    renderReportCenter();
+    renderCustomerOverview();
+    renderInspectionOverview();
+    renderEmployeeList();
+  }
+
   function renderDashboardMetrics() {
     const zeigen = Boolean(adminState) && canPlan() && !demoMode;
     elements.dashboardMetrics.hidden = !zeigen || currentDashboardPane !== "start";
@@ -3427,7 +3590,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   function renderReportCenter() {
-    if (!adminState) return;
+    if (!adminState) {
+      elements.reportCenterMissingList.replaceChildren();
+      return renderAdminListPlaceholder(
+        elements.reportCenterList,
+        "Berichte",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert,
+        "site-module-list__empty"
+      );
+    }
     populateReportCenterFilters();
     const allReports = reportCenterReports();
     const missing = reportCenterMissingAssignments();
@@ -4191,7 +4363,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // in Schaefchen keine Rechnungsstellung - eine Spalte mit erfundenen
   // Betraegen waere schlimmer als keine.
   function renderCustomerOverview() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.customerOverviewList,
+        "Kunden",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const query = elements.customerSearchField.value.trim().toLocaleLowerCase("de-DE");
     const kunden = adminState.customers
       .filter((customer) => customerStatusGroup(customer.status) === "active")
@@ -4258,6 +4437,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
 
   function renderVehicleList() {
     if (!elements.vehicleList) return;
+    if (vehicleListStatus !== "ready") {
+      return renderAdminListPlaceholder(
+        elements.vehicleList,
+        "Fahrzeuge",
+        vehicleListStatus === "failed",
+        vehicleListDauert
+      );
+    }
     const query = elements.vehicleSearchField.value.trim().toLocaleLowerCase("de-DE");
     const fahrzeuge = (vehicleState || []).filter((fahrzeug) => !query || [
       fahrzeug.licencePlate, fahrzeug.label, fahrzeug.assignedUserName,
@@ -4367,20 +4554,59 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   async function refreshVehicles() {
+    const lauf = ++vehicleListLauf;
     if (!canPlan() || demoMode || !moduleEnabled("fleet")) {
       vehicleState = [];
+      vehicleListStatus = "ready";
       renderVehicleList();
       return;
     }
+    vehicleListStatus = "loading";
+    vehicleListDauert = false;
+    window.clearTimeout(vehicleListUhr);
+    vehicleListUhr = window.setTimeout(() => {
+      // Derselbe Ablauf wie bei refreshTimeAccountData: ohne diese Pruefung
+      // koennte der Zeitgeber eines laengst abgeloesten Aufrufs noch feuern
+      // und "vehicleListDauert" fuer einen inzwischen gestarteten neueren
+      // Aufruf setzen.
+      if (lauf !== vehicleListLauf || vehicleListStatus !== "loading") return;
+      vehicleListDauert = true;
+      renderVehicleList();
+    }, 8000);
+    renderVehicleList();
     try {
       const body = await requestJson("./api/v1/admin/vehicles");
+      // Zwei rasch aufeinanderfolgende Aufrufe (z. B. Doppelklick auf
+      // "Fahrzeuge") starten je einen eigenen Zeitgeber im selben
+      // vehicleListUhr. Traefe die Antwort des aelteren zuerst ein und liefe
+      // er bis in sein "finally" durch, wuerde er dort den Zeitgeber des
+      // juengeren, noch laufenden Aufrufs loeschen und dessen
+      // "vehicleListDauert" zuruecksetzen - der juengere verloere seine
+      // "dauert laenger"-Meldung. Der Laufnummer-Vergleich laesst den
+      // aelteren Aufruf hier erkennen, dass er nicht mehr der aktuelle ist.
+      if (lauf !== vehicleListLauf) return;
       vehicleState = body.vehicles;
+      vehicleListStatus = "ready";
       renderVehicleList();
     } catch (error) {
-      if (error.status === 401) showLogin();
-      // Ein abgeschaltetes Modul ist kein Fehler, den man melden muesste: der
-      // Eintrag in der Leiste steht dann ohnehin nicht da.
-      else if (error.status !== 404) showToast(error.message);
+      if (error.status === 401) {
+        showLogin();
+      } else if (lauf === vehicleListLauf) {
+        // Ein abgeschaltetes Modul ist kein Fehler, den man melden muesste:
+        // der Eintrag in der Leiste steht dann ohnehin nicht da.
+        if (error.status !== 404) showErrorToast(error.message);
+        // 404 heisst "Modul aus" - dafuer gibt es schon eine leere Liste ohne
+        // Fehlertext. Alles andere bleibt sichtbar gescheitert.
+        vehicleListStatus = error.status === 404 ? "ready" : "failed";
+        renderVehicleList();
+      }
+    } finally {
+      // Nur der noch aktuelle Aufruf darf seinen Zeitgeber loeschen - siehe
+      // Kommentar oben im try-Zweig.
+      if (lauf === vehicleListLauf) {
+        window.clearTimeout(vehicleListUhr);
+        vehicleListDauert = false;
+      }
     }
   }
 
@@ -4388,7 +4614,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // der Akte der einzelnen Baustelle zu finden - wer wissen wollte, was noch
   // offen ist, musste jede Baustelle einzeln aufmachen.
   function renderInspectionOverview() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.inspectionOverviewList,
+        "Prüfprotokolle",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const query = elements.inspectionSearchField.value.trim().toLocaleLowerCase("de-DE");
     const selectedSiteId = elements.inspectionSiteFilter.value || "all";
     const selectedStatus = elements.inspectionStatusFilter.value || "draft";
@@ -5064,7 +5297,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             await refreshAdmin(adminState.date);
             showToast("Teamvorlage archiviert · bestehende Einsätze bleiben erhalten.");
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
           }
         });
         actions.append(archive);
@@ -5734,7 +5967,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             dayRow.append(details);
             entriesAction.textContent = "Schließen";
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
           } finally {
             entriesAction.disabled = false;
           }
@@ -5768,7 +6001,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
               );
             } catch (error) {
               action.disabled = false;
-              showToast(error.message);
+              showErrorToast(error.message);
             }
           });
           actions.append(action);
@@ -5866,7 +6099,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
             : "Zeitkorrektur abgelehnt · Originalzeit bleibt bestehen.");
           await Promise.all([refreshAdmin(), refreshLiveData(), refreshWeekData()]);
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
           approve.disabled = false;
           reject.disabled = false;
         }
@@ -5992,7 +6225,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
               refreshAdminTimeAccounts()
             ]);
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
             actions.querySelectorAll("button").forEach((button) => { button.disabled = false; });
           }
         };
@@ -6028,7 +6261,14 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   // sucht. Personalnummer und Arbeitskonto bleiben in der rechten Detailakte;
   // E-Mail und Telefon müssen dagegen schon beim Überfliegen erreichbar sein.
   function renderEmployeeList() {
-    if (!adminState) return;
+    if (!adminState) {
+      return renderAdminListPlaceholder(
+        elements.employeeList,
+        "Mitarbeiter",
+        adminOverviewStatus === "failed",
+        adminOverviewDauert
+      );
+    }
     const projectScoped = Boolean(adminState.projectScopeRestricted);
     const search = elements.employeeSearchField.value.trim().toLocaleLowerCase("de-DE");
     const roleFilter = elements.employeeRoleFilter.value;
@@ -6146,7 +6386,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           showToast("Mitarbeiter reaktiviert · Anmeldung und Planung sind wieder möglich.");
           await Promise.all([refreshAdmin(), refreshAdminTimeAccounts()]);
         } catch (error) {
-          showToast(error.message);
+          showErrorToast(error.message);
           reactivate.disabled = false;
         }
       });
@@ -6688,8 +6928,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       if (adminOverviewStatus !== "loading") return;
       adminOverviewDauert = true;
       renderDashboardLoading();
+      renderAdminListsLoading();
     }, 8000);
     renderDashboardLoading();
+    renderAdminListsLoading();
     try {
       const body = await requestJson(`./api/v1/admin/overview?date=${encodeURIComponent(date)}`);
       adminState = body.overview;
@@ -6703,8 +6945,9 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       // laede sie noch. Ohne Ende.
       adminOverviewStatus = "failed";
       renderDashboardLoading();
+      renderAdminListsLoading();
       if (error.status === 401) showLogin();
-      else if (!error.network) showToast(error.message);
+      else if (!error.network) showErrorToast(error.message);
     } finally {
       window.clearTimeout(adminOverviewUhr);
       adminOverviewDauert = false;
@@ -6743,7 +6986,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       try {
         uebernommeneId = await applySelectedSite(siteId);
       } catch (error) {
-        showToast(error.network
+        showErrorToast(error.network
           ? "Ohne Verbindung lässt sich die Baustelle nicht übernehmen."
           : "Diese Baustelle ist dir heute nicht zugewiesen.");
         return;
@@ -6872,7 +7115,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.39" }
+        headers: { "X-Schaefchen-Version": "0.44.40" }
       });
       if (response.ok) {
         await cache.put(
@@ -6928,7 +7171,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       showToast(nextStatus === "done" ? "Aufgabe erledigt." : "Aufgabenstatus aktualisiert.");
     } catch (error) {
       if (error.status === 401) showLogin();
-      else showToast(error.message);
+      else showErrorToast(error.message);
       button.disabled = false;
     }
   }
@@ -7355,7 +7598,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       showDashboardPane("site");
     } catch (error) {
       if (error.status === 401) showLogin();
-      else showToast(error.message);
+      else showErrorToast(error.message);
     } finally {
       elements.assignmentDetails.disabled = false;
       elements.assignmentDetailsLabel.textContent = "Baustellenakte";
@@ -7508,7 +7751,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       showToast("Materialstand aktualisiert.");
     } catch (error) {
       if (error.status === 401) showLogin();
-      else showToast(error.message);
+      else showErrorToast(error.message);
       button.disabled = false;
     }
   }
@@ -8042,7 +8285,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
         const behandlung = classifySyncError(error);
         if (behandlung.vermerken) report.syncError = error.message;
         if (behandlung.anmeldenNoetig) showLogin();
-        showToast(syncErrorMessage(behandlung.grund, error.message));
+        showErrorToast(syncErrorMessage(behandlung.grund, error.message));
         reportSyncFailed = true;
         break;
       }
@@ -8063,7 +8306,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
         const behandlung = classifySyncError(error);
         if (behandlung.vermerken) entry.syncError = error.message;
         if (behandlung.anmeldenNoetig) showLogin();
-        showToast(syncErrorMessage(behandlung.grund, error.message));
+        showErrorToast(syncErrorMessage(behandlung.grund, error.message));
         break;
       }
       saveState();
@@ -8277,6 +8520,57 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       next_site: "Wechsel zur nächsten Baustelle",
       clock_out: "Feierabend"
     }[type] || type;
+  }
+
+  // Zeitänderungen des Büros (und eigene Anträge) für den Monteur.
+  //
+  // Welche Felder sich überhaupt unterscheiden, entscheidet core/time-changes.js
+  // (siehe groupTimeChangesByWorkDate/describeChange). Hier wird daraus nur
+  // noch ein Satz - mit den vorhandenen Formaten der App (timeFormatter,
+  // formatMinutes), nicht mit neu erfundenen.
+  const TIME_CHANGE_STATUS_LABEL = {
+    effective: "Bereits gebucht",
+    pending: "Nur beantragt · noch nicht gebucht",
+    rejected: "Abgelehnt · ohne Wirkung"
+  };
+
+  // Eine constructionSiteId sagt dem Monteur nichts - der Zugang liefert
+  // deshalb neben ihr schon die aufgelösten Namen (fromName/toName aus
+  // core/time-changes.js). Fehlt einer, kann das zweierlei heißen (kein
+  // Baustellenbezug oder eine ausnahmsweise nicht auflösbare Kennung) - beide
+  // sehen für den Monteur gleich aus, ein geratener Name wäre falsch. Nur
+  // wenn beide fehlen, bleibt "Andere Baustelle" als bisheriger Rückfall.
+  function timeChangeFieldSentence(field) {
+    if (field.field === "recordedAt" && field.to) {
+      const to = timeFormatter.format(new Date(field.to));
+      const from = field.from ? timeFormatter.format(new Date(field.from)) : null;
+      return `Uhrzeit${from ? ` ${from} Uhr →` : ""} ${to} Uhr`;
+    }
+    if (field.field === "constructionSite") {
+      const { fromName, toName } = field;
+      if (toName && fromName) return `Baustelle: ${toName} statt ${fromName}`;
+      if (toName) return `Baustelle: ${toName}`;
+      if (fromName) return `Baustelle geändert (vorher: ${fromName})`;
+      return "Andere Baustelle";
+    }
+    if (field.field === "travelMinutes" && field.to != null) {
+      const to = formatMinutes(field.to);
+      const from = field.from != null ? formatMinutes(field.from) : null;
+      return `Fahrzeit${from ? ` ${from} →` : ""} ${to}`;
+    }
+    if (field.field === "activityNote") {
+      return field.to ? `Notiz: ${field.to}` : "Notiz entfernt";
+    }
+    return null;
+  }
+
+  function timeChangeSummarySentence(change) {
+    const teile = [];
+    if (change.deleted) teile.push("Buchung gelöscht");
+    else if (change.added) teile.push("Buchung ergänzt");
+    else teile.push(...change.fields.map(timeChangeFieldSentence).filter(Boolean));
+    if (change.movedTo) teile.push(`verschoben auf ${shortDate(change.movedTo)}`);
+    return teile.length ? teile.join(" · ") : "Änderung ohne sichtbaren Unterschied";
   }
 
   function localDateTimeInputValue(instant) {
@@ -8586,7 +8880,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
               refreshAdminTimeAccounts()
             ]);
           } catch (error) {
-            showToast(error.message);
+            showErrorToast(error.message);
             cancel.disabled = !navigator.onLine;
           }
         });
@@ -8694,9 +8988,13 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       elements.nextHolidayCard.hidden = true;
       elements.timeAccountBalance.textContent = "±00:00";
       elements.timeAccountBalance.className = "time-account-balance";
-      elements.timeAccountStatus.textContent = navigator.onLine
-        ? "Jahreskonto wird geladen …"
-        : "Das Jahreskonto ist offline gerade nicht verfügbar.";
+      elements.timeAccountStatus.textContent = !navigator.onLine
+        ? "Das Jahreskonto ist offline gerade nicht verfügbar."
+        : timeAccountFetchStatus === "failed"
+          ? "Das Jahreskonto konnte nicht geladen werden."
+          : timeAccountFetchDauert
+            ? "Das dauert länger als üblich. Der Server läuft vielleicht gerade erst an."
+            : "Jahreskonto wird geladen …";
       elements.timeAccountTargetWork.textContent = "00:00 / 00:00";
       elements.timeAccountVacationRemaining.textContent = "0 Tage";
       elements.timeAccountVacationPending.textContent = "0 Tage";
@@ -9101,13 +9399,22 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       elements.timeAccountAdminList.append(empty);
       return;
     }
-    if (overview.accounts.length === 0) {
+    // Ab 20-30 Mitarbeitern ist die Liste sonst nur noch Scrollen - dieselbe
+    // Suche wie bei Kunden, Fahrzeugen, Mitarbeitern und Prüfprotokollen.
+    const query = elements.timeAccountSearchField.value.trim().toLocaleLowerCase("de-DE");
+    const accounts = overview.accounts.filter((account) => (
+      !query || [account.employeeName, account.personnelNumber]
+        .filter(Boolean).join(" ").toLocaleLowerCase("de-DE").includes(query)
+    ));
+    if (accounts.length === 0) {
       const empty = document.createElement("li");
       empty.className = "absence-list__empty";
-      empty.textContent = "Noch keine aktiven Mitarbeiter vorhanden.";
+      empty.textContent = query
+        ? "Kein Jahreskonto passt zur Suche."
+        : "Noch keine aktiven Mitarbeiter vorhanden.";
       elements.timeAccountAdminList.append(empty);
     } else {
-      overview.accounts.forEach((account) => {
+      accounts.forEach((account) => {
         const item = document.createElement("li");
         const copy = document.createElement("div");
         const title = document.createElement("strong");
@@ -9263,6 +9570,11 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     renderOverviewCards();
     renderDashboardMetrics();
 
+    // Bleibt aus, wenn nichts geändert wurde (der Normalfall) oder der Abruf
+    // gescheitert ist - dann liefert groupTimeChangesByWorkDate eine leere
+    // Zuordnung, und keine Tageskarte bekommt einen Änderungshinweis.
+    const timeChangesByDay = groupTimeChangesByWorkDate(timeChangesState?.operations);
+
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
       const approvedAbsence = approvedAbsenceForDate(workDate);
@@ -9382,7 +9694,12 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       });
       elements.weekStrip.append(item);
 
-      if (!workDay && !approvedAbsence) return;
+      // Ein vergessener Tag ist der einzige, der die Nachbuchung wirklich braucht,
+      // und bekam bisher als einziger keine Karte. Künftige Tage bleiben draußen,
+      // weil es dort nichts nachzutragen gibt und sieben leere Karten die Woche
+      // unübersichtlich machen würden.
+      const isPastOrToday = workDate <= localDateKey(today);
+      if (!workDay && !approvedAbsence && !isPastOrToday) return;
 
       const dayCard = document.createElement("section");
       const heading = document.createElement("div");
@@ -9429,6 +9746,59 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           absenceDayPartLabel(approvedAbsence.dayPart)
         } · verbindlich freigegeben`;
         dayCard.append(absenceBanner);
+      }
+
+      const dayChanges = timeChangesByDay.get(workDate) || [];
+      if (dayChanges.length) {
+        const changesBox = document.createElement("div");
+        changesBox.className = "week-day-changes";
+        const changesHeading = document.createElement("strong");
+        changesHeading.className = "week-day-changes__heading";
+        changesHeading.textContent = "Zeitänderungen";
+        changesBox.append(changesHeading);
+        dayChanges.forEach(({ operation, change }) => {
+          const displayStatus = operationDisplayStatus(operation);
+          const item = document.createElement("div");
+          const badge = document.createElement("span");
+          const summary = document.createElement("p");
+          const meta = document.createElement("p");
+          item.className = `week-day-change week-day-change--${displayStatus}`;
+          badge.className = "week-day-change__badge";
+          badge.textContent = TIME_CHANGE_STATUS_LABEL[displayStatus];
+          summary.className = "week-day-change__summary";
+          summary.textContent = timeChangeSummarySentence(change);
+          meta.className = "week-day-change__meta";
+          // "Büro" oder "Du" - genau diese Unterscheidung wollte der Betreiber
+          // sichtbar haben, unabhängig davon, wer am Ende geprüft hat.
+          const wer = operation.initiatedBy === "employee" ? "Du" : "Büro";
+          const wann = operation.requestedAt ? new Date(operation.requestedAt) : null;
+          meta.textContent = [
+            wer,
+            wann && `${wann.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })} · ${
+              timeFormatter.format(wann)
+            } Uhr`
+          ].filter(Boolean).join(" · ");
+          item.append(badge, summary, meta);
+          if (operation.reason) {
+            const reason = document.createElement("p");
+            reason.className = "week-day-change__reason";
+            reason.textContent = `Begründung: ${operation.reason}`;
+            item.append(reason);
+          }
+          const noteText = displayStatus === "pending"
+            ? "Deine gebuchte Zeit ist dadurch noch nicht verändert."
+            : displayStatus === "rejected"
+              ? "Der Antrag wurde abgelehnt und bleibt ohne Wirkung."
+              : "";
+          if (noteText) {
+            const note = document.createElement("p");
+            note.className = "week-day-change__note";
+            note.textContent = noteText;
+            item.append(note);
+          }
+          changesBox.append(item);
+        });
+        dayCard.append(changesBox);
       }
 
       if (!workDay?.entries?.length) {
@@ -9503,15 +9873,6 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           dayCard.append(warnings);
         }
 
-        if (!demoMode) {
-          const addMissing = document.createElement("button");
-          addMissing.type = "button";
-          addMissing.className = "button button--quiet week-day-addition";
-          addMissing.textContent = "Fehlende Buchung ergänzen";
-          addMissing.addEventListener("click", () => void openTimeAdditionForm(workDate));
-          dayCard.append(addMissing);
-        }
-
         if (workflowStatus === "completed") {
           const stateNote = document.createElement("p");
           stateNote.className = "week-day-state week-day-state--approved";
@@ -9526,6 +9887,16 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           dayCard.append(stateNote);
         }
       }
+
+      if (!demoMode) {
+        const addMissing = document.createElement("button");
+        addMissing.type = "button";
+        addMissing.className = "button button--quiet week-day-addition";
+        addMissing.textContent = "Fehlende Buchung ergänzen";
+        addMissing.addEventListener("click", () => void openTimeAdditionForm(workDate));
+        dayCard.append(addMissing);
+      }
+
       elements.weekTimesheetList.append(dayCard);
     });
     if (elements.weekTimesheetList.childElementCount === 0) {
@@ -9697,7 +10068,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           renderPlatformAnnouncements();
         } catch (error) {
           dismiss.disabled = false;
-          showToast(error.message);
+          showErrorToast(error.message);
         }
       });
       article.append(copy, dismiss);
@@ -9713,7 +10084,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       renderPlatformAnnouncements();
     } catch (error) {
       if (error.status === 401) showLogin();
-      else if (!error.network) showToast(error.message);
+      else if (!error.network) showErrorToast(error.message);
     }
   }
 
@@ -10022,17 +10393,34 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }[pane] || elements.navStart;
     const mobileActiveButton = {
       time: elements.navWeek,
-      apprentice: elements.navApprentice,
+      // "Azubi" steht mobil nur direkt in der Leiste, wenn app.js ihm die
+      // Klasse "nav-item--apprentice-mobile" gegeben hat (Azubi selbst, oder
+      // Ausbilder ohne Planungsrecht). Ein planender Ausbilder findet ihn
+      // stattdessen unter "Mehr" - fuer ihn muss deshalb "Mehr" leuchten,
+      // sonst zeigt die Leiste in seinem Bereich gar nichts an.
+      apprentice: elements.navApprentice.classList.contains("nav-item--apprentice-mobile")
+        ? elements.navApprentice
+        : elements.navMore,
       assignments: elements.navMobilePlanning,
       sites: elements.navMobilePlanning,
+      // Arbeitszeiten (Freigabe fuer andere) haengt an derselben Gruppe wie
+      // Einsatzplanung und Baustellen daneben - ohne diesen Eintrag leuchtete
+      // am Telefon in diesem Bereich gar nichts, weil der Desktop-Knopf dort
+      // "nav-item--desktop" traegt und unsichtbar ist.
+      worktimes: elements.navMobilePlanning,
       reports: elements.navMobileDocumentation,
       documents: elements.navMobileDocumentation,
       inspections: elements.navMobileDocumentation,
       customers: elements.navMobileBusiness,
       employees: elements.navMobileBusiness,
       vehicles: elements.navMobileBusiness,
-      devices: elements.navDevices,
-      power: elements.navDevices,
+      // Geraete und Baustrom haben mobil keinen eigenen Knopf mehr (beide
+      // tragen "nav-item--desktop", siehe applyNavigationAccess) - sichtbar
+      // ist dort nur die Gruppe "Betrieb". Zeigt die Markierung trotzdem auf
+      // den einzelnen, unsichtbaren Knopf, leuchtet in der Leiste gar nichts:
+      // markiert werden muss, was der Nutzer tatsaechlich sieht.
+      devices: elements.navMobileBusiness,
+      power: elements.navMobileBusiness,
       analytics: elements.navMore
     }[pane] || null;
     activateNavigation(activeButton, mobileActiveButton);
@@ -10093,6 +10481,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   async function refreshWeekData() {
     if (demoMode) {
       weekState = null;
+      timeChangesState = null;
       elements.weekMessage.textContent = "";
       renderWeek();
       return;
@@ -10104,6 +10493,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }
     elements.weekMessage.textContent = "Stundenzettel wird geladen …";
     const requestedWeekStart = selectedWeekStart;
+    // Eigener, nicht blockierender Nebenlauf: Zeitänderungen sind eine
+    // Zusatzinfo zum Stundenzettel, keine Voraussetzung dafür. Scheitert
+    // dieser Abruf, bleibt der Stundenzettel selbst unberührt stehen.
+    void refreshTimeChangesData(requestedWeekStart);
     try {
       const body = await requestJson(`./api/v1/work-weeks/${requestedWeekStart}`);
       if (requestedWeekStart !== selectedWeekStart) return;
@@ -10119,6 +10512,27 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
           : error.message;
       }
     }
+  }
+
+  // Zeitänderungen des Büros zur angezeigten Woche: reine Einsicht, siehe
+  // core/time-changes.js. Läuft absichtlich neben refreshWeekData statt darin
+  // verschachtelt - ein Fehler oder eine langsame Antwort hier darf weder den
+  // Stundenzettel verzögern noch dessen eigenen Fehlerzustand überschreiben.
+  async function refreshTimeChangesData(requestedWeekStart) {
+    if (demoMode || !navigator.onLine) return;
+    try {
+      const body = await requestJson(`./api/v1/time-changes/${requestedWeekStart}`);
+      if (requestedWeekStart !== selectedWeekStart) return;
+      timeChangesState = body.timeChanges;
+    } catch (error) {
+      if (requestedWeekStart !== selectedWeekStart) return;
+      if (error.status === 401) return showLogin();
+      // Kein Toast, keine Fehlermeldung: die Änderungshistorie ist eine
+      // Zusatzinfo. Bleibt sie aus, sieht die Woche genauso aus wie im
+      // Normalfall ohne jede Änderung.
+      timeChangesState = null;
+    }
+    renderWeek();
   }
 
   // Berichtsheft
@@ -10873,8 +11287,10 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   }
 
   async function refreshTimeAccountData() {
+    const lauf = ++timeAccountFetchLauf;
     if (demoMode) {
       timeAccountState = null;
+      timeAccountFetchStatus = "idle";
       renderTimeAccount();
       return;
     }
@@ -10883,18 +11299,54 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       return;
     }
     const requestedYear = Number(selectedWeekStart.slice(0, 4));
+    timeAccountFetchStatus = "loading";
+    timeAccountFetchDauert = false;
+    window.clearTimeout(timeAccountFetchUhr);
+    timeAccountFetchUhr = window.setTimeout(() => {
+      // Ist inzwischen ein neuerer Aufruf gestartet, gehoert dieser Zeitgeber
+      // gar nicht mehr zu ihm - er wurde beim Start des neueren schon durch
+      // dessen eigenen ersetzt (siehe unten). Ohne diese Pruefung koennte er
+      // trotzdem noch feuern und "timeAccountFetchDauert" fuer den neueren
+      // Aufruf faelschlich setzen.
+      if (lauf !== timeAccountFetchLauf || timeAccountFetchStatus !== "loading") return;
+      timeAccountFetchDauert = true;
+      renderTimeAccount();
+    }, 8000);
+    renderTimeAccount();
     try {
       const body = await requestJson(`./api/v1/time-account?year=${requestedYear}`);
-      if (requestedYear !== Number(selectedWeekStart.slice(0, 4))) return;
+      // Zwei Jahreswechsel kurz hintereinander starten zwei Aufrufe. Kommt
+      // die Antwort des ersten erst an, nachdem der zweite laengst laeuft,
+      // ist sie fuer das inzwischen gewaehlte Jahr wertlos - der Jahresabgleich
+      // faengt genau das ab. Ohne den Laufnummer-Vergleich wuerde der erste
+      // Aufruf hier zwar korrekt aussteigen, aber gleich darunter in seinem
+      // "finally" trotzdem den Zeitgeber des zweiten loeschen und dessen
+      // "dauert laenger" zuruecksetzen - obwohl der zweite noch laeuft und die
+      // Meldung noch braucht.
+      if (requestedYear !== Number(selectedWeekStart.slice(0, 4)) || lauf !== timeAccountFetchLauf) return;
       timeAccountState = body.timeAccount;
+      timeAccountFetchStatus = "ready";
       elements.timeAccountMessage.textContent = "";
       renderTimeAccount();
     } catch (error) {
-      if (error.status === 401) showLogin();
-      else {
+      if (error.status === 401) {
+        showLogin();
+      } else if (lauf === timeAccountFetchLauf) {
         elements.timeAccountMessage.textContent = error.network
           ? "Das Stundenkonto konnte gerade nicht aktualisiert werden."
           : error.message;
+        // Ohne diese Zeile stand "wird geladen" stehen, obwohl der Fehler oben
+        // laengst gemeldet ist - der Text und die Meldung widersprachen sich.
+        timeAccountFetchStatus = "failed";
+        renderTimeAccount();
+      }
+    } finally {
+      // Nur der noch aktuelle Aufruf darf seinen Zeitgeber loeschen. Ein
+      // veralteter Aufruf haette sonst hier - wie oben beschrieben - den
+      // Zeitgeber eines inzwischen gestarteten neueren Aufrufs geloescht.
+      if (lauf === timeAccountFetchLauf) {
+        window.clearTimeout(timeAccountFetchUhr);
+        timeAccountFetchDauert = false;
       }
     }
   }
@@ -10937,6 +11389,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
   async function selectWeek(weekStart) {
     selectedWeekStart = weekStart;
     weekState = null;
+    timeChangesState = null;
     timeAccountState = null;
     timeAccountsState = null;
     closeTimeAccountEditor();
@@ -10978,7 +11431,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       render();
     } catch (error) {
       if (error.status === 401) showLogin();
-      else if (!error.network) showToast(error.message);
+      else if (!error.network) showErrorToast(error.message);
     }
   }
 
@@ -10989,6 +11442,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       assignments = [];
       adminState = null;
       weekState = null;
+      timeChangesState = null;
       absenceState = [];
       timeAccountState = null;
       timeAccountsState = null;
@@ -12995,7 +13449,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
       window.localStorage.removeItem(ONLINE_STORAGE_KEY);
       showLogin();
     } catch (error) {
-      showToast(error.message);
+      showErrorToast(error.message);
     }
   });
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
@@ -13654,6 +14108,7 @@ import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.39";
     }
   });
   elements.customerSearchField.addEventListener("input", renderCustomerOverview);
+  elements.timeAccountSearchField.addEventListener("input", renderAdminTimeAccounts);
   elements.inspectionSearchField.addEventListener("input", renderInspectionOverview);
   elements.inspectionSiteFilter.addEventListener("change", renderInspectionOverview);
   elements.inspectionStatusFilter.addEventListener("change", renderInspectionOverview);

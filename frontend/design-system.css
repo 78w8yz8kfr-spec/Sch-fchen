@@ -24,9 +24,14 @@
   --ui-sidebar-hover: #24272c;
   --ui-sidebar-text: #d9dce1;
   --ui-sidebar-muted: #9298a1;
-  --ui-success: #2f855a;
+  /* #2f855a/#a46910 erreichten gegen ihren -soft-Hintergrund nur 4,11:1 bzw.
+     4,21:1 (nötig: 4,5:1) - bei Text in --ui-text-xs (~10,9px) unterschreitet
+     das die WCAG-Mindestlesbarkeit fuer Status-Abzeichen wie "Aktiv" oder
+     "Bueroprüfung". Abgedunkelt auf jeweils 4,80:1 (siehe
+     tests/styles.test.mjs, Kontrast-Test), Hintergruende unveraendert. */
+  --ui-success: #2b7952;
   --ui-success-soft: #e9f7ef;
-  --ui-warning: #a46910;
+  --ui-warning: #97610f;
   --ui-warning-soft: #fff5df;
   --ui-danger: #c81e2a;
   --ui-danger-soft: #fff0f1;
@@ -609,7 +614,10 @@ textarea {
 }
 
 .status-icon {
-  color: var(--ui-brand);
+  /* --ui-brand auf --ui-brand-soft misst nur 4,41:1 - unter der Schwelle von
+     4,5:1. --ui-brand-hover erreicht 5,44:1 und ist bereits das Muster fuer
+     Text auf --ui-brand-soft (siehe .week-status--active weiter unten). */
+  color: var(--ui-brand-hover);
   background: var(--ui-brand-soft);
 }
 
@@ -1398,7 +1406,10 @@ body:has(#vde-app) main {
 }
 
 .form-section__heading > div > span {
-  color: var(--ui-brand);
+  /* Gleicher Grund wie bei .status-icon oben: --ui-brand-hover statt
+     --ui-brand, sonst unterschreitet die Schrittnummer (z.B. "01") im
+     VDE-Formular die Mindestlesbarkeit. */
+  color: var(--ui-brand-hover);
   background: var(--ui-brand-soft);
 }
 

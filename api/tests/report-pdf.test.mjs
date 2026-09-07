@@ -194,3 +194,46 @@ test("Auch ein sehr langer Bericht bleibt vollständig auf den Blättern", async
     assert.ok(document.getPageCount() >= 2);
   }
 });
+
+// Griechische Buchstaben, osteuropäische Sonderzeichen und Emoji liegen
+// außerhalb von WinAnsi (Latin-1). Ohne Zeichenschutz wirft pdf-lib dort eine
+// Ausnahme - und ein Montage- oder Bautagesbericht ist laut Dokumentenmodell
+// eine unveränderliche, rechtlich relevante Freigabe. Sie darf nicht an einem
+// Ohm-Zeichen in einer Bemerkung oder einem Mitarbeiternamen scheitern.
+test("Ein Bericht mit Ω, Ł und Emoji in Namen und Bemerkung wird trotzdem freigegeben", async () => {
+  const signature = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64"
+  );
+  const pdf = await buildFinalReportPdf({
+    report: {
+      id: "22222222-2222-4222-8222-222222222222",
+      number: "SE-R-2026-00003",
+      reportType: "montage",
+      workDate: "2026-07-21",
+      summary: "Isolationswiderstand 200 Ω gemessen",
+      details: "Messung durchgeführt.",
+      structuredData: {
+        workPerformed: "Isolationswiderstand mit 200 Ω gemessen und protokolliert 😀",
+        personnel: [{ userId: "33333333-3333-4333-8333-333333333333", name: "Łukasz Kowalski", minutes: 480 }]
+      },
+      authorName: "Şahin Yılmaz"
+    },
+    company: { legalName: "Schaaf Elektro GmbH", displayName: "Schaaf Elektro GmbH" },
+    context: {
+      customerName: "Kunde Đorđe Petrović",
+      siteNumber: "SE-B-2026-0001",
+      siteName: "Verwaltungsgebäude",
+      siteAddress: "Musterstraße 1, 04720 Döbeln"
+    },
+    signatures: {
+      employee: { name: "Łukasz Kowalski", data: signature },
+      customer: { name: "Kunde 😀", data: signature }
+    },
+    finalizedAt: "2026-07-21T18:30:00.000Z"
+  });
+
+  assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
+  const loaded = await PDFDocument.load(pdf);
+  assert.ok(loaded.getPageCount() >= 1);
+});

@@ -60,6 +60,7 @@ import {
   expectedNextTypes,
   InputError,
   localDate,
+  MAXIMUM_DOCUMENT_BYTES,
   readJson,
   validateAbsenceDecision,
   validateAbsenceRequest,
@@ -177,6 +178,24 @@ const FEDERAL_STATE_NAMES = new Map([
   ["TH", "Thüringen"]
 ]);
 
+// readJson() begrenzt die rohe HTTP-Anfrage, MAXIMUM_DOCUMENT_BYTES dagegen
+// nur den entpackten Dateiinhalt - beide Grenzen sind aus Absicht
+// verschieden, und die JSON-Grenze muss großzügig genug sein, dass sie nie
+// vor der fachlichen Meldung "höchstens 5 MB" zuschlägt.
+//
+// Nachrechnung: Base64 macht aus n Byte ceil(n/3)*4 Byte, also aus den
+// erlaubten 5.000.000 Byte Dateiinhalt 6.666.668 Byte codierten Text. Im
+// selben JSON-Dokument stehen daneben noch Titel (bis 200 Zeichen), Dateiname
+// (bis 255), Dateityp (bis 120), Kategorie (bis 30) und bis zu drei UUIDs -
+// selbst mit durchgehend mehrbytigen Zeichen (bis zu 4 Byte je Zeichen) sind
+// das keine 10.000 Byte. Der Aufschlag von 1.000.000 Byte deckt das mit
+// hundertfacher Reserve ab (Platz auch fuer ein grosszuegig eingeruecktes
+// oder anderweitig aufgeblähtes JSON-Dokument), ohne selbst in die Naehe der
+// fachlichen Grenze zu kommen: eine Datei, die tatsaechlich groesser als
+// 5 MB ist, erreicht validateDocumentUpload() darum immer noch und bekommt
+// dort "hoechstens 5 MB" statt hier "Die Anfrage ist zu gross".
+export const DOCUMENT_UPLOAD_JSON_BYTE_LIMIT = Math.ceil(MAXIMUM_DOCUMENT_BYTES / 3) * 4 + 1_000_000;
+
 function json(response, status, body, headers = {}) {
   const encoded = JSON.stringify(body);
   response.writeHead(status, {
@@ -202,7 +221,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.39";
+export const APPLICATION_VERSION = "0.44.40";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -264,11 +283,22 @@ function attachment(response, document) {
   response.end(document.content);
 }
 
-function inlineDocument(response, document) {
+export function inlineDocument(response, document) {
+  // Derselbe sichere Kopfaufbau wie in attachment(): ein ASCII-Rückfallname
+  // im filename-Parameter (den alte Clients lesen) und der volle Name erst
+  // im RFC-5987-codierten filename*. Ohne das brach ein Dateiname mit einem
+  // doppelten Anführungszeichen (z.B. "Foto\".pdf") aus dem Attributwert aus.
+  const fallbackName = document.fileName
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "dokument";
+  const encodedName = encodeURIComponent(document.fileName).replace(/[!'()*]/g, (character) => (
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  ));
   response.writeHead(200, {
     "Content-Type": document.mimeType,
     "Content-Length": document.content.length,
-    "Content-Disposition": `inline; filename="${document.fileName}"`,
+    "Content-Disposition": `inline; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`,
     "Cache-Control": "private, max-age=300",
     ...securityHeaders()
   });
@@ -9283,6 +9313,193 @@ async function existingTimeChange(client, companyId, userId, clientChangeId, exp
   return timeChangeOperationDto(operation.rows[0], items.rows);
 }
 
+// siteNameById löst die in oldValue/newValue enthaltene constructionSiteId zu
+// einem Anzeigenamen auf (siehe Aufrufer). Die Karte kommt bewusst als
+// Parameter herein statt hier selbst nachzuladen: die Baustellenliste gehört
+// company-weit zur Anfrage, nicht zu einer einzelnen Änderungszeile.
+function timeChangeItemViewDto(item, siteNameById = new Map()) {
+  const oldWorkDate = item.old_work_date ? databaseDate(item.old_work_date) : null;
+  const newWorkDate = item.new_work_date ? databaseDate(item.new_work_date) : null;
+  const oldSiteId = item.old_value?.constructionSiteId || null;
+  const newSiteId = item.new_value?.constructionSiteId || null;
+  return {
+    id: item.id,
+    action: item.item_action,
+    // Der Arbeitstag, den die Buchung vor der Änderung betraf. Bei einer
+    // Ungültigmarkierung ist das zugleich der einzige betroffene Tag.
+    workDate: oldWorkDate || newWorkDate,
+    // Nur gesetzt, wenn der Arbeitsblock auf einen anderen Tag verschoben
+    // wurde - sonst sind Quell- und Zieltag identisch und ein zweites Feld
+    // würde nur denselben Tag doppelt zeigen.
+    movedToWorkDate: newWorkDate && oldWorkDate && newWorkDate !== oldWorkDate ? newWorkDate : null,
+    oldValue: item.old_value || null,
+    newValue: item.new_value || null,
+    // Zusatzfelder neben oldValue/newValue statt darin: die Oberfläche soll
+    // weiterhin "Baustelle X" statt "Andere Baustelle" schreiben können,
+    // ohne dass sich das Vertragsformat von oldValue/newValue ändert. Bleibt
+    // eine Kennung ausnahmsweise unauflösbar (siteNameById kennt sie nicht),
+    // liefern wir bewusst kein Feld mit Platzhaltertext, sondern null - die
+    // Oberfläche entscheidet dann selbst, wie sie einen fehlenden Namen
+    // darstellt.
+    oldConstructionSiteName: oldSiteId ? siteNameById.get(oldSiteId) || null : null,
+    newConstructionSiteName: newSiteId ? siteNameById.get(newSiteId) || null : null
+  };
+}
+
+// Lesezugriff für den Monteur auf die eigene Zeitänderungshistorie
+// (Betreiberauftrag: "Der Monteur darf es nicht genehmigen, sieht aber
+// welche Zeiten das Büro geändert hat"). Einsicht ohne Stimmrecht - deshalb
+// ausschließlich SELECT-Anweisungen, kein Schreibzugriff, keine Möglichkeit
+// zu genehmigen oder abzulehnen. Firma und Mitarbeiter kommen wie bei
+// getWorkDay/getWorkWeek ausnahmslos aus der Sitzung (context), niemals aus
+// einem Anfrageparameter - ein Mitarbeiter kann so grundsätzlich keine
+// fremde Firma und keinen fremden Kollegen erfragen. Der Zeitraum folgt
+// exakt dem Muster von getWorkWeek/GET /api/v1/work-weeks/:weekStart
+// (Montag als Wochenbeginn, sieben Tage).
+async function getOwnTimeChanges(client, context, weekStart) {
+  const start = new Date(`${weekStart}T00:00:00Z`);
+  if (start.getUTCDay() !== 1) {
+    throw new InputError("Der Wochenbeginn muss ein Montag sein.", 400, "invalid_week_start");
+  }
+  const weekEnd = addUtcDays(weekStart, 6);
+
+  // Nur die eigenen Arbeitstage der angefragten Woche kommen als Filter in
+  // Frage. Ohne diese Einschränkung über den Mandanten und den Mitarbeiter
+  // hinaus könnte kein Vorgang eines anderen Mitarbeiters durchrutschen, denn
+  // die folgende Abfrage bindet ohnehin schon an operation.user_id = eigene
+  // ID - diese Liste liefert zusätzlich den Wochenfilter.
+  const ownDays = await client.query(
+    `SELECT id FROM work_days
+     WHERE company_id = $1 AND user_id = $2 AND work_date BETWEEN $3 AND $4`,
+    [context.companyId, context.userId, weekStart, weekEnd]
+  );
+  if (ownDays.rowCount === 0) {
+    return { weekStart, weekEnd, operations: [] };
+  }
+  const ownDayIds = ownDays.rows.map((day) => day.id);
+
+  // Sicherheitsregeln 1 und 2: company_id und user_id kommen ausschließlich
+  // aus context, niemals aus der Anfrage. operation.user_id ist laut Schema
+  // (time_change_operations_user_fkey) immer der Mitarbeiter, dessen Zeit
+  // geändert wurde - der Filter liefert deshalb ausnahmslos eigene Vorgänge.
+  // Zusätzlich muss mindestens ein betroffener Arbeitstag (Quelle oder Ziel)
+  // in der angefragten Woche liegen, sonst würden auch weit zurückliegende
+  // Vorgänge auf jeder Wochenabfrage erneut erscheinen.
+  const operations = await client.query(
+    `SELECT DISTINCT operation.*,
+            CASE WHEN requester.id IS NULL THEN NULL
+                 ELSE requester.first_name || ' ' || requester.last_name
+            END AS requested_by_name,
+            CASE WHEN reviewer.id IS NULL THEN NULL
+                 ELSE reviewer.first_name || ' ' || reviewer.last_name
+            END AS reviewed_by_name
+     FROM time_change_operations AS operation
+     JOIN time_change_items AS item
+       ON item.company_id = operation.company_id AND item.operation_id = operation.id
+     LEFT JOIN users AS requester
+       ON requester.company_id = operation.company_id
+      AND requester.id = operation.requested_by_user_id
+     LEFT JOIN users AS reviewer
+       ON reviewer.company_id = operation.company_id
+      AND reviewer.id = operation.reviewed_by_user_id
+     WHERE operation.company_id = $1
+       AND operation.user_id = $2
+       AND (
+         NULLIF(item.old_value->>'workDayId', '')::UUID = ANY($3::UUID[])
+         OR NULLIF(item.new_value->>'workDayId', '')::UUID = ANY($3::UUID[])
+       )
+     ORDER BY operation.requested_at DESC`,
+    [context.companyId, context.userId, ownDayIds]
+  );
+  if (operations.rowCount === 0) {
+    return { weekStart, weekEnd, operations: [] };
+  }
+
+  const operationIds = operations.rows.map((row) => row.id);
+  // Der betroffene Arbeitstag jeder Einzeländerung wird erst hier aufgelöst,
+  // und zwar bewusst ohne erneute Firmen-/Mitarbeiterprüfung: work_days.id ist
+  // ein serverseitig erzeugter Primärschlüssel, den alleine diese Anwendung in
+  // old_value/new_value eingetragen hat (siehe editTimeEntry/deleteTimeEntry
+  // weiter oben), niemals ein Anfragewert. Ein Vorgang eines anderen
+  // Mitarbeiters ist zu diesem Zeitpunkt bereits ausgeschlossen.
+  const items = await client.query(
+    `SELECT item.*, old_day.work_date AS old_work_date, new_day.work_date AS new_work_date
+     FROM time_change_items AS item
+     LEFT JOIN work_days AS old_day
+       ON old_day.company_id = item.company_id
+      AND old_day.id = NULLIF(item.old_value->>'workDayId', '')::UUID
+     LEFT JOIN work_days AS new_day
+       ON new_day.company_id = item.company_id
+      AND new_day.id = NULLIF(item.new_value->>'workDayId', '')::UUID
+     WHERE item.company_id = $1 AND item.operation_id = ANY($2::UUID[])
+     ORDER BY item.created_at, item.id`,
+    [context.companyId, operationIds]
+  );
+  // Baustellennamen für die Anzeige nachladen (Betreiberauftrag: der
+  // Monteur soll "Baustelle X" statt nur "Andere Baustelle" lesen können).
+  // Der Mandantenfilter auf company_id gilt wie überall; ein WHERE auf den
+  // Baustellenstatus fehlt hier bewusst, denn eine abgeschlossene oder
+  // archivierte Baustelle wird laut AGENTS.md nicht hart gelöscht und muss
+  // in der eigenen Historie weiterhin benennbar bleiben.
+  const siteIds = [...new Set(
+    items.rows.flatMap((item) => [
+      item.old_value?.constructionSiteId,
+      item.new_value?.constructionSiteId
+    ]).filter(Boolean)
+  )];
+  const siteNameById = new Map();
+  if (siteIds.length > 0) {
+    const sites = await client.query(
+      "SELECT id, name FROM construction_sites WHERE company_id = $1 AND id = ANY($2::UUID[])",
+      [context.companyId, siteIds]
+    );
+    for (const site of sites.rows) {
+      siteNameById.set(site.id, site.name);
+    }
+  }
+
+  const itemsByOperation = new Map();
+  for (const item of items.rows) {
+    const list = itemsByOperation.get(item.operation_id) || [];
+    list.push(timeChangeItemViewDto(item, siteNameById));
+    itemsByOperation.set(item.operation_id, list);
+  }
+
+  return {
+    weekStart,
+    weekEnd,
+    operations: operations.rows.map((operation) => ({
+      id: operation.id,
+      action: operation.action,
+      reason: operation.reason,
+      status: operation.status,
+      // "pending" und "approved"/"applied" sind für den Monteur zwei
+      // unterschiedliche Dinge: bei "pending" liegen alte und neue Werte nur
+      // als Antrag vor, seine tatsächliche Zeit ist unverändert; erst
+      // "applied" oder "approved" ist bereits wirksam gebuchte Zeit. Ein
+      // einzelnes Feld macht diesen Unterschied für die Oberfläche
+      // unmissverständlich, ohne dass sie die vier Statuswerte selbst
+      // interpretieren muss. "rejected" bleibt sichtbar (Historie wird
+      // erhalten), gilt aber ebenfalls nicht als wirksam.
+      effective: operation.status === "applied" || operation.status === "approved",
+      // Kein Genehmigungsfeld, keine Aktionslinks: die Ansicht ist rein
+      // lesend, dieselbe Entscheidung (genehmigen/ablehnen) bleibt exklusiv
+      // PATCH /api/v1/admin/time-change-operations/:id und damit
+      // requireFullPlanner vorbehalten.
+      requestedAt: new Date(operation.requested_at).toISOString(),
+      reviewedAt: operation.reviewed_at ? new Date(operation.reviewed_at).toISOString() : null,
+      requestedByName: operation.requested_by_name,
+      reviewedByName: operation.reviewed_by_name,
+      // requested_by_user_id ist bei einer Selbstkorrektur immer der
+      // Mitarbeiter selbst (operation.user_id); jeder andere Bearbeiter kann
+      // nur über das Büro/eine Planungsrolle entstanden sein, siehe
+      // editTimeEntry/deleteTimeEntry (administrator-Fall) weiter oben.
+      initiatedBy: operation.requested_by_user_id === operation.user_id ? "employee" : "office",
+      changes: itemsByOperation.get(operation.id) || []
+    }))
+  };
+}
+
 async function editableTimeEntry(client, context, entryId, administrator) {
   if (administrator) await requireFullPlanner(client, context);
   const result = await client.query(
@@ -9345,9 +9562,12 @@ async function expectedTimeEditAction(client, context, entryId, input, administr
 }
 
 async function ensureEditableSite(client, context, userId, workDate, siteId, administrator) {
+  // Die Auswahlquelle (getTimeTrackingSiteOptions) zeigt Baustellen mit Status 'delayed' an,
+  // daher müssen wir sie beim Speichern auch akzeptieren – sonst wird dem Nutzer etwas
+  // zum Speichern angeboten, das die API selbst ablehnt.
   const site = await client.query(
     `SELECT id FROM construction_sites
-     WHERE company_id = $1 AND id = $2 AND status IN ('active','planned','on_hold')`,
+     WHERE company_id = $1 AND id = $2 AND status IN ('active','planned','on_hold','delayed')`,
     [context.companyId, siteId]
   );
   if (site.rowCount !== 1) {
@@ -9445,9 +9665,17 @@ async function editTimeEntry(client, context, entryId, input, timeZone, administ
     || (!administrator && ownCorrectionNeedsReview(
       policy, databaseDate(original.work_date), timeZone
     ));
-  if (lockedDay && administrator) {
-    await requireEmployeeLifecycleAdministrator(client, context);
-  }
+  // Keine eigene Rollenprüfung mehr für den freigegebenen/abgerechneten Tag:
+  // Für administrator=true verlangen lockTimeEntryStream und editableTimeEntry
+  // weiter oben bereits requireFullPlanner, bevor wir überhaupt hier ankommen.
+  // Admin, Geschäftsführung und Büro/Disposition dürfen also ohnehin schon
+  // korrigieren – und bei lockedDay entsteht wegen "controlled" oben in jedem
+  // Fall ein Antrag mit Vorher-/Nachher-Stand und Pflichtgrund, nie eine stille
+  // Direktänderung. Dieselben Rollen genehmigen ihn anschließend über
+  // reviewTimeChangeOperation. Eine engere Prüfung hier (früher
+  // requireEmployeeLifecycleAdministrator, gedacht für das Entfernen und
+  // Reaktivieren von Mitarbeitern) wäre nicht nur sachfremd in der Meldung,
+  // sondern auch wirkungslos: der Zugriff ist zu diesem Zeitpunkt längst geklärt.
 
   const dayIds = [...new Set([original.work_day_id, targetDay.id])];
   const allEntries = await effectiveEntriesForDays(
@@ -9640,7 +9868,17 @@ async function deleteTimeEntry(client, context, entryId, input, timeZone, admini
     || (!administrator && ownCorrectionNeedsReview(
       policy, databaseDate(original.work_date), timeZone
     ));
-  if (lockedDay && administrator) await requireEmployeeLifecycleAdministrator(client, context);
+  // Keine eigene Rollenprüfung mehr für den freigegebenen/abgerechneten Tag:
+  // Für administrator=true verlangen lockTimeEntryStream und editableTimeEntry
+  // weiter oben bereits requireFullPlanner, bevor wir überhaupt hier ankommen.
+  // Admin, Geschäftsführung und Büro/Disposition dürfen also ohnehin schon
+  // löschen – und bei lockedDay entsteht wegen "controlled" oben in jedem Fall
+  // ein Antrag mit Vorher-/Nachher-Stand und Pflichtgrund, nie eine stille
+  // Direktänderung. Dieselben Rollen genehmigen ihn anschließend über
+  // reviewTimeChangeOperation. Eine engere Prüfung hier (früher
+  // requireEmployeeLifecycleAdministrator, gedacht für das Entfernen und
+  // Reaktivieren von Mitarbeitern) wäre nicht nur sachfremd in der Meldung,
+  // sondern auch wirkungslos: der Zugriff ist zu diesem Zeitpunkt längst geklärt.
   if (!controlled) {
     await client.query(
       `UPDATE work_days SET status = 'open'
@@ -9714,6 +9952,17 @@ async function reviewTimeChangeOperation(client, context, operationId, input) {
   );
   if (operation.rowCount !== 1 || operation.rows[0].status !== "pending") {
     throw new InputError("Die kontrollierte Korrektur wurde nicht gefunden oder bereits entschieden.", 409, "time_change_not_pending");
+  }
+  // Vier-Augen-Prinzip (Betreiberauftrag): wer den Korrekturantrag gestellt
+  // hat, darf ihn nicht selbst freigeben oder ablehnen - sonst genügt ein
+  // einziges Konto, um eine Zeitänderung unbeobachtet wirksam zu machen.
+  // Gleiches Muster wie bei reviewAbsenceRequest (management_review).
+  if (operation.rows[0].requested_by_user_id === context.userId) {
+    throw new InputError(
+      "Sie haben diese Korrektur selbst beantragt. Bitten Sie ein zweites berechtigtes Konto (Administration, Geschäftsführung oder Büro/Disposition), sie zu prüfen.",
+      403,
+      "time_change_two_person_rule"
+    );
   }
   const items = await client.query(
     `SELECT * FROM time_change_items
@@ -9953,21 +10202,17 @@ async function createTimeEntryAddition(client, context, input, timeZone) {
     );
   }
 
-  const dayResult = await client.query(
-    `SELECT id, status
-     FROM work_days
-     WHERE company_id = $1 AND user_id = $2 AND work_date = $3
-     FOR UPDATE`,
-    [context.companyId, context.userId, input.workDate]
-  );
-  if (dayResult.rowCount !== 1) {
-    throw new InputError(
-      "Für diesen Tag existiert noch kein Stundenzettel.",
-      404,
-      "work_day_not_found"
-    );
-  }
-  const day = dayResult.rows[0];
+  // Ein vollstaendig vergessener Arbeitstag hat keine work_days-Zeile. Genau das ist
+  // der Fall, fuer den das Nachtragen da ist - und genau den hat diese Funktion
+  // frueher mit 404 abgewiesen, waehrend targetWorkDay nebenan und das normale
+  // Stempeln die Zeile bei Bedarf anlegen. Wer einen Tag komplett vergessen hatte,
+  // bekam ausgerechnet von der Nachtragefunktion "Fuer diesen Tag existiert noch
+  // kein Stundenzettel".
+  //
+  // Der Status der neuen Zeile kommt aus dem Spaltenvorgabewert 'open'
+  // (011_create_work_days.sql). Der Trigger work_days_before_write setzt ihn nicht,
+  // er raeumt bei 'open' nur die Zeitstempel ab.
+  const day = await targetWorkDay(client, context.companyId, context.userId, input.workDate);
 
   if (input.constructionSiteId) {
     await ensureOwnSiteAssignment(
@@ -10151,6 +10396,7 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
             correction.correction_reason,
             correction.created_at AS requested_at,
             correction.correction_status, correction.reviewed_at,
+            correction.entered_by_user_id,
             account.first_name || ' ' || account.last_name AS employee_name
      FROM time_entries AS correction
      LEFT JOIN time_entries AS original
@@ -10183,6 +10429,19 @@ async function reviewTimeEntryCorrection(client, context, correctionId, input) {
       "Diese zusammenhängende Änderung muss als vollständiger Korrekturvorgang geprüft werden.",
       409,
       "time_change_operation_review_required"
+    );
+  }
+  // Vier-Augen-Prinzip (Betreiberauftrag), auch auf dem älteren Korrekturweg:
+  // entered_by_user_id nennt hier den Antragsteller (createTimeEntryCorrection/
+  // -Addition/-Invalidation setzen es stets auf den anfragenden Benutzer).
+  // Ohne diese Prüfung bliebe genau diese Hintertür zum neueren
+  // reviewTimeChangeOperation offen. Gleiches Muster wie dort und bei
+  // reviewAbsenceRequest.
+  if (correction.entered_by_user_id === context.userId) {
+    throw new InputError(
+      "Sie haben diese Korrektur selbst beantragt. Bitten Sie ein zweites berechtigtes Konto (Administration, Geschäftsführung oder Büro/Disposition), sie zu prüfen.",
+      403,
+      "time_correction_two_person_rule"
     );
   }
   await client.query(
@@ -10922,7 +11181,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         const date = validateWorkDate(
           url.searchParams.get("date") || localDate(new Date().toISOString(), config.timeZone)
         );
-        const body = await readJson(request, 7_000_000);
+        const body = await readJson(request, DOCUMENT_UPLOAD_JSON_BYTE_LIMIT);
         const input = validateDocumentUpload({
           ...body,
           category: "photo",
@@ -11245,7 +11504,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/documents") {
-        const input = validateDocumentUpload(await readJson(request, 7_000_000));
+        const input = validateDocumentUpload(await readJson(request, DOCUMENT_UPLOAD_JSON_BYTE_LIMIT));
         const created = await withReadySession(
           pool,
           tokenHash,
@@ -11705,6 +11964,17 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => getWorkWeek(client, context, weekStart)
         );
         return json(response, 200, { week });
+      }
+
+      const ownTimeChangesMatch = /^\/api\/v1\/time-changes\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+      if (request.method === "GET" && ownTimeChangesMatch) {
+        const weekStart = validateWorkDate(ownTimeChangesMatch[1]);
+        const timeChanges = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => getOwnTimeChanges(client, context, weekStart)
+        );
+        return json(response, 200, { timeChanges });
       }
 
       const assignmentMatch = /^\/api\/v1\/site-assignments\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);

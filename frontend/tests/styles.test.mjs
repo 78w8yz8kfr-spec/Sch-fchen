@@ -295,3 +295,71 @@ test("Am Telefon bleibt kein Daumenziel unter 44 Pixeln", async () => {
 
   assert.deepEqual(befunde, [], `Zu kleine Tippziele:\n${befunde.join("\n")}`);
 });
+
+// Relative Leuchtdichte und Kontrastverhaeltnis nach WCAG 2.x. Ohne diesen
+// Test faellt eine zu helle Statusfarbe erst auf, wenn jemand mit
+// Sehschwaeche auf der Baustelle im Gegenlicht ein Abzeichen wie "Aktiv" oder
+// "Bueroprüfung" nicht mehr von seinem Hintergrund unterscheiden kann - am
+// Bildschirm im Buero, bei gutem Licht und gutem Auge, sieht ein Abstand von
+// 4,1:1 statt 4,5:1 nicht anders aus als ein ausreichender.
+function kanal(anteil) {
+  const wert = anteil / 255;
+  return wert <= 0.03928 ? wert / 12.92 : ((wert + 0.055) / 1.055) ** 2.4;
+}
+function leuchtdichte(hex) {
+  const bereinigt = hex.replace("#", "");
+  const r = Number.parseInt(bereinigt.slice(0, 2), 16);
+  const g = Number.parseInt(bereinigt.slice(2, 4), 16);
+  const b = Number.parseInt(bereinigt.slice(4, 6), 16);
+  return 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b);
+}
+function kontrast(hexA, hexB) {
+  const hell = Math.max(leuchtdichte(hexA), leuchtdichte(hexB));
+  const dunkel = Math.min(leuchtdichte(hexA), leuchtdichte(hexB));
+  return (hell + 0.05) / (dunkel + 0.05);
+}
+
+test("Statusfarben auf ihrem weichen Hintergrund bleiben lesbar", async () => {
+  const css = await readFile(resolve(frontendDirectory, "design-system.css"), "utf8");
+  const regeln = leseRegeln(css);
+
+  const wurzel = regeln.find((regel) => regel.umgebung === null && regel.selektor === ":root");
+  assert.ok(wurzel, "Dem Designsystem fehlen die globalen Tokens");
+  const tokens = new Map();
+  for (const [name, wert] of wurzel.eigenschaften) {
+    if (/^#[0-9a-f]{6}$/i.test(wert)) tokens.set(name, wert);
+  }
+
+  // Ein "var(--name)" oder "var(--name, Fallback)" auf den Tokennamen
+  // zurueckfuehren, ein angehaengtes "!important" wie bei
+  // .site-status--pending nicht mitnehmen.
+  const tokenname = (wert) => {
+    const treffer = /^var\(\s*(--[a-z0-9-]+)/i.exec(wert.replace("!important", "").trim());
+    return treffer ? treffer[1] : null;
+  };
+
+  const geprueft = new Map();
+  for (const regel of regeln) {
+    const farbe = regel.eigenschaften.get("color");
+    const hintergrund = regel.eigenschaften.get("background");
+    if (!farbe || !hintergrund) continue;
+    const farbToken = tokenname(farbe);
+    const hintergrundToken = tokenname(hintergrund);
+    if (!farbToken || !hintergrundToken || !hintergrundToken.endsWith("-soft")) continue;
+    if (!tokens.has(farbToken) || !tokens.has(hintergrundToken)) continue;
+    geprueft.set(`${farbToken} auf ${hintergrundToken}`, [farbToken, hintergrundToken]);
+  }
+  // Ohne mindestens ein Statuspaar zu finden, prueft dieser Test versehentlich
+  // nichts - dann waere er bei einer umbenannten Eigenschaft stillschweigend
+  // gruen, obwohl niemand mehr etwas nachrechnet.
+  assert.ok(geprueft.size > 0, "Keine Textfarbe-auf-Soft-Hintergrund-Paare in design-system.css gefunden");
+
+  const befunde = [];
+  for (const [beschreibung, [farbToken, hintergrundToken]] of geprueft) {
+    const wert = kontrast(tokens.get(farbToken), tokens.get(hintergrundToken));
+    if (wert < 4.5) {
+      befunde.push(`${beschreibung}: ${wert.toFixed(2)}:1 (${tokens.get(farbToken)} auf ${tokens.get(hintergrundToken)})`);
+    }
+  }
+  assert.deepEqual(befunde, [], `Kontrast unter 4,5:1:\n${befunde.join("\n")}`);
+});

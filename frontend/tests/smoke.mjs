@@ -32,8 +32,9 @@ const [html, styles, designSystem, app, worker, refreshHtml, refreshScript, mani
 ]);
 
 const manifest = JSON.parse(manifestSource);
-const [deviceManagement, qrScannerVendor, qrScannerWorker] = await Promise.all([
+const [deviceManagement, powerModule, qrScannerVendor, qrScannerWorker] = await Promise.all([
   readFrontendFile("core/device-management.js"),
+  readFrontendFile("core/power-module.js"),
   readFrontendFile("vendor/qr-scanner.min.js"),
   readFrontendFile("vendor/qr-scanner-worker.min.js")
 ]);
@@ -216,7 +217,7 @@ assert.match(
 // Dokumente, Baustellenfotos, VDE-Protokoll -, gibt keine Kopfzeile mit. Ohne
 // die Fassung im Adressteil kam dort waehrend eines Pflichtupdates dessen
 // Meldung als JSON an: 203 Byte, abgelegt als "SE-R-….pdf.json".
-assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.39`;/);
+assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.40`;/);
 for (const stelle of [
   /apprentice\/reports\/\$\{selectedWeekStart\}\/pdf\?preview=true/,
   /admin\/documents\/\$\{encodeURIComponent\(documentItem\.id\)\}\/content/,
@@ -239,7 +240,7 @@ assert.doesNotMatch(app, /link\.target = "_blank";\s*link\.rel = "noopener";\s*l
 // Offline gesicherte Dokumente behalten ihren Schluessel ohne die Fassung.
 assert.match(app, /function employeeSiteContentKey\(/);
 assert.match(worker, /cacheUrl\.searchParams\.delete\("appVersion"\)/);
-assert.match(vdeApp, /appVersion=0\.44\.39/);
+assert.match(vdeApp, /appVersion=0\.44\.40/);
 assert.match(app, /element === elements\.apprenticeSection[\s\S]{0,160}mayReviewApprentices\(\)/);
 // Seine bisherigen Berichte fuehren in ihre Woche zurueck und lassen sich von
 // dort drucken. Vorher war die Liste eine tote Aufzaehlung.
@@ -687,15 +688,22 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.44\.39/);
-assert.match(html, /design-system\.css\?v=0\.44\.39/);
-assert.match(html, /app\.js\?v=0\.44\.39/);
-assert.match(html, /version\.js\?v=0\.44\.39/);
+assert.match(html, /styles\.css\?v=0\.44\.40/);
+assert.match(html, /design-system\.css\?v=0\.44\.40/);
+assert.match(html, /app\.js\?v=0\.44\.40/);
+assert.match(html, /version\.js\?v=0\.44\.40/);
 assert.match(html, /id="devices-section"[^>]*data-dashboard-pane="devices"/);
 assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
 assert.match(app, /createDeviceModule/);
 assert.match(app, /deviceModule\.handleDeepLink\(\)/);
+// Ohne diese Weiterleitung faellt jeder Fehlerpfad im Geraetemodul auf das
+// fluechtige showToast zurueck, sobald showErrorToast dort fehlt.
+assert.match(
+  app,
+  /const deviceModule = createDeviceModule\(\{[\s\S]{0,200}showErrorToast,/,
+  "app.js reicht showErrorToast nicht an das Geraetemodul weiter"
+);
 assert.match(styles, /\.device-scanner__camera/);
 assert.match(deviceManagement, /import\(QR_SCANNER_MODULE_URL\)/);
 assert.match(deviceManagement, /preferredCamera: "environment"/);
@@ -712,9 +720,59 @@ assert.ok(deviceManagement.includes('querySelector("input:invalid, select:invali
 assert.match(deviceManagement, /showToast\(message\)/);
 assert.match(deviceManagement, /Aktuellen Besitzer zuordnen/);
 assert.match(deviceManagement, /QR-Druckbogen für dieses Set/);
+
+// Eine Meldung, die nach 3,6 Sekunden verschwindet, ist fuer eine Bestaetigung
+// richtig, aber nicht fuer einen Fehlschlag: der Monteur hat ihn oft nicht
+// selbst ausgeloest und sieht ihn sonst nie. Fehlerpfade (catch(error)) rufen
+// deshalb showErrorToast, nicht das fluechtige showToast. Beide Module
+// bekommen showErrorToast getrennt uebergeben - dieselbe Pruefung faengt also
+// auch ab, wenn nur eines der beiden nachgezogen wird.
+assert.match(
+  deviceManagement,
+  /export function createDeviceModule\(\{[\s\S]{0,400}showErrorToast/,
+  "device-management.js nimmt showErrorToast nicht mehr als eigene Abhaengigkeit entgegen"
+);
+for (const stelle of deviceManagement.matchAll(/catch \(error\) \{[^}]*\}/g)) {
+  assert.doesNotMatch(
+    stelle[0],
+    /\bshowToast\(/,
+    `Ein Fehlerpfad in device-management.js zeigt noch die fluechtige Meldung: ${stelle[0]}`
+  );
+}
+// power-module.js meldet Fehler bislang gar nicht ueber einen Toast, sondern
+// zeigt sie eingebettet im Panel an (role="alert", ohne Zeitschaltung - siehe
+// detailAnsicht). Das ist bereits stehenbleibend; diese Pruefung haelt fest,
+// dass kein Fehlerpfad nachtraeglich doch auf das fluechtige showToast
+// umsteigt.
+for (const stelle of powerModule.matchAll(/catch \(error\) \{[^}]*\}/g)) {
+  assert.doesNotMatch(
+    stelle[0],
+    /\bshowToast\(/,
+    `Ein Fehlerpfad in power-module.js zeigt die fluechtige Meldung statt der eingebetteten: ${stelle[0]}`
+  );
+}
 assert.match(qrScannerVendor, /qr-scanner-worker\.min\.js/);
 assert.match(qrScannerWorker, /export const createWorker/);
 assert.match(styles, /\.device-settings__form/);
+
+// Ein voller Speicher (QuotaExceededError) ist keine Blockade: der eine loest
+// sich von selbst, sobald Platz frei ist, der andere gar nicht. saveState()
+// muss deshalb ueber state-store.js gehen, das genau diese Unterscheidung
+// trifft (siehe state-store.test.mjs) - ein eigener, pauschaler try/catch in
+// app.js wuerde beide Faelle wieder gleich behandeln.
+assert.match(app, /persistState\(window\.localStorage, storageKey\(demoMode\), nutzlast\)/);
+assert.doesNotMatch(
+  app,
+  /window\.localStorage\.setItem\(storageKey\(demoMode\)/,
+  "saveState() schreibt wieder direkt statt ueber persistState() aus state-store.js"
+);
+// Eine Meldung ueber verlorene Arbeit darf nicht nach 3,6 Sekunden verschwinden.
+assert.match(app, /function saveState\(\) \{[\s\S]{0,1600}showErrorToast/);
+assert.doesNotMatch(
+  app,
+  /function saveState\(\) \{[\s\S]{0,1600}\bshowToast\(/,
+  "saveState() meldet einen Fehlschlag noch ueber das fluechtige showToast"
+);
 assert.match(html, /id="site-dashboard-vde-panel"/);
 assert.match(html, /id="employee-site-vde-module"/);
 assert.match(html, /id="site-choice-open"/);
@@ -1360,9 +1418,61 @@ assert.match(app, /renderWorkDayReviews/);
 assert.doesNotMatch(app, /Stundenzettel einreichen/);
 assert.match(app, /Automatisch im Büro sichtbar/);
 assert.match(app, /Fehlende Buchung ergänzen/);
+// Der Knopf "Fehlende Buchung ergänzen" muss außerhalb des else-Zweigs stehen,
+// damit er auf Tagen ohne Buchungen angezeigt wird. Wir prüfen das, indem wir
+// nach dem Muster suchen, bei dem der Knopf NACH dem schließenden Brace des
+// else-Zweigs und NACH dem stateNote-Code erscheint.
+const weekRenderSection = app.slice(
+  app.indexOf("const workflowStatus = workDay?.workflowStatus"),
+  app.indexOf("elements.weekTimesheetList.append(dayCard);",
+    app.indexOf("const workflowStatus = workDay?.workflowStatus")
+  )
+);
+assert.ok(
+  weekRenderSection.includes("dayCard.append(stateNote);") &&
+  weekRenderSection.indexOf("dayCard.append(stateNote);") <
+  weekRenderSection.indexOf("const addMissing = document.createElement"),
+  "Der Fehlende-Buchung-Knopf muss NACH dem else-Zweig und den stateNote-Blöcken stehen"
+);
+// Die Kartenbedingung zeigt auch Tage an, die heute oder in der Vergangenheit
+// liegen - das sind die, auf denen man eigentlich arbeitet und die darum
+// nachgebessert werden können müssen. Künftige Tage haben noch nichts zu korrigieren.
+assert.match(app, /const isPastOrToday = workDate <= localDateKey\(today\)/,
+  "Die Datumsprüfung für vergangene/heutige Tage fehlt");
+assert.match(app, /if \(!workDay && !approvedAbsence && !isPastOrToday\) return/,
+  "Die Kartenbedingung berücksichtigt nicht, dass vergangene Tage eine Karte brauchen");
 assert.match(app, /Abgerechnet · im persönlichen Export enthalten/);
 assert.doesNotMatch(app, /liveDuration\.textContent = formatMinutes\(times\.gross\)/);
 assert.doesNotMatch(app, /geolocation/i, "Die Demo darf keine GPS- oder Standortabfrage enthalten");
+
+// Zeitänderungen des Büros auf der Tageskarte: reine Einsicht, siehe
+// core/time-changes.js. Der Server verweigert ein Genehmigen ohnehin (403) -
+// hier darf es aber gar nicht erst danach aussehen.
+assert.match(app, /\.\/api\/v1\/time-changes\/\$\{requestedWeekStart\}/,
+  "Der Abruf der Zeitänderungen fehlt");
+assert.match(app, /void refreshTimeChangesData\(requestedWeekStart\)/,
+  "Der Abruf der Zeitänderungen muss neben refreshWeekData laufen, nicht davor blockieren");
+{
+  const changesSectionStart = app.indexOf("const dayChanges = timeChangesByDay.get(workDate)");
+  const changesSectionEnd = app.indexOf("dayCard.append(changesBox);", changesSectionStart);
+  assert.ok(changesSectionStart >= 0 && changesSectionEnd > changesSectionStart,
+    "Der Änderungsabschnitt der Tageskarte fehlt");
+  const changesSection = app.slice(changesSectionStart, changesSectionEnd);
+
+  // Der leere Fall (der Normalfall: nichts geändert) zeichnet nichts - kein
+  // leerer Kasten belastet die Wochenansicht.
+  assert.match(changesSection, /if \(dayChanges\.length\) \{/,
+    "Ohne Änderungen darf der Abschnitt nicht gezeichnet werden");
+
+  // Kein Genehmigen, Ablehnen oder irgendein anderer Entscheidungsknopf - nur
+  // Anzeige. Weder eine Schaltfläche noch ein Klick-Handler gehören hierher.
+  assert.doesNotMatch(changesSection, /createElement\("button"\)/,
+    "Der Änderungsabschnitt darf keine Schaltfläche zeichnen");
+  assert.doesNotMatch(changesSection, /addEventListener/,
+    "Der Änderungsabschnitt darf nicht klickbar sein");
+  assert.doesNotMatch(changesSection, /Genehmigen|Ablehnen|Freigeben|Zustimmen|Widersprechen/,
+    "Der Änderungsabschnitt darf keinen Genehmigungs-Wortlaut zeigen");
+}
 
 assert.equal(manifest.name, "Schäfchen");
 assert.equal(manifest.display, "standalone");
@@ -1386,21 +1496,21 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.39"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.39"'));
-assert.ok(worker.includes('"./app.js?v=0.44.39"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.39"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.39"'));
-assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.39"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.39"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.40"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.40"'));
+assert.ok(worker.includes('"./app.js?v=0.44.40"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.40"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.40"'));
+assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.40"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.40"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.39"'));
+assert.ok(worker.includes('"./version.js?v=0.44.40"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.39"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.39";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.40"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.40";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1435,7 +1545,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.44\.39$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.44\.40$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1443,11 +1553,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.39"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.39"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.40"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.40"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.39"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.39"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.40"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.40"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 // Gesucht wird unter der abgelegten Adresse - ohne die App-Fassung, die nur an
@@ -1497,9 +1607,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.44\.39/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.44\.39/);
-assert.match(vdeHtml, /app\.js\?v=0\.44\.39/);
+assert.match(vdeHtml, /styles\.css\?v=0\.44\.40/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.44\.40/);
+assert.match(vdeHtml, /app\.js\?v=0\.44\.40/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1515,7 +1625,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.44\.39/);
+assert.match(platformHtml, /design-system\.css\?v=0\.44\.40/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,
@@ -1634,6 +1744,84 @@ assert.match(app, /adminOverviewStatus = "failed";\s*\n\s*renderDashboardLoading
 assert.match(app, /dashboardLoadingRetry\.addEventListener\("click"/);
 assert.match(styles, /\.dashboard-loading \{/);
 
+// Wer per Seitenleiste direkt in "Kunden" oder "Mitarbeiter" springt, bevor
+// die erste Antwort da ist, sah bislang nichts: renderDocumentList,
+// renderReportCenter, renderCustomerOverview, renderInspectionOverview,
+// renderEmployeeList und renderVehicleList brachen ohne Hinweis ab. Dieselbe
+// Loesung wie bei der Startseite (renderDashboardLoading) gilt jetzt auch fuer
+// diese sechs Listen.
+assert.match(app, /function renderAdminListPlaceholder\(/);
+assert.match(app, /function renderAdminListsLoading\(\) \{\s*\n\s*if \(adminState\) return;/);
+for (const [liste, gegenstand] of [
+  ["elements\\.documentList", "Dokumente"],
+  ["elements\\.customerOverviewList", "Kunden"],
+  ["elements\\.inspectionOverviewList", "Prüfprotokolle"],
+  ["elements\\.employeeList", "Mitarbeiter"]
+]) {
+  assert.match(
+    app,
+    new RegExp(`if \\(!adminState\\) \\{\\s*\\n\\s*return renderAdminListPlaceholder\\(\\s*\\n\\s*${liste},\\s*\\n\\s*"${gegenstand}",`),
+    `${gegenstand}: kein Ladehinweis, wenn die Betriebsuebersicht fehlt`
+  );
+}
+assert.match(
+  app,
+  /if \(!adminState\) \{\s*\n\s*elements\.reportCenterMissingList\.replaceChildren\(\);\s*\n\s*return renderAdminListPlaceholder\(\s*\n\s*elements\.reportCenterList,\s*\n\s*"Berichte",/
+);
+// Die Fahrzeugliste haengt nicht an der Betriebsuebersicht, sondern an einem
+// eigenen Ladezustand - derselbe Fehler war hier ohne "if (!adminState)"
+// versteckt: eine noch nicht geladene Liste war nicht von einem leeren
+// Fuhrpark zu unterscheiden.
+assert.match(app, /let vehicleListStatus = "idle";/);
+assert.match(
+  app,
+  /if \(vehicleListStatus !== "ready"\) \{\s*\n\s*return renderAdminListPlaceholder\(\s*\n\s*elements\.vehicleList,\s*\n\s*"Fahrzeuge",/
+);
+assert.match(app, /vehicleListStatus = error\.status === 404 \? "ready" : "failed";/);
+// refreshAdmin() stoesst die Platzhalter genauso an wie renderDashboardLoading
+// - sonst waeren sie erst erreichbar, wenn renderAdmin() bereits einmal
+// durchgelaufen ist, und genau das ist beim Direktsprung nicht der Fall.
+assert.match(app, /renderDashboardLoading\(\);\s*\n\s*renderAdminListsLoading\(\);\s*\n\s*try \{/);
+assert.match(
+  app,
+  /adminOverviewStatus = "failed";\s*\n\s*renderDashboardLoading\(\);\s*\n\s*renderAdminListsLoading\(\);/
+);
+
+// Das eigene Jahreskonto zeigte "wird geladen", auch wenn der Server laengst
+// mit einem Fehler geantwortet hatte - man wartete auf etwas, das nie kommt.
+assert.match(app, /let timeAccountFetchStatus = "idle";/);
+assert.match(
+  app,
+  /timeAccountFetchStatus === "failed"\s*\n\s*\? "Das Jahreskonto konnte nicht geladen werden\."/
+);
+assert.match(app, /timeAccountFetchStatus = "failed";\s*\n\s*renderTimeAccount\(\);/);
+
+// Ab 20-30 Mitarbeitern musste das Buero die Jahreskontenliste durchscrollen -
+// alle anderen Verwaltungslisten haben schon eine Suche.
+assert.match(html, /id="time-account-search-field"[^>]*placeholder="Name oder Personalnummer"/);
+assert.match(app, /timeAccountSearchField: document\.querySelector\("#time-account-search-field"\)/);
+assert.match(
+  app,
+  /const accounts = overview\.accounts\.filter\(\(account\) => \(\s*\n\s*!query \|\| \[account\.employeeName, account\.personnelNumber\]/
+);
+assert.match(app, /"Kein Jahreskonto passt zur Suche\."/);
+assert.match(app, /elements\.timeAccountSearchField\.addEventListener\("input", renderAdminTimeAccounts\)/);
+
+// Ein Reiter verspricht "gleiche Seite, anderer Ausschnitt". "Korrekturen" und
+// "Arbeitskonto" wechseln aber auf "Meine Woche" (siehe data-open-week-view) -
+// sie muessen deshalb wie ein Verweis aussehen, nicht wie ein Reiter.
+assert.match(
+  html,
+  /<button class="page-tab page-tab--leaves" type="button" data-open-week-view="requests"[\s\S]{0,200}Korrekturen ↗<\/button>/
+);
+assert.match(
+  html,
+  /<button class="page-tab page-tab--leaves" type="button" data-open-week-view="account"[\s\S]{0,200}Arbeitskonto ↗<\/button>/
+);
+assert.match(html, /aria-label="Korrekturen – öffnet „Meine Woche“"/);
+assert.match(html, /aria-label="Arbeitskonto – öffnet „Meine Woche“"/);
+assert.match(styles, /\.page-tab\.page-tab--leaves \{/);
+
 // Kunden und Baustellen fuehren nicht noch einmal eine sichtbare Projektliste.
 // Formulare und Schnittstellen fuer vorhandene technische Verknuepfungen
 // bleiben bestehen, damit keine Daten oder Altvertraege verloren gehen.
@@ -1704,5 +1892,79 @@ for (const stand of ["planned", "ordered", "available", "used"]) {
 
 assert.match(uiSpecification, /keine echte\s+Serveranmeldung/i);
 assert.match(uiSpecification, /keine GPS-Abfrage/i);
+
+// activateNavigation markiert einen Bereich am Telefon, wenn ENTWEDER der
+// Desktop-Knopf (activeButton) ODER der mobile Knopf (mobileActiveButton)
+// dort sichtbar ist:
+//   const active = button === activeButton
+//     || (amTelefon && button === mobileActiveButton);
+// Zwei Fehlerbilder fuehren beide zu einer Leiste, die in einem Bereich
+// nichts anzeigt: ein mobiler Eintrag, der auf einen Knopf mit
+// "nav-item--desktop" zeigt (Geraete/Baustrom vor der Korrektur oben), oder
+// ein Bereich, dessen Desktop-Knopf "nav-item--desktop" traegt und dem
+// zugleich der mobile Eintrag ganz fehlt (Arbeitszeiten vor dieser Korrektur -
+// keiner der bisherigen 108 Tests hat das bemerkt). Dieser Test prueft beide
+// Zuordnungen zusammen, pro Bereich: mindestens einer der beiden genannten
+// Knoepfe muss ohne "nav-item--desktop" dastehen - der, der am Telefon
+// tatsaechlich zu sehen ist.
+const elementIdByName = new Map(
+  [...app.matchAll(/(\w+):\s*document\.querySelector\("#([\w-]+)"\)/g)]
+    .map(([, name, id]) => [name, id])
+);
+
+// Zerlegt eine der beiden Zuordnungen (Objektliteral "bereich: elements.xyz,")
+// in eine Map von Bereich auf die darin genannten "elements.xyz"-Kennungen.
+// Kommentarzeilen faellen zuerst heraus, sonst rutscht ihr Text in die
+// naechste Eigenschaft.
+function leseZuordnung(quelltext, name) {
+  const treffer = new RegExp(`const ${name} = \\{([\\s\\S]*?)\\}\\[pane\\]`).exec(quelltext);
+  assert.ok(treffer, `Die Zuordnung ${name} fehlt in app.js`);
+  const ohneKommentare = treffer[1].replace(/\/\/[^\n]*/g, "");
+  const eintraege = ohneKommentare
+    .split(/,\n(?=\s*\w+:)/)
+    .map((zeile) => zeile.trim())
+    .filter(Boolean);
+  assert.ok(eintraege.length >= 10, `${name} wurde nicht vollstaendig erkannt`);
+  const zuordnung = new Map();
+  for (const eintrag of eintraege) {
+    const [, bereich] = /^(\w+):/.exec(eintrag) ?? [];
+    assert.ok(bereich, `${name}: Eintrag ohne Bereichsnamen: ${eintrag}`);
+    const knoepfe = [...eintrag.matchAll(/elements\.(\w+)/g)].map((m) => m[1]);
+    assert.ok(knoepfe.length > 0, `${name}.${bereich}: kein Knopf referenziert`);
+    zuordnung.set(bereich, knoepfe);
+  }
+  return zuordnung;
+}
+
+const desktopZuordnung = leseZuordnung(app, "activeButton");
+const mobileZuordnung = leseZuordnung(app, "mobileActiveButton");
+
+const klassenVonId = (id) => {
+  const beginn = html.indexOf(`id="${id}"`);
+  assert.ok(beginn !== -1, `#${id} fehlt in index.html`);
+  const tagStart = html.lastIndexOf("<", beginn);
+  const tagEnde = html.indexOf(">", beginn);
+  const tag = html.slice(tagStart, tagEnde + 1);
+  return /class="([^"]*)"/.exec(tag)?.[1] ?? "";
+};
+const istMobilSichtbar = (elementName) => {
+  const id = elementIdByName.get(elementName);
+  assert.ok(id, `elements.${elementName} ist keine bekannte id-Abfrage`);
+  return !klassenVonId(id).split(/\s+/).includes("nav-item--desktop");
+};
+
+const alleBereiche = new Set([...desktopZuordnung.keys(), ...mobileZuordnung.keys()]);
+const befunde = [];
+for (const bereich of alleBereiche) {
+  const knoepfe = [...(desktopZuordnung.get(bereich) ?? []), ...(mobileZuordnung.get(bereich) ?? [])];
+  if (!knoepfe.some(istMobilSichtbar)) {
+    befunde.push(`${bereich}: nur ${knoepfe.join(", ")} genannt - alle "nav-item--desktop"`);
+  }
+}
+assert.deepEqual(
+  befunde,
+  [],
+  `Kein am Telefon sichtbarer Knopf fuer diesen Bereich:\n${befunde.join("\n")}`
+);
 
 console.log("PWA-Smoke-Test erfolgreich.");

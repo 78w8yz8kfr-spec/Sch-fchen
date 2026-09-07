@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
+import { pdfSafeText } from "./pdf-text.mjs";
 
 // Der gedruckte Ausbildungsnachweis: eine A4-Seite je Woche.
 //
@@ -80,8 +81,11 @@ export function trainingYear(startedOn, weekStart) {
   return Math.min(4, jahre + 1);
 }
 
+// Erst absichern, dann messen: font.widthOfTextAtSize() wirft für Zeichen
+// außerhalb von Latin-1 dieselbe Ausnahme wie beim Zeichnen - und hier
+// stehen Tätigkeiten und Bemerkungen, die die Azubis selbst eintragen.
 function wrapText(text, font, size, maxWidth) {
-  const words = String(text || "").split(/\s+/).filter(Boolean);
+  const words = pdfSafeText(text || "").split(/\s+/).filter(Boolean);
   const lines = [];
   let current = "";
   for (const word of words) {
@@ -128,6 +132,13 @@ function layoutRows(zeilen, font, size, textWidth) {
   });
 }
 
+// Einziger Zeichenpfad der ganzen Datei: alle Textausgaben laufen hier durch,
+// damit kein Aufruf (auf jedem Blatt, auch in stampPreview/stampFooters) den
+// Zeichenschutz vergessen kann.
+function drawText(blatt, text, options) {
+  blatt.drawText(pdfSafeText(text), options);
+}
+
 // Eine Woche zeichnen: ein Blatt, im Ausnahmefall zwei. Die Funktion haengt
 // ihre Seiten an die uebergebene Liste an, damit ein Heft ueber mehrere Wochen
 // am Ende durchgezaehlt werden kann.
@@ -154,7 +165,7 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
     });
     y -= logoImage.height * skala + 14;
   } else {
-    page.drawText(company.displayName, { x: MARGIN, y: y - 16, size: 15, font: bold, color: INK });
+    drawText(page, company.displayName, { x: MARGIN, y: y - 16, size: 15, font: bold, color: INK });
     y -= 34;
   }
 
@@ -162,8 +173,9 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
   y -= 30;
 
   const mitte = (text, font, size, abstand) => {
-    const textBreite = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: MARGIN + (WIDTH - textBreite) / 2, y, size, font, color: INK });
+    const sicher = pdfSafeText(text);
+    const textBreite = font.widthOfTextAtSize(sicher, size);
+    drawText(page, sicher, { x: MARGIN + (WIDTH - textBreite) / 2, y, size, font, color: INK });
     y -= abstand;
   };
   mitte("BERICHTSHEFT", bold, 17, 22);
@@ -193,8 +205,8 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
   });
   let kopfY = y - 20;
   for (const [beschriftung, wert] of kopfZeilen) {
-    page.drawText(beschriftung, { x: MARGIN + 14, y: kopfY, size: 9, font: regular, color: MUTED });
-    page.drawText(wert, { x: MARGIN + 150, y: kopfY, size: 9.5, font: regular, color: INK });
+    drawText(page, beschriftung, { x: MARGIN + 14, y: kopfY, size: 9, font: regular, color: MUTED });
+    drawText(page, wert, { x: MARGIN + 150, y: kopfY, size: 9.5, font: regular, color: INK });
     kopfY -= 17;
   }
   y -= kopfHoehe + 26;
@@ -220,7 +232,7 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
       borderColor: LINE, borderWidth: 0.8, color: SOFT
     });
     for (const spalte of spalten) {
-      page.drawText(spalte.titel, {
+      drawText(page, spalte.titel, {
         x: spalte.x + 8, y: oben - 15, size: 8.5, font: regular, color: MUTED
       });
     }
@@ -268,14 +280,14 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
       (new Date(`${eintrag.zeile.workDate}T12:00:00Z`) - new Date(`${report.weekStart}T12:00:00Z`))
       / 86_400_000
     );
-    page.drawText(WEEKDAYS[abstand] || "", {
+    drawText(page, WEEKDAYS[abstand] || "", {
       x: MARGIN + 8, y: y - 18, size: 8.5, font: regular, color: INK
     });
-    page.drawText(germanDate(eintrag.zeile.workDate), {
+    drawText(page, germanDate(eintrag.zeile.workDate), {
       x: spalten[1].x + 8, y: y - 18, size: 8.5, font: regular, color: INK
     });
     eintrag.texte.forEach((zeilentext, index) => {
-      page.drawText(zeilentext.punkt ? `• ${zeilentext.text}` : `   ${zeilentext.text}`, {
+      drawText(page, zeilentext.punkt ? `• ${zeilentext.text}` : `   ${zeilentext.text}`, {
         x: spalten[2].x + 8,
         y: y - 14 - index * eintrag.zeilenhoehe,
         size: schriftgroesse,
@@ -283,7 +295,7 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
         color: INK
       });
     });
-    page.drawText(duration(eintrag.zeile.workedMinutes), {
+    drawText(page, duration(eintrag.zeile.workedMinutes), {
       x: spalten[3].x + 8, y: y - 18, size: 8.5, font: regular, color: INK
     });
     y -= eintrag.hoehe;
@@ -297,11 +309,11 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
     x: MARGIN, y: REMARK_BOTTOM, width: WIDTH, height: bemerkungHoehe,
     borderColor: LINE, borderWidth: 0.8
   });
-  page.drawText("Bemerkungen zur Woche:", {
+  drawText(page, "Bemerkungen zur Woche:", {
     x: MARGIN + 12, y: bemerkungOben - 18, size: 9, font: regular, color: INK
   });
   bemerkungZeilen.forEach((text, index) => {
-    page.drawText(text, {
+    drawText(page, text, {
       x: MARGIN + 12, y: bemerkungOben - 36 - index * 15, size: 9, font: regular, color: INK
     });
   });
@@ -314,15 +326,15 @@ function drawWeek({ document, seiten, fonts, logoImage, report, apprentice, comp
   }
 
   const unterschrift = (x, beschriftung, name, datum) => {
-    page.drawText(beschriftung, { x, y: SIGNATURE_TOP, size: 8.5, font: regular, color: MUTED });
+    drawText(page, beschriftung, { x, y: SIGNATURE_TOP, size: 8.5, font: regular, color: MUTED });
     if (name) {
-      page.drawText(name, { x, y: SIGNATURE_TOP - 26, size: 12, font: italic, color: INK });
+      drawText(page, name, { x, y: SIGNATURE_TOP - 26, size: 12, font: italic, color: INK });
     }
     page.drawLine({
       start: { x, y: SIGNATURE_TOP - 32 }, end: { x: x + 232, y: SIGNATURE_TOP - 32 },
       thickness: 0.8, color: LINE
     });
-    page.drawText(datum ? `Datum: ${germanDate(datum)}` : "Datum:", {
+    drawText(page, datum ? `Datum: ${germanDate(datum)}` : "Datum:", {
       x, y: SIGNATURE_TOP - 46, size: 8.5, font: regular, color: INK
     });
   };
@@ -348,7 +360,7 @@ function stampPreview(seiten, fonts) {
     const text = "VORSCHAU";
     const groesse = 62;
     const breite = fonts.bold.widthOfTextAtSize(text, groesse);
-    blatt.drawText(text, {
+    drawText(blatt, text, {
       x: (A4[0] - breite * 0.72) / 2,
       y: A4[1] / 2 - 40,
       size: groesse,
@@ -363,14 +375,14 @@ function stampPreview(seiten, fonts) {
 // fest, wie viele Blaetter es geworden sind.
 function stampFooters(seiten, regular, vorschau = false) {
   seiten.forEach((blatt, index) => {
-    blatt.drawText(
+    drawText(blatt,
       vorschau
         ? "Vorschau · noch nicht eingereicht. Erst nach dem Einreichen gilt dieses Blatt als Nachweis."
         : "Dieses Berichtsheft wurde digital erstellt und ist ohne Unterschriften ungültig.",
       { x: MARGIN, y: FOOTER_Y, size: 7.5, font: regular, color: MUTED }
     );
     const seitenzahl = `Seite ${index + 1} von ${seiten.length}`;
-    blatt.drawText(seitenzahl, {
+    drawText(blatt, seitenzahl, {
       x: RIGHT - regular.widthOfTextAtSize(seitenzahl, 7.5),
       y: FOOTER_Y, size: 7.5, font: regular, color: MUTED
     });

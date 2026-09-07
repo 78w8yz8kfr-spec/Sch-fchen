@@ -2798,6 +2798,90 @@ select:focus-visible {
   background: #f1f1f1;
 }
 
+/* Zeitänderungen des Büros (und eigene Anträge) auf der Tageskarte: reine
+   Einsicht, kein Genehmigen-Knopf. Die Farbe der Kennzeichnung entscheidet
+   zuerst, was der Monteur sieht - "nur beantragt" darf mit "bereits gebucht"
+   nie verwechselbar aussehen. */
+.week-day-changes {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 13px;
+}
+
+.week-day-changes__heading {
+  color: var(--muted);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.week-day-change {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fafafa;
+}
+
+.week-day-change__badge {
+  justify-self: start;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.week-day-change--effective .week-day-change__badge {
+  color: #176b45;
+  background: #e5f7ed;
+}
+
+.week-day-change--pending .week-day-change__badge {
+  color: #795400;
+  background: #fff5d6;
+}
+
+.week-day-change--rejected .week-day-change__badge {
+  color: #a1141d;
+  background: #fde7e9;
+}
+
+.week-day-change__summary {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.week-day-change__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.week-day-change__reason {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-style: italic;
+}
+
+.week-day-change__note {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.week-day-change--pending .week-day-change__note {
+  color: #795400;
+}
+
+.week-day-change--rejected .week-day-change__note {
+  color: #a1141d;
+}
+
 .work-day-review-list {
   gap: 12px;
   padding-top: 8px;
@@ -5449,10 +5533,17 @@ select:focus-visible {
 
 .bottom-nav--planner .nav-item,
 .bottom-nav--compact .nav-item {
-  padding-right: 2px;
-  padding-left: 2px;
+  padding-right: 4px;
+  padding-left: 4px;
   border-radius: 12px;
-  font-size: 0.58rem;
+  /* 0.58rem (rund 9,3px) bei 2px Innenabstand war die Ausweichloesung fuer zu
+     viele Ziele in der Leiste - am Telefon, mit Handschuh, im Stehen nicht
+     mehr zu lesen. Die zu seltenen Ziele wandern jetzt stattdessen unter
+     "Betrieb"/"Mehr" (siehe updateNavigationVisibility in app.js), aber
+     selbst wenn hier noch fuenf Ziele stehen, darf die Schrift nicht kleiner
+     werden als die kleinste Schriftgroesse, die sonst im Designsystem als
+     noch lesbar gilt (--ui-text-xs, siehe design-system.css). */
+  font-size: var(--ui-text-xs, 0.68rem);
 }
 
 .bottom-nav--planner .nav-item svg,
@@ -5500,11 +5591,36 @@ select:focus-visible {
   margin: 0 auto;
   padding: 13px 16px;
   border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #fff;
   background: rgba(17, 17, 17, 0.96);
   box-shadow: 0 15px 35px rgba(17, 17, 17, 0.22);
   font-size: 0.79rem;
+}
+
+#toast-message {
+  flex: 1 1 auto;
   text-align: center;
+}
+
+/* Nur eine Fehlermeldung (siehe showErrorToast in app.js) bekommt den
+   Schliessen-Knopf zu sehen; die uebliche Bestaetigung verschwindet weiter
+   von selbst und braucht keine Bedienung. */
+.toast__dismiss {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .platform-admin-link {
@@ -8327,6 +8443,23 @@ body.hat-fassungshinweis {
 
 .device-tabs .page-tab {
   flex: 0 0 auto;
+}
+
+/* Ein Reiter verspricht "gleiche Seite, anderer Ausschnitt". "Korrekturen" und
+   "Arbeitskonto" in der Zeiterfassung brechen dieses Versprechen: sie wechseln
+   auf "Meine Woche". Damit das nicht wie ein normaler Reiter aussieht, bekommt
+   dieser hier die Unterstreichung eines Verweises - das Pfeilzeichen im Text
+   und title/aria-label nennen zusaetzlich das Ziel. Die Farbe bleibt bewusst
+   unangetastet: sie ist schon identisch mit der eines normalen Reiters
+   (.page-tab setzt --ui-text-secondary, aktiv/hover --ui-brand - beides deckt
+   sich mit --muted/--brand hier), eine eigene Angabe waere nur Attrappe.
+   Die doppelte Klasse im Selektor ist noetig, weil design-system.css nach
+   dieser Datei geladen wird: bei gleicher Spezifitaet gewinnt sonst immer die
+   zuletzt geladene Regel, und die einfache Klasse allein bliebe wirkungslos -
+   das betrifft hier text-decoration, die design-system.css auf "none" setzt. */
+.page-tab.page-tab--leaves {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .device-sync-state {
