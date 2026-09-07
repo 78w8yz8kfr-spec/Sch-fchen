@@ -23,7 +23,10 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
   nur die Kennung lieferte und ein geratener Name schlechter gewesen wäre als
   keiner. Jetzt kommen die Namen mit — auch für Baustellen, die längst
   abgeschlossen sind. Eine Historie, die ihre eigenen Bezüge verliert, ist
-  keine.
+  keine. Die Oberfläche nennt sie jetzt: „Baustelle: Müllerstraße 12 statt
+  Hauptwerk". Lässt sich ausnahmsweise nur eine der beiden auflösen, steht
+  eben nur diese da; lässt sich keine auflösen, bleibt es beim bisherigen
+  „Andere Baustelle". Geraten wird nichts.
 
 - **Vergessene Tage lassen sich wieder nachtragen (Fassung 0.44.40).** Wer
   einen Arbeitstag komplett vergessen hatte, kam an ihn nicht heran. Zwei

@@ -34,6 +34,65 @@ test("Nur tatsächlich unterschiedliche Felder werden als Änderung gemeldet", (
   assert.equal(gleicheBaustelle.movedTo, null);
 });
 
+test("Aufgelöste Baustellennamen werden ins constructionSite-Feld durchgereicht", () => {
+  // Normalfall: der Zugang konnte beide Kennungen auflösen. Die Namen stehen
+  // auf Höhe der Änderung (siehe api/src/app.mjs timeChangeItemViewDto), nicht
+  // in oldValue/newValue - describeChange muss sie von dort holen.
+  const beideNamenBekannt = describeChange({
+    workDate: "2026-09-01",
+    oldValue: { constructionSiteId: "site-1" },
+    newValue: { constructionSiteId: "site-2" },
+    oldConstructionSiteName: "Hauptwerk",
+    newConstructionSiteName: "Müllerstraße 12"
+  });
+  assert.deepEqual(beideNamenBekannt.fields, [
+    { field: "constructionSite", from: "site-1", to: "site-2", fromName: "Hauptwerk", toName: "Müllerstraße 12" }
+  ]);
+});
+
+test("Ein nicht auflösbarer oder fehlender Baustellenname wird als null durchgereicht, nie geraten", () => {
+  // Nur die neue Kennung war auflösbar - die alte war entweder gar keine
+  // Baustelle oder ausnahmsweise nicht auflösbar. Beides sieht hier gleich
+  // aus (null), wie von der API vorgegeben - describeChange erfindet nichts.
+  const nurNeuerNameBekannt = describeChange({
+    workDate: "2026-09-01",
+    oldValue: { constructionSiteId: "site-1" },
+    newValue: { constructionSiteId: "site-2" },
+    oldConstructionSiteName: null,
+    newConstructionSiteName: "Müllerstraße 12"
+  });
+  assert.deepEqual(nurNeuerNameBekannt.fields, [
+    { field: "constructionSite", from: "site-1", to: "site-2", fromName: null, toName: "Müllerstraße 12" }
+  ]);
+
+  const nurAlterNameBekannt = describeChange({
+    workDate: "2026-09-01",
+    oldValue: { constructionSiteId: "site-1" },
+    newValue: { constructionSiteId: "site-2" },
+    oldConstructionSiteName: "Hauptwerk",
+    newConstructionSiteName: null
+  });
+  assert.deepEqual(nurAlterNameBekannt.fields, [
+    { field: "constructionSite", from: "site-1", to: "site-2", fromName: "Hauptwerk", toName: null }
+  ]);
+});
+
+test("Fehlen beide Baustellennamen, bleiben from/toName null statt eines Platzhalters", () => {
+  // Weder Server noch describeChange dürfen hier einen Namen erfinden - die
+  // Oberfläche entscheidet selbst, wie sie den fehlenden Namen darstellt
+  // (siehe timeChangeFieldSentence in app.js, Rückfall "Andere Baustelle").
+  const keinNameBekannt = describeChange({
+    workDate: "2026-09-01",
+    oldValue: { constructionSiteId: "site-1" },
+    newValue: { constructionSiteId: "site-2" }
+    // oldConstructionSiteName/newConstructionSiteName fehlen ganz - wie bei
+    // einer älteren Serverantwort oder wenn beide Kennungen unauflösbar sind.
+  });
+  assert.deepEqual(keinNameBekannt.fields, [
+    { field: "constructionSite", from: "site-1", to: "site-2", fromName: null, toName: null }
+  ]);
+});
+
 test("Eine leere Notiz und keine Notiz gelten als derselbe Zustand", () => {
   const unveraendert = describeChange({
     workDate: "2026-09-01",

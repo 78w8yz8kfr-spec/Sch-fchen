@@ -28,7 +28,13 @@ export function operationDisplayStatus(operation) {
 // Nicht anzeigbare Felder wie die interne workDayId werden hier gar nicht
 // erst betrachtet: ohne verständliche Formulierung lieber weglassen als eine
 // Kennung zeigen.
-function fieldChanges(oldValue, newValue) {
+//
+// Bei der Baustelle liefert der Zugang zusätzlich zur Kennung schon den
+// aufgelösten Namen (oldConstructionSiteName/newConstructionSiteName, je auf
+// Höhe der Änderung, nicht in oldValue/newValue). Der Name wird hier nur
+// durchgereicht, nicht selbst aufgelöst - das bleibt Sache des Servers, der
+// im Zweifel bewusst null statt eines geratenen Namens liefert.
+function fieldChanges(oldValue, newValue, siteNames = {}) {
   const before = oldValue || {};
   const after = newValue || {};
   const changes = [];
@@ -39,7 +45,9 @@ function fieldChanges(oldValue, newValue) {
     changes.push({
       field: "constructionSite",
       from: before.constructionSiteId ?? null,
-      to: after.constructionSiteId ?? null
+      to: after.constructionSiteId ?? null,
+      fromName: siteNames.oldConstructionSiteName ?? null,
+      toName: siteNames.newConstructionSiteName ?? null
     });
   }
   if ((before.travelMinutes ?? null) !== (after.travelMinutes ?? null)) {
@@ -74,7 +82,10 @@ export function describeChange(change) {
     deleted,
     // Bei einer neuen oder entfernten Buchung gibt es kein "vorher/nachher"
     // je Feld zu vergleichen - nur dass sie entstanden bzw. verschwunden ist.
-    fields: added || deleted ? [] : fieldChanges(change?.oldValue, change?.newValue)
+    fields: added || deleted ? [] : fieldChanges(change?.oldValue, change?.newValue, {
+      oldConstructionSiteName: change?.oldConstructionSiteName,
+      newConstructionSiteName: change?.newConstructionSiteName
+    })
   };
 }
 

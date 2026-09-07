@@ -8534,15 +8534,25 @@ import {
     rejected: "Abgelehnt · ohne Wirkung"
   };
 
-  // Eine constructionSiteId sagt dem Monteur nichts - "andere Baustelle"
-  // reicht, um die Änderung einzuordnen, ohne eine Kennung zu zeigen.
+  // Eine constructionSiteId sagt dem Monteur nichts - der Zugang liefert
+  // deshalb neben ihr schon die aufgelösten Namen (fromName/toName aus
+  // core/time-changes.js). Fehlt einer, kann das zweierlei heißen (kein
+  // Baustellenbezug oder eine ausnahmsweise nicht auflösbare Kennung) - beide
+  // sehen für den Monteur gleich aus, ein geratener Name wäre falsch. Nur
+  // wenn beide fehlen, bleibt "Andere Baustelle" als bisheriger Rückfall.
   function timeChangeFieldSentence(field) {
     if (field.field === "recordedAt" && field.to) {
       const to = timeFormatter.format(new Date(field.to));
       const from = field.from ? timeFormatter.format(new Date(field.from)) : null;
       return `Uhrzeit${from ? ` ${from} Uhr →` : ""} ${to} Uhr`;
     }
-    if (field.field === "constructionSite") return "Andere Baustelle";
+    if (field.field === "constructionSite") {
+      const { fromName, toName } = field;
+      if (toName && fromName) return `Baustelle: ${toName} statt ${fromName}`;
+      if (toName) return `Baustelle: ${toName}`;
+      if (fromName) return `Baustelle geändert (vorher: ${fromName})`;
+      return "Andere Baustelle";
+    }
     if (field.field === "travelMinutes" && field.to != null) {
       const to = formatMinutes(field.to);
       const from = field.from != null ? formatMinutes(field.from) : null;
