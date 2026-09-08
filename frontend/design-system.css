@@ -1731,9 +1731,16 @@ body:has(#vde-app) main {
     min-height: var(--ui-touch-height);
   }
 
+  /* Kein "overflow-x: hidden" hier: sobald eine Achse "hidden" ist, rechnet
+     CSS die andere zwangsweise von "visible" auf "auto" hoch - die Leiste
+     wurde damit unbemerkt zum Scrollcontainer. Zusammen mit "position: fixed"
+     (styles.css) und dem "backdrop-filter" auf der Leiste ist das in WebKit
+     auf iOS das bekannte Muster, bei dem die Ebene beim Scrollen an einer
+     alten Position stehenbleibt. Ueberfluessig ist es ohnehin: die Eintraege
+     bekommen unten "flex: 1 1 0; min-width: 0" und teilen sich die Breite
+     gleichmaessig - sie koennen den Rahmen gar nicht ueberragen. */
   .bottom-nav {
     display: flex;
-    overflow-x: hidden;
     scrollbar-width: none;
   }
 

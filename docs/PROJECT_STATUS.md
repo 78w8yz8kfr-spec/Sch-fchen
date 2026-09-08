@@ -1,12 +1,20 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.42
+Technischer Stand: V0.44.43
 
 
 ## Abgeschlossen
 
-- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.42,
+- **Untere Leiste bleibt am Bildschirmrand** (Fassung 0.44.43, Migration 154).
+  Auf dem iPhone schwebte die Navigationsleiste mitten im Inhalt. Ursache war
+  kein Layoutfehler — der Platz unten war korrekt reserviert —, sondern ein
+  Kompositionsfehler in WebKit: `backdrop-filter` neben `position: fixed` und
+  ein `overflow-x: hidden`, das die Leiste unbemerkt zum Scrollcontainer
+  machte (eine Achse `hidden` zwingt die andere von `visible` auf `auto`).
+  Beide Auslöser entfernt, Hintergrund undurchsichtig, Regressionstest dagegen.
+  Die Desktop-Seitenleiste (`position: sticky`) bleibt unverändert.
+- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.43,
   Migrationen 152 und 153). Bislang griff `changeInitialPassword` nur einmalig
   beim allerersten Login; danach gab es kein Ändern des eigenen bekannten
   Passworts, kein Zurücksetzen durch das Büro und keinen Notausgang für die
@@ -27,7 +35,7 @@ Technischer Stand: V0.44.42
   Notfallskript für einen unerreichbaren Plattformdienst
   (`api/scripts/notfall-passwort.mjs`) kamen in eigenen Änderungen vorher.
 
-- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.42,
+- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.43,
   Migration 150). Keine Zugangsdaten im ausgelieferten Frontend, keine im
   Git-Verlauf über alle 250 Commits, und der Anmelde-Endpunkt hält allen zehn
   geprüften Punkten stand — scrypt mit Kostenparameter 16384, `timingSafeEqual`,

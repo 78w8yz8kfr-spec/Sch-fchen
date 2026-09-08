@@ -4,6 +4,36 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die untere Leiste blieb auf dem iPhone mitten im Bild stehen (Fassung 0.44.43, Migration 154).**
+  Der Betreiber schickte einen Screenshot: Die Navigationsleiste schwebte
+  mitten im Inhalt statt unten am Rand, verdeckte oben eine Karte und ließ den
+  Inhalt darunter weiterlaufen.
+
+  Die Vermessung des Screenshots (1206 × 2622, ein echtes iPhone-Vollbild)
+  zeigte: Der Platz unten war korrekt freigehalten — unter dem letzten Inhalt
+  lagen genau die 372 Gerätepixel, die `.dashboard-view` per `padding-bottom`
+  für die Leiste reserviert. Nur gezeichnet wurde sie rund 330 Pixel zu hoch.
+  In Chromium bei iPhone-Maßen saß sie bei jeder Scrollposition exakt am
+  Unterrand; kein Vorfahre erzeugte einen Positionierungsrahmen. Es war also
+  kein Layoutfehler, sondern ein Kompositionsfehler in WebKit.
+
+  Zwei Angaben auf derselben Leiste hatten sie dorthin gebracht:
+  `backdrop-filter: blur(18px)` neben `position: fixed`, und — die
+  unauffälligere Falle — `overflow-x: hidden` in `design-system.css`: Sobald
+  eine Achse `hidden` ist, rechnet CSS die andere zwangsweise von `visible` auf
+  `auto` hoch. Die Leiste war damit unbemerkt ein **Scrollcontainer**. Beides
+  zusammen zwingt WebKit auf eine eigene Ebene, und die blieb beim Blättern an
+  einer alten Position stehen.
+
+  Beides entfernt: Der Hintergrund ist jetzt undurchsichtig (`var(--surface)`)
+  statt zu 95 % deckend — von der Unschärfe war ohnehin fast nichts zu sehen.
+  Das `overflow-x: hidden` war überflüssig, weil die Einträge über
+  `flex: 1 1 0; min-width: 0` ohnehin nicht über den Rahmen hinauskönnen. Die
+  Desktop-Seitenleiste bleibt unverändert: Sie ist `position: sticky`, davon
+  nicht betroffen, und ihr `overflow-y: auto` ist gewollt. Ein Regressionstest
+  schlägt an, sobald einer der beiden Auslöser zurückkommt — mit Begründung im
+  Kommentar, damit ihn niemand für Willkür hält.
+
 - **Drei Wege zurück, wenn das Passwort weg ist (Fassung 0.44.42, Migrationen 152 und 153).** Der
   Betreiber wörtlich: „der login muss auch verbessert werden ich habe das
   passwort vergessen und es gibt keinen weg dieses zurück zu setzen". Stimmte:

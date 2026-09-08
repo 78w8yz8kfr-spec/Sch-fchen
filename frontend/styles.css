@@ -5557,9 +5557,15 @@ select:focus-visible {
   grid-auto-columns: 1fr;
   padding: 8px max(18px, calc((100vw - 540px) / 2)) max(8px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.95);
+  /* Undurchsichtig statt durchscheinend: "position: fixed" plus
+     "backdrop-filter" zwingt WebKit auf iOS, die Leiste auf eine eigene
+     Kompositionsebene zu legen, und genau die blieb beim Scrollen an einer
+     alten Position stehen - die Leiste schwebte mitten im Inhalt statt unten
+     am Rand. Bei 95 % Deckkraft war von der Unschaerfe ohnehin fast nichts zu
+     sehen; eine Verzierung, die dem Betreiber die Bedienleiste ins Bild
+     schiebt, ist ihren Preis nicht wert. */
+  background: var(--surface);
   box-shadow: 0 -10px 30px rgba(17, 17, 17, 0.07);
-  backdrop-filter: blur(18px);
 }
 
 /* Die fachlichen Gruppen gehoeren zur Desktop-Seitenleiste. In der mobilen

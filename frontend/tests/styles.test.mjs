@@ -363,3 +363,46 @@ test("Statusfarben auf ihrem weichen Hintergrund bleiben lesbar", async () => {
   }
   assert.deepEqual(befunde, [], `Kontrast unter 4,5:1:\n${befunde.join("\n")}`);
 });
+
+// Auf dem iPhone schwebte die untere Leiste mitten im Inhalt statt unten am
+// Rand - Screenshot des Betreibers, 1206x2622, iPhone 16 Pro. Ursache war ein
+// WebKit-Muster: "position: fixed" zusammen mit "backdrop-filter" zwingt die
+// Leiste auf eine eigene Kompositionsebene, und die blieb beim Scrollen an
+// einer alten Position stehen. "overflow-x: hidden" verschaerfte es, weil CSS
+// eine "hidden"-Achse dazu zwingt, die andere Achse von "visible" auf "auto"
+// hochzurechnen - macht die Leiste zusaetzlich zum Scrollcontainer, obwohl sie
+// nichts zu scrollen hat: die Eintraege bekommen "flex: 1 1 0; min-width: 0"
+// bzw. teilen sich als Grid-Spalten die Breite und koennen den Rahmen gar
+// nicht ueberragen. In Chromium trat der Fehler nicht auf, deshalb faengt ihn
+// nur ein Blick ins Stylesheet, kein Browserlauf. Betroffen ist ausschliesslich
+// die mobile Leiste (Selektor exakt ".bottom-nav", ausserhalb von
+// "min-width: 1080px"): die Desktop-Seitenleiste ist "position: sticky" mit
+// gewolltem "overflow-y: auto" (viele Eintraege, hohe Leiste) und von diesem
+// Fehler nicht betroffen - sie bleibt bewusst unangetastet.
+test("Die untere Leiste bleibt am Bildschirmrand: keine eigene Kompositionsebene, kein Scrollcontainer", async () => {
+  const befunde = [];
+  for (const datei of ["styles.css", "design-system.css"]) {
+    const css = await readFile(resolve(frontendDirectory, datei), "utf8");
+    for (const regel of leseRegeln(css)) {
+      if (regel.selektor !== ".bottom-nav") continue;
+      // Die Desktop-Seitenleiste lebt unter "min-width: 1080px" und darf
+      // ihr gewolltes overflow-y behalten.
+      if (regel.umgebung?.includes("min-width: 1080px")) continue;
+
+      if (regel.eigenschaften.has("backdrop-filter")) {
+        befunde.push(`${datei}:${regel.zeile} setzt backdrop-filter auf der mobilen Leiste`);
+      }
+      for (const name of ["overflow", "overflow-x", "overflow-y"]) {
+        if (!regel.eigenschaften.has(name)) continue;
+        const wert = regel.eigenschaften.get(name);
+        if (wert === "visible") continue;
+        befunde.push(`${datei}:${regel.zeile} setzt ${name}: ${wert} auf der mobilen Leiste`);
+      }
+    }
+  }
+  assert.deepEqual(
+    befunde,
+    [],
+    `Die mobile Leiste ist wieder eine Kompositionsebene und/oder ein Scrollcontainer:\n${befunde.join("\n")}`
+  );
+});
