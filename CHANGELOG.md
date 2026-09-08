@@ -4,6 +4,43 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Das DATEV-Fenster ist da (Fassung 0.44.44, Migration 155).** Der Betreiber
+  fragte: „wo ist datev?" — zu Recht. Die Serverseite stand seit Migration 151,
+  aber in der App war davon **nichts** zu sehen: kein Menüpunkt, kein Feld,
+  keine Zeile. Seine Vorgabe war „Soll alles im datev fenster in der app selbst
+  eingebbar sein"; genau das gab es nicht.
+
+  Jetzt gibt es unter Einstellungen einen DATEV-Reiter mit drei Bereichen:
+
+  - **Stammdaten**: Beraternummer (bis 7 Ziffern), Mandantennummer (bis 5) und
+    das Lohnprodukt (LODAS oder Lohn und Gehalt). Die Regeln stehen vor dem
+    Absenden da, nicht erst als Servermeldung danach.
+  - **Lohnartenzuordnung**: alle zwölf Schlüssel — drei Zeitarten und neun
+    Abwesenheitsarten — stehen immer als Zeile da, gepflegte wie fehlende. Die
+    Pflichtfelder unterscheiden sich je Art, genau wie die Datenbank es
+    verlangt: eine Zeitart braucht eine Lohnartennummer und **darf keinen**
+    Ausfallschlüssel tragen, eine Abwesenheitsart umgekehrt (Lohnart dort
+    optional, weil manche Kanzleien nur über den Ausfallschlüssel buchen).
+  - **Vorschau**: zeigt für einen Zeitraum bis zu einem Jahr, was übermittelt
+    würde — je Mitarbeiter, Tag, Lohnart und Stundenzahl.
+
+  Historie statt Überschreiben, auch in der Oberfläche: Es gibt bewusst kein
+  PUT und kein DELETE. Wer eine Lohnartennummer ändert, legt einen **neuen
+  Stand** an, die Datenbank löst den bisherigen ab (Auslöser aus Migration
+  151). Die Oberfläche sagt das so und zeigt die früheren Stände mit
+  Gültigkeitszeitraum, Urheber und Begründung.
+
+  Fehlende Zuordnungen werden ausdrücklich angezeigt — mit direktem Weg zum
+  Anlegen, und in der Vorschautabelle sind unzugeordnete Zeilen markiert. Eine
+  Vorschau, die Lücken verschweigt, wäre gefährlicher als gar keine. Eine
+  **Exportdatei erzeugt diese Stufe bewusst nicht**; es gibt keinen Knopf, der
+  etwas verspricht, was dahinter fehlt.
+
+  Sichtbar nur für Administration, Geschäftsführung, Büro/Disposition, Planung
+  und Assistenz — dieselben sechs Rollen wie im API-Vertrag, was ein Test
+  gegen die Rollenliste aus `api/src/datev.mjs` abgleicht. Ein Monteur sieht
+  den Reiter nicht.
+
 - **Die untere Leiste blieb auf dem iPhone mitten im Bild stehen (Fassung 0.44.43, Migration 154).**
   Der Betreiber schickte einen Screenshot: Die Navigationsleiste schwebte
   mitten im Inhalt statt unten am Rand, verdeckte oben eine Karte und ließ den

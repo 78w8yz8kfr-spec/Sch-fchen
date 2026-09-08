@@ -8,10 +8,10 @@
     <title>Schäfchen</title>
     <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=0.44.43">
-    <link rel="stylesheet" href="./design-system.css?v=0.44.43">
-    <script type="module" src="./app.js?v=0.44.43"></script>
-    <script src="./version.js?v=0.44.43" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=0.44.44">
+    <link rel="stylesheet" href="./design-system.css?v=0.44.44">
+    <script type="module" src="./app.js?v=0.44.44"></script>
+    <script src="./version.js?v=0.44.44" defer></script>
   </head>
   <body>
     <!-- Wenn der Server eine neuere Fassung hat als diese Seite, sagt die App
@@ -155,7 +155,7 @@
 
           <a class="platform-admin-link" href="./platform-admin.html">Zur Plattformverwaltung</a>
 
-          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.43</p>
+          <p id="login-footer" class="login-footer">Einfach vor komplex · Version 0.44.44</p>
         </div>
 
         <!-- Die dunkle Seite steht am Rechner links neben dem Formular, im
@@ -1400,6 +1400,7 @@
               <button class="page-tab page-tab--active" type="button" data-settings-view="time-accounts" aria-pressed="true">Arbeitskonten</button>
               <button class="page-tab" type="button" data-settings-view="holidays" aria-pressed="false">Feiertage</button>
               <button class="page-tab" type="button" data-settings-view="time-rules" aria-pressed="false">Zeitregeln</button>
+              <button class="page-tab" type="button" data-settings-view="datev" aria-pressed="false">DATEV</button>
               <button class="page-tab" type="button" data-settings-view="account" aria-pressed="false">Mein Konto</button>
             </nav>
             <p id="admin-intro" class="admin-intro">Baustellen, Einsätze und Mitarbeiter – übersichtlich an einem Ort.</p>
@@ -3020,6 +3021,178 @@
                   Zeiten unabhängig davon.
                 </p>
               </form>
+            </section>
+
+            <!-- DATEV-Lohnschnittstelle, Stufe 1: Stammdaten, Lohnartenzuordnung und
+                 eine reine Vorschau. Es gibt hier bewusst keinen Export und keine
+                 Übertragung - beides ist eine spätere Stufe (docs/DATEV_EXPORT.md). -->
+            <section id="datev-settings-admin" class="holiday-calendar-admin" aria-labelledby="datev-settings-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Lohnschnittstelle</p>
+                  <h4 id="datev-settings-title">DATEV-Stammdaten</h4>
+                </div>
+                <span id="datev-settings-state" class="site-list-summary">wird geladen …</span>
+              </div>
+              <p id="datev-settings-status" class="time-account-status" aria-live="polite">
+                DATEV-Stammdaten werden geladen …
+              </p>
+              <form id="datev-settings-form" class="holiday-calendar-form" novalidate>
+                <div class="setup-grid">
+                  <div>
+                    <label for="datev-consultant-number">Beraternummer</label>
+                    <input
+                      id="datev-consultant-number"
+                      inputmode="numeric"
+                      pattern="[0-9]{1,7}"
+                      maxlength="7"
+                      required
+                      placeholder="z. B. 1234567"
+                    >
+                  </div>
+                  <div>
+                    <label for="datev-client-number">Mandantennummer</label>
+                    <input
+                      id="datev-client-number"
+                      inputmode="numeric"
+                      pattern="[0-9]{1,5}"
+                      maxlength="5"
+                      required
+                      placeholder="z. B. 12345"
+                    >
+                  </div>
+                </div>
+                <label for="datev-payroll-product">Lohnprodukt</label>
+                <select id="datev-payroll-product" required>
+                  <option value="lodas">LODAS</option>
+                  <option value="lug">Lohn und Gehalt</option>
+                </select>
+                <button id="datev-settings-save" class="button button--secondary" type="submit">
+                  Stammdaten speichern
+                </button>
+                <p id="datev-settings-message" class="form-message" role="status"></p>
+                <p class="absence-flow-note">
+                  Beraternummer, Mandantennummer und Lohnprodukt liefert die
+                  Steuerkanzlei. Ohne sie bleibt die Firma nicht angebunden, und eine
+                  spätere Exportdatei lässt sich nicht erzeugen.
+                </p>
+              </form>
+            </section>
+
+            <section id="datev-mapping-admin" class="holiday-calendar-admin" aria-labelledby="datev-mapping-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Zeit- und Abwesenheitsarten</p>
+                  <h4 id="datev-mapping-title">Lohnartenzuordnung</h4>
+                </div>
+                <span id="datev-mapping-missing-count" class="site-list-summary">wird geladen …</span>
+              </div>
+              <p class="absence-flow-note">
+                Eine geänderte Zuordnung überschreibt die bisherige nicht: sie legt
+                einen neuen, gültigen Stand an und löst den bisherigen ab. Der
+                bisherige Stand bleibt in der Historie unten nachvollziehbar erhalten.
+              </p>
+              <ul id="datev-mapping-list" class="time-account-admin-list" aria-label="Lohnartenzuordnung je Zeit- und Abwesenheitsart"></ul>
+              <form id="datev-mapping-form" class="time-account-admin-form" novalidate hidden>
+                <div class="admin-edit-heading">
+                  <div>
+                    <p class="eyebrow">Neuer Stand</p>
+                    <strong id="datev-mapping-form-title">Zuordnung</strong>
+                  </div>
+                </div>
+                <div id="datev-mapping-wage-type-field">
+                  <label for="datev-mapping-wage-type">Lohnartennummer</label>
+                  <input
+                    id="datev-mapping-wage-type"
+                    inputmode="numeric"
+                    pattern="[0-9]{1,4}"
+                    maxlength="4"
+                    placeholder="z. B. 1000"
+                  >
+                </div>
+                <div id="datev-mapping-absence-code-field">
+                  <label for="datev-mapping-absence-code">Ausfallschlüssel</label>
+                  <input
+                    id="datev-mapping-absence-code"
+                    inputmode="numeric"
+                    pattern="[0-9]{1,2}"
+                    maxlength="2"
+                    placeholder="z. B. 7"
+                  >
+                  <p id="datev-mapping-absence-code-note" class="absence-flow-note">
+                    Bei Abwesenheitsarten optional zusätzlich zur Lohnartennummer –
+                    manche Kanzleien buchen Abwesenheiten ausschließlich über den
+                    Ausfallschlüssel.
+                  </p>
+                </div>
+                <label for="datev-mapping-reason">Begründung für die Änderung</label>
+                <textarea
+                  id="datev-mapping-reason"
+                  maxlength="500"
+                  rows="2"
+                  required
+                  placeholder="Warum wird die Zuordnung geändert?"
+                ></textarea>
+                <div class="form-actions">
+                  <button id="datev-mapping-save" class="button button--primary" type="submit">Neuen Stand anlegen</button>
+                  <button id="datev-mapping-cancel" class="button button--secondary" type="button">Abbrechen</button>
+                </div>
+                <p id="datev-mapping-message" class="form-message" aria-live="polite"></p>
+              </form>
+              <details id="datev-mapping-history-panel" class="time-account-months-panel">
+                <summary>Frühere Zuordnungen anzeigen</summary>
+                <p id="datev-mapping-history-status" class="time-account-status">Wird geladen, sobald geöffnet …</p>
+                <ul id="datev-mapping-history-list" class="holiday-closure-list" aria-label="Historie der Lohnartenzuordnung"></ul>
+              </details>
+            </section>
+
+            <section id="datev-preview-admin" class="holiday-calendar-admin" aria-labelledby="datev-preview-title" hidden>
+              <div class="site-management-panel__heading">
+                <div>
+                  <p class="eyebrow">Ohne Datei</p>
+                  <h4 id="datev-preview-title">Vorschau</h4>
+                </div>
+              </div>
+              <p class="absence-flow-note">
+                Diese Vorschau erzeugt keine Exportdatei und überträgt nichts an
+                DATEV – beides ist eine spätere Stufe. Sie zeigt nur, was eine
+                spätere Exportdatei für den gewählten Zeitraum übermitteln würde,
+                und macht sichtbar, wo dafür heute noch Zuordnungen fehlen.
+              </p>
+              <form id="datev-preview-form" class="holiday-calendar-form" novalidate>
+                <div class="setup-grid">
+                  <div>
+                    <label for="datev-preview-from">Von</label>
+                    <input id="datev-preview-from" type="date" required>
+                  </div>
+                  <div>
+                    <label for="datev-preview-to">Bis</label>
+                    <input id="datev-preview-to" type="date" required>
+                  </div>
+                </div>
+                <button id="datev-preview-load" class="button button--secondary" type="submit">Vorschau laden</button>
+                <p id="datev-preview-message" class="form-message" role="status"></p>
+              </form>
+              <p id="datev-preview-status" class="time-account-status" aria-live="polite"></p>
+              <div id="datev-preview-missing" class="datev-missing" hidden>
+                <strong>Diese Zuordnungen fehlen im gewählten Zeitraum – ohne sie bricht eine spätere Exportdatei an dieser Stelle ab:</strong>
+                <ul id="datev-preview-missing-list"></ul>
+              </div>
+              <div class="time-account-table-wrap">
+                <table id="datev-preview-table" class="time-account-table" hidden>
+                  <thead>
+                    <tr>
+                      <th>Mitarbeiter</th>
+                      <th>Tag</th>
+                      <th>Art</th>
+                      <th>Lohnart / Ausfallschlüssel</th>
+                      <th>Stunden / Tage</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="datev-preview-body"></tbody>
+                </table>
+              </div>
             </section>
 
           </section>

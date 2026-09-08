@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.43";
-import { serverIsNewer } from "./core/versions.js?v=0.44.43";
+} from "./core/work-time.js?v=0.44.44";
+import { serverIsNewer } from "./core/versions.js?v=0.44.44";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.43";
+} from "./core/sync-queue.js?v=0.44.44";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.43";
+} from "./core/permissions.js?v=0.44.44";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.43";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.43";
-import { createPowerModule } from "./core/power-module.js?v=0.44.43";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.43";
+} from "./core/state-store.js?v=0.44.44";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.44";
+import { createPowerModule } from "./core/power-module.js?v=0.44.44";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.44";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.43";
+} from "./core/time-changes.js?v=0.44.44";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -380,6 +380,43 @@ import {
     holidayClosureSubmit: document.querySelector("#holiday-closure-submit"),
     holidayClosureList: document.querySelector("#holiday-closure-list"),
     holidayCalendarMessage: document.querySelector("#holiday-calendar-message"),
+    datevSettingsAdmin: document.querySelector("#datev-settings-admin"),
+    datevSettingsState: document.querySelector("#datev-settings-state"),
+    datevSettingsStatus: document.querySelector("#datev-settings-status"),
+    datevSettingsForm: document.querySelector("#datev-settings-form"),
+    datevConsultantNumber: document.querySelector("#datev-consultant-number"),
+    datevClientNumber: document.querySelector("#datev-client-number"),
+    datevPayrollProduct: document.querySelector("#datev-payroll-product"),
+    datevSettingsSave: document.querySelector("#datev-settings-save"),
+    datevSettingsMessage: document.querySelector("#datev-settings-message"),
+    datevMappingAdmin: document.querySelector("#datev-mapping-admin"),
+    datevMappingMissingCount: document.querySelector("#datev-mapping-missing-count"),
+    datevMappingList: document.querySelector("#datev-mapping-list"),
+    datevMappingForm: document.querySelector("#datev-mapping-form"),
+    datevMappingFormTitle: document.querySelector("#datev-mapping-form-title"),
+    datevMappingWageTypeField: document.querySelector("#datev-mapping-wage-type-field"),
+    datevMappingWageType: document.querySelector("#datev-mapping-wage-type"),
+    datevMappingAbsenceCodeField: document.querySelector("#datev-mapping-absence-code-field"),
+    datevMappingAbsenceCode: document.querySelector("#datev-mapping-absence-code"),
+    datevMappingAbsenceCodeNote: document.querySelector("#datev-mapping-absence-code-note"),
+    datevMappingReason: document.querySelector("#datev-mapping-reason"),
+    datevMappingSave: document.querySelector("#datev-mapping-save"),
+    datevMappingCancel: document.querySelector("#datev-mapping-cancel"),
+    datevMappingMessage: document.querySelector("#datev-mapping-message"),
+    datevMappingHistoryPanel: document.querySelector("#datev-mapping-history-panel"),
+    datevMappingHistoryStatus: document.querySelector("#datev-mapping-history-status"),
+    datevMappingHistoryList: document.querySelector("#datev-mapping-history-list"),
+    datevPreviewAdmin: document.querySelector("#datev-preview-admin"),
+    datevPreviewForm: document.querySelector("#datev-preview-form"),
+    datevPreviewFrom: document.querySelector("#datev-preview-from"),
+    datevPreviewTo: document.querySelector("#datev-preview-to"),
+    datevPreviewLoad: document.querySelector("#datev-preview-load"),
+    datevPreviewMessage: document.querySelector("#datev-preview-message"),
+    datevPreviewStatus: document.querySelector("#datev-preview-status"),
+    datevPreviewMissing: document.querySelector("#datev-preview-missing"),
+    datevPreviewMissingList: document.querySelector("#datev-preview-missing-list"),
+    datevPreviewTable: document.querySelector("#datev-preview-table"),
+    datevPreviewBody: document.querySelector("#datev-preview-body"),
     absenceArea: document.querySelector("#absence-area"),
     absencePanel: document.querySelector("#absence-panel"),
     absenceForm: document.querySelector("#absence-form"),
@@ -1192,6 +1229,21 @@ import {
   let timeAccountFetchLauf = 0;
   let timeAccountsState = null;
   let timeCorrectionPolicyState = null;
+  // DATEV-Lohnschnittstelle, Stufe 1: Stammdaten, gueltige Zuordnungen, ihre
+  // Historie (erst beim Aufklappen geladen) und die zuletzt geladene
+  // Vorschau. Getrennt von timeAccountsState, weil die drei Endpunkte
+  // unabhaengig voneinander laden und scheitern koennen.
+  let datevSettingsState = null;
+  // "null" heisst bei den Stammdaten zweierlei: noch nicht geladen, oder
+  // geladen und die Firma ist schlicht noch nicht angebunden. Ohne dieses
+  // Merkmal saehe die Oberflaeche vor dem ersten Laden faelschlich schon
+  // "Nicht angebunden", statt ehrlich "wird geladen" zu zeigen.
+  let datevSettingsLoaded = false;
+  let datevMappingsState = null;
+  let datevMappingHistoryState = null;
+  let datevMappingHistoryLoaded = false;
+  let datevEditingMapping = null;
+  let datevPreviewState = null;
   // Die Verwaltung wertet ein Kalenderjahr aus. Frueher folgte sie der
   // gewaehlten Woche des Monteurs; seit die Bereiche getrennt sind, waere das
   // nicht mehr nachvollziehbar.
@@ -1509,7 +1561,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.43",
+          "X-Schaefchen-Version": "0.44.44",
           ...options.headers
         }
       });
@@ -1544,7 +1596,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.43`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.44`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1566,7 +1618,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.43" }
+        headers: { "X-Schaefchen-Version": "0.44.44" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1613,7 +1665,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.43 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.44 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3023,7 +3075,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.43";
+  const EIGENE_FASSUNG = "0.44.44";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3062,7 +3114,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.43". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.44". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -7032,7 +7084,7 @@ import {
       adminOverviewStatus = "ready";
       elements.assignmentDate.value = adminState.date;
       renderAdmin();
-      await refreshTimeCorrectionPolicy();
+      await Promise.all([refreshTimeCorrectionPolicy(), refreshDatevAdmin()]);
     } catch (error) {
       // Auch ein Netzfehler muss sichtbar werden. Er blieb bisher stumm - und
       // die Startseite, die ohne diese Uebersicht leer ist, sah dann aus, als
@@ -7209,7 +7261,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.43" }
+        headers: { "X-Schaefchen-Version": "0.44.44" }
       });
       if (response.ok) {
         await cache.put(
@@ -8864,6 +8916,55 @@ import {
     }[type] || type;
   }
 
+  // Die drei Zeitarten, die die DATEV-Lohnschnittstelle kennt (work_days,
+  // Migration 011). Für Abwesenheitsarten wird bewusst absenceTypeLabel oben
+  // wiederverwendet, statt hier eine zweite, leicht abweichende Liste zu
+  // pflegen - sie werden an anderer Stelle bereits mit denselben Namen
+  // angezeigt.
+  const DATEV_TIME_TYPE_KEYS = ["work", "travel", "overtime"];
+  const DATEV_ABSENCE_TYPE_KEYS = [
+    "vacation", "unpaid_vacation", "time_off", "leave", "special_leave",
+    "sick", "training", "vocational_school", "other"
+  ];
+
+  function datevTimeTypeLabel(key) {
+    return {
+      work: "Arbeitszeit",
+      travel: "Fahrzeit",
+      overtime: "Überstunden"
+    }[key] || key;
+  }
+
+  function datevMappingKeyLabel(category, mappingKey) {
+    return category === "time_type" ? datevTimeTypeLabel(mappingKey) : absenceTypeLabel(mappingKey);
+  }
+
+  function datevPayrollProductLabel(product) {
+    if (product === "lodas") return "LODAS";
+    if (product === "lug") return "Lohn und Gehalt";
+    return "–";
+  }
+
+  // Alle zwoelf Zuordnungsziele in der Reihenfolge aus DATEV_EXPORT.md - die
+  // Zeile steht auch dann, wenn dafuer noch keine Zuordnung existiert, damit
+  // eine fehlende Zuordnung als Zeile auffaellt statt als leere Luecke.
+  function datevMappingDefinitions() {
+    return [
+      ...DATEV_TIME_TYPE_KEYS.map((mappingKey) => ({ category: "time_type", mappingKey })),
+      ...DATEV_ABSENCE_TYPE_KEYS.map((mappingKey) => ({ category: "absence_type", mappingKey }))
+    ];
+  }
+
+  // Fuer Zeitstempel mit Uhrzeit (updatedAt, validFrom, validUntil) - anders
+  // als shortDate() oben, das ein reines Datum ohne Uhrzeitanteil erwartet
+  // und an einem vollen ISO-Zeitstempel scheitern wuerde.
+  function shortDateTime(iso) {
+    if (!iso) return "";
+    const value = new Date(iso);
+    if (Number.isNaN(value.valueOf())) return "";
+    return new Intl.DateTimeFormat("de-DE", { dateStyle: "short" }).format(value);
+  }
+
   function absenceDayPartLabel(dayPart) {
     return {
       full_day: "ganztägig",
@@ -9228,6 +9329,326 @@ import {
       if (!error.network) timeCorrectionPolicyState = null;
     }
     renderTimeCorrectionPolicy();
+  }
+
+  // Sichtbarkeit exakt wie der API-Vertrag: dieselbe Rollengruppe, die auch
+  // sonst firmenweite Einstellungen pflegt (FULL_PLANNING_ROLES), und nicht
+  // bloss canPlan() - eine reine Projektleitung sieht die Lohnschnittstelle
+  // serverseitig ohnehin nicht (403 datev_administration_forbidden), und die
+  // Oberflaeche bietet ihr die Schaltflaeche deshalb erst gar nicht an.
+  function canManageDatev() {
+    return canPlan() && !isProjectScopedSession();
+  }
+
+  function renderDatevSettings() {
+    elements.datevSettingsAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    if (!datevSettingsLoaded) {
+      elements.datevSettingsState.textContent = navigator.onLine ? "wird geladen …" : "offline nicht verfügbar";
+      elements.datevSettingsState.className = "site-list-summary";
+      elements.datevSettingsStatus.textContent = navigator.onLine
+        ? "DATEV-Stammdaten werden geladen …"
+        : "DATEV-Stammdaten sind offline gerade nicht verfügbar.";
+    } else if (!datevSettingsState) {
+      elements.datevSettingsState.textContent = "Nicht angebunden";
+      elements.datevSettingsState.className = "site-list-summary site-list-summary--alert";
+      elements.datevSettingsStatus.textContent =
+        "Noch keine Stammdaten hinterlegt. Ohne Beraternummer, Mandantennummer und Lohnprodukt bleibt die Firma nicht angebunden.";
+      elements.datevConsultantNumber.value = "";
+      elements.datevClientNumber.value = "";
+      elements.datevPayrollProduct.value = "lodas";
+    } else {
+      elements.datevSettingsState.className = "site-list-summary";
+      elements.datevSettingsState.textContent = datevPayrollProductLabel(datevSettingsState.payrollProduct);
+      elements.datevSettingsStatus.textContent =
+        `Angebunden · Beraternummer ${datevSettingsState.consultantNumber} · ` +
+        `Mandantennummer ${datevSettingsState.clientNumber} · ` +
+        `zuletzt geändert ${shortDateTime(datevSettingsState.updatedAt)}.`;
+      if (document.activeElement !== elements.datevConsultantNumber) {
+        elements.datevConsultantNumber.value = datevSettingsState.consultantNumber;
+      }
+      if (document.activeElement !== elements.datevClientNumber) {
+        elements.datevClientNumber.value = datevSettingsState.clientNumber;
+      }
+      if (document.activeElement !== elements.datevPayrollProduct) {
+        elements.datevPayrollProduct.value = datevSettingsState.payrollProduct;
+      }
+    }
+    elements.datevSettingsSave.disabled = !navigator.onLine;
+  }
+
+  async function refreshDatevSettings() {
+    if (!canManageDatev()) {
+      datevSettingsState = null;
+      datevSettingsLoaded = false;
+      renderDatevSettings();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderDatevSettings();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/datev/settings");
+      datevSettingsState = body.settings;
+      datevSettingsLoaded = true;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) {
+        datevSettingsState = null;
+        datevSettingsLoaded = true;
+      }
+    }
+    renderDatevSettings();
+  }
+
+  // Findet die aktuell gueltige Zuordnung fuer eine Zeile der festen
+  // Schluesselliste - oder nichts, wenn diese Art noch nicht gepflegt ist.
+  function findDatevMapping(category, mappingKey) {
+    return (datevMappingsState || []).find(
+      (mapping) => mapping.category === category && mapping.mappingKey === mappingKey
+    ) || null;
+  }
+
+  function datevMappingValueText(mapping) {
+    const parts = [];
+    if (mapping.wageTypeNumber) parts.push(`Lohnart ${mapping.wageTypeNumber}`);
+    if (mapping.absenceCode) parts.push(`Ausfallschlüssel ${mapping.absenceCode}`);
+    return parts.join(" · ") || "–";
+  }
+
+  function renderDatevMappingList() {
+    elements.datevMappingList.replaceChildren();
+    if (!datevMappingsState) {
+      const empty = document.createElement("li");
+      empty.className = "absence-list__empty";
+      empty.textContent = navigator.onLine
+        ? "Lohnartenzuordnung wird geladen …"
+        : "Die Lohnartenzuordnung ist offline gerade nicht verfügbar.";
+      elements.datevMappingList.append(empty);
+      elements.datevMappingMissingCount.textContent = "";
+      return;
+    }
+    const definitions = datevMappingDefinitions();
+    let missingCount = 0;
+    definitions.forEach((definition) => {
+      const mapping = findDatevMapping(definition.category, definition.mappingKey);
+      if (!mapping) missingCount += 1;
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      const badge = document.createElement("span");
+      item.className = "time-account-admin-item";
+      title.textContent = `${definition.category === "time_type" ? "Zeitart" : "Abwesenheitsart"} · ${
+        datevMappingKeyLabel(definition.category, definition.mappingKey)
+      }`;
+      badge.className = `device-badge ${mapping ? "device-badge--ok" : "device-badge--danger"}`;
+      badge.textContent = mapping ? "Gepflegt" : "Fehlt";
+      meta.textContent = mapping
+        ? `${datevMappingValueText(mapping)} · gültig seit ${shortDateTime(mapping.validFrom)} · ` +
+          `geändert von ${mapping.changedByName}: ${mapping.changeReason}`
+        : "Noch nicht gepflegt – eine spätere Exportdatei würde hier abbrechen.";
+      actions.className = "time-account-admin-item__actions";
+      actions.append(badge);
+      if (canManageDatev()) {
+        const change = document.createElement("button");
+        change.type = "button";
+        change.className = "text-button";
+        change.textContent = mapping ? "Ändern" : "Anlegen";
+        change.disabled = !navigator.onLine;
+        change.addEventListener("click", () => openDatevMappingEditor(definition.category, definition.mappingKey));
+        actions.append(change);
+      }
+      copy.append(title, meta);
+      item.append(copy, actions);
+      elements.datevMappingList.append(item);
+    });
+    elements.datevMappingMissingCount.textContent = missingCount === 0
+      ? "Alle Zuordnungen gepflegt"
+      : `${missingCount} von ${definitions.length} fehlen`;
+    elements.datevMappingMissingCount.className = missingCount === 0
+      ? "site-list-summary"
+      : "site-list-summary site-list-summary--alert";
+  }
+
+  function renderDatevMappingHistory() {
+    elements.datevMappingHistoryList.replaceChildren();
+    if (!datevMappingHistoryLoaded) {
+      elements.datevMappingHistoryStatus.hidden = false;
+      elements.datevMappingHistoryStatus.textContent = "Wird geladen, sobald geöffnet …";
+      return;
+    }
+    // Nur abgeloeste Zeilen (validUntil gesetzt) - die gueltige Zeile steht
+    // bereits oben in der Hauptliste, sie hier zu wiederholen wuerde nur
+    // verwirren.
+    const history = (datevMappingHistoryState || []).filter((mapping) => mapping.validUntil);
+    if (history.length === 0) {
+      elements.datevMappingHistoryStatus.hidden = false;
+      elements.datevMappingHistoryStatus.textContent = "Noch keine abgelöste Zuordnung vorhanden.";
+      return;
+    }
+    elements.datevMappingHistoryStatus.hidden = true;
+    history.forEach((mapping) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      title.textContent = `${
+        mapping.category === "time_type" ? "Zeitart" : "Abwesenheitsart"
+      } · ${datevMappingKeyLabel(mapping.category, mapping.mappingKey)} · ${datevMappingValueText(mapping)}`;
+      meta.textContent = `${shortDateTime(mapping.validFrom)} – ${shortDateTime(mapping.validUntil)} · ` +
+        `abgelöst durch ${mapping.changedByName}: ${mapping.changeReason}`;
+      copy.append(title, meta);
+      item.append(copy);
+      elements.datevMappingHistoryList.append(item);
+    });
+  }
+
+  async function refreshDatevMappings() {
+    if (!canManageDatev()) {
+      datevMappingsState = null;
+      renderDatevMappingList();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderDatevMappingList();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/datev/wage-type-mappings");
+      datevMappingsState = body.mappings;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) datevMappingsState = null;
+    }
+    renderDatevMappingList();
+  }
+
+  async function refreshDatevMappingHistory() {
+    if (!canManageDatev() || !navigator.onLine) return;
+    try {
+      const body = await requestJson("./api/v1/admin/datev/wage-type-mappings?includeHistory=true");
+      datevMappingHistoryState = body.mappings;
+      datevMappingHistoryLoaded = true;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+    }
+    renderDatevMappingHistory();
+  }
+
+  function closeDatevMappingEditor() {
+    datevEditingMapping = null;
+    elements.datevMappingForm.hidden = true;
+    elements.datevMappingForm.reset();
+    elements.datevMappingMessage.textContent = "";
+  }
+
+  // Oeffnet das Formular fuer genau eine der zwoelf festen Zeilen. Kategorie
+  // und Schluessel stehen damit fest - die Oberflaeche bietet hier keine
+  // freie Eingabe an, wie es der API-Vertrag verlangt.
+  function openDatevMappingEditor(category, mappingKey) {
+    if (!canManageDatev()) return;
+    const current = findDatevMapping(category, mappingKey);
+    datevEditingMapping = { category, mappingKey };
+    const isTimeType = category === "time_type";
+    elements.datevMappingFormTitle.textContent =
+      `${isTimeType ? "Zeitart" : "Abwesenheitsart"} · ${datevMappingKeyLabel(category, mappingKey)}`;
+    elements.datevMappingWageTypeField.hidden = false;
+    elements.datevMappingWageType.required = isTimeType;
+    elements.datevMappingAbsenceCodeField.hidden = isTimeType;
+    elements.datevMappingAbsenceCode.required = !isTimeType;
+    elements.datevMappingWageType.value = current?.wageTypeNumber || "";
+    elements.datevMappingAbsenceCode.value = current?.absenceCode || "";
+    elements.datevMappingReason.value = "";
+    elements.datevMappingMessage.textContent = "";
+    elements.datevMappingSave.textContent = current ? "Neuen Stand anlegen" : "Zuordnung anlegen";
+    elements.datevMappingForm.hidden = false;
+    elements.datevMappingForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    (isTimeType ? elements.datevMappingWageType : elements.datevMappingAbsenceCode).focus({ preventScroll: true });
+  }
+
+  function datevPreviewLineStatus(line) {
+    return line.mapped ? "Zugeordnet" : "Fehlt";
+  }
+
+  function renderDatevPreview() {
+    elements.datevPreviewMissing.hidden = true;
+    elements.datevPreviewMissingList.replaceChildren();
+    elements.datevPreviewTable.hidden = true;
+    elements.datevPreviewBody.replaceChildren();
+    if (!datevPreviewState) {
+      elements.datevPreviewStatus.textContent = "";
+      return;
+    }
+    const state = datevPreviewState;
+    const rangeText = `${shortDate(state.from)} – ${shortDate(state.to)}`;
+    elements.datevPreviewStatus.textContent = state.settingsConfigured
+      ? `${rangeText} · ${state.lineCount} Buchungszeile${state.lineCount === 1 ? "" : "n"} · ` +
+        `${datevPayrollProductLabel(state.payrollProduct)}, Beraternummer ${state.consultantNumber}, ` +
+        `Mandantennummer ${state.clientNumber}.`
+      : `${rangeText} · ${state.lineCount} Buchungszeile${state.lineCount === 1 ? "" : "n"} · ` +
+        "Noch keine DATEV-Stammdaten hinterlegt.";
+    if (state.missingMappings.length > 0) {
+      elements.datevPreviewMissing.hidden = false;
+      state.missingMappings.forEach((missing) => {
+        const item = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = `${missing.category === "time_type" ? "Zeitart" : "Abwesenheitsart"} · ${
+          datevMappingKeyLabel(missing.category, missing.mappingKey)
+        }`;
+        item.append(label);
+        if (canManageDatev()) {
+          const create = document.createElement("button");
+          create.type = "button";
+          create.className = "text-button";
+          create.textContent = "Jetzt anlegen";
+          create.addEventListener("click", () => openDatevMappingEditor(missing.category, missing.mappingKey));
+          item.append(create);
+        }
+        elements.datevPreviewMissingList.append(item);
+      });
+    }
+    if (state.lines.length > 0) {
+      elements.datevPreviewTable.hidden = false;
+      state.lines.forEach((line) => {
+        const row = document.createElement("tr");
+        if (!line.mapped) row.className = "datev-preview-row--missing";
+        const cells = [
+          `${line.employeeName} (${line.personnelNumber})`,
+          shortDate(line.workDate),
+          datevMappingKeyLabel(line.category, line.mappingKey),
+          [line.wageTypeNumber, line.absenceCode].filter(Boolean).join(" · ") || "–",
+          line.hours !== null ? `${line.hours} h` : `${line.days} Tag(e)`,
+          datevPreviewLineStatus(line)
+        ];
+        cells.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        });
+        elements.datevPreviewBody.append(row);
+      });
+    }
+  }
+
+  function renderDatevAdmin() {
+    renderDatevSettings();
+    renderDatevMappingList();
+    renderDatevMappingHistory();
+    elements.datevMappingAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    elements.datevPreviewAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    renderDatevPreview();
+  }
+
+  async function refreshDatevAdmin() {
+    await Promise.all([refreshDatevSettings(), refreshDatevMappings()]);
   }
 
   function renderHolidayCalendarAdmin(calendar, requestedYear) {
@@ -10341,7 +10762,7 @@ import {
   }
 
   function showSettingsSubarea(requested) {
-    const allowed = new Set(["time-accounts", "holidays", "time-rules", "account"]);
+    const allowed = new Set(["time-accounts", "holidays", "time-rules", "datev", "account"]);
     const accountOnly = !canPlan() || isProjectScopedSession();
     currentSettingsSubarea = accountOnly
       ? "account"
@@ -10360,6 +10781,7 @@ import {
     });
     renderAdminTimeAccounts();
     renderTimeCorrectionPolicy();
+    renderDatevAdmin();
     renderAccountCard();
     elements.infoCard.hidden = currentDashboardPane !== "more"
       || (!demoMode && canPlan() && currentSettingsSubarea !== "account");
@@ -12083,6 +12505,162 @@ import {
     showAnalyticsSubarea("export");
     elements.timesheetExportPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     elements.timesheetExportFrom.focus({ preventScroll: true });
+  });
+
+  elements.datevSettingsForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const consultantNumber = elements.datevConsultantNumber.value.trim();
+    const clientNumber = elements.datevClientNumber.value.trim();
+    const payrollProduct = elements.datevPayrollProduct.value;
+    // Dieselben Regeln, die auch der Server prueft (validateDatevExportSettings)
+    // - hier vorab, damit niemand eine Servermeldung fuer etwas kassiert, das
+    // die Oberflaeche schon wusste.
+    if (!/^[0-9]{1,7}$/.test(consultantNumber)) {
+      elements.datevSettingsMessage.textContent =
+        "Die Beraternummer darf nur aus bis zu sieben Ziffern bestehen.";
+      return;
+    }
+    if (!/^[0-9]{1,5}$/.test(clientNumber)) {
+      elements.datevSettingsMessage.textContent =
+        "Die Mandantennummer darf nur aus bis zu fünf Ziffern bestehen.";
+      return;
+    }
+    elements.datevSettingsSave.disabled = true;
+    elements.datevSettingsMessage.textContent = "Stammdaten werden gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/admin/datev/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          consultantNumber,
+          clientNumber,
+          payrollProduct,
+          rowVersion: datevSettingsState?.rowVersion ?? 0
+        })
+      });
+      datevSettingsState = body.settings;
+      elements.datevSettingsMessage.textContent = "";
+      showToast("DATEV-Stammdaten gespeichert.");
+      renderDatevSettings();
+    } catch (error) {
+      if (error.code === "row_version_conflict") {
+        elements.datevSettingsMessage.textContent =
+          "Die Stammdaten wurden zwischenzeitlich geändert. Werden neu geladen …";
+        await refreshDatevSettings();
+      } else {
+        elements.datevSettingsMessage.textContent = error.message;
+      }
+    } finally {
+      elements.datevSettingsSave.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.datevMappingForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!datevEditingMapping) return;
+    const { category, mappingKey } = datevEditingMapping;
+    const isTimeType = category === "time_type";
+    const wageTypeNumber = elements.datevMappingWageType.value.trim() || null;
+    const absenceCode = elements.datevMappingAbsenceCode.value.trim() || null;
+    const changeReason = elements.datevMappingReason.value.trim();
+    // Dieselben Regeln wie validateDatevWageTypeMapping auf dem Server: eine
+    // Zeitart braucht eine Lohnart und kennt keinen Ausfallschluessel, eine
+    // Abwesenheitsart braucht immer einen Ausfallschluessel.
+    if (wageTypeNumber && !/^[0-9]{1,4}$/.test(wageTypeNumber)) {
+      elements.datevMappingMessage.textContent =
+        "Die Lohnartennummer darf nur aus bis zu vier Ziffern bestehen.";
+      return;
+    }
+    if (absenceCode && !/^[0-9]{1,2}$/.test(absenceCode)) {
+      elements.datevMappingMessage.textContent =
+        "Der Ausfallschlüssel darf nur aus bis zu zwei Ziffern bestehen.";
+      return;
+    }
+    if (isTimeType && !wageTypeNumber) {
+      elements.datevMappingMessage.textContent = "Eine Zeitart benötigt eine Lohnartennummer.";
+      return;
+    }
+    if (!isTimeType && !absenceCode) {
+      elements.datevMappingMessage.textContent = "Eine Abwesenheitsart benötigt einen Ausfallschlüssel.";
+      return;
+    }
+    if (changeReason.length < 1) {
+      elements.datevMappingMessage.textContent = "Bitte kurz begründen, warum die Zuordnung geändert wird.";
+      return;
+    }
+    elements.datevMappingSave.disabled = true;
+    elements.datevMappingMessage.textContent = "Neuer Stand wird angelegt …";
+    try {
+      await requestJson("./api/v1/admin/datev/wage-type-mappings", {
+        method: "POST",
+        body: JSON.stringify({
+          category,
+          mappingKey,
+          wageTypeNumber,
+          absenceCode: isTimeType ? null : absenceCode,
+          changeReason
+        })
+      });
+      showToast(`Zuordnung angelegt · ${datevMappingKeyLabel(category, mappingKey)}`);
+      closeDatevMappingEditor();
+      datevMappingHistoryLoaded = false;
+      await refreshDatevMappings();
+      if (elements.datevMappingHistoryPanel.open) await refreshDatevMappingHistory();
+      if (datevPreviewState) {
+        // Die zuletzt geladene Vorschau ist jetzt veraltet - eine gerade erst
+        // angelegte Zuordnung soll sofort sichtbar sein, statt eine alte
+        // Luecke weiter als "fehlt" zu zeigen.
+        elements.datevPreviewForm.requestSubmit();
+      }
+    } catch (error) {
+      elements.datevMappingMessage.textContent = error.message;
+    } finally {
+      elements.datevMappingSave.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.datevMappingCancel.addEventListener("click", () => closeDatevMappingEditor());
+
+  elements.datevMappingHistoryPanel.addEventListener("toggle", () => {
+    if (elements.datevMappingHistoryPanel.open && !datevMappingHistoryLoaded) {
+      void refreshDatevMappingHistory();
+    }
+  });
+
+  elements.datevPreviewForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const from = elements.datevPreviewFrom.value;
+    const to = elements.datevPreviewTo.value;
+    if (!from || !to) {
+      elements.datevPreviewMessage.textContent = "Bitte Anfangs- und Enddatum wählen.";
+      return;
+    }
+    if (to < from) {
+      elements.datevPreviewMessage.textContent = "Das Enddatum darf nicht vor dem Startdatum liegen.";
+      return;
+    }
+    const dayCount = Math.floor(
+      (new Date(`${to}T00:00:00Z`) - new Date(`${from}T00:00:00Z`)) / 86_400_000
+    ) + 1;
+    if (dayCount > 366) {
+      elements.datevPreviewMessage.textContent = "Der Vorschauzeitraum darf höchstens ein Jahr umfassen.";
+      return;
+    }
+    elements.datevPreviewLoad.disabled = true;
+    elements.datevPreviewMessage.textContent = "Vorschau wird geladen …";
+    try {
+      const body = await requestJson(
+        `./api/v1/admin/datev/export-preview?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      );
+      datevPreviewState = body;
+      elements.datevPreviewMessage.textContent = "";
+      renderDatevPreview();
+    } catch (error) {
+      datevPreviewState = null;
+      elements.datevPreviewMessage.textContent = error.message;
+      renderDatevPreview();
+    } finally {
+      elements.datevPreviewLoad.disabled = !navigator.onLine;
+    }
   });
 
   elements.holidayCalendarForm.addEventListener("submit", async (event) => {

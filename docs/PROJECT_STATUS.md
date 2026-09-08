@@ -1,12 +1,21 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.43
+Technischer Stand: V0.44.44
 
 
 ## Abgeschlossen
 
-- **Untere Leiste bleibt am Bildschirmrand** (Fassung 0.44.43, Migration 154).
+- **DATEV-Fenster in der App** (Fassung 0.44.44, Migration 155). Die
+  Lohnschnittstelle gab es bisher nur auf dem Server. Jetzt pflegt das Büro
+  unter Einstellungen Stammdaten (Berater-/Mandantennummer, LODAS oder Lohn
+  und Gehalt), die Zuordnung aller zwölf Zeit- und Abwesenheitsarten auf
+  Lohnarten und Ausfallschlüssel sowie eine Vorschau für bis zu ein Jahr.
+  Zuordnungen werden abgelöst statt überschrieben, frühere Stände sind mit
+  Grund und Urheber einsehbar. Fehlende Zuordnungen werden angezeigt, nicht
+  verschwiegen. Eine Exportdatei erzeugt diese Stufe bewusst noch nicht —
+  dafür fehlen die Nummern der Steuerkanzlei (siehe docs/DATEV_EXPORT.md).
+- **Untere Leiste bleibt am Bildschirmrand** (Fassung 0.44.44, Migration 154).
   Auf dem iPhone schwebte die Navigationsleiste mitten im Inhalt. Ursache war
   kein Layoutfehler — der Platz unten war korrekt reserviert —, sondern ein
   Kompositionsfehler in WebKit: `backdrop-filter` neben `position: fixed` und
@@ -14,7 +23,7 @@ Technischer Stand: V0.44.43
   machte (eine Achse `hidden` zwingt die andere von `visible` auf `auto`).
   Beide Auslöser entfernt, Hintergrund undurchsichtig, Regressionstest dagegen.
   Die Desktop-Seitenleiste (`position: sticky`) bleibt unverändert.
-- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.43,
+- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.44,
   Migrationen 152 und 153). Bislang griff `changeInitialPassword` nur einmalig
   beim allerersten Login; danach gab es kein Ändern des eigenen bekannten
   Passworts, kein Zurücksetzen durch das Büro und keinen Notausgang für die
@@ -35,7 +44,7 @@ Technischer Stand: V0.44.43
   Notfallskript für einen unerreichbaren Plattformdienst
   (`api/scripts/notfall-passwort.mjs`) kamen in eigenen Änderungen vorher.
 
-- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.43,
+- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.44,
   Migration 150). Keine Zugangsdaten im ausgelieferten Frontend, keine im
   Git-Verlauf über alle 250 Commits, und der Anmelde-Endpunkt hält allen zehn
   geprüften Punkten stand — scrypt mit Kostenparameter 16384, `timingSafeEqual`,
