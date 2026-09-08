@@ -5,6 +5,10 @@ Technischer Stand: V0.44.42
 
 ## Ergänzende Sicherheitsprüfung 08.09.2026
 
+Die Plattform-Anmeldesperre verwendet die normalisierte Anmeldekennung
+statt einer vom Client beeinflussbaren IP-Kopfzeile. Ein Regressionstest
+prüft den Umgehungsversuch sowie die Unabhängigkeit anderer Konten.
+
 Eine erneute Prüfung hat beim Anmeldeschutz dauerhaft gespeicherte,
 veraltete Fehlversuche gefunden. Der aktuelle Hotfix entfernt abgelaufene
 Einträge regelmäßig und begrenzt die Liste auf 10.000 Kennungen je Prozess.

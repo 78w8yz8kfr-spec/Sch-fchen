@@ -418,7 +418,9 @@ async function createPlatformSuperadmin(pool, config, body) {
 async function login(pool, config, limiter, request, body) {
   const email = requiredText(body.email, "E-Mail-Adresse", 254).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
-  const rateKey = limiter.key(requestIp(request) || "unknown", "platform", email);
+  // Die Kontosperre gilt unabhängig von vom Client mitgesendeten IP-Headern
+  // und vom Wechsel des Anschlusses. Proxy-Adressen sind keine Identität.
+  const rateKey = limiter.key("platform-login", "platform", email);
   if (limiter.isBlocked(rateKey)) {
     throw new InputError("Zu viele fehlgeschlagene Anmeldeversuche.", 429, "login_rate_limited");
   }

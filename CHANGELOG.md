@@ -4,6 +4,10 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Plattform-Anmeldeschutz.** Die Sperre gilt je normalisierter Anmeldekennung
+  unabhängig von wechselnden IP-Kopfzeilen. Ein Regressionstest prüft
+  Kopfzeilenwechsel, Anschlusswechsel, Großschreibung und getrennte Konten.
+
 - **Anmeldeschutz: begrenzter Speicher (08.09.2026).** Abgelaufene
   Fehlversuche werden auch bei wechselnden Kennungen entfernt. Höchstens
   10.000 Einträge bleiben je Prozess im Speicher. Bei voller Liste warten
