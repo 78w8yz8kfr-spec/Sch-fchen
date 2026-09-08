@@ -43,7 +43,7 @@ class FakeCache {
     const treffer = this.entries.get(cacheKey(request));
     if (treffer || !options.ignoreSearch) return treffer;
     // Wie im Browser: ohne Fragezeichenteil vergleichen. So findet eine Anfrage
-    // nach app.js?v=0.44.41 die abgelegte app.js?v=0.42.1.
+    // nach app.js?v=0.44.42 die abgelegte app.js?v=0.42.1.
     const ohneAbfrage = (wert) => new URL(wert, ORIGIN).pathname;
     const gesucht = ohneAbfrage(cacheKey(request));
     for (const [schluessel, antwort] of this.entries) {
@@ -162,9 +162,9 @@ test("Installation legt genau die App-Shell im Versionscache ab", async () => {
   const shell = await worker.caches.open(CACHE_NAME);
   const cachedPaths = [...shell.entries.keys()];
   for (const required of [
-    "./", "./index.html", "./design-system.css?v=0.44.41", "./app.js?v=0.44.41",
-    "./core/device-management.js?v=0.44.41", "./core/apprentice-view.js?v=0.44.41",
-    "./vendor/qr-scanner.min.js?v=0.44.41",
+    "./", "./index.html", "./design-system.css?v=0.44.42", "./app.js?v=0.44.42",
+    "./core/device-management.js?v=0.44.42", "./core/apprentice-view.js?v=0.44.42",
+    "./vendor/qr-scanner.min.js?v=0.44.42",
     "./vendor/qr-scanner-worker.min.js",
     "./platform-admin.html", "./vde/index.html", "./manifest.webmanifest", "./assets/mark.svg"
   ]) {
@@ -252,7 +252,7 @@ test("Offline liefert nur der eigene Dokumentencache ein Baustellendokument", as
 });
 
 test("Ein vor dem Update gesichertes Dokument bleibt offline auffindbar", async () => {
-  // Die App-Fassung steht seit 0.44.41 im Adressteil, damit ein Pflichtupdate
+  // Die App-Fassung steht seit 0.44.42 im Adressteil, damit ein Pflichtupdate
   // ein Dokument nicht durch seine eigene Meldung ersetzt. Abgelegt ist es
   // aber weiterhin ohne sie - sonst waere mit jeder neuen Fassung alles
   // Gesicherte auf einen Schlag verschwunden, und zwar genau dann, wenn kein
@@ -272,7 +272,7 @@ test("Ein vor dem Update gesichertes Dokument bleibt offline auffindbar", async 
 
   const response = await runFetch(
     worker,
-    requestFor(`${documentPath}?offlineScope=${scope}&appVersion=0.44.41`)
+    requestFor(`${documentPath}?offlineScope=${scope}&appVersion=0.44.42`)
   );
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "Vor dem Update gesichert");
@@ -340,7 +340,7 @@ test("Statische Dateien kommen zuerst aus dem Cache und werden sonst nachgeladen
     fetchImplementation: async () => new Response("Frisch geladen", { status: 200 })
   });
   const shell = await worker.caches.open(CACHE_NAME);
-  const cachedRequest = requestFor("/styles.css?v=0.44.41");
+  const cachedRequest = requestFor("/styles.css?v=0.44.42");
   await shell.put(cachedRequest, new Response("Aus dem Cache"));
 
   const fromCache = await runFetch(worker, cachedRequest);
@@ -367,7 +367,7 @@ test("Waehrend einer Veroeffentlichung springt die vorherige Fassung ein", async
   const shell = await worker.caches.open(CACHE_NAME);
   await shell.put(requestFor("/app.js?v=0.42.1"), new Response("Vorherige Fassung"));
 
-  const neu = requestFor("/app.js?v=0.44.41");
+  const neu = requestFor("/app.js?v=0.44.42");
   const antwort = await runFetch(worker, neu);
   assert.equal(await antwort.text(), "Vorherige Fassung");
 });
@@ -381,7 +381,7 @@ test("Eine Fehlerseite des anlaufenden Dienstes ersetzt keine Datei", async () =
   const shell = await worker.caches.open(CACHE_NAME);
   await shell.put(requestFor("/styles.css?v=0.42.1"), new Response("Vorherige Gestaltung"));
 
-  const antwort = await runFetch(worker, requestFor("/styles.css?v=0.44.41"));
+  const antwort = await runFetch(worker, requestFor("/styles.css?v=0.44.42"));
   assert.equal(await antwort.text(), "Vorherige Gestaltung");
 });
 

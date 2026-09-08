@@ -1496,15 +1496,15 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.41"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.41"'));
-assert.ok(worker.includes('"./app.js?v=0.44.41"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.41"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.41"'));
-assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.41"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.41"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.42"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.42"'));
+assert.ok(worker.includes('"./app.js?v=0.44.42"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.42"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.42"'));
+assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.42"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.42"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.41"'));
+assert.ok(worker.includes('"./version.js?v=0.44.42"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
@@ -1553,11 +1553,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.41"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.41"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.42"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.42"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.41"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.41"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.42"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.42"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 // Gesucht wird unter der abgelegten Adresse - ohne die App-Fassung, die nur an

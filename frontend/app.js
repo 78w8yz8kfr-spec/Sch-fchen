@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.41";
-import { serverIsNewer } from "./core/versions.js?v=0.44.41";
+} from "./core/work-time.js?v=0.44.42";
+import { serverIsNewer } from "./core/versions.js?v=0.44.42";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.41";
+} from "./core/sync-queue.js?v=0.44.42";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.41";
+} from "./core/permissions.js?v=0.44.42";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.41";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.41";
-import { createPowerModule } from "./core/power-module.js?v=0.44.41";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.41";
+} from "./core/state-store.js?v=0.44.42";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.42";
+import { createPowerModule } from "./core/power-module.js?v=0.44.42";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.42";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.41";
+} from "./core/time-changes.js?v=0.44.42";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -513,6 +513,7 @@ import {
     navCustomers: document.querySelector("#nav-customers"),
     navVehicles: document.querySelector("#nav-vehicles"),
     navDevices: document.querySelector("#nav-devices"),
+    navInventory: document.querySelector("#nav-inventory"),
     navPower: document.querySelector("#nav-power"),
     powerModuleRoot: document.querySelector("#power-module"),
     areaSwitchPower: document.querySelector("#area-switch-power"),
@@ -1485,7 +1486,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.41",
+          "X-Schaefchen-Version": "0.44.42",
           ...options.headers
         }
       });
@@ -1520,7 +1521,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.41`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.42`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1542,7 +1543,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.41" }
+        headers: { "X-Schaefchen-Version": "0.44.42" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1589,7 +1590,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.41 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.42 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1702,6 +1703,7 @@ import {
     // Baustrom auch - erreichbar bleibt er ueber "Betrieb", nur nicht mehr
     // als eigene Kachel in der Hauptleiste.
     elements.navDevices.hidden = demoMode || !moduleEnabled("devices");
+    elements.navInventory.hidden = demoMode || !moduleEnabled("inventory_structure");
     deviceModule.setEnabled(!elements.navDevices.hidden);
     // Baustrom haengt an derselben Freigabe: ein Verteiler ist ein Geraet.
     elements.navPower.hidden = elements.navDevices.hidden;
@@ -2994,7 +2996,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.41";
+  const EIGENE_FASSUNG = "0.44.42";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3033,7 +3035,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.41". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.42". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -7146,7 +7148,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.41" }
+        headers: { "X-Schaefchen-Version": "0.44.42" }
       });
       if (response.ok) {
         await cache.put(

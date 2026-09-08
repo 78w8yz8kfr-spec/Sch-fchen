@@ -55,6 +55,9 @@ export async function serveStatic(request, response, directory, pathname) {
   }
 
   const relativePath = decodedPath === "/" ? "index.html" : decodedPath.replace(/^\/+/, "");
+  // Auch versehentlich in frontend abgelegte Konfiguration niemals ausliefern.
+  if (relativePath.split("/").some((part) => part.startsWith("."))
+      || /\.(?:env|pem|key|p12|pfx|sql|bak)$/i.test(relativePath)) return false;
   const root = resolve(directory);
   const candidate = resolve(root, relativePath);
   if (candidate !== root && !candidate.startsWith(`${root}${sep}`)) return false;

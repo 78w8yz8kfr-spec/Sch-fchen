@@ -1,7 +1,23 @@
 # Projektstatus
 
-Stand: 13.08.2026
-Technischer Stand: V0.44.41
+Stand: 08.09.2026
+Technischer Stand: V0.44.42
+
+## Lagerstruktur und kostenloser Wiederanlauf
+
+Render meldet den Neon-Deploy als live; /health antwortete am 08.09.2026 mit
+HTTP 200. Die neue Datenbank enthält einen fiktiven Testbetrieb, keine geretteten
+Altdaten. Datenbankpasswort und Einrichtungsschlüssel bleiben serverseitige
+Render-Umgebungsvariablen. Der Einrichtungsschlüssel ist dort unter
+INITIAL_SETUP_TOKEN zu finden, nicht in einer öffentlichen API-Antwort.
+
+Migrationen 151–153 ergänzen Lager → Bereich → Regal → Fach mit RLS,
+Änderungshistorie und Archivierung. Die neuen inventory_-Tabellen und der
+Modulschlüssel inventory_structure sind unabhängig von Migration 141: der
+Neustart entfernt diese Daten nicht. Neue Firmen erhalten das Modul nicht
+automatisch. Freigabe erfolgt über die Plattform; für den neuen Testbetrieb
+kann der Betreiber es separat aktivieren. Bestandsbuchungen, Artikel, Einkauf
+und Barcodeprozesse gehören noch nicht zu dieser Struktur.
 
 ## Hosting-Wiederanlauf 07.09.2026
 
