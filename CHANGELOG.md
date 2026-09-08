@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Anmeldeschutz: begrenzter Speicher (08.09.2026).** Abgelaufene
+  Fehlversuche werden auch bei wechselnden Kennungen entfernt. Höchstens
+  10.000 Einträge bleiben je Prozess im Speicher. Bei voller Liste warten
+  neue Kennungen bis zur Freigabe eines Platzes; aktive Sperren werden nicht
+  verdrängt. Regressionstests decken Ablauf, Kapazität, parallele ausstehende
+  Fehlversuche und anschließende Erholung ab. Die Änderung ersetzt keine
+  verteilten Rate-Limits und keine vollständige Sicherheitsfreigabe.
+
 - **0.44.42 – Lagerstruktur (08.09.2026).** Neue, von der entfernten Altverwaltung
   unabhängige Struktur Lager → Bereich → Regal → Fach. Mandanten- und Rollenprüfung,
   unveränderliche Herkunft und Historie, Archivierung/Reaktivierung, Suchansicht

@@ -63,10 +63,15 @@ export function platformSessionCookie(token, options) {
 }
 
 export class LoginRateLimiter {
-  constructor({ maximumFailures = 5, windowMs = 15 * 60 * 1000 } = {}) {
+  constructor({ maximumFailures = 5, windowMs = 15 * 60 * 1000, maximumEntries = 10_000 } = {}) {
+    if (!Number.isSafeInteger(maximumEntries) || maximumEntries < 1) {
+      throw new TypeError("maximumEntries muss eine positive ganze Zahl sein.");
+    }
     this.maximumFailures = maximumFailures;
     this.windowMs = windowMs;
+    this.maximumEntries = maximumEntries;
     this.failures = new Map();
+    this.nextSweepAt = 0;
   }
 
   key(ip, companyNumber, personnelNumber) {
@@ -74,8 +79,11 @@ export class LoginRateLimiter {
   }
 
   isBlocked(key, now = Date.now()) {
+    this.pruneExpired(now);
     const entry = this.failures.get(key);
-    if (!entry) return false;
+    // Bei ausgeschöpfter Kapazität keine vorhandene Sperre verdrängen.
+    // Neue Kennungen warten, bis ein Eintrag abläuft oder gelöscht wird.
+    if (!entry) return this.failures.size >= this.maximumEntries;
     if (entry.resetAt <= now) {
       this.failures.delete(key);
       return false;
@@ -84,7 +92,11 @@ export class LoginRateLimiter {
   }
 
   fail(key, now = Date.now()) {
+    this.pruneExpired(now);
     const current = this.failures.get(key);
+    // Mehrere Passwortprüfungen können gleichzeitig unterwegs sein und
+    // isBlocked() noch vor Erreichen der Grenze durchlaufen haben.
+    if (!current && this.failures.size >= this.maximumEntries) return;
     const entry = !current || current.resetAt <= now
       ? { count: 0, resetAt: now + this.windowMs }
       : current;
@@ -94,5 +106,13 @@ export class LoginRateLimiter {
 
   clear(key) {
     this.failures.delete(key);
+  }
+
+  pruneExpired(now) {
+    if (now < this.nextSweepAt && this.failures.size < this.maximumEntries) return;
+    for (const [key, entry] of this.failures) {
+      if (entry.resetAt <= now) this.failures.delete(key);
+    }
+    this.nextSweepAt = now + Math.min(this.windowMs, 60_000);
   }
 }

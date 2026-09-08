@@ -3,6 +3,20 @@
 Stand: 08.09.2026
 Technischer Stand: V0.44.42
 
+## Ergänzende Sicherheitsprüfung 08.09.2026
+
+Eine erneute Prüfung hat beim Anmeldeschutz dauerhaft gespeicherte,
+veraltete Fehlversuche gefunden. Der aktuelle Hotfix entfernt abgelaufene
+Einträge regelmäßig und begrenzt die Liste auf 10.000 Kennungen je Prozess.
+Bei voller Liste erhalten neue Kennungen vorübergehend eine Anmeldesperre;
+bestehende Sperren werden nicht durch wechselnde Kennungen verdrängt.
+Gesonderte Regressionstests prüfen diese Grenze und ihre Erholung.
+
+Die frühere Aussage „nichts gefunden“ bezieht sich nur auf die damaligen
+Prüfpunkte. Sie ist keine Freigabe der gesamten App. Der aktuelle private
+Prüfbericht trennt Live-Prüfungen, Quellcodebefunde und offene Prüfbereiche.
+Weitergehende Plattform-Sicherheitsfunktionen benötigen noch Nacharbeit.
+
 ## Lagerstruktur und kostenloser Wiederanlauf
 
 Render meldet den Neon-Deploy als live; /health antwortete am 08.09.2026 mit
