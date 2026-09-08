@@ -44,7 +44,7 @@ BEGIN
     IF NEW.parent_id IS NOT NULL THEN
         SELECT kind, status INTO parent_kind, parent_status
         FROM inventory_locations WHERE company_id = NEW.company_id AND id = NEW.parent_id;
-        IF parent_kind IS DISTINCT FROM CASE NEW.kind WHEN 'area' THEN 'depot' WHEN 'rack' THEN 'area' WHEN 'bin' THEN 'rack' END
+        IF parent_kind IS DISTINCT FROM (CASE NEW.kind WHEN 'area' THEN 'depot' WHEN 'rack' THEN 'area' WHEN 'bin' THEN 'rack' END)
            OR (NEW.status = 'active' AND parent_status IS DISTINCT FROM 'active') THEN
             RAISE EXCEPTION 'Übergeordneter Lagerplatz fehlt, ist archiviert oder hat die falsche Ebene' USING ERRCODE = '23514';
         END IF;
