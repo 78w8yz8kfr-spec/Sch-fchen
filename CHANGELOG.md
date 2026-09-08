@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **0.44.42 – Lagerstruktur (08.09.2026).** Neue, von der entfernten Altverwaltung
+  unabhängige Struktur Lager → Bereich → Regal → Fach. Mandanten- und Rollenprüfung,
+  unveränderliche Herkunft und Historie, Archivierung/Reaktivierung, Suchansicht
+  und Schutz gegen verlorene parallele Änderungen. Migrationen 151–153; eigener
+  Modulschlüssel `inventory_structure`. Artikel, Bestände und Buchungen sind noch
+  nicht enthalten. Keine automatische Freischaltung für Bestandsfirmen.
+- Geheimnisdateien und versteckte Pfade werden auch dann nicht statisch
+  ausgeliefert, wenn sie versehentlich im Frontend-Verzeichnis liegen.
+
 - **Neon-Anbindung für den kostenlosen Testbetrieb (07.09.2026).** Die API
   verbindet sich mit Neon über TLS und prüft das Serverzertifikat. Andere
   PostgreSQL-Anbieter können dieselbe Prüfung über `API_DB_SSL_MODE=verify-full`

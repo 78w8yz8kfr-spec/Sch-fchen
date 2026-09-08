@@ -55,6 +55,7 @@ import {
 } from "./apprentice-reports.mjs";
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
+import { handleInventoryRequest } from "./inventory.mjs";
 import { handlePowerRequest } from "./power.mjs";
 import {
   expectedNextTypes,
@@ -221,7 +222,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.41";
+export const APPLICATION_VERSION = "0.44.42";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -10714,6 +10715,12 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           )
         );
         return json(response, 200, { announcement });
+      }
+
+      if (url.pathname.startsWith("/api/v1/inventory/")) {
+        const handled = await withReadySession(pool, tokenHash, (client, context) =>
+          handleInventoryRequest({ request, url, client, context }));
+        if (handled) return json(response, handled.status, handled.body);
       }
 
       // Maschinen & Geräte kapselt seine umfangreiche Fachlogik in einem

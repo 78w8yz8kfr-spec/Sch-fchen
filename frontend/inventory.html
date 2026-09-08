@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e30613"><title>Lagerstruktur · Schäfchen</title>
+  <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./inventory.css?v=0.44.42">
+  <script type="module" src="./inventory.js?v=0.44.42"></script>
+</head>
+<body><main>
+  <header><a href="./">← Zur Arbeitsapp</a><img src="./assets/mark.svg" alt="Schäfchen" width="40" height="40"></header>
+  <p class="eyebrow">Betrieb</p><h1>Lagerstruktur</h1>
+  <p>Lager → Bereich → Regal → Fach. Hier organisierst du Lagerplätze; Artikel und Bestandsbuchungen folgen getrennt.</p>
+  <p id="message" role="status" aria-live="polite">Lagerstruktur wird geladen …</p>
+  <section id="workspace" hidden>
+    <div class="toolbar"><label>Suchen <input id="search" type="search" placeholder="Name oder Code"></label>
+      <label class="check"><input id="archived" type="checkbox"> Archivierte anzeigen</label>
+      <button id="add" type="button" hidden>+ Lager anlegen</button><button id="reload" type="button">Neu laden</button></div>
+    <div id="locations" aria-label="Lagerplätze"></div>
+    <section id="history" hidden><h2>Änderungshistorie</h2><p>Die letzten 100 Änderungen dieses Lagerplatzes.</p><ol id="events"></ol></section>
+  </section>
+  <dialog id="editor"><form id="form">
+    <h2 id="editor-title">Lagerplatz anlegen</h2>
+    <p id="parent-label"></p>
+    <label>Code <input id="code" required maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,29}" autocomplete="off" placeholder="z. B. L1, R01, F01"></label>
+    <label>Name <input id="name" required maxlength="120" autocomplete="off"></label>
+    <p id="form-message" role="alert"></p>
+    <div class="toolbar"><button id="save" type="submit">Speichern</button><button id="cancel" type="button">Abbrechen</button></div>
+  </form></dialog>
+</main></body></html>
