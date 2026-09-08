@@ -475,6 +475,38 @@ select:focus-visible {
   text-align: center;
 }
 
+/* "Passwort vergessen?" auf der Anmeldung: ein ehrlicher Weg statt eines
+   Selbstbedienungslinks, den es ohne Mailversand gar nicht geben kann. */
+.login-help {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.login-help > summary {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.login-help__content {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.login-help__content p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.login-help__content strong {
+  color: var(--ink);
+}
+
 .dashboard-view {
   padding-bottom: calc(86px + env(safe-area-inset-bottom));
   background: var(--canvas);
@@ -1624,6 +1656,37 @@ select:focus-visible {
 .time-correction-form label {
   font-size: 0.73rem;
   font-weight: 750;
+}
+
+/* Zurückgesetztes Passwort: wird einmal angezeigt und danach nirgends
+   gespeichert. Grosse, gut unterscheidbare Zeichen, weil es oft am Telefon
+   durchgegeben wird - Verwechslungen zwischen 0/O oder l/1 sind hier teuer. */
+.employee-password-reset-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #f1c3c6;
+  border-radius: 13px;
+  color: #7a0f16;
+  background: #fff0f1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.employee-password-reset-value {
+  margin: 4px 0 0;
+  padding: 18px 16px;
+  border: 1px dashed #cfd9d3;
+  border-radius: 14px;
+  color: var(--ink);
+  background: #f7f8f7;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-align: center;
+  word-break: break-all;
+  user-select: all;
 }
 
 .time-correction-form input,
@@ -6065,6 +6128,20 @@ select:focus-visible {
   font-size: 0.82rem;
   font-weight: 700;
   text-align: right;
+}
+
+/* Eigenes Passwort aendern: bisher gab es dafuer keinen Weg, auch nicht fuer
+   den Betreiber selbst. Ein eigener Abschnitt statt eines Aufklappers, weil
+   es die einzige Handlung im eigenen Konto mit echten Folgen ist. */
+.account-password-form {
+  margin-top: 4px;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.account-password-form h3 {
+  margin: 0 0 2px;
+  font-size: 0.92rem;
 }
 
 /* Berichtsheft: Wochenbericht des Auszubildenden und die Pruefung durch den

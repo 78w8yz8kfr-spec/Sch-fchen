@@ -279,6 +279,12 @@ import {
     accountPersonnelNumber: document.querySelector("#account-personnel-number"),
     accountCompany: document.querySelector("#account-company"),
     accountRoles: document.querySelector("#account-roles"),
+    accountPasswordForm: document.querySelector("#account-password-form"),
+    accountCurrentPassword: document.querySelector("#account-current-password"),
+    accountNewPassword: document.querySelector("#account-new-password"),
+    accountConfirmPassword: document.querySelector("#account-confirm-password"),
+    accountPasswordSubmit: document.querySelector("#account-password-submit"),
+    accountPasswordMessage: document.querySelector("#account-password-message"),
     accountLogout: document.querySelector("#account-logout"),
     weekPrevious: document.querySelector("#week-previous"),
     weekCurrent: document.querySelector("#week-current"),
@@ -873,8 +879,22 @@ import {
     employeeEditTrainer: document.querySelector("#employee-edit-trainer"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
+    employeeEditResetPassword: document.querySelector("#employee-edit-reset-password"),
     employeeEditRemove: document.querySelector("#employee-edit-remove"),
     employeeEditMessage: document.querySelector("#employee-edit-message"),
+    employeePasswordResetDialog: document.querySelector("#employee-password-reset-dialog"),
+    employeePasswordResetForm: document.querySelector("#employee-password-reset-form"),
+    employeePasswordResetName: document.querySelector("#employee-password-reset-name"),
+    employeePasswordResetClose: document.querySelector("#employee-password-reset-close"),
+    employeePasswordResetRequest: document.querySelector("#employee-password-reset-request"),
+    employeePasswordResetReason: document.querySelector("#employee-password-reset-reason"),
+    employeePasswordResetSubmit: document.querySelector("#employee-password-reset-submit"),
+    employeePasswordResetMessage: document.querySelector("#employee-password-reset-message"),
+    employeePasswordResetResult: document.querySelector("#employee-password-reset-result"),
+    employeePasswordResetValue: document.querySelector("#employee-password-reset-value"),
+    employeePasswordResetCopy: document.querySelector("#employee-password-reset-copy"),
+    employeePasswordResetAck: document.querySelector("#employee-password-reset-ack"),
+    employeePasswordResetDone: document.querySelector("#employee-password-reset-done"),
     customerPanel: document.querySelector("#customer-panel"),
     customerForm: document.querySelector("#customer-form"),
     customerType: document.querySelector("#customer-type"),
@@ -1201,6 +1221,10 @@ import {
   let returningReportId = null;
   let deepLinkedSiteHandled = false;
   let editingEmployeeId = null;
+  // Wessen Passwort im offenen Dialog gerade zurueckgesetzt wird. Getrennt von
+  // editingEmployeeId, weil der Bearbeitungsdialog dahinter geschlossen sein
+  // kann, waehrend das neue Passwort noch angezeigt wird.
+  let passwordResetEmployeeId = null;
   let editingTimeAccountId = null;
   let speechRecognition = null;
   let cachedUserId = null;
@@ -1798,6 +1822,11 @@ import {
     elements.siteImportFileName.textContent = "Keine Datei ausgewählt";
     elements.siteImportSelection.hidden = true;
     resetSiteImportPreview();
+    elements.accountPasswordForm.reset();
+    elements.accountPasswordMessage.textContent = "";
+    // Ein zurueckgesetztes Startpasswort darf keine Abmeldung ueberdauern -
+    // weder in der Anzeige noch im Dialog selbst.
+    closeEmployeePasswordResetDialog();
   }
 
   function showSetup(setup) {
@@ -6633,9 +6662,43 @@ import {
       }
       elements.employeeEditTrainer.value = employee.trainerUserId || "";
     }
+    // Das eigene Passwort setzt niemand ueber diesen Weg zurueck - dafuer gibt
+    // es "Passwort aendern" im eigenen Konto. Die Schnittstelle wuerde das
+    // ohnehin mit "password_reset_self" ablehnen; hier faellt schon die
+    // Schaltflaeche weg, statt erst nach einer Rueckfrage einen Fehler zu zeigen.
+    elements.employeeEditResetPassword.hidden = employee.id === session?.user?.id;
     elements.employeeEditMessage.textContent = "";
     elements.employeeEditForm.hidden = false;
     elements.employeeEditForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function closeEmployeePasswordResetDialog() {
+    passwordResetEmployeeId = null;
+    elements.employeePasswordResetForm.reset();
+    // Das Passwort stand nur in dieser Anzeige - nirgends sonst. Ohne diese
+    // Zeile bliebe es im DOM stehen, auch nachdem der Dialog laengst zu ist.
+    elements.employeePasswordResetValue.textContent = "";
+    elements.employeePasswordResetMessage.textContent = "";
+    elements.employeePasswordResetRequest.hidden = false;
+    elements.employeePasswordResetResult.hidden = true;
+    elements.employeePasswordResetClose.hidden = false;
+    elements.employeePasswordResetDone.disabled = true;
+    if (elements.employeePasswordResetDialog.open) elements.employeePasswordResetDialog.close();
+  }
+
+  function openEmployeePasswordResetDialog(employee) {
+    passwordResetEmployeeId = employee.id;
+    elements.employeePasswordResetName.textContent =
+      `${employee.firstName} ${employee.lastName} · Personalnummer ${employee.personnelNumber}`;
+    elements.employeePasswordResetReason.value = "";
+    elements.employeePasswordResetMessage.textContent = "";
+    elements.employeePasswordResetRequest.hidden = false;
+    elements.employeePasswordResetResult.hidden = true;
+    elements.employeePasswordResetClose.hidden = false;
+    elements.employeePasswordResetValue.textContent = "";
+    elements.employeePasswordResetAck.checked = false;
+    elements.employeePasswordResetDone.disabled = true;
+    elements.employeePasswordResetDialog.showModal();
   }
 
   function renderDispatchSummary() {
@@ -11731,6 +11794,92 @@ import {
     }
   });
   elements.employeeEditCancel.addEventListener("click", closeEmployeeEditor);
+  elements.employeeEditResetPassword.addEventListener("click", () => {
+    const employee = adminState?.employees.find((item) => item.id === editingEmployeeId);
+    if (!employee) return;
+    openEmployeePasswordResetDialog(employee);
+  });
+  elements.employeePasswordResetForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const employee = adminState?.employees.find((item) => item.id === passwordResetEmployeeId);
+    if (!employee) {
+      elements.employeePasswordResetMessage.textContent = "Der Mitarbeiter wurde nicht gefunden. Bitte neu laden.";
+      return;
+    }
+    const reason = elements.employeePasswordResetReason.value.trim();
+    if (reason.length < 3) {
+      elements.employeePasswordResetMessage.textContent = "Bitte eine Begründung eintragen.";
+      return;
+    }
+    // Die Rueckfrage nennt, wen es trifft - nicht nur "sicher?". Wer sofort auf
+    // allen Geraeten abgemeldet wird, ist eine Person mit Namen, keine Nummer.
+    if (!window.confirm(
+      `${employee.firstName} ${employee.lastName} (Personalnummer ${employee.personnelNumber}) `
+      + "wird sofort auf allen Geräten abgemeldet und erhält ein neues Startpasswort. Fortfahren?"
+    )) return;
+    elements.employeePasswordResetSubmit.disabled = true;
+    elements.employeePasswordResetMessage.textContent = "Neues Startpasswort wird sicher erzeugt …";
+    try {
+      const body = await requestJson(
+        `./api/v1/admin/employees/${encodeURIComponent(employee.id)}/password-reset`,
+        { method: "POST", body: JSON.stringify({ reason }) }
+      );
+      // Das Passwort lebt ab hier ausschliesslich in dieser Anzeige - nicht im
+      // Zustand, nicht in localStorage, nicht in der Konsole. Danach ist es
+      // nirgends mehr abrufbar, auch fuer diese App nicht.
+      elements.employeePasswordResetValue.textContent = body.reset.temporaryPassword;
+      elements.employeePasswordResetRequest.hidden = true;
+      elements.employeePasswordResetResult.hidden = false;
+      // Solange das Passwort zu sehen ist, gibt es keinen stillen Ausgang: die
+      // Kreuz-Schaltflaeche verschwindet, Esc und ein Klick daneben bleiben
+      // wirkungslos (siehe die Dialog-Handler weiter unten).
+      elements.employeePasswordResetClose.hidden = true;
+    } catch (error) {
+      if (error.code === "password_reset_self") {
+        elements.employeePasswordResetMessage.textContent =
+          "Das eigene Passwort lässt sich hier nicht zurücksetzen. Nutze „Passwort ändern“ im eigenen Konto.";
+      } else if (error.status === 403) {
+        elements.employeePasswordResetMessage.textContent =
+          "Die Geschäftsführung kann nur von einer weiteren Geschäftsführung zurückgesetzt werden.";
+      } else if (error.status === 401) {
+        closeEmployeePasswordResetDialog();
+        showLogin();
+      } else {
+        elements.employeePasswordResetMessage.textContent = error.message;
+      }
+    } finally {
+      elements.employeePasswordResetSubmit.disabled = false;
+    }
+  });
+  elements.employeePasswordResetAck.addEventListener("change", () => {
+    elements.employeePasswordResetDone.disabled = !elements.employeePasswordResetAck.checked;
+  });
+  elements.employeePasswordResetDone.addEventListener("click", closeEmployeePasswordResetDialog);
+  elements.employeePasswordResetClose.addEventListener("click", closeEmployeePasswordResetDialog);
+  elements.employeePasswordResetCopy.addEventListener("click", async () => {
+    const value = elements.employeePasswordResetValue.textContent;
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast("Passwort in die Zwischenablage kopiert.");
+    } catch {
+      window.prompt("Passwort kopieren:", value);
+    }
+  });
+  elements.employeePasswordResetDialog.addEventListener("click", (event) => {
+    // Solange das neue Passwort angezeigt wird, schliesst ein Klick daneben
+    // nichts - sonst waere das einmalige Passwort durch einen Fehlklick fort.
+    if (event.target === elements.employeePasswordResetDialog && elements.employeePasswordResetResult.hidden) {
+      closeEmployeePasswordResetDialog();
+    }
+  });
+  elements.employeePasswordResetDialog.addEventListener("cancel", (event) => {
+    if (!elements.employeePasswordResetResult.hidden) {
+      event.preventDefault();
+      return;
+    }
+    closeEmployeePasswordResetDialog();
+  });
   elements.employeeEditRemove.addEventListener("click", async () => {
     const employee = adminState?.employees.find((item) => item.id === editingEmployeeId);
     if (!employee) return;
@@ -13531,6 +13680,40 @@ import {
       .filter((bericht) => bericht.status === "submitted")
       .map((bericht) => bericht.id);
     if (offene.length) void decideApprentice(offene, "approved");
+  });
+  elements.accountPasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (elements.accountNewPassword.value !== elements.accountConfirmPassword.value) {
+      elements.accountPasswordMessage.textContent = "Die beiden neuen Passwörter stimmen nicht überein.";
+      return;
+    }
+    elements.accountPasswordSubmit.disabled = true;
+    elements.accountPasswordMessage.textContent = "Passwort wird sicher geändert …";
+    try {
+      await requestJson("./api/v1/me/password", {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: elements.accountCurrentPassword.value,
+          newPassword: elements.accountNewPassword.value
+        })
+      });
+      elements.accountPasswordForm.reset();
+      // Das gilt wirklich und ist keine Fehlermeldung: wer es nicht weiss, haelt
+      // es sonst fuer einen Fehler, wenn das andere Geraet ploetzlich abgemeldet ist.
+      elements.accountPasswordMessage.textContent =
+        "Passwort geändert. Du wurdest damit auf allen anderen Geräten abgemeldet.";
+      showToast("Passwort geändert.");
+    } catch (error) {
+      if (error.code === "invalid_credentials") {
+        elements.accountPasswordMessage.textContent = "Das aktuelle Passwort ist nicht richtig.";
+      } else if (error.status === 401) {
+        showLogin();
+      } else {
+        elements.accountPasswordMessage.textContent = error.message;
+      }
+    } finally {
+      elements.accountPasswordSubmit.disabled = false;
+    }
   });
   elements.accountLogout.addEventListener("click", () => elements.closePreview.click());
   elements.primaryAction.addEventListener("click", handlePrimaryAction);

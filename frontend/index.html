@@ -105,6 +105,17 @@
             <p id="login-message" class="form-message" aria-live="polite"></p>
           </form>
 
+          <!-- Ehrlich statt hübsch: es gibt keinen Mailversand in Schäfchen,
+               also auch keinen Selbstbedienungslink. Wer sein Passwort
+               vergessen hat, braucht einen Menschen, der es zurücksetzt. -->
+          <details class="login-help">
+            <summary>Passwort vergessen?</summary>
+            <div class="login-help__content">
+              <p><strong>Monteure und Büro:</strong> Beim Büro melden. Dort wird das Passwort zurückgesetzt und ein neues Startpasswort durchgegeben.</p>
+              <p><strong>Geschäftsführung/Administration:</strong> Eine zweite Person mit Administratorrechten kann das Passwort zurücksetzen. Gibt es die nicht, hilft der Betreiber der Plattform über den Supportzugang.</p>
+            </div>
+          </details>
+
           <form id="setup-form" class="login-form" novalidate hidden>
             <div class="setup-heading">
               <p class="eyebrow">Einmalige Ersteinrichtung</p>
@@ -2421,6 +2432,9 @@
                   <button id="employee-edit-save" class="button button--primary" type="submit">Änderungen speichern</button>
                   <button id="employee-edit-cancel" class="button button--secondary" type="button">Abbrechen</button>
                 </div>
+                <button id="employee-edit-reset-password" class="button button--secondary" type="button">
+                  Passwort zurücksetzen
+                </button>
                 <button id="employee-edit-remove" class="button button--danger" type="button">
                   Mitarbeiter entfernen oder archivieren
                 </button>
@@ -3066,6 +3080,46 @@
             </section>
           </dialog>
 
+          <!-- Zwei Schritte in einem Dialog: erst die Begruendung, dann - nach
+               Ruecksprache - das einmalig angezeigte Ergebnis. Solange das neue
+               Passwort zu sehen ist, verschwindet der Dialog nicht wortlos:
+               weder ueber Esc noch ueber einen Klick daneben, sondern erst nach
+               ausdruecklicher Bestaetigung, dass es notiert oder weitergegeben
+               wurde. Danach steht es nirgends mehr - auch nicht in dieser Seite. -->
+          <dialog id="employee-password-reset-dialog" class="time-correction-dialog employee-password-reset-dialog" aria-labelledby="employee-password-reset-title">
+            <form id="employee-password-reset-form" class="time-correction-form" novalidate>
+              <div class="time-correction-form__heading">
+                <div>
+                  <p class="eyebrow">Zugang zurücksetzen</p>
+                  <h2 id="employee-password-reset-title">Passwort zurücksetzen</h2>
+                  <p id="employee-password-reset-name" class="time-correction-original"></p>
+                </div>
+                <button id="employee-password-reset-close" class="dialog-close" type="button" aria-label="Zurücksetzen abbrechen">×</button>
+              </div>
+
+              <div id="employee-password-reset-request">
+                <label for="employee-password-reset-reason">Begründung <span>(wird unveränderbar protokolliert)</span></label>
+                <textarea id="employee-password-reset-reason" maxlength="500" rows="3" required placeholder="z. B. telefonisch gemeldet, Zugang vergessen"></textarea>
+                <p class="time-correction-note">Der Mitarbeiter wird dabei sofort auf allen Geräten abgemeldet und muss beim nächsten Anmelden ein eigenes Passwort festlegen.</p>
+                <button id="employee-password-reset-submit" class="button button--primary" type="submit">Neues Startpasswort erzeugen</button>
+                <p id="employee-password-reset-message" class="form-message" aria-live="polite"></p>
+              </div>
+
+              <div id="employee-password-reset-result" hidden>
+                <p class="employee-password-reset-warning" role="alert">
+                  Dieses Passwort wird nur jetzt angezeigt. Danach ist es nirgends mehr abrufbar – bitte jetzt sofort weitergeben oder notieren.
+                </p>
+                <p id="employee-password-reset-value" class="employee-password-reset-value" aria-live="polite"></p>
+                <button id="employee-password-reset-copy" class="button button--secondary" type="button">In Zwischenablage kopieren</button>
+                <label class="toggle-field" for="employee-password-reset-ack">
+                  <input id="employee-password-reset-ack" type="checkbox">
+                  <span><strong>Bestätigt</strong><small>Ich habe das Passwort sicher weitergegeben oder notiert.</small></span>
+                </label>
+                <button id="employee-password-reset-done" class="button button--primary" type="button" disabled>Schließen</button>
+              </div>
+            </form>
+          </dialog>
+
           <section id="account-card" class="section account-card" data-dashboard-pane="more" aria-labelledby="account-title" hidden>
             <div class="section-heading">
               <div>
@@ -3079,6 +3133,23 @@
               <div><dt>Firma</dt><dd id="account-company">–</dd></div>
               <div><dt>Rolle</dt><dd id="account-roles">–</dd></div>
             </dl>
+
+            <!-- Das Startpasswort war fuer die Uebergabe. Bisher gab es keinen
+                 Weg, es danach aus eigener Kraft zu aendern - wer es einmal
+                 kannte, kannte es fuer immer. -->
+            <form id="account-password-form" class="admin-form account-password-form" novalidate>
+              <h3 id="account-password-title">Passwort ändern</h3>
+              <label for="account-current-password">Aktuelles Passwort</label>
+              <input id="account-current-password" type="password" autocomplete="current-password" required>
+              <label for="account-new-password">Neues Passwort</label>
+              <input id="account-new-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+              <p class="field-help">Mindestens 12 Zeichen mit mindestens einem Buchstaben und einer Ziffer.</p>
+              <label for="account-confirm-password">Neues Passwort wiederholen</label>
+              <input id="account-confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+              <button id="account-password-submit" class="button button--primary" type="submit">Passwort ändern</button>
+              <p id="account-password-message" class="form-message" aria-live="polite"></p>
+            </form>
+
             <button id="account-logout" class="button button--secondary" type="button">Abmelden</button>
           </section>
 
