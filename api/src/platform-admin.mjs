@@ -4,7 +4,7 @@ import {
   withPlatformSessionTransaction,
   withPlatformTransaction
 } from "./database.mjs";
-import { hashPassword, verifyPassword } from "./password.mjs";
+import { generateTemporaryPassword, hashPassword, verifyPassword } from "./password.mjs";
 import {
   createSessionToken,
   hashSessionToken,
@@ -1171,6 +1171,100 @@ async function updatePlatformRole(client, context, permissions, request, roleId,
   return publicValue(updated.rows[0]);
 }
 
+// Notausgang: "und wer setzt den Administrator zurück?" Eine zweite
+// Administration oder Geschäftsführung kann eine erste bereits über
+// api/v1/admin/employees/:id/password-reset zurücksetzen (siehe
+// resetEmployeePassword in app.mjs, docs/PASSWORT_NOTFALL.md). Dieser Weg
+// greift erst, wenn es niemanden Gleichrangigen mehr in der Firma gibt.
+// Er fügt sich in das bestehende Supportzugriff-Muster ein
+// (support_access_sessions, zeitbegrenzt, protokolliert) statt daneben etwas
+// Neues zu erfinden.
+async function resetCompanyAdministratorPassword(client, context, permissions, request, companyId, body) {
+  requirePermission(permissions, "accounts.manage");
+  await ensureCompany(client, companyId);
+  const reason = requiredText(body.reason, "Begründung", 1000);
+  const userId = validateId(body.userId, "Benutzer-ID");
+
+  const activeAccess = await client.query(
+    `SELECT id FROM support_access_sessions
+     WHERE company_id = $1 AND platform_user_id = $2
+       AND ended_at IS NULL AND expires_at > CURRENT_TIMESTAMP`,
+    [companyId, context.platformUserId]
+  );
+  if (activeAccess.rowCount === 0) {
+    throw new InputError(
+      "Für diese Firma ist kein aktiver Supportzugriff vorhanden.",
+      409,
+      "support_access_inactive"
+    );
+  }
+
+  const before = await client.query(
+    `SELECT id, personnel_number, first_name, last_name, status,
+            must_change_password, failed_login_attempts, locked_until
+     FROM users WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [companyId, userId]
+  );
+  if (before.rowCount !== 1) {
+    throw new InputError("Das Benutzerkonto wurde nicht gefunden.", 404, "account_not_found");
+  }
+  if (before.rows[0].status !== "active") {
+    throw new InputError("Nur ein aktives Konto kann ein neues Passwort erhalten.", 409, "account_not_active");
+  }
+
+  const targetRoles = await client.query(
+    `SELECT role.role_key FROM user_roles AS assignment
+     JOIN roles AS role
+       ON role.company_id = assignment.company_id AND role.id = assignment.role_id
+     WHERE assignment.company_id = $1 AND assignment.user_id = $2
+       AND assignment.revoked_at IS NULL AND role.status = 'active'`,
+    [companyId, userId]
+  );
+  const roleKeys = new Set(targetRoles.rows.map((row) => row.role_key));
+  // Dieser Weg ist der Notausgang für Administration und Geschäftsführung,
+  // nicht die Abkürzung für ein beliebiges Konto - dafür bleibt
+  // accountAction("reset_password") in der regulären Kontoverwaltung.
+  if (!roleKeys.has("admin") && !roleKeys.has("managing_director")) {
+    throw new InputError(
+      "Dieser Weg gilt nur für Administrator- oder Geschäftsführungskonten.",
+      409,
+      "administrator_role_required"
+    );
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+  await client.query(
+    `UPDATE users
+     SET password_hash = $3, must_change_password = TRUE, password_changed_at = CURRENT_TIMESTAMP,
+         failed_login_attempts = 0, locked_until = NULL
+     WHERE company_id = $1 AND id = $2`,
+    [companyId, userId, passwordHash]
+  );
+  await client.query(
+    `UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP, revocation_reason = 'password_reset'
+     WHERE company_id = $1 AND user_id = $2 AND revoked_at IS NULL`,
+    [companyId, userId]
+  );
+
+  await audit(client, context, request, {
+    action: "account.administrator_password_reset", targetType: "user_account", targetId: userId,
+    companyId,
+    oldState: before.rows[0],
+    // Niemals das erzeugte Passwort oder seinen Hash im Protokoll - nur die
+    // Wirkung.
+    newState: { mustChangePassword: true, failedLoginAttemptsCleared: true },
+    reason
+  });
+
+  return {
+    userId,
+    personnelNumber: before.rows[0].personnel_number,
+    temporaryPassword,
+    mustChangePassword: true
+  };
+}
+
 async function accountAction(client, context, permissions, request, accountId, body) {
   const action = requiredText(body.action, "Aktion", 50);
   const reason = requiredText(body.reason, "Begründung", 1000);
@@ -2077,6 +2171,15 @@ export function createPlatformHandler({ pool, config, limiter }) {
           validateId(firstAdminMatch[1], "Firmen-ID"), await readJson(request)
         );
         return { status: 201, body: { administrator: ergebnis } };
+      }
+      const administratorPasswordResetMatch =
+        /^\/api\/v1\/platform\/companies\/([^/]+)\/administrator-password-reset$/.exec(url.pathname);
+      if (administratorPasswordResetMatch && request.method === "POST") {
+        const reset = await resetCompanyAdministratorPassword(
+          client, context, permissions, request,
+          validateId(administratorPasswordResetMatch[1], "Firmen-ID"), await readJson(request)
+        );
+        return { status: 200, body: { reset } };
       }
       const companyMatch = /^\/api\/v1\/platform\/companies\/([^/]+)$/.exec(url.pathname);
       if (companyMatch && request.method === "GET") {

@@ -278,7 +278,9 @@ function boolean(value, label, fallback = false) {
   return value;
 }
 
-function password(value) {
+// Exportiert, damit password.mjs (generateTemporaryPassword) und dessen Tests
+// exakt dieselbe Regel prüfen können, statt sie ein zweites Mal nachzubauen.
+export function password(value) {
   const normalized = text(value, "Passwort", 12, 256);
   if (!/[a-zäöü]/i.test(normalized) || !/\d/.test(normalized)) {
     throw new InputError("Das Passwort benötigt mindestens einen Buchstaben und eine Zahl.");
@@ -920,6 +922,19 @@ export function validateId(value, label = "ID") {
 export function validateInitialPasswordChange(body) {
   rejectTenantFields(body);
   return { newPassword: password(body.newPassword) };
+}
+
+// Eigenes, bekanntes Passwort ändern (POST /api/v1/me/password) - anders als
+// validateInitialPasswordChange verlangt dieser Weg das aktuelle Passwort.
+// Er ist nicht auf must_change_password beschränkt und daher jederzeit
+// aufrufbar; ohne diese Pflichtangabe reichte eine gestohlene Sitzung
+// (z. B. ein mitgelesenes Cookie) allein aus, um das Passwort zu übernehmen.
+export function validatePasswordChange(body) {
+  rejectTenantFields(body);
+  return {
+    currentPassword: text(body.currentPassword, "Aktuelles Passwort", 1, 256),
+    newPassword: password(body.newPassword)
+  };
 }
 
 export function validateDocumentUpload(body) {

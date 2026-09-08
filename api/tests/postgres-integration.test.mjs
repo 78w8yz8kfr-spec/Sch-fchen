@@ -7150,6 +7150,419 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     }
   });
 
+  // Betreiberauftrag wörtlich: "der login muss auch verbessert werden ich
+  // habe das passwort vergessen und es gibt keinen weg dieses zurück zu
+  // setzen". Drei Wege, die zusammen jeden realen Fall abdecken: das eigene,
+  // noch bekannte Passwort ändern; das Büro setzt ein vergessenes Passwort
+  // zurück; die Plattform ist der Notausgang für Administration und
+  // Geschäftsführung.
+  await t.test("Passwort ändern und zurücksetzen", async () => {
+    // targetCompanyNumber ist optional: Teil 3 (Notausgang) legt eine eigene
+    // Firma an, deren Firmennummer sich von der äußeren "companyNumber"
+    // unterscheidet.
+    async function login(personnelNumber, password, targetCompanyNumber = companyNumber) {
+      const response = await fetch(`${baseUrl}/api/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: config.allowedOrigin },
+        body: JSON.stringify({ companyNumber: targetCompanyNumber, personnelNumber, password })
+      });
+      return response;
+    }
+    async function loginCookie(personnelNumber, password, targetCompanyNumber = companyNumber) {
+      const response = await login(personnelNumber, password, targetCompanyNumber);
+      assert.equal(response.status, 201, await response.clone().text());
+      return response.headers.get("set-cookie").split(";", 1)[0];
+    }
+    async function sessionStatus(sessionCookie) {
+      return (await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: sessionCookie } })).status;
+    }
+
+    // ---- 1. Eigenes, bekanntes Passwort ändern (POST /api/v1/me/password) ----
+    const selfPersonnelNumber = `PW-A-${suffix}`;
+    const selfStartPassword = "Passwortwechsel-Start-2026!";
+    const createdSelf = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        personnelNumber: selfPersonnelNumber,
+        firstName: "Selma",
+        lastName: "Selbst",
+        role: "installer",
+        temporaryPassword: selfStartPassword
+      })
+    });
+    assert.equal(createdSelf.status, 201, await createdSelf.clone().text());
+
+    const selfFirstSession = await loginCookie(selfPersonnelNumber, selfStartPassword);
+    const selfKnownPassword = "Passwortwechsel-Eigen-2026!";
+    const selfInitialChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: selfFirstSession },
+      body: JSON.stringify({ newPassword: selfKnownPassword })
+    });
+    assert.equal(selfInitialChange.status, 200);
+
+    // Zwei frische Sitzungen mit dem jetzt bekannten Passwort: eine ruft
+    // gleich /api/v1/me/password auf, die andere zeigt, dass genau die
+    // fremde Sitzung widerrufen wird - nicht die aufrufende.
+    const selfSessionA = await loginCookie(selfPersonnelNumber, selfKnownPassword);
+    const selfSessionB = await loginCookie(selfPersonnelNumber, selfKnownPassword);
+
+    // Falsches aktuelles Passwort: 401, kein Fehlversuchszähler, keine
+    // Nebenwirkung auf irgendeine Sitzung.
+    const wrongCurrent = await fetch(`${baseUrl}/api/v1/me/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: selfSessionA },
+      body: JSON.stringify({
+        currentPassword: "Falsches-Aktuelles-Passwort-2026!",
+        newPassword: "Ganz-Neues-Passwort-2026!"
+      })
+    });
+    assert.equal(wrongCurrent.status, 401);
+    assert.equal((await wrongCurrent.json()).error.code, "invalid_credentials");
+
+    // Gleiches Passwort wie bisher wird klar abgelehnt.
+    const samePassword = await fetch(`${baseUrl}/api/v1/me/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: selfSessionA },
+      body: JSON.stringify({ currentPassword: selfKnownPassword, newPassword: selfKnownPassword })
+    });
+    assert.equal(samePassword.status, 409);
+    assert.equal((await samePassword.json()).error.code, "password_unchanged");
+
+    // Beide Sitzungen sind nach den beiden abgelehnten Versuchen noch gültig.
+    assert.equal(await sessionStatus(selfSessionA), 200);
+    assert.equal(await sessionStatus(selfSessionB), 200);
+
+    const selfNewPassword = "Passwortwechsel-Neu-2026!";
+    const ownChange = await fetch(`${baseUrl}/api/v1/me/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: selfSessionA },
+      body: JSON.stringify({ currentPassword: selfKnownPassword, newPassword: selfNewPassword })
+    });
+    assert.equal(ownChange.status, 200, await ownChange.clone().text());
+    assert.deepEqual(await ownChange.json(), { changed: true });
+
+    // Die aufrufende Sitzung bleibt gültig, alle anderen Sitzungen desselben
+    // Kontos sind widerrufen - genau wie bei changeInitialPassword.
+    assert.equal(await sessionStatus(selfSessionA), 200);
+    assert.equal(await sessionStatus(selfSessionB), 401);
+
+    const oldPasswordLoginRejected = await login(selfPersonnelNumber, selfKnownPassword);
+    assert.equal(oldPasswordLoginRejected.status, 401);
+    const newPasswordLoginWorks = await login(selfPersonnelNumber, selfNewPassword);
+    assert.equal(newPasswordLoginWorks.status, 201);
+
+    // ---- 2. Büro setzt ein vergessenes Passwort zurück ----
+    const resetPersonnelNumber = `PW-B-${suffix}`;
+    const resetStartPassword = "Zuruecksetzen-Start-2026!";
+    const createdReset = await fetch(`${baseUrl}/api/v1/admin/employees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        personnelNumber: resetPersonnelNumber,
+        firstName: "Reiner",
+        lastName: "Zuruecksetzung",
+        role: "installer",
+        temporaryPassword: resetStartPassword
+      })
+    });
+    assert.equal(createdReset.status, 201, await createdReset.clone().text());
+    const resetEmployee = (await createdReset.json()).employee;
+
+    const resetKnownPassword = "Zuruecksetzen-Eigen-2026!";
+    const resetFirstSession = await loginCookie(resetPersonnelNumber, resetStartPassword);
+    const resetInitialChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: resetFirstSession },
+      body: JSON.stringify({ newPassword: resetKnownPassword })
+    });
+    assert.equal(resetInitialChange.status, 200);
+
+    // Eine zweite, aktive Sitzung - sie muss nach dem Zurücksetzen widerrufen
+    // sein.
+    const resetActiveSession = await loginCookie(resetPersonnelNumber, resetKnownPassword);
+
+    // Zehn Fehlversuche sperren ein Konto (Migration 044). Direkt in der
+    // Datenbank simuliert statt über zehn echte Fehlanmeldungen: der
+    // IP-Ratenlimiter (LoginRateLimiter, Standard fünf Fehlversuche) griffe
+    // sonst zuerst und dieser Test prüfte den falschen Mechanismus.
+    await inspectionPool.query(
+      `UPDATE users SET failed_login_attempts = 10,
+              locked_until = CURRENT_TIMESTAMP + INTERVAL '30 minutes'
+       WHERE company_id = $1 AND id = $2`,
+      [tenantCompany.id, resetEmployee.id]
+    );
+    const lockedLoginAttempt = await login(resetPersonnelNumber, resetKnownPassword);
+    assert.equal(lockedLoginAttempt.status, 401, "Ein gesperrtes Konto darf sich nicht anmelden können");
+
+    // Der Monteur selbst darf niemanden zurücksetzen.
+    const installerAttempt = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${resetEmployee.id}/password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: resetActiveSession },
+        body: JSON.stringify({ reason: "Unberechtigter Versuch im Integrationstest" })
+      }
+    );
+    assert.equal(installerAttempt.status, 403);
+
+    // Büro (plannerCookie: reine dispatch_office-Rolle) darf die
+    // Geschäftsführung nicht zurücksetzen - sonst Rechteausweitung durch die
+    // Hintertür.
+    const officeOnDirectorAttempt = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${director.id}/password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ reason: "Darf nicht gelingen - Büro gegen Geschäftsführung" })
+      }
+    );
+    assert.equal(officeOnDirectorAttempt.status, 403);
+    assert.equal((await officeOnDirectorAttempt.json()).error.code, "forbidden");
+
+    // Das Firmenadministratorkonto ist genauso geschützt wie eine
+    // Verwaltungsrolle: eine Rolle ohne Verwaltungsrechte (plannerCookie,
+    // reine dispatch_office-Rolle) darf es nicht zurücksetzen.
+    const adminSessionResponse = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: cookie } });
+    assert.equal(adminSessionResponse.status, 200);
+    const adminUserId = (await adminSessionResponse.json()).session.user.id;
+    const officeOnAdminAttempt = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${adminUserId}/password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ reason: "Darf nicht gelingen - Büro gegen Administratorkonto" })
+      }
+    );
+    assert.equal(officeOnAdminAttempt.status, 403);
+    assert.equal((await officeOnAdminAttempt.json()).error.code, "forbidden");
+
+    // Anders als bei createEmployee/updateEmployee ist das Administratorkonto
+    // hier NICHT unbedingt gesperrt: docs/PASSWORT_NOTFALL.md sieht vor, dass
+    // eine zweite Administration oder Geschäftsführung die erste zurücksetzen
+    // darf - der Plattform-Notausgang bleibt die Ausnahme für den Fall, dass
+    // es niemanden Gleichrangigen gibt.
+    const adminResetByDirector = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${adminUserId}/password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: directorCookie },
+        body: JSON.stringify({ reason: "Administrator hat sein Passwort vergessen (Integrationstest)" })
+      }
+    );
+    assert.equal(adminResetByDirector.status, 200, await adminResetByDirector.clone().text());
+    const adminReset = (await adminResetByDirector.json()).reset;
+    assert.equal(adminReset.employeeId, adminUserId);
+    assert.equal(adminReset.mustChangePassword, true);
+
+    // Die bisherige Administratorsitzung ("cookie") ist jetzt widerrufen -
+    // spätere Testabschnitte (bis hin zur abschließenden Abmeldung) brauchen
+    // aber weiterhin eine gültige Administratorsitzung unter demselben Namen.
+    // Deshalb frisch anmelden, das neue Startpasswort sofort ersetzen und
+    // "cookie" auf die neue, gültige Sitzung zeigen lassen.
+    assert.equal(await sessionStatus(cookie), 401);
+    const adminReloginCookie = await loginCookie(personnelNumber, adminReset.temporaryPassword);
+    const adminReplacementChange = await fetch(`${baseUrl}/api/v1/account/initial-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: adminReloginCookie },
+      body: JSON.stringify({ newPassword: "Verwaltung-Neu-Nach-Reset-2026!" })
+    });
+    assert.equal(adminReplacementChange.status, 200);
+    cookie = adminReloginCookie;
+
+    // Auf sich selbst anwenden.
+    const officeSessionResponse = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: plannerCookie } });
+    assert.equal(officeSessionResponse.status, 200);
+    const officeUserId = (await officeSessionResponse.json()).session.user.id;
+    const selfResetAttempt = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${officeUserId}/password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ reason: "Eigenes Konto - darf nicht gelingen" })
+      }
+    );
+    assert.equal(selfResetAttempt.status, 409);
+    assert.equal((await selfResetAttempt.json()).error.code, "password_reset_self");
+
+    // Erfolgreiches Zurücksetzen durch das Büro. dispatch_office reicht, weil
+    // die Installer-Rolle keine Verwaltungsrolle ist (MANAGEMENT_ROLES).
+    const resetReason = "Mitarbeiter hat sein Passwort vergessen (Integrationstest)";
+    const resetResponse = await fetch(
+      `${baseUrl}/api/v1/admin/employees/${resetEmployee.id}/password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: plannerCookie },
+        body: JSON.stringify({ reason: resetReason })
+      }
+    );
+    assert.equal(resetResponse.status, 200, await resetResponse.clone().text());
+    const reset = (await resetResponse.json()).reset;
+    assert.equal(reset.employeeId, resetEmployee.id);
+    assert.equal(reset.personnelNumber, resetPersonnelNumber);
+    assert.equal(reset.mustChangePassword, true);
+    assert.ok(reset.temporaryPassword && reset.temporaryPassword.length >= 12);
+
+    // Alle Sitzungen des Mitarbeiters sind widerrufen.
+    assert.equal(await sessionStatus(resetActiveSession), 401);
+
+    // Besonders wichtig: das zuvor gesperrte Konto kann sich mit dem
+    // erzeugten Passwort wieder anmelden - die Sperre aus Migration 044
+    // wurde gelöst, nicht nur das Passwort erneuert.
+    const loginAfterReset = await login(resetPersonnelNumber, reset.temporaryPassword);
+    assert.equal(loginAfterReset.status, 201, await loginAfterReset.clone().text());
+    assert.equal((await loginAfterReset.json()).session.user.mustChangePassword, true);
+
+    // Die Historie steht, ohne das Passwort preiszugeben.
+    const lifecycleEvents = await inspectionPool.query(
+      `SELECT reason, new_state FROM employee_lifecycle_events
+       WHERE company_id = $1 AND employee_id = $2 AND action = 'password_reset'
+       ORDER BY occurred_at DESC LIMIT 1`,
+      [tenantCompany.id, resetEmployee.id]
+    );
+    assert.equal(lifecycleEvents.rowCount, 1);
+    assert.equal(lifecycleEvents.rows[0].reason, resetReason);
+    assert.deepEqual(lifecycleEvents.rows[0].new_state, { mustChangePassword: true });
+    const serializedEvent = JSON.stringify(lifecycleEvents.rows[0]).toLowerCase();
+    assert.ok(!serializedEvent.includes(reset.temporaryPassword.toLowerCase()));
+
+    // ---- 3. Notausgang der Plattform für Administration/Geschäftsführung ----
+    const emergencyCompanyResponse = await fetch(`${baseUrl}/api/v1/platform/companies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        legalName: `Notausgang ${suffix} GmbH`,
+        displayName: `Notausgang ${suffix}`,
+        contactName: "Norma Notausgang",
+        contactEmail: `notausgang-${suffix.toLowerCase()}@example.test`,
+        status: "active",
+        reason: "Firma für den Notausgang-Test des Passwort-Zurücksetzens anlegen"
+      })
+    });
+    assert.equal(emergencyCompanyResponse.status, 201, await emergencyCompanyResponse.clone().text());
+    const emergencyCompany = (await emergencyCompanyResponse.json()).company;
+
+    const emergencyPersonnelNumber = `NOTFALL-${suffix}`;
+    const emergencyStartPassword = "Notausgang-Start-2026!";
+    const emergencyAdminResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${emergencyCompany.id}/administrator`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({
+          personnelNumber: emergencyPersonnelNumber,
+          firstName: "Norbert",
+          lastName: "Notausgang",
+          temporaryPassword: emergencyStartPassword,
+          reason: "Erster Administrator für den Notausgang-Test"
+        })
+      }
+    );
+    assert.equal(emergencyAdminResponse.status, 201, await emergencyAdminResponse.clone().text());
+
+    // Sitzung als frisch angelegter Administrator, um seine Benutzer-ID zu
+    // erfahren - createFirstCompanyAdministrator liefert sie bewusst nicht
+    // mit zurück (siehe publicValue-Rückgabe dort).
+    const emergencyAdminCookie = await loginCookie(
+      emergencyPersonnelNumber, emergencyStartPassword, emergencyCompany.companyNumber
+    );
+    const emergencyAdminSession = await fetch(`${baseUrl}/api/v1/session`, { headers: { Cookie: emergencyAdminCookie } });
+    assert.equal(emergencyAdminSession.status, 200);
+    const emergencyAdminUserId = (await emergencyAdminSession.json()).session.user.id;
+
+    // Ohne aktiven Supportzugriff auf genau diese Firma wird der Notausgang
+    // abgewiesen.
+    const withoutSupportAccess = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${emergencyCompany.id}/administrator-password-reset`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: platformCookie },
+        body: JSON.stringify({ userId: emergencyAdminUserId, reason: "Ohne Supportzugriff - darf nicht gelingen" })
+      }
+    );
+    assert.equal(withoutSupportAccess.status, 409);
+    assert.equal((await withoutSupportAccess.json()).error.code, "support_access_inactive");
+
+    // Supportzugriff auf genau diese Firma eröffnen - dasselbe Muster wie in
+    // "Getrennte Plattformverwaltung".
+    const emergencyTicketResponse = await fetch(`${baseUrl}/api/v1/platform/support/tickets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        companyId: emergencyCompany.id,
+        contactName: "Norma Notausgang",
+        contactEmail: "notausgang@example.test",
+        category: "technical",
+        priority: "critical",
+        subject: "Administrator hat sein Passwort vergessen",
+        description: "Notausgang für das Zurücksetzen des Administratorpassworts testen.",
+        reason: "Supportfall für den Notausgang-Test anlegen"
+      })
+    });
+    assert.equal(emergencyTicketResponse.status, 201, await emergencyTicketResponse.clone().text());
+    const emergencyTicket = (await emergencyTicketResponse.json()).ticket;
+
+    const emergencyAccessResponse = await fetch(`${baseUrl}/api/v1/platform/support-access`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: platformCookie },
+      body: JSON.stringify({
+        companyId: emergencyCompany.id,
+        supportTicketId: emergencyTicket.id,
+        reasonCode: "support_request",
+        reasonDetail: "Administrator hat sein Passwort vergessen und keinen anderen Weg zurück"
+      })
+    });
+    assert.equal(emergencyAccessResponse.status, 201, await emergencyAccessResponse.clone().text());
+    const emergencyAccess = (await emergencyAccessResponse.json()).supportAccess;
+
+    const emergencyResetResponse = await fetch(
+      `${baseUrl}/api/v1/platform/companies/${emergencyCompany.id}/administrator-password-reset`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: platformCookie,
+          "X-Support-Access-Id": emergencyAccess.id
+        },
+        body: JSON.stringify({
+          userId: emergencyAdminUserId,
+          reason: "Administrator hat sein Passwort vergessen - Notausgang im Integrationstest"
+        })
+      }
+    );
+    assert.equal(emergencyResetResponse.status, 200, await emergencyResetResponse.clone().text());
+    const emergencyReset = (await emergencyResetResponse.json()).reset;
+    assert.equal(emergencyReset.userId, emergencyAdminUserId);
+    assert.equal(emergencyReset.mustChangePassword, true);
+    assert.ok(emergencyReset.temporaryPassword && emergencyReset.temporaryPassword.length >= 12);
+
+    // Die vorherige Administratorsitzung ist widerrufen, das alte
+    // Startpasswort funktioniert nicht mehr, das neue schon.
+    assert.equal(await sessionStatus(emergencyAdminCookie), 401);
+    const emergencyOldLoginRejected = await login(
+      emergencyPersonnelNumber, emergencyStartPassword, emergencyCompany.companyNumber
+    );
+    assert.equal(emergencyOldLoginRejected.status, 401);
+    const emergencyNewLogin = await login(
+      emergencyPersonnelNumber, emergencyReset.temporaryPassword, emergencyCompany.companyNumber
+    );
+    assert.equal(emergencyNewLogin.status, 201, await emergencyNewLogin.clone().text());
+
+    await fetch(
+      `${baseUrl}/api/v1/platform/support-access/${emergencyAccess.id}/end`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: platformCookie,
+          "X-Support-Access-Id": emergencyAccess.id
+        },
+        body: JSON.stringify({ reason: "Notausgang-Test abgeschlossen" })
+      }
+    );
+  });
+
   await t.test("Abmeldung und Sitzungsende", async () => {
 
     const logout = await fetch(`${baseUrl}/api/v1/session`, { method: "DELETE", headers: { Cookie: cookie } });

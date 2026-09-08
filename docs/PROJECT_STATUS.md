@@ -1,12 +1,33 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.41
+Technischer Stand: V0.44.42
 
 
 ## Abgeschlossen
 
-- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.41,
+- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.42,
+  Migrationen 152 und 153). Bislang griff `changeInitialPassword` nur einmalig
+  beim allerersten Login; danach gab es kein Ändern des eigenen bekannten
+  Passworts, kein Zurücksetzen durch das Büro und keinen Notausgang für die
+  Administration — verschärft durch die Kontosperre nach zehn Fehlversuchen
+  aus Migration 044. Jetzt: `POST /api/v1/me/password` ändert das eigene,
+  bekannte Passwort jederzeit und beendet dabei alle anderen Sitzungen;
+  `POST /api/v1/admin/employees/:id/password-reset` lässt Büro oder
+  Verwaltung ein vergessenes Passwort zurücksetzen, erzeugt selbst ein
+  telefontaugliches Startpasswort, löst dabei ausdrücklich die Kontosperre
+  und verweigert die Rechteausweitung auf Verwaltungsrollen und das
+  Administratorkonto (das nur eine zweite Administration oder
+  Geschäftsführung zurücksetzen darf); `POST /api/v1/platform/companies/:companyId/
+  administrator-password-reset` ist der Notausgang für Administration und
+  Geschäftsführung, gebunden an einen aktiven, firmenscharfen Supportzugriff.
+  Migration 152 erweitert dafür den CHECK auf `employee_lifecycle_events` um
+  die Aktion `password_reset` — das erzeugte Passwort selbst steht dort nie,
+  nur die Wirkung. Oberfläche für die ersten beiden Wege und ein
+  Notfallskript für einen unerreichbaren Plattformdienst
+  (`api/scripts/notfall-passwort.mjs`) kamen in eigenen Änderungen vorher.
+
+- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.42,
   Migration 150). Keine Zugangsdaten im ausgelieferten Frontend, keine im
   Git-Verlauf über alle 250 Commits, und der Anmelde-Endpunkt hält allen zehn
   geprüften Punkten stand — scrypt mit Kostenparameter 16384, `timingSafeEqual`,

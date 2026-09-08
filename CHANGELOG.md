@@ -4,6 +4,61 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Drei Wege zurück, wenn das Passwort weg ist (Fassung 0.44.42, Migrationen 152 und 153).** Der
+  Betreiber wörtlich: „der login muss auch verbessert werden ich habe das
+  passwort vergessen und es gibt keinen weg dieses zurück zu setzen". Stimmte:
+  `changeInitialPassword` griff ausschließlich einmalig, solange
+  `must_change_password` stand. Danach gab es kein Ändern des eigenen
+  bekannten Passworts, kein Zurücksetzen durch das Büro und keinen Notausgang
+  für die Administration — verschärft durch die Kontosperre aus Migration 044:
+  wer sein Passwort vergisst, hat es vorher zehnmal falsch probiert und sitzt
+  danach zusätzlich hinter einer Sperre.
+
+  Jetzt gibt es drei Wege, ohne neue Infrastruktur (kein Mailversand im
+  Projekt, also kein Selbstbedienungslink):
+
+  1. **`POST /api/v1/me/password`** ändert das eigene, bekannte Passwort
+     jederzeit — unabhängig von `must_change_password`. Verlangt das aktuelle
+     Passwort, lehnt ein unverändertes ab, beendet alle *anderen* Sitzungen
+     des Kontos und lässt die aufrufende unangetastet. Ein falsches aktuelles
+     Passwort zählt keinen Fehlversuch: Wer schon eine gültige Sitzung hat,
+     muss nichts erraten.
+  2. **`POST /api/v1/admin/employees/:id/password-reset`** lässt Büro oder
+     Verwaltung ein vergessenes Passwort zurücksetzen. Der Server erzeugt das
+     Startpasswort selbst — ein selbst gewähltes wäre regelmäßig
+     „Sommer2024" und bliebe oft dauerhaft. Löst dabei **die Kontosperre**
+     (`failed_login_attempts = 0`, `locked_until = NULL`), sonst wäre der
+     Fehler nur verschoben. Widerruft alle Sitzungen des Mitarbeiters, trägt
+     sich unveränderlich in `employee_lifecycle_events` ein (ohne das
+     Passwort!) und verweigert die Rechteausweitung: Wer eine Verwaltungsrolle
+     zurücksetzen will, braucht selbst eine — sonst könnte das Büro die
+     Geschäftsführung zurücksetzen, sich anmelden und hätte deren Rechte. Das
+     Firmenadministratorkonto zählt dabei mit: nur eine zweite Administration
+     oder Geschäftsführung darf die erste zurücksetzen (siehe
+     `docs/PASSWORT_NOTFALL.md`). Gibt es niemanden Gleichrangigen, bleibt Weg
+     drei.
+  3. **`POST /api/v1/platform/companies/:companyId/administrator-password-reset`**
+     ist der Notausgang für Administration und Geschäftsführung, wenn niemand
+     in der Firma mehr zurücksetzen kann. Fügt sich in das vorhandene
+     Supportzugriff-Muster ein (`support_access_sessions`, zeitbegrenzt auf
+     60 Minuten, protokolliert): ohne aktiven, auf genau diese Firma
+     begrenzten Supportzugriff bleibt der Weg verschlossen.
+
+  Das erzeugte Startpasswort erfüllt dieselbe Regel wie jedes andere (12–256
+  Zeichen, Buchstabe und Ziffer — strukturell erzwungen, nicht dem Zufall
+  überlassen), meidet am Telefon verwechselbare Zeichen (0/O, 1/l/I) und
+  steht in Gruppen mit Bindestrich, z. B. `xkrm-pfug-4823` — es wird oft
+  telefonisch durchgegeben. Erzeugt mit `randomInt` aus `node:crypto`, nie
+  `Math.random()`. Es landet nirgends im Protokoll: nicht in
+  `employee_lifecycle_events`, nicht im `platform_audit_log` (dessen
+  `sanitizeAuditState` zusätzlich absichert).
+
+  Die Oberfläche für Weg 1 und 2 (eigenes Passwort ändern, Rückfrage mit Name
+  und Personalnummer, einmalig angezeigtes Startpasswort ohne stillen Ausgang)
+  und ein Notfallskript `api/scripts/notfall-passwort.mjs` für den Fall, dass
+  selbst die Plattform nicht erreichbar ist, kamen in eigenen Änderungen
+  vorher.
+
 - **Grundlage für den DATEV-Lohnexport (Fassung 0.44.41, Migration 151).**
   Stunden sollen an die Steuerkanzlei gehen. DATEV hat dafür zwei Lohnprodukte
   — LODAS und Lohn und Gehalt — mit fast gleichen Datenzeilen, aber

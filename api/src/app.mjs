@@ -10,7 +10,7 @@ import {
   withSessionTransaction,
   withTenantTransaction
 } from "./database.mjs";
-import { hashPassword, verifyPassword } from "./password.mjs";
+import { generateTemporaryPassword, hashPassword, verifyPassword } from "./password.mjs";
 import {
   createSessionToken,
   hashSessionToken,
@@ -83,6 +83,7 @@ import {
   validateId,
   validateInitialPasswordChange,
   validateInitialSetup,
+  validatePasswordChange,
   validateHolidayCalendar,
   validateHolidayClosure,
   validateHolidayClosureCancellation,
@@ -222,7 +223,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.41";
+export const APPLICATION_VERSION = "0.44.42";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -7181,6 +7182,98 @@ function employeeLifecycleInput(body) {
   return { reason, rowVersion };
 }
 
+function employeePasswordResetInput(body) {
+  const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+  if (reason.length < 3 || reason.length > 500) {
+    throw new InputError("Die Begründung muss zwischen 3 und 500 Zeichen lang sein.");
+  }
+  return { reason };
+}
+
+// Der Betrieb hatte bislang keinen Weg zurück, wenn ein Mitarbeiter sein
+// Passwort vergaß: changeInitialPassword griff nur beim allerersten Login.
+// Das Büro erzeugt hier ein neues Startpasswort - der Auslösende wählt es
+// nicht selbst, sonst würde daraus schnell ein dauerhaftes "Sommer2024".
+async function resetEmployeePassword(client, context, employeeId, input) {
+  const roles = await requireFullPlanner(client, context);
+  if (employeeId === context.userId) {
+    throw new InputError(
+      "Das eigene Passwort wird über \"Eigenes Passwort ändern\" geändert.",
+      409,
+      "password_reset_self"
+    );
+  }
+  const current = await client.query(
+    `SELECT id, personnel_number, status FROM users
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, employeeId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  if (current.rows[0].status !== "active") {
+    throw new InputError(
+      "Nur aktive Mitarbeiter können ein neues Passwort erhalten.",
+      409,
+      "employee_not_active"
+    );
+  }
+  const targetRoles = await activeRoleKeys(client, { ...context, userId: employeeId });
+  // Ohne diese Prüfung könnte das Büro das Passwort der Geschäftsführung
+  // zurücksetzen, sich damit anmelden und hätte deren Rechte - eine
+  // Rechteausweitung durch die Hintertür. Das Administratorkonto zählt hier
+  // bewusst mit dazu (anders als bei createEmployee/updateEmployee, wo es
+  // ganz gesperrt ist): docs/PASSWORT_NOTFALL.md sieht vor, dass eine zweite
+  // Administration oder Geschäftsführung die erste zurücksetzen darf - dafür
+  // braucht es hier kein eigenes Protokoll wie beim Notausgang, denn beide
+  // Seiten sind schon Firmenangehörige mit denselben Rechten. Nur wenn es
+  // niemanden Gleichrangigen gibt, bleibt der Plattform-Notausgang übrig.
+  const targetIsProtected = targetRoles.has("admin")
+    || [...targetRoles].some((role) => MANAGEMENT_ROLES.has(role));
+  if (targetIsProtected && ![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
+    throw new InputError(
+      "Nur Geschäftsführung oder Administrator dürfen das Passwort von Verwaltungsrollen oder des Administratorkontos zurücksetzen.",
+      403,
+      "forbidden"
+    );
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+  await client.query(
+    `UPDATE users
+     SET password_hash = $3, must_change_password = TRUE, password_changed_at = CURRENT_TIMESTAMP,
+         failed_login_attempts = 0, locked_until = NULL
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, employeeId, passwordHash]
+  );
+  await client.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP, revocation_reason = 'password_reset'
+     WHERE company_id = $1 AND user_id = $2 AND revoked_at IS NULL`,
+    [context.companyId, employeeId]
+  );
+  await client.query(
+    `INSERT INTO employee_lifecycle_events (
+       company_id, employee_id, actor_user_id, action, reason, new_state
+     ) VALUES ($1, $2, $3, 'password_reset', $4, $5::JSONB)`,
+    [
+      context.companyId,
+      employeeId,
+      context.userId,
+      input.reason,
+      // Niemals das Passwort oder den Hash in der Historie - nur die Wirkung.
+      JSON.stringify({ mustChangePassword: true })
+    ]
+  );
+  return {
+    employeeId,
+    personnelNumber: current.rows[0].personnel_number,
+    temporaryPassword,
+    mustChangePassword: true
+  };
+}
+
 async function requireEmployeeLifecycleAdministrator(client, context) {
   const roles = await requireFullPlanner(client, context);
   if (![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
@@ -8932,6 +9025,50 @@ async function changeInitialPassword(client, context, newPassword) {
     [context.companyId, context.userId, context.sessionId]
   );
   return sessionView(client, context);
+}
+
+// "der login muss auch verbessert werden ich habe das passwort vergessen und
+// es gibt keinen weg dieses zurück zu setzen" - changeInitialPassword hilft
+// nur, wer sein Startpasswort noch kennt. Dieser Weg ändert ein bekanntes
+// Passwort jederzeit, unabhängig von must_change_password, und bleibt damit
+// auch dann nutzbar, nachdem das Startpasswort längst ersetzt wurde.
+async function changeOwnPassword(client, context, input) {
+  const account = await client.query(
+    "SELECT password_hash FROM users WHERE company_id = $1 AND id = $2 AND status = 'active' FOR UPDATE",
+    [context.companyId, context.userId]
+  );
+  if (account.rowCount !== 1) throw new InputError("Das Benutzerkonto ist nicht mehr aktiv.", 401, "unauthorized");
+  const currentHash = account.rows[0].password_hash;
+  // Kein Fehlversuchszähler hier: wer schon eine gültige Sitzung hat, muss
+  // nichts erraten - ein Zähler an dieser Stelle könnte nur das eigene Konto
+  // versehentlich sperren.
+  if (!(await verifyPassword(input.currentPassword, currentHash))) {
+    throw new InputError("Das aktuelle Passwort ist falsch.", 401, "invalid_credentials");
+  }
+  if (await verifyPassword(input.newPassword, currentHash)) {
+    throw new InputError(
+      "Das neue Passwort muss sich vom bisherigen unterscheiden.",
+      409,
+      "password_unchanged"
+    );
+  }
+  const passwordHash = await hashPassword(input.newPassword);
+  await client.query(
+    `UPDATE users SET password_hash = $3, password_changed_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, context.userId, passwordHash]
+  );
+  // Die eigene Sitzung bleibt gültig - wer sein Passwort ändert, will sich
+  // nicht selbst aussperren. Alle anderen Sitzungen (ein verlorenes Gerät,
+  // ein mitgelesenes Cookie) werden beendet, genau wie bei
+  // changeInitialPassword.
+  await client.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP, revocation_reason = 'password_changed'
+     WHERE company_id = $1 AND user_id = $2 AND id <> $3 AND revoked_at IS NULL`,
+    [context.companyId, context.userId, context.sessionId]
+  );
+  return { changed: true };
 }
 
 async function insertTimeEntry(client, context, input, timeZone) {
@@ -10692,6 +10829,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { changed: true, session: view });
       }
 
+      if (request.method === "POST" && url.pathname === "/api/v1/me/password") {
+        const input = validatePasswordChange(await readJson(request));
+        // Bewusst withSessionTransaction statt withReadySession: dieser Weg
+        // muss auch funktionieren, solange must_change_password noch steht.
+        const result = await withSessionTransaction(
+          pool,
+          tokenHash,
+          (client, context) => changeOwnPassword(client, context, input)
+        );
+        return json(response, 200, result);
+      }
+
       if (request.method === "GET" && url.pathname === "/api/v1/announcements") {
         const announcements = await withReadySession(
           pool,
@@ -11642,6 +11791,19 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => reactivateEmployee(client, context, employeeId, input)
         );
         return json(response, 200, { employee });
+      }
+
+      const adminEmployeePasswordResetMatch =
+        /^\/api\/v1\/admin\/employees\/([^/]+)\/password-reset$/.exec(url.pathname);
+      if (request.method === "POST" && adminEmployeePasswordResetMatch) {
+        const employeeId = validateId(adminEmployeePasswordResetMatch[1], "Mitarbeiter-ID");
+        const input = employeePasswordResetInput(await readJson(request));
+        const reset = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => resetEmployeePassword(client, context, employeeId, input)
+        );
+        return json(response, 200, { reset });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/customers") {
