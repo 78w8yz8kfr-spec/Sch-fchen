@@ -5,10 +5,13 @@
 // Dieses Modul verwaltet die Grundlage einer spaeteren Lohnexportdatei: die
 // DATEV-Stammdaten einer Firma (Berater-/Mandantennummer, Lohnprodukt) und
 // die Zuordnung von Zeit- und Abwesenheitsarten zu kanzleispezifischen
-// Lohnarten (Migration 151). Dazu eine Vorschau, die fuer einen Zeitraum
-// zeigt, was uebermittelt wuerde - je Mitarbeiter, Tag, Lohnart und
-// Stundenzahl -, ohne eine Datei zu erzeugen. Das eigentliche Erzeugen der
-// LODAS- oder Lohn-und-Gehalt-Datei ist eine spaetere Stufe.
+// Lohnarten (Migration 151), dazu die rein numerische DATEV-Personalnummer
+// je Mitarbeiter (Migration 156) - noetig, weil users.personnel_number in
+// Schaefchen freier Text ist ("M-1"), DATEV die Personalnummer aber als Zahl
+// liest. Dazu eine Vorschau, die fuer einen Zeitraum zeigt, was uebermittelt
+// wuerde - je Mitarbeiter, Tag, Lohnart und Stundenzahl -, ohne eine Datei zu
+// erzeugen. Das eigentliche Erzeugen der LODAS- oder Lohn-und-Gehalt-Datei
+// ist eine spaetere Stufe.
 //
 // Die Vorschau rechnet nichts neu: Arbeits-, Fahr- und Ueberstundenminuten
 // kommen unveraendert aus work_days (Migration 011), demselben Bestand, den
@@ -20,7 +23,15 @@
 // Modul lokal und dupliziert die Rollenliste aus app.mjs, statt sie zu
 // importieren - derselbe Schnitt wie bei den beiden genannten Modulen.
 
-import { InputError, readJson, validateDatevExportSettings, validateDatevWageTypeMapping, validateWorkDate } from "./validation.mjs";
+import {
+  InputError,
+  readJson,
+  validateDatevExportSettings,
+  validateDatevPersonnelNumberAssignment,
+  validateDatevWageTypeMapping,
+  validateId,
+  validateWorkDate
+} from "./validation.mjs";
 
 // Dieselbe Rolle, die auch sonst firmenweite Einstellungen pflegt (siehe
 // FULL_PLANNER_ROLES in app.mjs, z. B. für Stundenkonten und die
@@ -187,6 +198,98 @@ async function createMapping(client, context, input) {
   return mappingDto({ ...inserted.rows[0], changed_by_name: changer.rows[0]?.name || null });
 }
 
+function personnelNumberDto(row) {
+  return {
+    employeeId: row.id,
+    personnelNumber: row.personnel_number,
+    employeeName: `${row.first_name} ${row.last_name}`,
+    datevPersonnelNumber: row.datev_personnel_number,
+    rowVersion: Number(row.row_version)
+  };
+}
+
+// Nur aktive Mitarbeiter: wer die Firma verlassen hat, taucht auch im Export
+// nicht mehr auf und braucht hier keine Pflege mehr.
+async function listPersonnelNumbers(client, context) {
+  const result = await client.query(
+    `SELECT id, personnel_number, first_name, last_name, datev_personnel_number, row_version
+     FROM users
+     WHERE company_id = $1 AND status = 'active'
+     ORDER BY personnel_number`,
+    [context.companyId]
+  );
+  return result.rows.map(personnelNumberDto);
+}
+
+// Setzt oder löscht (datevPersonnelNumber: null) die DATEV-Personalnummer
+// eines einzelnen Mitarbeiters. "Löschen" ist kein Sonderfall - NULL ist ein
+// gewöhnlicher Wert wie jeder andere (siehe
+// validateDatevPersonnelNumberAssignment), falls sich jemand vertan hat.
+async function updatePersonnelNumber(client, context, employeeId, input) {
+  const current = await client.query(
+    `SELECT id, row_version
+     FROM users
+     WHERE company_id = $1 AND id = $2 AND status = 'active'
+     FOR UPDATE`,
+    [context.companyId, employeeId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  if (Number(current.rows[0].row_version) !== input.rowVersion) {
+    throw new InputError(
+      "Der Mitarbeiter wurde zwischenzeitlich geändert. Bitte neu laden.",
+      409,
+      "row_version_conflict"
+    );
+  }
+
+  if (input.datevPersonnelNumber !== null) {
+    await assertDatevPersonnelNumberFree(client, context, employeeId, input.datevPersonnelNumber);
+  }
+
+  try {
+    const updated = await client.query(
+      `UPDATE users
+       SET datev_personnel_number = $3
+       WHERE company_id = $1 AND id = $2
+       RETURNING id, personnel_number, first_name, last_name, datev_personnel_number, row_version`,
+      [context.companyId, employeeId, input.datevPersonnelNumber]
+    );
+    return personnelNumberDto(updated.rows[0]);
+  } catch (error) {
+    // Rückfalllösung gegen eine Wettlaufsituation zwischen der Prüfung oben
+    // und diesem UPDATE: zwei gleichzeitige Anfragen für unterschiedliche
+    // Mitarbeiter könnten sonst beide die Prüfung passieren. Der eindeutige
+    // Index aus Migration 156 fängt das am Ende immer ab.
+    if (error.code === "23505") {
+      await assertDatevPersonnelNumberFree(client, context, employeeId, input.datevPersonnelNumber);
+    }
+    throw error;
+  }
+}
+
+// Meldet nicht nur "bereits vergeben", sondern nennt, wem die Nummer bereits
+// gehört - sonst zwingt eine Kollision das Büro, die ganze Mitarbeiterliste
+// nach der Nummer zu durchsuchen.
+async function assertDatevPersonnelNumberFree(client, context, employeeId, datevPersonnelNumber) {
+  const taken = await client.query(
+    `SELECT personnel_number, first_name, last_name
+     FROM users
+     WHERE company_id = $1 AND id <> $2 AND datev_personnel_number = $3`,
+    [context.companyId, employeeId, datevPersonnelNumber]
+  );
+  if (taken.rowCount) {
+    const inhaber = taken.rows[0];
+    throw new InputError(
+      `Die DATEV-Personalnummer ${datevPersonnelNumber} ist bereits ${inhaber.first_name} ${inhaber.last_name} `
+      + `(${inhaber.personnel_number}) zugeordnet.`,
+      409,
+      "datev_personnel_number_taken"
+    );
+  }
+}
+
 // Ein Jahr reicht für jede reale Abrechnungsperiode und begrenzt die
 // generate_series-Erweiterung der Abwesenheiten auf eine überschaubare
 // Zeilenzahl.
@@ -238,6 +341,7 @@ async function buildPreview(client, context, range) {
            day.user_id AS employee_id,
            account.personnel_number,
            account.first_name || ' ' || account.last_name AS employee_name,
+           account.datev_personnel_number,
            day.work_date::DATE AS work_date,
            'time_type' AS category,
            value.mapping_key,
@@ -261,6 +365,7 @@ async function buildPreview(client, context, range) {
            request.user_id AS employee_id,
            account.personnel_number,
            account.first_name || ' ' || account.last_name AS employee_name,
+           account.datev_personnel_number,
            absence_day.work_date::DATE AS work_date,
            'absence_type' AS category,
            request.absence_type AS mapping_key,
@@ -294,13 +399,27 @@ async function buildPreview(client, context, range) {
   const settings = settingsResult.rows[0] || null;
   const mappingByKey = new Map(mappingResult.rows.map((row) => [row.mapping_key, row]));
   const missingKeys = new Map();
+  // Nur Mitarbeiter, die im Zeitraum tatsächlich eine Zeile erzeugen -
+  // gesammelt aus lineResult, nicht aus dem gesamten Mitarbeiterbestand. Wer
+  // im Zeitraum nicht gearbeitet hat, fehlt auch nicht in dieser Liste; eine
+  // Meldung, die alle Mitarbeiter anmeckert statt der drei Betroffenen, würde
+  // im Büro schlicht ignoriert.
+  const missingPersonnelNumbers = new Map();
 
   const lines = lineResult.rows.map((row) => {
     const mapping = mappingByKey.get(row.mapping_key);
     if (!mapping) missingKeys.set(row.mapping_key, row.category);
+    if (!row.datev_personnel_number) {
+      missingPersonnelNumbers.set(row.employee_id, {
+        employeeId: row.employee_id,
+        personnelNumber: row.personnel_number,
+        employeeName: row.employee_name
+      });
+    }
     return {
       employeeId: row.employee_id,
       personnelNumber: row.personnel_number,
+      datevPersonnelNumber: row.datev_personnel_number,
       employeeName: row.employee_name,
       workDate: databaseDate(row.work_date),
       category: row.category,
@@ -325,7 +444,12 @@ async function buildPreview(client, context, range) {
     // Was hier steht, würde eine spätere Exportdatei mangels Zuordnung
     // ablehnen müssen. Der Vorschau-Endpunkt zeigt es an, statt es zu
     // verstecken oder mit einer geratenen Nummer zu überdecken.
-    missingMappings: [...missingKeys.entries()].map(([mappingKey, category]) => ({ category, mappingKey }))
+    missingMappings: [...missingKeys.entries()].map(([mappingKey, category]) => ({ category, mappingKey })),
+    // Dasselbe Prinzip wie missingMappings, nur für Feld 1 des
+    // Bewegungsdatensatzes (Migration 156): eine fehlende DATEV-
+    // Personalnummer blockiert den späteren Export genauso wie eine fehlende
+    // Lohnart.
+    missingPersonnelNumbers: [...missingPersonnelNumbers.values()]
   };
 }
 
@@ -356,6 +480,20 @@ export async function handleDatevRequest({ request, url, client, context }) {
 
   if (request.method === "GET" && path === "/api/v1/admin/datev/export-preview") {
     return { status: 200, body: await buildPreview(client, context, previewRange(url)) };
+  }
+
+  if (request.method === "GET" && path === "/api/v1/admin/datev/personnel-numbers") {
+    return { status: 200, body: { employees: await listPersonnelNumbers(client, context) } };
+  }
+
+  const personnelNumberMatch = /^\/api\/v1\/admin\/datev\/personnel-numbers\/([^/]+)$/.exec(path);
+  if (request.method === "PUT" && personnelNumberMatch) {
+    const employeeId = validateId(personnelNumberMatch[1], "Mitarbeiter-ID");
+    const input = validateDatevPersonnelNumberAssignment(await readJson(request));
+    return {
+      status: 200,
+      body: { employee: await updatePersonnelNumber(client, context, employeeId, input) }
+    };
   }
 
   return null;

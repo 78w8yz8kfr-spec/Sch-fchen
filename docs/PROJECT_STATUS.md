@@ -1,12 +1,31 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.44
+Technischer Stand: V0.44.45
 
 
 ## Abgeschlossen
 
-- **DATEV-Fenster in der App** (Fassung 0.44.44, Migration 155). Die
+- **DATEV-Personalnummern in der Oberfläche und tote Schaltflächen nach
+  Offline-Versuch** (Fassung 0.44.45). Vierter Bereich im DATEV-Reiter zum
+  Pflegen der Nummern; die Vorschau trennt fehlende Lohnartenzuordnung und
+  fehlende Personalnummer als zwei eigene Lücken. Nebenbei behoben: fünf
+  Schaltflächen fehlten in `updateConnectionState()` und blieben nach einem
+  Speicherversuch ohne Netz bis zum Neuladen gesperrt. Ein Test leitet die
+  Prüfung jetzt mechanisch aus dem Quelltext ab, statt Namen aufzuzählen.
+- **DATEV-Personalnummer** (Fassung 0.44.45, Migrationen 156 und 157). Löst
+  den offenen Punkt aus `docs/DATEV_EXPORT.md`: `users.personnel_number` ist
+  freier Text, DATEV liest die Personalnummer aber als Zahl. Neue Spalte
+  `users.datev_personnel_number` (ein bis fünf Ziffern, keine führende Null —
+  sonst wären „123" und „0123" bei DATEV dieselbe Person, ohne dass unsere
+  Eindeutigkeitsprüfung das bemerkt), NULL erlaubt, eindeutig je Firma nur
+  unter gesetzten Nummern. Anders als die Lohnartenzuordnung nicht
+  historisiert — eine Personalnummer ist eine Identität, keine zeitlich
+  veränderliche Buchung. Neue Endpunkte zum Lesen, Setzen und Löschen; eine
+  doppelt vergebene Nummer nennt in der Fehlermeldung den bisherigen
+  Inhaber. Die Vorschau meldet unter `missingPersonnelNumbers` genau die
+  Mitarbeiter mit Zeilen im Zeitraum und ohne Nummer.
+- **DATEV-Fenster in der App** (Fassung 0.44.45, Migration 155). Die
   Lohnschnittstelle gab es bisher nur auf dem Server. Jetzt pflegt das Büro
   unter Einstellungen Stammdaten (Berater-/Mandantennummer, LODAS oder Lohn
   und Gehalt), die Zuordnung aller zwölf Zeit- und Abwesenheitsarten auf
@@ -15,7 +34,7 @@ Technischer Stand: V0.44.44
   Grund und Urheber einsehbar. Fehlende Zuordnungen werden angezeigt, nicht
   verschwiegen. Eine Exportdatei erzeugt diese Stufe bewusst noch nicht —
   dafür fehlen die Nummern der Steuerkanzlei (siehe docs/DATEV_EXPORT.md).
-- **Untere Leiste bleibt am Bildschirmrand** (Fassung 0.44.44, Migration 154).
+- **Untere Leiste bleibt am Bildschirmrand** (Fassung 0.44.45, Migration 154).
   Auf dem iPhone schwebte die Navigationsleiste mitten im Inhalt. Ursache war
   kein Layoutfehler — der Platz unten war korrekt reserviert —, sondern ein
   Kompositionsfehler in WebKit: `backdrop-filter` neben `position: fixed` und
@@ -23,7 +42,7 @@ Technischer Stand: V0.44.44
   machte (eine Achse `hidden` zwingt die andere von `visible` auf `auto`).
   Beide Auslöser entfernt, Hintergrund undurchsichtig, Regressionstest dagegen.
   Die Desktop-Seitenleiste (`position: sticky`) bleibt unverändert.
-- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.44,
+- **Drei Wege zurück, wenn das Passwort weg ist** (Fassung 0.44.45,
   Migrationen 152 und 153). Bislang griff `changeInitialPassword` nur einmalig
   beim allerersten Login; danach gab es kein Ändern des eigenen bekannten
   Passworts, kein Zurücksetzen durch das Büro und keinen Notausgang für die
@@ -44,7 +63,7 @@ Technischer Stand: V0.44.44
   Notfallskript für einen unerreichbaren Plattformdienst
   (`api/scripts/notfall-passwort.mjs`) kamen in eigenen Änderungen vorher.
 
-- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.44,
+- **Sicherheitsdurchsicht Anmeldung und Auslieferung** (Fassung 0.44.45,
   Migration 150). Keine Zugangsdaten im ausgelieferten Frontend, keine im
   Git-Verlauf über alle 250 Commits, und der Anmelde-Endpunkt hält allen zehn
   geprüften Punkten stand — scrypt mit Kostenparameter 16384, `timingSafeEqual`,

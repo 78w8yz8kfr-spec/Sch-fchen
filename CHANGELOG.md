@@ -4,6 +4,69 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **DATEV-Personalnummern im DATEV-Fenster, und fünf Schaltflächen, die nach
+  einem Versuch ohne Netz tot blieben (Fassung 0.44.45).** Zur Spalte aus
+  Migration 156 gehört ein vierter Bereich im DATEV-Reiter: alle aktiven
+  Mitarbeiter mit Name, gewohnter Personalnummer und der DATEV-Nummer zum
+  Eintragen; wer noch keine hat, ist als fehlend markiert, mit Zusammenfassung
+  darüber. Die Vorschau unterscheidet jetzt **zwei** Gründe, an denen ein
+  Export scheitern kann — fehlende Lohnartenzuordnung und fehlende
+  DATEV-Personalnummer — und zeigt sie getrennt, jeweils mit eigenem Weg zum
+  Schließen. Wer eine Lücke stopfen soll, muss wissen, welche Art es ist.
+
+  Dabei fiel ein Fehler auf, der nichts mit DATEV zu tun hatte: Die App sperrt
+  Schaltflächen offline (`disabled = !navigator.onLine`) und gibt sie beim
+  Wiederverbinden über `updateConnectionState()` frei — das ruft der
+  `online`-Zuhörer auf. **Fünf Schaltflächen fehlten dort**: die drei
+  DATEV-Speicherknöpfe, die DATEV-Vorschau und die Zeitkorrekturregel. Wer
+  offline auf Speichern drückte, hatte danach einen toten Knopf, bis er die
+  Seite neu lud — auf der Baustelle mit einem Balken Empfang also regelmäßig.
+
+  Statt fünf Einzelprüfungen leitet ein Test beide Mengen jetzt **mechanisch
+  aus dem Quelltext** ab und vergleicht sie: Jede Schaltfläche, die irgendwo
+  offline gesperrt wird, muss in `updateConnectionState()` einen Rückweg
+  haben. Eine von Hand gepflegte Namensliste hätte den nächsten neuen Knopf
+  derselben Art wieder verschwiegen — genau so war dieser Fehler entstanden.
+
+- **Die DATEV-Personalnummer: eine eigene, rein numerische Spalte je
+  Mitarbeiter (Fassung 0.44.45, Migrationen 156 und 157).** `docs/DATEV_EXPORT.md`
+  führte es schon als offenen Punkt vor Stufe 2: Feld 1 des
+  Bewegungsdatensatzes soll aus `users.personnel_number` kommen, aber die ist
+  in Schäfchen freier Text (`M-1`, `ADMIN-1`, `REG-0001`). DATEV liest die
+  Personalnummer als Zahl — selbst mit allen Nummern der Kanzlei wäre daran
+  jede Exportdatei gescheitert.
+
+  Jetzt trägt `users` zusätzlich `datev_personnel_number`: eine bis fünf
+  Ziffern, **keine führende Null erlaubt**. Das ist kein Stilzwang — DATEV
+  liest die Nummer als Zahl, „123" und „0123" wären dort dieselbe Person,
+  während unsere Eindeutigkeitsprüfung (die auf Text vergleicht) das nicht
+  bemerken würde und zwei Mitarbeiter auf ein Lohnkonto bringen könnte. Ein
+  Verbot führender Nullen macht „eindeutig bei uns" und „eindeutig bei DATEV"
+  deckungsgleich.
+
+  Anders als die Lohnartenzuordnung (Migration 151) wird die Nummer **nicht**
+  historisiert: eine Personalnummer ist eine Identität, kein zeitlich
+  veränderlicher Satz — eine geänderte Nummer war vorher schlicht falsch.
+  Eine gewöhnliche Spalte also, gegen gleichzeitiges Überschreiben durch die
+  vorhandene `row_version` von `users` geschützt, kein zweiter Verlauf.
+
+  Neu: `GET`/`PUT /api/v1/admin/datev/personnel-numbers[/:employeeId]` zum
+  Lesen, Setzen, Ändern und Löschen (`datevPersonnelNumber: null`, falls sich
+  jemand vertan hat); eine doppelt vergebene Nummer meldet `409
+  datev_personnel_number_taken` **mit Namen und Personalnummer des
+  bisherigen Inhabers** — „bereits vergeben" allein zwingt das Büro sonst zum
+  Durchsuchen der ganzen Liste. Die Vorschau (`export-preview`) trägt jetzt
+  `datevPersonnelNumber` in jeder Zeile und meldet unter
+  `missingPersonnelNumbers` genau die Mitarbeiter, die im Vorschauzeitraum
+  tatsächlich Zeilen erzeugen und keine Nummer haben — nicht den ganzen
+  Mitarbeiterbestand.
+
+  Die Fünf-Stellen-Grenze ist wie die übrigen Feldlängen in
+  `docs/DATEV_EXPORT.md` aus allgemeiner Kenntnis der DATEV-Nummernkreise
+  angenommen, nicht durch eine geprüfte Spezifikation belegt — das Dokument
+  vermerkt das jetzt ehrlich als offene Prüfung vor Stufe 2, nicht als
+  gesichert.
+
 - **Das DATEV-Fenster ist da (Fassung 0.44.44, Migration 155).** Der Betreiber
   fragte: „wo ist datev?" — zu Recht. Die Serverseite stand seit Migration 151,
   aber in der App war davon **nichts** zu sehen: kein Menüpunkt, kein Feld,

@@ -2229,6 +2229,15 @@ select:focus-visible {
   font-weight: 700;
 }
 
+/* Eine fehlende Lohnartenzuordnung und eine fehlende DATEV-Personalnummer
+   sind zwei verschiedene Luecken (siehe DATEV_EXPORT.md) - die zweite faerbt
+   darum nur ihre eigene Spalte ein, statt die ganze Zeile wie oben erneut zu
+   roeten und beide Faelle optisch ununterscheidbar zu machen. */
+.datev-preview-row--missing-personnel td:nth-child(2) {
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
 .holiday-list,
 .holiday-closure-list {
   display: grid;
