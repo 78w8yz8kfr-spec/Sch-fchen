@@ -3155,6 +3155,49 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     const updated=await (await send(path,cookie)).json();assert.equal(updated.history.length,2);assert.equal(updated.policy.mode,'default');
   });
 
+  await t.test("Einstufige Abwesenheit und direkte Büroeinträge mit Planungsschutz", async () => {
+    const send = (path,auth,method='GET',body) => fetch(`${baseUrl}${path}`,{method,
+      headers:{'Content-Type':'application/json',...(auth?{Cookie:auth}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const ok = async(response,status=200) => {assert.equal(response.status,status,await response.clone().text());return response.json();};
+    const path='/api/v1/absence-approvals';
+    const before=await ok(await send(path,cookie));
+    const payload={absenceType:'other',startDate:'2027-11-23',endDate:'2027-11-23',dayPart:'full_day',note:'Einstufiger Test'};
+    const pending=(await ok(await send('/api/v1/absences',employeeCookie,'POST',payload),201)).absence;
+    const selected=(await ok(await send(path,cookie,'PUT',{mode:'selected',approvalSteps:1,reviewerIds:[],approverIds:[foreman.id,employee.id],rowVersion:before.policy.rowVersion,reason:'Eine Freigabe genügt'}))).policy;
+    assert.equal(selected.approvalSteps,1);
+    const access=await ok(await send(path,foremanCookie));assert.equal(access.approvalSteps,1);assert.equal(access.canReviewAbsenceOffice,false);assert.equal(access.canApproveAbsenceManagement,true);assert.equal(access.canRecordDirect,false);
+    const review=`/api/v1/admin/absence-requests/${pending.id}`;
+    assert.equal((await send(review,employeeCookie,'PATCH',{action:'approve',rowVersion:pending.rowVersion})).status,403);
+    assert.equal((await send(review,directorCookie,'PATCH',{action:'approve',rowVersion:pending.rowVersion})).status,403);
+    const approved=(await ok(await send(review,foremanCookie,'PATCH',{action:'approve',rowVersion:pending.rowVersion}))).absence;
+    assert.equal(approved.status,'approved');assert.equal(approved.approvalSteps,1);assert.equal(approved.officeReviewedByName,null);assert.equal(approved.history.length,2);
+    assert.equal((await send(review,foremanCookie,'PATCH',{action:'approve',rowVersion:pending.rowVersion})).status,409);
+    await ok(await send(review,foremanCookie,'PATCH',{action:'cancel',rowVersion:approved.rowVersion,comment:'Test abgeschlossen'}));
+    const rejectRequest=(await ok(await send('/api/v1/absences',employeeCookie,'POST',payload),201)).absence;
+    const rejected=(await ok(await send(`/api/v1/admin/absence-requests/${rejectRequest.id}`,foremanCookie,'PATCH',{action:'reject',rowVersion:rejectRequest.rowVersion,comment:'Testablehnung'}))).absence;
+    assert.equal(rejected.status,'management_rejected');assert.equal(rejected.officeReviewedByName,null);
+    const directPath='/api/v1/admin/absences';
+    const direct={...payload,employeeId:employee.id,startDate:'2027-11-24',endDate:'2027-11-24',note:'Telefonisch gemeldete Abwesenheit'};
+    assert.equal((await send(directPath,null,'POST',direct)).status,401);
+    assert.equal((await send(directPath,foremanCookie,'POST',direct)).status,403);
+    assert.equal((await send(directPath,employeeCookie,'POST',direct)).status,403);
+    assert.equal((await send(directPath,plannerCookie,'POST',{...direct,employeeId:randomUUID()})).status,404);
+    assert.equal((await send(directPath,plannerCookie,'POST',{...direct,companyId:randomUUID()})).status,400);
+    assert.equal((await send(directPath,plannerCookie,'POST',{...direct,note:''})).status,400);
+    const planner=(await ok(await send('/api/v1/session',plannerCookie))).session.user;
+    assert.equal((await send(directPath,plannerCookie,'POST',{...direct,employeeId:planner.id})).status,403);
+    const recorded=(await ok(await send(directPath,plannerCookie,'POST',direct),201)).absence;
+    assert.equal(recorded.status,'approved');assert.equal(recorded.entrySource,'office_direct');assert.equal(recorded.officeReviewedByName,null);assert.equal(recorded.history[0].action,'office_recorded');assert.equal(recorded.history.length,1);
+    assert.equal((await send(directPath,plannerCookie,'POST',direct)).status,409);
+    const blocked=await send('/api/v1/admin/assignments',plannerCookie,'POST',{employeeId:employee.id,constructionSiteId:site.id,workDate:direct.startDate,plannedStartTime:'07:00',reportResponsible:false});
+    assert.equal(blocked.status,409);assert.equal((await blocked.json()).error.code,'employee_absent');
+    const own=await ok(await send('/api/v1/absences?from=2027-11-24&to=2027-11-24',employeeCookie));assert.equal(own.absences[0].entrySource,'office_direct');
+    const conflict=await send(directPath,plannerCookie,'POST',{...direct,startDate:assignmentDate,endDate:assignmentDate});assert.equal(conflict.status,409);assert.equal((await conflict.json()).error.code,'absence_assignment_conflict');
+    await ok(await send(`/api/v1/admin/absence-requests/${recorded.id}`,plannerCookie,'PATCH',{action:'cancel',rowVersion:recorded.rowVersion,comment:'Direkten Testeintrag aufheben'}));
+    const reset=(await ok(await send(path,cookie,'PUT',{mode:'default',approvalSteps:2,reviewerIds:[],approverIds:[],rowVersion:selected.rowVersion,reason:'Zweistufigen Standard wiederherstellen'}))).policy;
+    assert.equal(reset.approvalSteps,2);
+  });
+
   await t.test("Mobile Baustellenarbeit", async () => {
     const employeeAssignments = await fetch(
       `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,

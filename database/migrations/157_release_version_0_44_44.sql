@@ -1,0 +1,9 @@
+BEGIN;
+INSERT INTO application_versions(version,release_status,released_at,changelog,known_issues,database_migrations,rollout_percent,mandatory_update)
+VALUES('0.44.44','superseded',CURRENT_TIMESTAMP,
+ 'Wählbare ein- oder zweistufige Abwesenheitsgenehmigung. Direkte bestätigte Büroeinträge in der Planung mit Historie, Mandantentrennung und Konfliktprüfung.',
+ '[]'::JSONB,'["156","157"]'::JSONB,100,FALSE)
+ON CONFLICT(version) DO NOTHING;
+UPDATE application_versions SET release_status='superseded' WHERE release_status='production' AND version<>'0.44.44';
+UPDATE application_versions SET release_status='production',rollout_percent=100 WHERE version='0.44.44' AND release_status<>'production';
+COMMIT;

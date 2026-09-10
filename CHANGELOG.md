@@ -4,6 +4,8 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **0.44.44 – Einstufige Freigabe und Büroeinträge (10.09.2026).** Firmen können zwischen einer Freigabe und zwei getrennten Prüfungen wählen; die Personen bleiben pro Stufe auswählbar. Offene Anträge verwenden die aktuelle Regel, abgeschlossene Freigaben behalten ihre Historie. Planung → Abwesenheiten ermöglicht berechtigtem Büro direkt bestätigte Einträge für aktive Mitarbeiter derselben Firma ohne Mitarbeiterantrag. Eigene Direktfreigaben bleiben ausgeschlossen. Überschneidungen und ganztägige Einsatzkonflikte werden gesperrt; Büroeinträge erhalten eine eigene Herkunft und Historie und können begründet aufgehoben werden. Migrationen 156–157.
+
 - **0.44.43 – Abwesenheitszuständigkeiten (10.09.2026).** Administration und Geschäftsführung können je Firma konkrete aktive Mitarbeiter für die erste Prüfung und die verbindliche Freigabe auswählen. Mehrere Vertreter pro Stufe sind möglich. Die bisherige Rollenregel bleibt Standard und kann wiederhergestellt werden. Ausgewählte Personen erhalten nur Abwesenheitszugriff; Änderungen gelten auch für offene Anträge. Zweipersonenprüfung, Sperre eigener Freigaben, Versionsschutz und unveränderlicher Zuständigkeitsverlauf. Neue Ansicht unter Woche → Abwesenheit → Anträge prüfen / Zuständigkeiten. Migrationen 154–155.
 
 

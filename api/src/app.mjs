@@ -223,7 +223,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.43";
+export const APPLICATION_VERSION = "0.44.44";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1647,9 +1647,9 @@ async function requireScopedEntitySiteAccess(
 async function absenceApprovalAccess(client, context, roles = null) {
   roles ||= await activeRoleKeys(client, context);
   const policy = await absenceApprovalPolicy(client, context);
-  return { policy, canManage: [...roles].some(role => MANAGEMENT_ASSIGNER_ROLES.has(role)),
-    canReviewAbsenceOffice: policy.mode === "selected" ? policy.reviewerIds.includes(context.userId)
-      : !hasProjectScopedAccess(roles) && [...roles].some(role => ABSENCE_OFFICE_REVIEW_ROLES.has(role)),
+  return { policy, approvalSteps: policy.approvalSteps, canRecordDirect: hasFullPlannerAccess(roles), canManage: [...roles].some(role => MANAGEMENT_ASSIGNER_ROLES.has(role)),
+    canReviewAbsenceOffice: policy.approvalSteps === 2 && (policy.mode === "selected" ? policy.reviewerIds.includes(context.userId)
+      : !hasProjectScopedAccess(roles) && [...roles].some(role => ABSENCE_OFFICE_REVIEW_ROLES.has(role))),
     canApproveAbsenceManagement: policy.mode === "selected" ? policy.approverIds.includes(context.userId)
       : [...roles].some(role => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role)) };
 }
@@ -1766,7 +1766,7 @@ function employeeDto(row) {
 const ABSENCE_REQUEST_SELECT = `
   SELECT request.id, request.user_id, request.absence_type,
          request.start_date, request.end_date, request.day_part,
-         request.note, request.status, request.row_version,
+         request.note, request.status, request.row_version, request.approval_steps, request.entry_source,
          request.created_at, request.updated_at,
          request.office_reviewed_at, request.office_comment, request.office_reviewed_by_user_id,
          request.management_reviewed_at, request.management_comment,
@@ -1823,6 +1823,7 @@ const ABSENCE_REQUEST_SELECT = `
 
 function absenceRequestDto(row) {
   return {
+    approvalSteps: row.approval_steps || 2, entrySource: row.entry_source || "request",
     id: row.id,
     employeeId: row.user_id,
     employeeName: row.employee_name,
@@ -3420,11 +3421,18 @@ async function listOwnAbsenceRequests(client, context, { from, to }) {
   return result.rows.map(absenceRequestDto);
 }
 
-async function createAbsenceRequest(client, context, input) {
+async function createAbsenceRequest(client, context, input, employeeId = context.userId, direct = false) {
   await requireEnabledModule(client, context, "absences");
+  if (direct) {
+    await requireFullPlanner(client, context);
+    if (employeeId === context.userId) throw new InputError('Eigene Abwesenheiten bitte beantragen.',403,'absence_self_review_forbidden');
+    const employee = await client.query("SELECT id FROM users WHERE company_id=$1 AND id=$2 AND status='active' FOR SHARE", [context.companyId,employeeId]);
+    if (!employee.rowCount) throw new InputError('Aktiver Mitarbeiter dieser Firma nicht gefunden.',404,'employee_not_found');
+    if (!input.note || input.note.trim().length < 3) throw new InputError('Für direkte Einträge ist eine Begründung mit mindestens 3 Zeichen erforderlich.');
+  }
   await client.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-    [`absence:${context.companyId}:${context.userId}`]
+    [`absence:${context.companyId}:${employeeId}`]
   );
   const overlap = await client.query(
     `SELECT 1
@@ -3435,7 +3443,7 @@ async function createAbsenceRequest(client, context, input) {
        AND start_date <= $4
        AND end_date >= $3
      LIMIT 1`,
-    [context.companyId, context.userId, input.startDate, input.endDate]
+    [context.companyId, employeeId, input.startDate, input.endDate]
   );
   if (overlap.rowCount) {
     throw new InputError(
@@ -3445,6 +3453,7 @@ async function createAbsenceRequest(client, context, input) {
     );
   }
 
+  if (direct) await ensureAbsenceAvailability(client, context, {user_id:employeeId,start_date:input.startDate,end_date:input.endDate,day_part:input.dayPart});
   const inserted = await client.query(
     `INSERT INTO absence_requests (
        company_id,
@@ -3454,17 +3463,17 @@ async function createAbsenceRequest(client, context, input) {
        end_date,
        day_part,
        note,
-       requested_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $2)
+       requested_by_user_id, entry_source
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
     [
       context.companyId,
-      context.userId,
+      employeeId,
       input.absenceType,
       input.startDate,
       input.endDate,
       input.dayPart,
-      input.note
+      input.note, context.userId, direct ? "office_direct" : "request"
     ]
   );
   return loadAbsenceRequest(client, context, inserted.rows[0].id);
@@ -3515,12 +3524,45 @@ async function cancelOwnAbsenceRequest(client, context, requestId, input) {
   return loadAbsenceRequest(client, context, requestId);
 }
 
+async function ensureAbsenceAvailability(client, context, request) {
+    if (request.day_part === "full_day") {
+      await lockAssignmentAvailability(
+        client,
+        context,
+        request.user_id,
+        databaseDate(request.start_date),
+        databaseDate(request.end_date)
+      );
+      const conflicts = await client.query(
+        `SELECT COUNT(*)::INTEGER AS count
+         FROM site_assignments
+         WHERE company_id = $1
+           AND user_id = $2
+           AND work_date BETWEEN $3 AND $4
+           AND status IN ('draft', 'released')`,
+        [
+          context.companyId,
+          request.user_id,
+          databaseDate(request.start_date),
+          databaseDate(request.end_date)
+        ]
+      );
+      if (conflicts.rows[0].count > 0) {
+        throw new InputError(
+          `Vor der verbindlichen Freigabe müssen ${conflicts.rows[0].count} vorhandene Einsätze verschoben oder storniert werden.`,
+          409,
+          "absence_assignment_conflict"
+        );
+      }
+    }
+}
+
 async function reviewAbsenceRequest(client, context, requestId, input) {
   await requireEnabledModule(client, context, "absences");
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended('absence-policy:' || $1::text,0))", [context.companyId]);
   const current = await client.query(
     `SELECT id, user_id, start_date, end_date, day_part,
-            status, row_version, office_reviewed_by_user_id
+            status, row_version, office_reviewed_by_user_id, entry_source
      FROM absence_requests
      WHERE company_id = $1 AND id = $2
      FOR UPDATE`,
@@ -3544,6 +3586,17 @@ async function reviewAbsenceRequest(client, context, requestId, input) {
 
   if (request.user_id === context.userId) {
     throw new InputError("Eigene Anträge können nicht selbst geprüft oder freigegeben werden.",403,"absence_self_review_forbidden");
+  }
+  const access = await absenceApprovalAccess(client, context);
+  if (access.approvalSteps === 1 && ['office_review','management_review'].includes(request.status)) {
+    await requireAbsenceManagementApprover(client, context);
+    if (input.action === 'cancel') throw new InputError('Offene Anträge werden genehmigt oder abgelehnt.');
+    if (input.action === 'approve') await ensureAbsenceAvailability(client, context, request);
+    await client.query(`UPDATE absence_requests SET status=$3,approval_steps=1,
+      management_reviewed_by_user_id=$4,management_reviewed_at=CURRENT_TIMESTAMP,management_comment=$5
+      WHERE company_id=$1 AND id=$2 AND row_version=$6`,
+      [context.companyId,requestId,input.action==='approve'?'approved':'management_rejected',context.userId,input.comment,input.rowVersion]);
+    return loadAbsenceRequest(client,context,requestId);
   }
   if (request.status === "office_review") {
     await requireAbsenceOfficeReviewer(client, context);
@@ -3575,36 +3628,7 @@ async function reviewAbsenceRequest(client, context, requestId, input) {
     if (input.action === "cancel") {
       throw new InputError("Ein Antrag in Geschäftsführungsprüfung wird genehmigt oder abgelehnt.");
     }
-    if (input.action === "approve" && request.day_part === "full_day") {
-      await lockAssignmentAvailability(
-        client,
-        context,
-        request.user_id,
-        databaseDate(request.start_date),
-        databaseDate(request.end_date)
-      );
-      const conflicts = await client.query(
-        `SELECT COUNT(*)::INTEGER AS count
-         FROM site_assignments
-         WHERE company_id = $1
-           AND user_id = $2
-           AND work_date BETWEEN $3 AND $4
-           AND status IN ('draft', 'released')`,
-        [
-          context.companyId,
-          request.user_id,
-          databaseDate(request.start_date),
-          databaseDate(request.end_date)
-        ]
-      );
-      if (conflicts.rows[0].count > 0) {
-        throw new InputError(
-          `Vor der verbindlichen Freigabe müssen ${conflicts.rows[0].count} vorhandene Einsätze verschoben oder storniert werden.`,
-          409,
-          "absence_assignment_conflict"
-        );
-      }
-    }
+    if (input.action === "approve") await ensureAbsenceAvailability(client, context, request);
     const status = input.action === "approve" ? "approved" : "management_rejected";
     await client.query(
       `UPDATE absence_requests
@@ -3619,7 +3643,7 @@ async function reviewAbsenceRequest(client, context, requestId, input) {
   }
 
   if (request.status === "approved" && input.action === "cancel") {
-    await requireAbsenceManagementApprover(client, context);
+    if (!(request.entry_source === "office_direct" && access.canRecordDirect)) await requireAbsenceManagementApprover(client, context);
     await client.query(
       `UPDATE absence_requests
        SET status = 'cancelled',
@@ -4968,6 +4992,7 @@ async function adminOverview(client, context, date) {
     planningEnd,
     canCreateManagementRoles: [...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role)),
     projectScopeRestricted,
+    approvalSteps: approvalAccess.approvalSteps,
     canReviewAbsenceOffice: approvalAccess.canReviewAbsenceOffice,
     canApproveAbsenceManagement: approvalAccess.canApproveAbsenceManagement,
     employees: employeeResult.rows.filter((row) => row.status === "active").map(employeeDto),
@@ -10715,6 +10740,16 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { announcement });
       }
 
+      if (url.pathname === "/api/v1/admin/absences" && request.method === "POST") {
+        const body = await readJson(request);
+        const data = await withReadySession(pool,tokenHash,async (client,context) => {
+          await requireFullPlanner(client,context);
+          if (!body || Object.keys(body).some(key=>!['employeeId','absenceType','startDate','endDate','dayPart','note'].includes(key))) throw new InputError('Ungültige Felder für die direkte Abwesenheit.');
+          return createAbsenceRequest(client,context,validateAbsenceRequest(body),validateId(body.employeeId,'Mitarbeiter-ID'),true);
+        });
+        return json(response,201,{absence:data});
+      }
+
       if (url.pathname === "/api/v1/absence-approvals" && ["GET", "PUT"].includes(request.method)) {
         const body = request.method === "PUT" ? await readJson(request) : null;
         const data = await withReadySession(pool, tokenHash, async (client, context) => {
@@ -10724,18 +10759,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             if (!access.canManage) throw new InputError("Nur Administration oder Geschäftsführung darf Zuständigkeiten ändern.",403,"forbidden");
             return { policy: await saveApprovalPolicy(client, context, body) };
           }
-          if (!access.canManage && !access.canReviewAbsenceOffice && !access.canApproveAbsenceManagement) {
+          if (!access.canManage && !access.canRecordDirect && !access.canReviewAbsenceOffice && !access.canApproveAbsenceManagement) {
             throw new InputError("Du bist nicht für Abwesenheitsprüfungen ausgewählt.",403,"forbidden");
           }
-          const requests = access.canReviewAbsenceOffice || access.canApproveAbsenceManagement
+          const requests = access.canRecordDirect || access.canReviewAbsenceOffice || access.canApproveAbsenceManagement
             ? await client.query(`${ABSENCE_REQUEST_SELECT} WHERE request.company_id=$1
                 AND request.status IN ('office_review','management_review','approved')
                 ORDER BY request.created_at DESC, request.id LIMIT 500`, [context.companyId]) : { rows: [] };
-          const employees = access.canManage ? await client.query(
+          const employees = access.canManage || access.canRecordDirect ? await client.query(
             "SELECT id,first_name,last_name,personnel_number,status FROM users WHERE company_id=$1 ORDER BY last_name,first_name,id",
             [context.companyId]) : { rows: [] };
           const history = access.canManage ? await client.query(
-            `SELECT p.row_version,p.created_at,p.reason,p.reviewer_ids,p.approver_ids,
+            `SELECT p.row_version,p.created_at,p.reason,p.reviewer_ids,p.approver_ids,p.approval_steps,
               u.first_name || ' ' || u.last_name AS actor_name
              FROM absence_approval_policies p JOIN users u ON u.company_id=p.company_id AND u.id=p.actor_user_id
              WHERE p.company_id=$1 ORDER BY p.row_version DESC LIMIT 20`,[context.companyId]) : { rows: [] };

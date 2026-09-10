@@ -5,9 +5,12 @@ import { absenceApprovalPolicy, validateApprovalPolicy, saveApprovalPolicy } fro
 import { createPool } from '../src/database.mjs';
 
 const a=randomUUID(), b=randomUUID();
-const chosen={mode:'selected',reviewerIds:[a],approverIds:[b],rowVersion:0,reason:'Vertretung'};
+const chosen={approvalSteps:2,mode:'selected',reviewerIds:[a],approverIds:[b],rowVersion:0,reason:'Vertretung'};
 test('Abwesenheitszuständigkeit: vollständige Auswahl, zwei Personen und serverseitige Herkunft',()=>{
   assert.deepEqual(validateApprovalPolicy(chosen),chosen);
+  assert.equal(validateApprovalPolicy({...chosen,approvalSteps:1,reviewerIds:[],approverIds:[a]}).approvalSteps,1);
+  assert.throws(()=>validateApprovalPolicy({...chosen,approvalSteps:3}));
+  assert.throws(()=>validateApprovalPolicy({...chosen,approvalSteps:1}));
   assert.equal(validateApprovalPolicy({...chosen,reviewerIds:[a,a]}).reviewerIds.length,1);
   assert.equal(validateApprovalPolicy({mode:'default',reviewerIds:[],approverIds:[],rowVersion:1,reason:'Standard'}).mode,'default');
   for(const input of [null,[],{}, {...chosen,companyId:a},{...chosen,mode:'all'}, {...chosen,rowVersion:-1},
