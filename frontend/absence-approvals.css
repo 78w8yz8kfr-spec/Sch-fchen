@@ -1,0 +1,4 @@
+select{font:inherit;padding:10px;max-width:100%;min-height:44px;border:1px solid #a9a9b0;border-radius:8px;background:white}
+details{margin:20px 0;padding:16px;border:1px solid #ddd;border-radius:12px;background:white}summary{cursor:pointer;font-weight:700;min-height:44px}
+#policy-form>label{margin-top:18px}#policy-form>button{margin-top:12px}.person{display:grid;grid-template-columns:minmax(130px,1fr) 110px 110px;gap:12px;padding:12px 0;border-bottom:1px solid #eee;align-items:center}.person label{display:flex;align-items:center;gap:6px;min-height:44px}.person input{width:20px;height:20px}.person small{display:block}.request{padding:18px;background:white;border:1px solid #ddd;border-radius:12px;margin:16px 0}.request h3{margin:0}.request input{margin:12px 0}.request button{margin-right:8px;margin-bottom:8px}
+@media(max-width:520px){.person{grid-template-columns:1fr 1fr;gap:6px}.person>div{grid-column:1/-1}details{padding:12px}}

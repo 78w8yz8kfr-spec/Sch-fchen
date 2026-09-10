@@ -1,7 +1,11 @@
 # Projektstatus
 
-Stand: 08.09.2026
-Technischer Stand: V0.44.42
+Stand: 10.09.2026
+Technischer Stand: V0.44.43
+
+## Abwesenheitszuständigkeiten
+
+- **0.44.43 – Abwesenheitszuständigkeiten (10.09.2026).** Administration und Geschäftsführung können je Firma konkrete aktive Mitarbeiter für die erste Prüfung und die verbindliche Freigabe auswählen. Mehrere Vertreter pro Stufe sind möglich. Die bisherige Rollenregel bleibt Standard und kann wiederhergestellt werden. Ausgewählte Personen erhalten nur Abwesenheitszugriff; Änderungen gelten auch für offene Anträge. Zweipersonenprüfung, Sperre eigener Freigaben, Versionsschutz und unveränderlicher Zuständigkeitsverlauf. Neue Ansicht unter Woche → Abwesenheit → Anträge prüfen / Zuständigkeiten. Migrationen 154–155.
 
 ## Ergänzende Sicherheitsprüfung 08.09.2026
 

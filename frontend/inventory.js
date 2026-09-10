@@ -6,7 +6,7 @@ let locations = [], canManage = false, editing = null, parent = null, busy = fal
 
 async function request(path = "", options = {}) {
   const response = await fetch(base + path, { credentials: "same-origin", cache: "no-store", ...options,
-    headers: { "Content-Type": "application/json", "X-Schaefchen-Version": "0.44.42" } });
+    headers: { "Content-Type": "application/json", "X-Schaefchen-Version": "0.44.43" } });
   const data = await response.json();
   if (!response.ok) throw new Error(response.status === 401
     ? "Bitte zuerst in der Arbeitsapp anmelden und diese Seite erneut öffnen."

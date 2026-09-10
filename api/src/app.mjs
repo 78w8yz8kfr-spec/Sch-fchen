@@ -1,3 +1,4 @@
+import { absenceApprovalPolicy, saveApprovalPolicy } from './absence-approval-policy.mjs';
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -222,7 +223,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.42";
+export const APPLICATION_VERSION = "0.44.43";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1643,31 +1644,25 @@ async function requireScopedEntitySiteAccess(
   );
 }
 
-async function requireAbsenceOfficeReviewer(client, context) {
-  const roles = await activeRoleKeys(client, context);
-  if (
-    hasProjectScopedAccess(roles)
-    || ![...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role))
-  ) {
-    throw new InputError(
-      "Die erste Abwesenheitsprüfung ist nur für Büro und Planung freigeschaltet.",
-      403,
-      "absence_office_review_forbidden"
-    );
-  }
-  return roles;
+async function absenceApprovalAccess(client, context, roles = null) {
+  roles ||= await activeRoleKeys(client, context);
+  const policy = await absenceApprovalPolicy(client, context);
+  return { policy, canManage: [...roles].some(role => MANAGEMENT_ASSIGNER_ROLES.has(role)),
+    canReviewAbsenceOffice: policy.mode === "selected" ? policy.reviewerIds.includes(context.userId)
+      : !hasProjectScopedAccess(roles) && [...roles].some(role => ABSENCE_OFFICE_REVIEW_ROLES.has(role)),
+    canApproveAbsenceManagement: policy.mode === "selected" ? policy.approverIds.includes(context.userId)
+      : [...roles].some(role => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role)) };
 }
 
-async function requireAbsenceManagementApprover(client, context) {
-  const roles = await activeRoleKeys(client, context);
-  if (![...roles].some((role) => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role))) {
-    throw new InputError(
-      "Die verbindliche Abwesenheitsfreigabe ist nur für die Geschäftsführung freigeschaltet.",
-      403,
-      "absence_management_approval_forbidden"
-    );
+async function requireAbsenceOfficeReviewer(client, context) {
+  if (!(await absenceApprovalAccess(client, context)).canReviewAbsenceOffice) {
+    throw new InputError("Du bist für die erste Abwesenheitsprüfung nicht freigeschaltet.",403,"absence_office_review_forbidden");
   }
-  return roles;
+}
+async function requireAbsenceManagementApprover(client, context) {
+  if (!(await absenceApprovalAccess(client, context)).canApproveAbsenceManagement) {
+    throw new InputError("Du bist für die verbindliche Abwesenheitsfreigabe nicht freigeschaltet.",403,"absence_management_approval_forbidden");
+  }
 }
 
 // Regel der Firma für eigene Zeitkorrekturen vor der Freigabe des Arbeitstags.
@@ -1773,7 +1768,7 @@ const ABSENCE_REQUEST_SELECT = `
          request.start_date, request.end_date, request.day_part,
          request.note, request.status, request.row_version,
          request.created_at, request.updated_at,
-         request.office_reviewed_at, request.office_comment,
+         request.office_reviewed_at, request.office_comment, request.office_reviewed_by_user_id,
          request.management_reviewed_at, request.management_comment,
          request.cancelled_at, request.cancellation_reason,
          employee.first_name || ' ' || employee.last_name AS employee_name,
@@ -3521,6 +3516,8 @@ async function cancelOwnAbsenceRequest(client, context, requestId, input) {
 }
 
 async function reviewAbsenceRequest(client, context, requestId, input) {
+  await requireEnabledModule(client, context, "absences");
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended('absence-policy:' || $1::text,0))", [context.companyId]);
   const current = await client.query(
     `SELECT id, user_id, start_date, end_date, day_part,
             status, row_version, office_reviewed_by_user_id
@@ -3545,6 +3542,9 @@ async function reviewAbsenceRequest(client, context, requestId, input) {
     );
   }
 
+  if (request.user_id === context.userId) {
+    throw new InputError("Eigene Anträge können nicht selbst geprüft oder freigegeben werden.",403,"absence_self_review_forbidden");
+  }
   if (request.status === "office_review") {
     await requireAbsenceOfficeReviewer(client, context);
     if (input.action === "cancel") {
@@ -4960,6 +4960,7 @@ async function adminOverview(client, context, date) {
     .filter((row) => !projectScopeRestricted || visibleSiteIds.has(row.construction_site_id))
     .map(mapper);
 
+  const approvalAccess = await absenceApprovalAccess(client, context, roles);
   return {
     date,
     weekStart,
@@ -4967,11 +4968,8 @@ async function adminOverview(client, context, date) {
     planningEnd,
     canCreateManagementRoles: [...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role)),
     projectScopeRestricted,
-    canReviewAbsenceOffice: !projectScopeRestricted
-      && [...roles].some((role) => ABSENCE_OFFICE_REVIEW_ROLES.has(role)),
-    canApproveAbsenceManagement: [...roles].some(
-      (role) => ABSENCE_MANAGEMENT_APPROVAL_ROLES.has(role)
-    ),
+    canReviewAbsenceOffice: approvalAccess.canReviewAbsenceOffice,
+    canApproveAbsenceManagement: approvalAccess.canApproveAbsenceManagement,
     employees: employeeResult.rows.filter((row) => row.status === "active").map(employeeDto),
     archivedEmployees: employeeResult.rows.filter((row) => row.status === "archived").map(employeeDto),
     customers,
@@ -10577,7 +10575,7 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
     }
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
-        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Schaefchen-Version, X-Support-Access-Id",
         "Access-Control-Max-Age": "600"
       });
@@ -10715,6 +10713,37 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           )
         );
         return json(response, 200, { announcement });
+      }
+
+      if (url.pathname === "/api/v1/absence-approvals" && ["GET", "PUT"].includes(request.method)) {
+        const body = request.method === "PUT" ? await readJson(request) : null;
+        const data = await withReadySession(pool, tokenHash, async (client, context) => {
+          await requireEnabledModule(client, context, "absences");
+          const access = await absenceApprovalAccess(client, context);
+          if (request.method === "PUT") {
+            if (!access.canManage) throw new InputError("Nur Administration oder Geschäftsführung darf Zuständigkeiten ändern.",403,"forbidden");
+            return { policy: await saveApprovalPolicy(client, context, body) };
+          }
+          if (!access.canManage && !access.canReviewAbsenceOffice && !access.canApproveAbsenceManagement) {
+            throw new InputError("Du bist nicht für Abwesenheitsprüfungen ausgewählt.",403,"forbidden");
+          }
+          const requests = access.canReviewAbsenceOffice || access.canApproveAbsenceManagement
+            ? await client.query(`${ABSENCE_REQUEST_SELECT} WHERE request.company_id=$1
+                AND request.status IN ('office_review','management_review','approved')
+                ORDER BY request.created_at DESC, request.id LIMIT 500`, [context.companyId]) : { rows: [] };
+          const employees = access.canManage ? await client.query(
+            "SELECT id,first_name,last_name,personnel_number,status FROM users WHERE company_id=$1 ORDER BY last_name,first_name,id",
+            [context.companyId]) : { rows: [] };
+          const history = access.canManage ? await client.query(
+            `SELECT p.row_version,p.created_at,p.reason,p.reviewer_ids,p.approver_ids,
+              u.first_name || ' ' || u.last_name AS actor_name
+             FROM absence_approval_policies p JOIN users u ON u.company_id=p.company_id AND u.id=p.actor_user_id
+             WHERE p.company_id=$1 ORDER BY p.row_version DESC LIMIT 20`,[context.companyId]) : { rows: [] };
+          return { ...access, policy: access.canManage ? access.policy : null, userId: context.userId,
+            absences: requests.rows.map(row => ({...absenceRequestDto(row), officeReviewerId: row.office_reviewed_by_user_id})),
+            employees: employees.rows, history: history.rows };
+        });
+        return json(response,200,data);
       }
 
       if (url.pathname.startsWith("/api/v1/inventory/")) {
