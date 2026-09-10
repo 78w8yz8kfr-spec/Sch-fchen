@@ -317,6 +317,29 @@ export function validateInitialSetup(body) {
   };
 }
 
+// Die DATEV-Personalnummer wird an zwei Stellen gepflegt: im Mitarbeiter-
+// formular (hier) und in der eigenstaendigen DATEV-Liste
+// (validateDatevPersonnelNumberAssignment weiter unten). Beide pruefen
+// dieselbe Regel aus Migration 156 (ein bis fuenf Ziffern, keine fuehrende
+// Null) - deshalb eine einzige Pruefung fuer beide, statt sie zu verdoppeln
+// und irgendwann auseinanderlaufen zu lassen.
+function datevPersonnelNumber(value) {
+  const normalized = text(value, "DATEV-Personalnummer", 1, 5);
+  if (!/^[1-9][0-9]{0,4}$/.test(normalized)) {
+    throw new InputError(
+      "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern ohne führende Null bestehen."
+    );
+  }
+  return normalized;
+}
+
+// Optionale Fassung fuer das Mitarbeiterformular: ein leeres Feld bedeutet
+// "nicht gepflegt" (null), nicht "ungueltig".
+function optionalDatevPersonnelNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return datevPersonnelNumber(value);
+}
+
 export function validateEmployee(body) {
   rejectTenantFields(body);
   const role = text(body.role, "Rolle", 2, 50).toLowerCase();
@@ -333,7 +356,10 @@ export function validateEmployee(body) {
     // Deshalb ein Schalter zusaetzlich zur Hauptrolle und kein weiterer
     // Eintrag in der Auswahlliste.
     drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
-    temporaryPassword: password(body.temporaryPassword)
+    temporaryPassword: password(body.temporaryPassword),
+    // Beim Anlegen gibt es noch keinen "unveraendert"-Fall: fehlt das Feld,
+    // ist die Nummer schlicht noch nicht gepflegt (null).
+    datevPersonnelNumber: optionalDatevPersonnelNumber(body.datevPersonnelNumber)
   };
 }
 
@@ -345,7 +371,7 @@ export function validateEmployeeUpdate(body) {
   if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
     throw new InputError("Die Mitarbeiterversion ist ungültig.");
   }
-  return {
+  const result = {
     personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
     firstName: text(body.firstName, "Vorname", 1, 100),
     lastName: text(body.lastName, "Nachname", 1, 100),
@@ -363,6 +389,16 @@ export function validateEmployeeUpdate(body) {
     drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
     rowVersion
   };
+  // Anders als beim Anlegen gibt es beim Bearbeiten einen dritten Zustand:
+  // "Feld nicht mitgeschickt" heisst "unveraendert lassen", nicht "loeschen".
+  // Ein alter Client, der das Feld gar nicht kennt, darf eine bereits
+  // gepflegte Nummer nicht versehentlich leeren. Deshalb erscheint der
+  // Schluessel im Ergebnis nur, wenn er im Request tatsaechlich vorkam;
+  // app.mjs unterscheidet danach mit Object.hasOwn.
+  if (Object.hasOwn(body, "datevPersonnelNumber")) {
+    result.datevPersonnelNumber = optionalDatevPersonnelNumber(body.datevPersonnelNumber);
+  }
+  return result;
 }
 
 // Fahrzeuge des Fuhrparks.
@@ -2313,13 +2349,9 @@ export function validateDatevPersonnelNumberAssignment(body) {
   if (body.datevPersonnelNumber === null) {
     return { datevPersonnelNumber: null, rowVersion };
   }
-  const datevPersonnelNumber = text(body.datevPersonnelNumber, "DATEV-Personalnummer", 1, 5);
-  if (!/^[1-9][0-9]{0,4}$/.test(datevPersonnelNumber)) {
-    throw new InputError(
-      "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern ohne führende Null bestehen."
-    );
-  }
-  return { datevPersonnelNumber, rowVersion };
+  // Dieselbe Pruefung wie im Mitarbeiterformular - siehe datevPersonnelNumber
+  // weiter oben in dieser Datei.
+  return { datevPersonnelNumber: datevPersonnelNumber(body.datevPersonnelNumber), rowVersion };
 }
 
 // Legt eine neue gültige Zuordnung an; die bisherige wird von der Datenbank

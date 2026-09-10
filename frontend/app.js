@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.45";
-import { serverIsNewer } from "./core/versions.js?v=0.44.45";
+} from "./core/work-time.js?v=0.44.46";
+import { serverIsNewer } from "./core/versions.js?v=0.44.46";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.45";
+} from "./core/sync-queue.js?v=0.44.46";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.45";
+} from "./core/permissions.js?v=0.44.46";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.45";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.45";
-import { createPowerModule } from "./core/power-module.js?v=0.44.45";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.45";
+} from "./core/state-store.js?v=0.44.46";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.46";
+import { createPowerModule } from "./core/power-module.js?v=0.44.46";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.46";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.45";
+} from "./core/time-changes.js?v=0.44.46";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -897,6 +897,7 @@ import {
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
     employeePersonnelNumber: document.querySelector("#employee-personnel-number"),
+    employeeDatevPersonnelNumber: document.querySelector("#employee-datev-personnel-number"),
     employeePhone: document.querySelector("#employee-phone"),
     employeeEmail: document.querySelector("#employee-email"),
     employeeRole: document.querySelector("#employee-role"),
@@ -920,6 +921,7 @@ import {
     employeeEditFirstName: document.querySelector("#employee-edit-first-name"),
     employeeEditLastName: document.querySelector("#employee-edit-last-name"),
     employeeEditPersonnelNumber: document.querySelector("#employee-edit-personnel-number"),
+    employeeEditDatevPersonnelNumber: document.querySelector("#employee-edit-datev-personnel-number"),
     employeeEditPhone: document.querySelector("#employee-edit-phone"),
     employeeEditEmail: document.querySelector("#employee-edit-email"),
     employeeEditRole: document.querySelector("#employee-edit-role"),
@@ -1577,7 +1579,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.45",
+          "X-Schaefchen-Version": "0.44.46",
           ...options.headers
         }
       });
@@ -1612,7 +1614,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.45`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.46`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1634,7 +1636,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.45" }
+        headers: { "X-Schaefchen-Version": "0.44.46" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1681,7 +1683,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.45 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.46 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3091,7 +3093,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.45";
+  const EIGENE_FASSUNG = "0.44.46";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3130,7 +3132,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.45". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.46". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6707,6 +6709,10 @@ import {
     elements.employeeEditFirstName.value = employee.firstName;
     elements.employeeEditLastName.value = employee.lastName;
     elements.employeeEditPersonnelNumber.value = employee.personnelNumber;
+    // Ohne diese Zeile wuerde der erste Speichervorgang die vorhandene
+    // DATEV-Personalnummer versehentlich mit nichts ueberschreiben - das
+    // Formular schickt ja immer den aktuellen Feldinhalt, leer oder nicht.
+    elements.employeeEditDatevPersonnelNumber.value = employee.datevPersonnelNumber || "";
     elements.employeeEditPhone.value = employee.phone || "";
     elements.employeeEditEmail.value = employee.email || "";
     elements.employeeEditRole.value = editableEmployeeRole(employee.roles);
@@ -7277,7 +7283,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.45" }
+        headers: { "X-Schaefchen-Version": "0.44.46" }
       });
       if (response.ok) {
         await cache.put(
@@ -9591,6 +9597,16 @@ import {
   // zwei verschiedene. Dieselbe Regel prueft der Server vorab (siehe
   // API-Vertrag admin/datev/personnel-numbers).
   const DATEV_PERSONNEL_NUMBER_PATTERN = /^[1-9][0-9]{0,4}$/;
+
+  // Dieselbe Regel wie beim DATEV-Reiter, jetzt auch am Mitarbeiterformular:
+  // die Nummer gehoert zum Mitarbeiter und soll dort eintragbar sein, nicht
+  // nur nachtraeglich in einer eigenen Liste. Ein leeres Feld ist erlaubt -
+  // es bedeutet null, nicht ein leerer Text.
+  function readEmployeeDatevPersonnelNumber(inputElement) {
+    const raw = inputElement.value.trim();
+    if (raw !== "" && !DATEV_PERSONNEL_NUMBER_PATTERN.test(raw)) return { ok: false };
+    return { ok: true, value: raw === "" ? null : raw };
+  }
 
   function findDatevPersonnelNumberEntry(employeeId) {
     return (datevPersonnelNumbersState || []).find(
@@ -12292,6 +12308,15 @@ import {
 
   elements.employeeForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    // Dasselbe Format, das der Server prueft - hier vorab, damit niemand eine
+    // Servermeldung fuer etwas kassiert, das die Oberflaeche schon wusste. Ein
+    // leeres Feld ist erlaubt: der Betrieb nutzt dann einfach kein DATEV.
+    const datevPersonnelNumber = readEmployeeDatevPersonnelNumber(elements.employeeDatevPersonnelNumber);
+    if (!datevPersonnelNumber.ok) {
+      elements.employeeMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
     const saved = await submitAdminForm(
       elements.employeeForm,
       elements.employeeMessage,
@@ -12300,6 +12325,7 @@ import {
         firstName: elements.employeeFirstName.value,
         lastName: elements.employeeLastName.value,
         personnelNumber: elements.employeePersonnelNumber.value,
+        datevPersonnelNumber: datevPersonnelNumber.value,
         phone: elements.employeePhone.value,
         email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
@@ -12342,6 +12368,15 @@ import {
       elements.employeeEditMessage.textContent = "Der Mitarbeiter wurde nicht gefunden. Bitte neu laden.";
       return;
     }
+    // Dasselbe Format, das der Server prueft - hier vorab, damit niemand eine
+    // Servermeldung fuer etwas kassiert, das die Oberflaeche schon wusste. Ein
+    // leeres Feld ist erlaubt und entfernt eine vorhandene Zuordnung wieder.
+    const datevPersonnelNumber = readEmployeeDatevPersonnelNumber(elements.employeeEditDatevPersonnelNumber);
+    if (!datevPersonnelNumber.ok) {
+      elements.employeeEditMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
     elements.employeeEditSave.disabled = true;
     elements.employeeEditCancel.disabled = true;
     elements.employeeEditMessage.textContent = "Änderungen werden sicher gespeichert …";
@@ -12352,6 +12387,7 @@ import {
           firstName: elements.employeeEditFirstName.value,
           lastName: elements.employeeEditLastName.value,
           personnelNumber: elements.employeeEditPersonnelNumber.value,
+          datevPersonnelNumber: datevPersonnelNumber.value,
           phone: elements.employeeEditPhone.value,
           email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,

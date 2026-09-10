@@ -272,11 +272,18 @@ async function updatePersonnelNumber(client, context, employeeId, input) {
 // Meldet nicht nur "bereits vergeben", sondern nennt, wem die Nummer bereits
 // gehört - sonst zwingt eine Kollision das Büro, die ganze Mitarbeiterliste
 // nach der Nummer zu durchsuchen.
-async function assertDatevPersonnelNumberFree(client, context, employeeId, datevPersonnelNumber) {
+//
+// Exportiert, weil app.mjs (createEmployee/updateEmployee) dieselbe Spalte
+// schreibt und dieselbe Meldung braucht - es darf nur eine Formulierung
+// dafuer geben. employeeId ist null bei einer Neuanlage: der neue Mitarbeiter
+// existiert noch nicht als Zeile, es gibt also niemanden auszuschliessen.
+export async function assertDatevPersonnelNumberFree(client, context, employeeId, datevPersonnelNumber) {
   const taken = await client.query(
     `SELECT personnel_number, first_name, last_name
      FROM users
-     WHERE company_id = $1 AND id <> $2 AND datev_personnel_number = $3`,
+     WHERE company_id = $1
+       AND ($2::UUID IS NULL OR id <> $2)
+       AND datev_personnel_number = $3`,
     [context.companyId, employeeId, datevPersonnelNumber]
   );
   if (taken.rowCount) {

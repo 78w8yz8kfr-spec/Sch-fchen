@@ -4,6 +4,33 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Die DATEV-Personalnummer lässt sich jetzt direkt im Mitarbeiterformular
+  pflegen, nicht mehr nur in der eigenen DATEV-Liste (Fassung 0.44.46).** Wer einen Mitarbeiter
+  anlegt oder bearbeitet, trägt die Nummer dort ein, wo sie hingehört — der
+  Betreiber musste bislang nach dem Anlegen extra in den DATEV-Reiter
+  wechseln, und vergaß es leicht. Die DATEV-Liste bleibt daneben bestehen,
+  weiterhin der Ort für das Nachtragen vieler Nummern am Stück; beide Wege
+  schreiben dieselbe Spalte aus Migration 156 und teilen sich dieselbe
+  Prüfung (`api/src/validation.mjs`) sowie dieselbe Kollisionsmeldung
+  (`assertDatevPersonnelNumberFree` aus `api/src/datev.mjs`, jetzt exportiert
+  statt ein zweites Mal nachgebaut) — inklusive derselben Absicherung gegen
+  einen Wettlauf zweier gleichzeitiger Vergaben über den eindeutigen Index.
+
+  In der Oberfläche steht das Feld in **beiden** Mitarbeiterformularen direkt
+  nach der Personalnummer — freiwillig, mit der Formatregel vorab statt als
+  Fehlermeldung danach. Beim Bearbeiten wird die vorhandene Nummer vorbefüllt;
+  ohne das hätte der erste Speichervorgang sie stillschweigend gelöscht. Und
+  die DATEV-Liste im DATEV-Reiter frischt nach jedem Mitarbeiter-Speichern
+  ohnehin schon auf (`refreshAdmin` → `refreshDatevAdmin` →
+  `refreshDatevPersonnelNumbers`) — dafür war kein neuer Code nötig, wohl aber
+  ein Test, der anschlägt, wenn jemand diese Kette später zerschneidet.
+
+  Beim Bearbeiten unterscheidet die API drei Zustände: Feld nicht
+  mitgeschickt heißt „unverändert lassen" (ein alter Client kennt das Feld
+  schlicht nicht), ausdrücklich leer heißt „löschen", ein Wert heißt „setzen
+  oder ändern". Ohne diese Unterscheidung hätte ein älterer Aufruf eine
+  bereits gepflegte Nummer versehentlich gelöscht.
+
 - **DATEV-Personalnummern im DATEV-Fenster, und fünf Schaltflächen, die nach
   einem Versuch ohne Netz tot blieben (Fassung 0.44.45).** Zur Spalte aus
   Migration 156 gehört ein vierter Bereich im DATEV-Reiter: alle aktiven

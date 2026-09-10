@@ -1,11 +1,24 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.45
+Technischer Stand: V0.44.46
 
 
 ## Abgeschlossen
 
+- **DATEV-Personalnummer im Mitarbeiterformular** (Fassung 0.44.46). Anlegen und Bearbeiten
+  eines Mitarbeiters (`api/src/app.mjs`, `createEmployee`/`updateEmployee`)
+  tragen `users.datev_personnel_number` jetzt direkt mit ein, statt den
+  Umweg über den DATEV-Reiter zu erzwingen. Prüfung und Kollisionsmeldung
+  sind mit der eigenständigen DATEV-Liste geteilt (`validateEmployee`/
+  `validateEmployeeUpdate` in `api/src/validation.mjs` nutzen dieselbe Regel
+  wie `validateDatevPersonnelNumberAssignment`; `assertDatevPersonnelNumberFree`
+  aus `api/src/datev.mjs` ist jetzt exportiert und wird von beiden Wegen
+  benutzt, inklusive der Absicherung gegen einen gleichzeitigen Doppel-
+  vergabe-Wettlauf über den eindeutigen Index aus Migration 156). Beim
+  Bearbeiten unterscheidet die API "Feld fehlt" (unverändert lassen) von
+  "Feld ausdrücklich leer" (löschen). Mitarbeiterdatensatz und -liste liefern
+  `datevPersonnelNumber` mit. Keine neue Migration nötig.
 - **DATEV-Personalnummern in der Oberfläche und tote Schaltflächen nach
   Offline-Versuch** (Fassung 0.44.45). Vierter Bereich im DATEV-Reiter zum
   Pflegen der Nummern; die Vorschau trennt fehlende Lohnartenzuordnung und

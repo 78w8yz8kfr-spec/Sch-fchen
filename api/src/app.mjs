@@ -56,7 +56,7 @@ import {
 import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
 import { handlePowerRequest } from "./power.mjs";
-import { handleDatevRequest } from "./datev.mjs";
+import { assertDatevPersonnelNumberFree, handleDatevRequest } from "./datev.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -223,7 +223,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.45";
+export const APPLICATION_VERSION = "0.44.46";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1765,6 +1765,10 @@ function employeeDto(row) {
     // Die Einsatzplanung warnt, wenn auf einer Baustelle niemand mit
     // Fuehrerschein steht - dafuer muss sie die Klassen kennen.
     drivingLicenceClasses: row.driving_licence_classes || [],
+    // Siehe Migration 156: getrennt von personnelNumber (freier Text),
+    // ausschliesslich fuer den DATEV-Lohnexport. null heisst "nicht
+    // gepflegt", nicht "kein Mitarbeiter".
+    datevPersonnelNumber: row.datev_personnel_number || null,
     rowVersion: Number(row.row_version || 1)
   };
 }
@@ -4504,6 +4508,7 @@ async function adminOverview(client, context, date) {
               account.archived_reason, account.row_version,
               account.trainer_user_id,
               account.driving_licence_classes,
+              account.datev_personnel_number,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
                   FILTER (WHERE role.id IS NOT NULL),
@@ -6902,6 +6907,7 @@ async function getEmployeeRecord(client, context, employeeId) {
             account.archived_reason, account.row_version,
             account.trainer_user_id,
             account.driving_licence_classes,
+            account.datev_personnel_number,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
                 FILTER (WHERE role.id IS NOT NULL),
@@ -6962,24 +6968,45 @@ async function createEmployee(client, context, input) {
   );
   if (roleResult.rowCount !== 1) throw new InputError("Die gewählte Rolle ist nicht verfügbar.");
 
+  // Dieselbe Meldung wie in der DATEV-Verwaltung (siehe datev.mjs) - eine
+  // Nummer gehoert bereits jemandem, bevor der neue Mitarbeiter ueberhaupt
+  // angelegt ist. employeeId ist hier null: es gibt noch keine Zeile, die
+  // ausgeschlossen werden muesste.
+  if (input.datevPersonnelNumber !== null) {
+    await assertDatevPersonnelNumberFree(client, context, null, input.datevPersonnelNumber);
+  }
+
   const passwordHash = await hashPassword(input.temporaryPassword);
-  const inserted = await client.query(
-    `INSERT INTO users (
-       company_id, personnel_number, first_name, last_name, email, phone,
-       password_hash, must_change_password, driving_licence_classes
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
-     RETURNING id, personnel_number, first_name, last_name, email, phone, must_change_password`,
-    [
-      context.companyId,
-      input.personnelNumber,
-      input.firstName,
-      input.lastName,
-      input.email,
-      input.phone,
-      passwordHash,
-      input.drivingLicenceClasses
-    ]
-  );
+  let inserted;
+  try {
+    inserted = await client.query(
+      `INSERT INTO users (
+         company_id, personnel_number, first_name, last_name, email, phone,
+         password_hash, must_change_password, driving_licence_classes,
+         datev_personnel_number
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9)
+       RETURNING id, personnel_number, first_name, last_name, email, phone, must_change_password`,
+      [
+        context.companyId,
+        input.personnelNumber,
+        input.firstName,
+        input.lastName,
+        input.email,
+        input.phone,
+        passwordHash,
+        input.drivingLicenceClasses,
+        input.datevPersonnelNumber
+      ]
+    );
+  } catch (error) {
+    // Rueckfalllösung gegen eine Wettlaufsituation zwischen der Pruefung oben
+    // und diesem INSERT: der eindeutige Index aus Migration 156 faengt eine
+    // gleichzeitige Doppelvergabe am Ende immer ab (siehe datev.mjs).
+    if (error.code === "23505" && input.datevPersonnelNumber !== null) {
+      await assertDatevPersonnelNumberFree(client, context, null, input.datevPersonnelNumber);
+    }
+    throw error;
+  }
   await client.query(
     `INSERT INTO user_roles (company_id, user_id, role_id, assigned_by_user_id, reason)
      VALUES ($1, $2, $3, $4, 'Anlage in der Verwaltung')`,
@@ -7113,27 +7140,50 @@ async function updateEmployee(client, context, employeeId, input) {
     }
   }
 
-  const updated = await client.query(
-    `UPDATE users
-     SET personnel_number = $3, first_name = $4, last_name = $5,
-         email = $6, phone = $7,
-         trainer_user_id = $9,
-         driving_licence_classes = $10
-     WHERE company_id = $1 AND id = $2 AND row_version = $8
-     RETURNING id`,
-    [
-      context.companyId,
-      employeeId,
-      input.personnelNumber,
-      input.firstName,
-      input.lastName,
-      input.email,
-      input.phone,
-      input.rowVersion,
-      input.trainerUserId,
-      input.drivingLicenceClasses
-    ]
-  );
+  // Ein alter Client, der das Feld nicht kennt, schickt es gar nicht mit -
+  // das heisst "unveraendert lassen", nicht "loeschen" (siehe
+  // validateEmployeeUpdate). Nur wenn der Schluessel im Request vorkam, wird
+  // die Spalte unten ueberhaupt angefasst; explizit null bleibt weiterhin
+  // "loeschen".
+  const datevPersonnelNumberProvided = Object.hasOwn(input, "datevPersonnelNumber");
+  if (datevPersonnelNumberProvided && input.datevPersonnelNumber !== null) {
+    await assertDatevPersonnelNumberFree(client, context, employeeId, input.datevPersonnelNumber);
+  }
+
+  let updated;
+  try {
+    updated = await client.query(
+      `UPDATE users
+       SET personnel_number = $3, first_name = $4, last_name = $5,
+           email = $6, phone = $7,
+           trainer_user_id = $9,
+           driving_licence_classes = $10,
+           datev_personnel_number = CASE WHEN $11 THEN $12 ELSE datev_personnel_number END
+       WHERE company_id = $1 AND id = $2 AND row_version = $8
+       RETURNING id`,
+      [
+        context.companyId,
+        employeeId,
+        input.personnelNumber,
+        input.firstName,
+        input.lastName,
+        input.email,
+        input.phone,
+        input.rowVersion,
+        input.trainerUserId,
+        input.drivingLicenceClasses,
+        datevPersonnelNumberProvided,
+        datevPersonnelNumberProvided ? input.datevPersonnelNumber : null
+      ]
+    );
+  } catch (error) {
+    // Rueckfalllösung gegen eine Wettlaufsituation zwischen der Pruefung oben
+    // und diesem UPDATE - siehe createEmployee und datev.mjs.
+    if (error.code === "23505" && datevPersonnelNumberProvided && input.datevPersonnelNumber !== null) {
+      await assertDatevPersonnelNumberFree(client, context, employeeId, input.datevPersonnelNumber);
+    }
+    throw error;
+  }
   if (updated.rowCount !== 1) {
     throw new InputError(
       "Der Mitarbeiter wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
