@@ -6,7 +6,7 @@ const stages = {office_review:'Erste Prüfung',management_review:'Verbindliche F
 const kinds = {vacation:'Urlaub',sick:'Krankheit',sick_leave:'Krankheit',time_off:'Freizeitausgleich',unpaid_leave:'Unbezahlter Urlaub',other:'Sonstiges'};
 async function request(url=endpoint,options={}) {
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options,
-    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.43'}});
+    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.44'}});
   const data=await response.json();
   if(!response.ok) throw new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Anfrage fehlgeschlagen.');
   return data;
@@ -20,6 +20,7 @@ function renderPeople() {
     if(!`${name} ${person.personnel_number}`.toLocaleLowerCase('de').includes(query)) continue;
     const row=el('div');row.className='person';const info=el('div');info.append(el('strong',name),el('small',`${person.personnel_number}${person.status==='active'?'':' · nicht aktiv'}`));row.append(info);
     for(const [key,label] of [['reviewerIds','Prüfen'],['approverIds','Freigeben']]) {
+      if(key==='reviewerIds' && $('steps').value==='1')continue;
       const field=el('label'),input=el('input');input.type='checkbox';input.checked=selected[key].has(person.id);
       input.disabled=busy || (person.status!=='active'&&!input.checked);
       input.setAttribute('aria-label',`${name}: ${label}`);
@@ -29,21 +30,22 @@ function renderPeople() {
     $('employees').append(row);
   }
 }
-function modeChanged() {$('selection').hidden=$('mode').value!=='selected';$('default-note').hidden=$('mode').value!=='default';}
+function modeChanged() {$('default-note').textContent=$('steps').value==='1'?'Standard: Die Geschäftsführung erteilt die Freigabe.':'Standard: Administration, Büro und Planung prüfen zuerst; die Geschäftsführung gibt verbindlich frei.';$('selection').hidden=$('mode').value!=='selected';$('default-note').hidden=$('mode').value!=='default';}
 function renderRequests() {
   $('requests').replaceChildren();
   if(!state.absences.length) {$('requests').textContent='Keine Anträge zur Prüfung vorhanden.';return;}
   for(const item of state.absences) {
     const card=el('article');card.className='request';
-    card.append(el('h3',`${item.employeeName} · ${kinds[item.absenceType]||item.absenceType}`),el('p',`${item.startDate} bis ${item.endDate} · ${stages[item.status]}`));
+    card.append(el('h3',`${item.employeeName} · ${kinds[item.absenceType]||item.absenceType}`),el('p',`${item.startDate} bis ${item.endDate} · ${state.approvalSteps===1&&item.status==='office_review'?'Wartet auf Freigabe':stages[item.status]}`));
+    if(item.entrySource==='office_direct')card.append(el('p',`Direkt vom Büro eingetragen · ${item.managementReviewedByName||''}`));
     if(item.note)card.append(el('p',item.note));
     if(item.officeReviewedByName)card.append(el('p',`Erste Prüfung: ${item.officeReviewedByName}`));
     const own=item.employeeId===state.userId;
-    const first=item.status==='office_review'&&state.canReviewAbsenceOffice;
-    const second=item.status==='management_review'&&state.canApproveAbsenceManagement;
-    const cancel=item.status==='approved'&&state.canApproveAbsenceManagement;
+    const first=state.approvalSteps===2&&item.status==='office_review'&&state.canReviewAbsenceOffice;
+    const second=(item.status==='management_review'||(state.approvalSteps===1&&item.status==='office_review'))&&state.canApproveAbsenceManagement;
+    const cancel=item.status==='approved'&&(state.canApproveAbsenceManagement||(state.canRecordDirect&&item.entrySource==='office_direct'));
     if(own)card.append(el('p','Eigener Antrag – eine andere Person übernimmt die Prüfung.'));
-    else if(second&&item.officeReviewerId===state.userId)card.append(el('p','Du hast bereits die erste Prüfung vorgenommen. Eine andere Person übernimmt die Freigabe.'));
+    else if(second&&state.approvalSteps===2&&item.officeReviewerId===state.userId)card.append(el('p','Du hast bereits die erste Prüfung vorgenommen. Eine andere Person übernimmt die Freigabe.'));
     else if(first||second||cancel) {
       const comment=el('input');comment.maxLength=500;comment.placeholder='Begründung (bei Ablehnung oder Aufhebung erforderlich)';comment.setAttribute('aria-label',`Kommentar für ${item.employeeName}`);card.append(comment);
       for(const [action,label] of cancel?[['cancel','Freigabe aufheben']]:[['approve',first?'Geprüft – zur Freigabe': 'Verbindlich freigeben'],['reject','Ablehnen']]) {
@@ -66,12 +68,22 @@ async function reload() {
   try {
     const data=await request();state=data;$('workspace').hidden=false;$('settings').hidden=!data.canManage;
     $('message').textContent='Zuständigkeiten und Anträge sind aktuell.';
+    $('procedure-note').textContent=data.approvalSteps===1?'Einstufig: Eine berechtigte Person genehmigt den Antrag. Eigene Anträge sind ausgeschlossen.':'Zweistufig: Zwei verschiedene Personen prüfen und genehmigen. Eigene Anträge sind ausgeschlossen.';
+    $('direct-entry').hidden=!data.canRecordDirect;
+    if(data.canRecordDirect) {
+      const previous=$('direct-employee').value;$('direct-employee').replaceChildren();
+      const empty=el('option','Mitarbeiter auswählen');empty.value='';$('direct-employee').append(empty);
+      for(const person of data.employees.filter(p=>p.status==='active'&&p.id!==data.userId)) {
+        const option=el('option',`${person.first_name} ${person.last_name} · ${person.personnel_number}`);option.value=person.id;$('direct-employee').append(option);
+      }
+      $('direct-employee').value=previous;
+    }
     if(data.canManage) {
-      $('mode').value=data.policy.mode;
+      $('steps').value=String(data.policy.approvalSteps);$('mode').value=data.policy.mode;
       for(const key of ['reviewerIds','approverIds'])selected[key]=new Set(data.policy[key]);
       renderPeople();modeChanged();$('history').replaceChildren();
       const names=ids=>ids?ids.map(id=>{const p=data.employees.find(p=>p.id===id);return p?`${p.first_name} ${p.last_name}`:'Ehemaliges Konto';}).join(', '):'Standardrollen';
-      for(const event of data.history) $('history').append(el('li',`${new Date(event.created_at).toLocaleString('de-DE')} · ${event.actor_name}: ${event.reason} · Prüfung: ${names(event.reviewer_ids)} · Freigabe: ${names(event.approver_ids)}`));
+      for(const event of data.history) $('history').append(el('li',`${new Date(event.created_at).toLocaleString('de-DE')} · ${event.actor_name}: ${event.reason} · ${event.approval_steps===1?'Einstufig':'Zweistufig'} · Prüfung: ${names(event.reviewer_ids)} · Freigabe: ${names(event.approver_ids)}`));
     }
     renderRequests();
   } catch(error){$('workspace').hidden=true;$('message').textContent=error.message;}
@@ -80,12 +92,25 @@ $('policy-form').addEventListener('submit',async event=>{
   event.preventDefault();if(busy||!state?.canManage)return;
   busy=true;$('save').disabled=true;$('form-message').textContent='';
   try {
-    await request(endpoint,{method:'PUT',body:JSON.stringify({mode:$('mode').value,
-      reviewerIds:$('mode').value==='selected'?[...selected.reviewerIds]:[],approverIds:$('mode').value==='selected'?[...selected.approverIds]:[],
+    await request(endpoint,{method:'PUT',body:JSON.stringify({mode:$('mode').value,approvalSteps:Number($('steps').value),
+      reviewerIds:$('mode').value==='selected'&&$('steps').value==='2'?[...selected.reviewerIds]:[],approverIds:$('mode').value==='selected'?[...selected.approverIds]:[],
       rowVersion:state.policy.rowVersion,reason:$('reason').value.trim()})});
     $('reason').value='';busy=false;await reload();$('message').textContent='Zuständigkeiten gespeichert. Sie gelten ab sofort.';
   } catch(error){$('form-message').textContent=error.message;}
   finally{busy=false;$('save').disabled=false;}
 });
+$('steps').addEventListener('change',()=>{modeChanged();renderPeople();});
 $('mode').addEventListener('change',modeChanged);$('search').addEventListener('input',renderPeople);$('reload').addEventListener('click',()=>{if(!busy)void reload();});
+$('direct-form').addEventListener('submit',async event=>{
+  event.preventDefault();if(busy||!state?.canRecordDirect)return;
+  if(!window.confirm('Abwesenheit ohne Antrag verbindlich in die Planung eintragen?'))return;
+  busy=true;$('direct-save').disabled=true;$('direct-message').textContent='';
+  try {
+    await request('./api/v1/admin/absences',{method:'POST',body:JSON.stringify({employeeId:$('direct-employee').value,
+      absenceType:$('direct-type').value,startDate:$('direct-start').value,endDate:$('direct-end').value,
+      dayPart:$('direct-part').value,note:$('direct-note').value.trim()})});
+    $('direct-form').reset();busy=false;await reload();$('direct-message').textContent='Abwesenheit eingetragen und in der Planung berücksichtigt.';
+  } catch(error){$('direct-message').textContent=error.message;}
+  finally{busy=false;$('direct-save').disabled=false;}
+});
 void reload();
