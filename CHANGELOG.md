@@ -4,6 +4,9 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **0.44.43 – Abwesenheitszuständigkeiten (10.09.2026).** Administration und Geschäftsführung können je Firma konkrete aktive Mitarbeiter für die erste Prüfung und die verbindliche Freigabe auswählen. Mehrere Vertreter pro Stufe sind möglich. Die bisherige Rollenregel bleibt Standard und kann wiederhergestellt werden. Ausgewählte Personen erhalten nur Abwesenheitszugriff; Änderungen gelten auch für offene Anträge. Zweipersonenprüfung, Sperre eigener Freigaben, Versionsschutz und unveränderlicher Zuständigkeitsverlauf. Neue Ansicht unter Woche → Abwesenheit → Anträge prüfen / Zuständigkeiten. Migrationen 154–155.
+
+
 - **Plattform-Anmeldeschutz.** Die Sperre gilt je normalisierter Anmeldekennung
   unabhängig von wechselnden IP-Kopfzeilen. Ein Regressionstest prüft
   Kopfzeilenwechsel, Anschlusswechsel, Großschreibung und getrennte Konten.

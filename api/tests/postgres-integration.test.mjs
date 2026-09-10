@@ -3121,6 +3121,40 @@ integrationTest("Login, Sitzung und idempotente Offline-Zeitbuchung funktioniere
     assert.equal((await blockedAbsenceAssignmentResponse.json()).error.code, "employee_absent");
   });
 
+  await t.test("Abwesenheitszuständigkeiten gelten pro Firma auch ohne Verwaltungsrolle", async () => {
+    const send = (path, auth, method="GET", body) => fetch(`${baseUrl}${path}`, {
+      method, headers: {"Content-Type":"application/json", ...(auth ? {Cookie:auth} : {})},
+      ...(body ? {body:JSON.stringify(body)} : {})
+    });
+    const path="/api/v1/absence-approvals";
+    assert.equal((await send(path,null)).status,401);
+    assert.equal((await send(path,employeeCookie)).status,403);
+    const initial=await send(path,cookie); assert.equal(initial.status,200,await initial.clone().text());
+    const before=await initial.json();
+    const plannerSession=await (await send('/api/v1/session',plannerCookie)).json();
+    const plannerId=plannerSession.session.user.id;
+    const body={mode:'selected',reviewerIds:[foreman.id,employee.id],approverIds:[foreman.id,plannerId],rowVersion:before.policy.rowVersion,reason:'Vertretung im Integrationstest'};
+    assert.equal((await send(path,employeeCookie,'PUT',body)).status,403);
+    const saved=await send(path,cookie,'PUT',body);assert.equal(saved.status,200,await saved.clone().text());
+    const selected=(await saved.json()).policy;
+    assert.equal((await send(path,cookie,'PUT',body)).status,409);
+    const foremanAccess=await send(path,foremanCookie);assert.equal(foremanAccess.status,200,await foremanAccess.clone().text());
+    const access=await foremanAccess.json();assert.equal(access.canManage,false);assert.equal(access.canReviewAbsenceOffice,true);assert.equal(access.canApproveAbsenceManagement,true);assert.deepEqual(access.employees,[]);assert.equal(access.policy,null);
+    assert.equal((await send('/api/v1/admin/overview',foremanCookie)).status,403);
+    const created=await send('/api/v1/absences',employeeCookie,'POST',{absenceType:'other',startDate:'2027-11-22',endDate:'2027-11-22',dayPart:'full_day',note:'Zuständigkeitstest'});
+    assert.equal(created.status,201,await created.clone().text());const absence=(await created.json()).absence;
+    const review=`/api/v1/admin/absence-requests/${absence.id}`;
+    const own=await send(review,employeeCookie,'PATCH',{action:'approve',rowVersion:absence.rowVersion});assert.equal(own.status,403);assert.equal((await own.json()).error.code,'absence_self_review_forbidden');
+    assert.equal((await send(review,directorCookie,'PATCH',{action:'approve',rowVersion:absence.rowVersion})).status,403);
+    const first=await send(review,foremanCookie,'PATCH',{action:'approve',rowVersion:absence.rowVersion});assert.equal(first.status,200,await first.clone().text());const checked=(await first.json()).absence;
+    const same=await send(review,foremanCookie,'PATCH',{action:'approve',rowVersion:checked.rowVersion});assert.equal(same.status,403);assert.equal((await same.json()).error.code,'absence_two_person_rule');
+    const final=await send(review,plannerCookie,'PATCH',{action:'approve',rowVersion:checked.rowVersion});assert.equal(final.status,200,await final.clone().text());const approved=(await final.json()).absence;assert.equal(approved.status,'approved');
+    const cancelled=await send(review,plannerCookie,'PATCH',{action:'cancel',rowVersion:approved.rowVersion,comment:'Test abschließen'});assert.equal(cancelled.status,200,await cancelled.clone().text());
+    const reset=await send(path,cookie,'PUT',{mode:'default',reviewerIds:[],approverIds:[],rowVersion:selected.rowVersion,reason:'Standard wiederherstellen'});assert.equal(reset.status,200,await reset.clone().text());
+    assert.equal((await send(path,foremanCookie)).status,403);
+    const updated=await (await send(path,cookie)).json();assert.equal(updated.history.length,2);assert.equal(updated.policy.mode,'default');
+  });
+
   await t.test("Mobile Baustellenarbeit", async () => {
     const employeeAssignments = await fetch(
       `${baseUrl}/api/v1/site-assignments/${assignmentDate}`,

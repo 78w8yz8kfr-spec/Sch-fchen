@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#e30613"><title>Abwesenheiten freigeben · Schäfchen</title>
+<link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./inventory.css?v=0.44.43">
+<link rel="stylesheet" href="./absence-approvals.css?v=0.44.43">
+<script type="module" src="./absence-approvals.js?v=0.44.43"></script>
+</head><body><main>
+<header><a href="./#week">← Zur Arbeitsapp</a><img src="./assets/mark.svg" alt="Schäfchen" width="40" height="40"></header>
+<p class="eyebrow">Urlaub und Abwesenheit</p><h1>Abwesenheiten freigeben</h1>
+<p>Erste Prüfung und verbindliche Freigabe erfolgen durch zwei verschiedene Personen. Eigene Anträge prüft jemand anderes.</p>
+<p id="message" role="status" aria-live="polite">Zuständigkeiten werden geladen …</p>
+<div id="workspace" hidden>
+<button id="reload" type="button">Neu laden</button>
+<details id="settings" hidden><summary>Zuständige Mitarbeiter auswählen</summary>
+<form id="policy-form">
+<label for="mode">Zuständigkeit</label><select id="mode"><option value="default">Standardrollen verwenden</option><option value="selected">Mitarbeiter selbst auswählen</option></select>
+<p id="default-note">Standard: Administration, Büro und Planung prüfen zuerst; die Geschäftsführung erteilt die verbindliche Freigabe. Projektleiter mit ausschließlich projektbezogenem Zugriff sind ausgenommen.</p>
+<div id="selection" hidden><p>Pro Stufe sind mehrere Personen möglich. Ausgewählte Mitarbeiter erhalten ausschließlich das Recht zur Abwesenheitsprüfung, keine weiteren Verwaltungsrechte. Für einen eigenen Antrag werden zwei andere Prüfer benötigt.</p>
+<label>Suchen <input id="search" type="search" placeholder="Name oder Personalnummer"></label>
+<div id="employees"></div></div>
+<label for="reason">Begründung der Änderung</label><input id="reason" required minlength="3" maxlength="500" placeholder="z. B. Vertretung während des Urlaubs">
+<p id="form-message" role="alert"></p><button id="save" type="submit">Zuständigkeiten speichern</button>
+</form><details><summary>Änderungsverlauf (letzte 20 Änderungen)</summary><ol id="history"></ol></details>
+</details>
+<section><h2>Offene Anträge und Freigaben</h2><p>Die neuesten 500 offenen oder genehmigten Anträge. Änderungen gelten sofort, auch für bereits eingereichte Anträge.</p><div id="requests"></div></section>
+</div></main></body></html>
