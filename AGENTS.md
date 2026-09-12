@@ -50,3 +50,12 @@ Die GitHub-Prüfung erzwingt zusätzlich eine Mindestabdeckung von `api/src`
 Funktionen). Die Schwelle ist ein Boden gegen grobe Rückschritte, vor allem
 gegen stillschweigend nicht mehr laufende Integrationstests. Sie ersetzt keine
 Prüfung im Einzelfall: neuer Code ohne eigenen Test kann die Schwelle halten.
+
+## Werkzeuge
+
+`.claude/settings.json` meldet den offiziellen Plugin-Marktplatz
+`anthropics/claude-plugins-official` an und aktiviert daraus das Plugin
+`claude-code-setup`. Claude Code fragt beim ersten Start im Projekt einmal nach
+Zustimmung und installiert es danach selbst; ein manuelles
+`/plugin marketplace add` entfällt. Persönliche Abweichungen gehören in
+`.claude/settings.local.json`, das nicht eingecheckt wird.
