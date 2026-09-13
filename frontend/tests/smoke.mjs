@@ -378,6 +378,73 @@ assert.match(html, /id="account-card"/);
 assert.match(html, /id="account-personnel-number"/);
 assert.match(html, /id="account-logout"/);
 assert.match(app, /function renderAccountCard\(\)/);
+
+// Bis heute gab es keinen Weg zurueck, wenn jemand sein Passwort vergessen
+// hatte. "Passwort aendern" im eigenen Konto braucht - anders als der
+// Zwangsdialog nach dem Startpasswort - das aktuelle Passwort und liegt im
+// eigenen Bereich, nicht in der Anmeldung.
+assert.match(html, /id="account-password-form"/);
+assert.match(html, /id="account-current-password"[^>]*autocomplete="current-password"/);
+assert.match(html, /id="account-new-password"[^>]*minlength="12"/);
+assert.match(html, /id="account-confirm-password"/);
+assert.match(html, /id="account-password-message"[^>]*aria-live="polite"/);
+// Die Regel steht vor dem Absenden, nicht erst als Fehlermeldung danach.
+assert.match(
+  html,
+  /id="account-new-password"[\s\S]{0,200}<p class="field-help">Mindestens 12 Zeichen mit mindestens einem Buchstaben und einer Ziffer\.<\/p>/
+);
+assert.match(app, /\.\/api\/v1\/me\/password/);
+assert.match(app, /currentPassword: elements\.accountCurrentPassword\.value/);
+assert.match(app, /error\.code === "invalid_credentials"/);
+// Die Folge der Aenderung wird deutlich gesagt, nicht nur im flüchtigen Toast.
+assert.match(
+  app,
+  /elements\.accountPasswordMessage\.textContent =\s*"Passwort geändert\. Du wurdest damit auf allen anderen Geräten abgemeldet\."/
+);
+
+// Das Buero kann einen Mitarbeiter zuruecksetzen: Begruendung, Rueckfrage mit
+// Namen und Personalnummer, danach das einmalig angezeigte Passwort.
+assert.match(html, /id="employee-edit-reset-password"/);
+assert.match(html, /id="employee-password-reset-dialog"/);
+assert.match(html, /id="employee-password-reset-reason"[^>]*required/);
+assert.match(html, /id="employee-password-reset-value"/);
+assert.match(html, /id="employee-password-reset-copy"/);
+assert.match(html, /id="employee-password-reset-ack"/);
+assert.match(html, /id="employee-password-reset-done"[^>]*disabled/);
+assert.match(app, /\.\/api\/v1\/admin\/employees\/\$\{encodeURIComponent\(employee\.id\)\}\/password-reset/);
+// Die Rueckfrage nennt Name und Personalnummer, nicht nur "sicher?".
+assert.match(
+  app,
+  /`\$\{employee\.firstName\} \$\{employee\.lastName\} \(Personalnummer \$\{employee\.personnelNumber\}\) `/
+);
+assert.match(app, /error\.code === "password_reset_self"/);
+// Wer das eigene Konto bearbeitet, bekommt die Schaltflaeche gar nicht erst -
+// die Schnittstelle würde ohnehin mit "password_reset_self" ablehnen.
+assert.match(app, /elements\.employeeEditResetPassword\.hidden = employee\.id === session\?\.user\?\.id;/);
+// Das Passwort darf nirgends landen ausser in der Anzeige: nicht im
+// gespeicherten Zustand, nicht in localStorage, nicht in der Konsole.
+assert.doesNotMatch(app, /state[.\[][\s\S]{0,80}temporaryPassword/);
+assert.doesNotMatch(app, /console\.(log|info|warn|debug)\([^)]*temporaryPassword/);
+// Solange das neue Passwort zu sehen ist, schliesst weder Esc noch ein Klick
+// daneben den Dialog wortlos - erst die ausdrueckliche Bestaetigung tut das.
+assert.match(
+  app,
+  /elements\.employeePasswordResetDialog\.addEventListener\("cancel", \(event\) => \{\s*if \(!elements\.employeePasswordResetResult\.hidden\) \{\s*event\.preventDefault\(\);/
+);
+assert.match(
+  app,
+  /if \(event\.target === elements\.employeePasswordResetDialog && elements\.employeePasswordResetResult\.hidden\)/
+);
+assert.match(app, /elements\.employeePasswordResetDone\.disabled = !elements\.employeePasswordResetAck\.checked;/);
+
+// Anmeldung ohne bekanntes Passwort: ein ehrlicher Hinweis statt eines
+// Selbstbedienungslinks, den es ohne Mailversand im Projekt nicht geben kann.
+assert.match(html, /class="login-help"/);
+assert.match(html, /<summary>Passwort vergessen\?<\/summary>/);
+assert.match(html, /Beim Büro melden/);
+assert.match(html, /Eine zweite Person mit Administratorrechten kann das Passwort zurücksetzen/);
+assert.doesNotMatch(html, /Link per E-Mail/);
+assert.doesNotMatch(html, /mailto:/);
 assert.match(app, /function moduleEnabled\(key\)/);
 assert.match(app, /function applyModuleVisibility\(\)/);
 // Die Bereiche tragen die Schluessel des Plattformkatalogs, nicht eigene.
