@@ -3,38 +3,42 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#e30613"><title>Abwesenheiten freigeben · Schäfchen</title>
 <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./inventory.css?v=0.44.44">
-<link rel="stylesheet" href="./absence-approvals.css?v=0.44.44">
-<script type="module" src="./absence-approvals.js?v=0.44.44"></script>
-</head><body><main>
-<header><a href="./#week">← Zur Arbeitsapp</a><img src="./assets/mark.svg" alt="Schäfchen" width="40" height="40"></header>
-<p class="eyebrow">Urlaub und Abwesenheit</p><h1>Abwesenheiten freigeben</h1>
+<link rel="stylesheet" href="./design-system.css?v=0.44.46">
+<link rel="stylesheet" href="./absence-approvals.css?v=0.44.46">
+<script type="module" src="./absence-approvals.js?v=0.44.46"></script>
+</head><body><main class="aa-shell">
+<header class="aa-header"><a class="aa-back" href="./#week">← Zur Arbeitsapp</a><img src="./assets/mark.svg" alt="Schäfchen" width="40" height="40"></header>
+<div class="aa-intro"><p class="eyebrow">Urlaub und Abwesenheit</p><h1>Abwesenheiten freigeben</h1></div>
+<div class="card aa-notice">
 <p id="procedure-note">Eigene Anträge prüft jemand anderes. Das Genehmigungsverfahren legt die Firma fest.</p>
-<p id="message" role="status" aria-live="polite">Zuständigkeiten werden geladen …</p>
-<div id="workspace" hidden>
-<button id="reload" type="button">Neu laden</button>
-<details id="settings" hidden><summary>Zuständige Mitarbeiter auswählen</summary>
-<form id="policy-form">
+<p id="message" role="status" aria-live="polite" class="aa-status">Zuständigkeiten werden geladen …</p>
+</div>
+<div id="workspace" class="aa-stack" hidden>
+<div class="aa-toolbar"><button id="reload" type="button" class="button button--secondary">Neu laden</button></div>
+<details id="settings" class="card aa-card" hidden><summary class="aa-card__summary">Zuständige Mitarbeiter auswählen</summary>
+<div class="aa-card__body">
+<form id="policy-form" class="aa-form">
 <label for="steps">Genehmigungsverfahren</label><select id="steps"><option value="2">Zweistufig: erste Prüfung und verbindliche Freigabe</option><option value="1">Einstufig: eine Freigabe genügt</option></select>
 <label for="mode">Zuständigkeit</label><select id="mode"><option value="default">Standardrollen verwenden</option><option value="selected">Mitarbeiter selbst auswählen</option></select>
-<p id="default-note"></p>
-<div id="selection" hidden><p>Pro Stufe sind mehrere Personen möglich. Ausgewählte Mitarbeiter erhalten ausschließlich das Recht zur Abwesenheitsprüfung, keine weiteren Verwaltungsrechte. Für eigene Anträge ist mindestens eine andere Freigabeperson nötig; bei zwei Stufen sind es zwei verschiedene Personen.</p>
-<label>Suchen <input id="search" type="search" placeholder="Name oder Personalnummer"></label>
-<div id="employees"></div></div>
+<p id="default-note" class="aa-hint"></p>
+<div id="selection" class="aa-selection" hidden><p class="aa-hint">Pro Stufe sind mehrere Personen möglich. Ausgewählte Mitarbeiter erhalten ausschließlich das Recht zur Abwesenheitsprüfung, keine weiteren Verwaltungsrechte. Für eigene Anträge ist mindestens eine andere Freigabeperson nötig; bei zwei Stufen sind es zwei verschiedene Personen.</p>
+<label class="aa-search-label">Suchen <input id="search" type="search" placeholder="Name oder Personalnummer"></label>
+<div id="employees" class="aa-people"></div></div>
 <label for="reason">Begründung der Änderung</label><input id="reason" required minlength="3" maxlength="500" placeholder="z. B. Vertretung während des Urlaubs">
-<p id="form-message" role="alert"></p><button id="save" type="submit">Zuständigkeiten speichern</button>
-</form><details><summary>Änderungsverlauf (letzte 20 Änderungen)</summary><ol id="history"></ol></details>
+<p id="form-message" role="alert" class="aa-form-message"></p><button id="save" type="submit" class="button button--primary">Zuständigkeiten speichern</button>
+</form><details class="aa-history"><summary>Änderungsverlauf (letzte 20 Änderungen)</summary><ol id="history" class="aa-history__list"></ol></details>
+</div>
 </details>
-<section id="direct-entry" hidden><h2>Abwesenheit direkt eintragen</h2>
-<p>Für das Büro: sofort bestätigte Abwesenheit ohne Antrag des Mitarbeiters. Der Eintrag erscheint in der Planung und in der Historie.</p>
-<form id="direct-form">
+<section id="direct-entry" class="card aa-card" hidden><div class="aa-card__body"><h2>Abwesenheit direkt eintragen</h2>
+<p class="aa-hint">Für das Büro: sofort bestätigte Abwesenheit ohne Antrag des Mitarbeiters. Der Eintrag erscheint in der Planung und in der Historie.</p>
+<form id="direct-form" class="aa-form">
 <label for="direct-employee">Mitarbeiter</label><select id="direct-employee" required></select>
 <label for="direct-type">Abwesenheitsart</label><select id="direct-type"><option value="vacation">Urlaub</option><option value="sick">Krankheit</option><option value="time_off">Freizeitausgleich</option><option value="other">Sonstiges</option></select>
 <label for="direct-start">Von</label><input id="direct-start" type="date" required>
 <label for="direct-end">Bis</label><input id="direct-end" type="date" required>
 <label for="direct-part">Umfang</label><select id="direct-part"><option value="full_day">Ganzer Tag</option><option value="first_half">Vormittag</option><option value="second_half">Nachmittag</option></select>
 <label for="direct-note">Begründung / Hinweis</label><input id="direct-note" required minlength="3" maxlength="500" placeholder="z. B. telefonisch gemeldete Abwesenheit">
-<p id="direct-message" role="alert"></p><button id="direct-save" type="submit">Abwesenheit verbindlich eintragen</button>
-</form></section>
-<section><h2>Offene Anträge und Freigaben</h2><p>Die neuesten 500 offenen oder genehmigten Anträge. Änderungen gelten sofort, auch für bereits eingereichte Anträge.</p><div id="requests"></div></section>
+<p id="direct-message" role="alert" class="aa-form-message"></p><button id="direct-save" type="submit" class="button button--primary">Abwesenheit verbindlich eintragen</button>
+</form></div></section>
+<section class="card aa-card"><div class="aa-card__body"><h2>Offene Anträge und Freigaben</h2><p class="aa-hint">Die neuesten 500 offenen oder genehmigten Anträge. Änderungen gelten sofort, auch für bereits eingereichte Anträge.</p><div id="requests" class="aa-requests"></div></div></section>
 </div></main></body></html>

@@ -11,7 +11,7 @@ import {
   withSessionTransaction,
   withTenantTransaction
 } from "./database.mjs";
-import { hashPassword, verifyPassword } from "./password.mjs";
+import { generateTemporaryPassword, hashPassword, verifyPassword } from "./password.mjs";
 import {
   createSessionToken,
   hashSessionToken,
@@ -58,6 +58,7 @@ import { createPlatformHandler } from "./platform-admin.mjs";
 import { handleDeviceRequest } from "./devices.mjs";
 import { handleInventoryRequest } from "./inventory.mjs";
 import { handlePowerRequest } from "./power.mjs";
+import { assertDatevPersonnelNumberFree, handleDatevRequest } from "./datev.mjs";
 import {
   expectedNextTypes,
   InputError,
@@ -84,6 +85,7 @@ import {
   validateId,
   validateInitialPasswordChange,
   validateInitialSetup,
+  validatePasswordChange,
   validateHolidayCalendar,
   validateHolidayClosure,
   validateHolidayClosureCancellation,
@@ -223,7 +225,7 @@ function json(response, status, body, headers = {}) {
 // Kennungsform, wie sie die Datenbank vergibt.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const APPLICATION_VERSION = "0.44.44";
+export const APPLICATION_VERSION = "0.44.46";
 
 export function compareApplicationVersions(left, right) {
   const parse = (value) => String(value || "")
@@ -1759,6 +1761,10 @@ function employeeDto(row) {
     // Die Einsatzplanung warnt, wenn auf einer Baustelle niemand mit
     // Fuehrerschein steht - dafuer muss sie die Klassen kennen.
     drivingLicenceClasses: row.driving_licence_classes || [],
+    // Siehe Migration 156: getrennt von personnelNumber (freier Text),
+    // ausschliesslich fuer den DATEV-Lohnexport. null heisst "nicht
+    // gepflegt", nicht "kein Mitarbeiter".
+    datevPersonnelNumber: row.datev_personnel_number || null,
     rowVersion: Number(row.row_version || 1)
   };
 }
@@ -4527,6 +4533,7 @@ async function adminOverview(client, context, date) {
               account.archived_reason, account.row_version,
               account.trainer_user_id,
               account.driving_licence_classes,
+              account.datev_personnel_number,
               COALESCE(
                 jsonb_agg(role.role_key ORDER BY role.role_key)
                   FILTER (WHERE role.id IS NOT NULL),
@@ -6924,6 +6931,7 @@ async function getEmployeeRecord(client, context, employeeId) {
             account.archived_reason, account.row_version,
             account.trainer_user_id,
             account.driving_licence_classes,
+            account.datev_personnel_number,
             COALESCE(
               jsonb_agg(role.role_key ORDER BY role.role_key)
                 FILTER (WHERE role.id IS NOT NULL),
@@ -6984,24 +6992,45 @@ async function createEmployee(client, context, input) {
   );
   if (roleResult.rowCount !== 1) throw new InputError("Die gewählte Rolle ist nicht verfügbar.");
 
+  // Dieselbe Meldung wie in der DATEV-Verwaltung (siehe datev.mjs) - eine
+  // Nummer gehoert bereits jemandem, bevor der neue Mitarbeiter ueberhaupt
+  // angelegt ist. employeeId ist hier null: es gibt noch keine Zeile, die
+  // ausgeschlossen werden muesste.
+  if (input.datevPersonnelNumber !== null) {
+    await assertDatevPersonnelNumberFree(client, context, null, input.datevPersonnelNumber);
+  }
+
   const passwordHash = await hashPassword(input.temporaryPassword);
-  const inserted = await client.query(
-    `INSERT INTO users (
-       company_id, personnel_number, first_name, last_name, email, phone,
-       password_hash, must_change_password, driving_licence_classes
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
-     RETURNING id, personnel_number, first_name, last_name, email, phone, must_change_password`,
-    [
-      context.companyId,
-      input.personnelNumber,
-      input.firstName,
-      input.lastName,
-      input.email,
-      input.phone,
-      passwordHash,
-      input.drivingLicenceClasses
-    ]
-  );
+  let inserted;
+  try {
+    inserted = await client.query(
+      `INSERT INTO users (
+         company_id, personnel_number, first_name, last_name, email, phone,
+         password_hash, must_change_password, driving_licence_classes,
+         datev_personnel_number
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9)
+       RETURNING id, personnel_number, first_name, last_name, email, phone, must_change_password`,
+      [
+        context.companyId,
+        input.personnelNumber,
+        input.firstName,
+        input.lastName,
+        input.email,
+        input.phone,
+        passwordHash,
+        input.drivingLicenceClasses,
+        input.datevPersonnelNumber
+      ]
+    );
+  } catch (error) {
+    // Rueckfalllösung gegen eine Wettlaufsituation zwischen der Pruefung oben
+    // und diesem INSERT: der eindeutige Index aus Migration 156 faengt eine
+    // gleichzeitige Doppelvergabe am Ende immer ab (siehe datev.mjs).
+    if (error.code === "23505" && input.datevPersonnelNumber !== null) {
+      await assertDatevPersonnelNumberFree(client, context, null, input.datevPersonnelNumber);
+    }
+    throw error;
+  }
   await client.query(
     `INSERT INTO user_roles (company_id, user_id, role_id, assigned_by_user_id, reason)
      VALUES ($1, $2, $3, $4, 'Anlage in der Verwaltung')`,
@@ -7135,27 +7164,50 @@ async function updateEmployee(client, context, employeeId, input) {
     }
   }
 
-  const updated = await client.query(
-    `UPDATE users
-     SET personnel_number = $3, first_name = $4, last_name = $5,
-         email = $6, phone = $7,
-         trainer_user_id = $9,
-         driving_licence_classes = $10
-     WHERE company_id = $1 AND id = $2 AND row_version = $8
-     RETURNING id`,
-    [
-      context.companyId,
-      employeeId,
-      input.personnelNumber,
-      input.firstName,
-      input.lastName,
-      input.email,
-      input.phone,
-      input.rowVersion,
-      input.trainerUserId,
-      input.drivingLicenceClasses
-    ]
-  );
+  // Ein alter Client, der das Feld nicht kennt, schickt es gar nicht mit -
+  // das heisst "unveraendert lassen", nicht "loeschen" (siehe
+  // validateEmployeeUpdate). Nur wenn der Schluessel im Request vorkam, wird
+  // die Spalte unten ueberhaupt angefasst; explizit null bleibt weiterhin
+  // "loeschen".
+  const datevPersonnelNumberProvided = Object.hasOwn(input, "datevPersonnelNumber");
+  if (datevPersonnelNumberProvided && input.datevPersonnelNumber !== null) {
+    await assertDatevPersonnelNumberFree(client, context, employeeId, input.datevPersonnelNumber);
+  }
+
+  let updated;
+  try {
+    updated = await client.query(
+      `UPDATE users
+       SET personnel_number = $3, first_name = $4, last_name = $5,
+           email = $6, phone = $7,
+           trainer_user_id = $9,
+           driving_licence_classes = $10,
+           datev_personnel_number = CASE WHEN $11 THEN $12 ELSE datev_personnel_number END
+       WHERE company_id = $1 AND id = $2 AND row_version = $8
+       RETURNING id`,
+      [
+        context.companyId,
+        employeeId,
+        input.personnelNumber,
+        input.firstName,
+        input.lastName,
+        input.email,
+        input.phone,
+        input.rowVersion,
+        input.trainerUserId,
+        input.drivingLicenceClasses,
+        datevPersonnelNumberProvided,
+        datevPersonnelNumberProvided ? input.datevPersonnelNumber : null
+      ]
+    );
+  } catch (error) {
+    // Rueckfalllösung gegen eine Wettlaufsituation zwischen der Pruefung oben
+    // und diesem UPDATE - siehe createEmployee und datev.mjs.
+    if (error.code === "23505" && datevPersonnelNumberProvided && input.datevPersonnelNumber !== null) {
+      await assertDatevPersonnelNumberFree(client, context, employeeId, input.datevPersonnelNumber);
+    }
+    throw error;
+  }
   if (updated.rowCount !== 1) {
     throw new InputError(
       "Der Mitarbeiter wurde zwischenzeitlich geändert. Bitte die Verwaltung aktualisieren.",
@@ -7202,6 +7254,98 @@ function employeeLifecycleInput(body) {
     throw new InputError("Die Mitarbeiterversion ist ungültig.");
   }
   return { reason, rowVersion };
+}
+
+function employeePasswordResetInput(body) {
+  const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+  if (reason.length < 3 || reason.length > 500) {
+    throw new InputError("Die Begründung muss zwischen 3 und 500 Zeichen lang sein.");
+  }
+  return { reason };
+}
+
+// Der Betrieb hatte bislang keinen Weg zurück, wenn ein Mitarbeiter sein
+// Passwort vergaß: changeInitialPassword griff nur beim allerersten Login.
+// Das Büro erzeugt hier ein neues Startpasswort - der Auslösende wählt es
+// nicht selbst, sonst würde daraus schnell ein dauerhaftes "Sommer2024".
+async function resetEmployeePassword(client, context, employeeId, input) {
+  const roles = await requireFullPlanner(client, context);
+  if (employeeId === context.userId) {
+    throw new InputError(
+      "Das eigene Passwort wird über \"Eigenes Passwort ändern\" geändert.",
+      409,
+      "password_reset_self"
+    );
+  }
+  const current = await client.query(
+    `SELECT id, personnel_number, status FROM users
+     WHERE company_id = $1 AND id = $2 FOR UPDATE`,
+    [context.companyId, employeeId]
+  );
+  if (current.rowCount !== 1) {
+    throw new InputError("Der Mitarbeiter wurde nicht gefunden.", 404, "employee_not_found");
+  }
+  if (current.rows[0].status !== "active") {
+    throw new InputError(
+      "Nur aktive Mitarbeiter können ein neues Passwort erhalten.",
+      409,
+      "employee_not_active"
+    );
+  }
+  const targetRoles = await activeRoleKeys(client, { ...context, userId: employeeId });
+  // Ohne diese Prüfung könnte das Büro das Passwort der Geschäftsführung
+  // zurücksetzen, sich damit anmelden und hätte deren Rechte - eine
+  // Rechteausweitung durch die Hintertür. Das Administratorkonto zählt hier
+  // bewusst mit dazu (anders als bei createEmployee/updateEmployee, wo es
+  // ganz gesperrt ist): docs/PASSWORT_NOTFALL.md sieht vor, dass eine zweite
+  // Administration oder Geschäftsführung die erste zurücksetzen darf - dafür
+  // braucht es hier kein eigenes Protokoll wie beim Notausgang, denn beide
+  // Seiten sind schon Firmenangehörige mit denselben Rechten. Nur wenn es
+  // niemanden Gleichrangigen gibt, bleibt der Plattform-Notausgang übrig.
+  const targetIsProtected = targetRoles.has("admin")
+    || [...targetRoles].some((role) => MANAGEMENT_ROLES.has(role));
+  if (targetIsProtected && ![...roles].some((role) => MANAGEMENT_ASSIGNER_ROLES.has(role))) {
+    throw new InputError(
+      "Nur Geschäftsführung oder Administrator dürfen das Passwort von Verwaltungsrollen oder des Administratorkontos zurücksetzen.",
+      403,
+      "forbidden"
+    );
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+  await client.query(
+    `UPDATE users
+     SET password_hash = $3, must_change_password = TRUE, password_changed_at = CURRENT_TIMESTAMP,
+         failed_login_attempts = 0, locked_until = NULL
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, employeeId, passwordHash]
+  );
+  await client.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP, revocation_reason = 'password_reset'
+     WHERE company_id = $1 AND user_id = $2 AND revoked_at IS NULL`,
+    [context.companyId, employeeId]
+  );
+  await client.query(
+    `INSERT INTO employee_lifecycle_events (
+       company_id, employee_id, actor_user_id, action, reason, new_state
+     ) VALUES ($1, $2, $3, 'password_reset', $4, $5::JSONB)`,
+    [
+      context.companyId,
+      employeeId,
+      context.userId,
+      input.reason,
+      // Niemals das Passwort oder den Hash in der Historie - nur die Wirkung.
+      JSON.stringify({ mustChangePassword: true })
+    ]
+  );
+  return {
+    employeeId,
+    personnelNumber: current.rows[0].personnel_number,
+    temporaryPassword,
+    mustChangePassword: true
+  };
 }
 
 async function requireEmployeeLifecycleAdministrator(client, context) {
@@ -8955,6 +9099,50 @@ async function changeInitialPassword(client, context, newPassword) {
     [context.companyId, context.userId, context.sessionId]
   );
   return sessionView(client, context);
+}
+
+// "der login muss auch verbessert werden ich habe das passwort vergessen und
+// es gibt keinen weg dieses zurück zu setzen" - changeInitialPassword hilft
+// nur, wer sein Startpasswort noch kennt. Dieser Weg ändert ein bekanntes
+// Passwort jederzeit, unabhängig von must_change_password, und bleibt damit
+// auch dann nutzbar, nachdem das Startpasswort längst ersetzt wurde.
+async function changeOwnPassword(client, context, input) {
+  const account = await client.query(
+    "SELECT password_hash FROM users WHERE company_id = $1 AND id = $2 AND status = 'active' FOR UPDATE",
+    [context.companyId, context.userId]
+  );
+  if (account.rowCount !== 1) throw new InputError("Das Benutzerkonto ist nicht mehr aktiv.", 401, "unauthorized");
+  const currentHash = account.rows[0].password_hash;
+  // Kein Fehlversuchszähler hier: wer schon eine gültige Sitzung hat, muss
+  // nichts erraten - ein Zähler an dieser Stelle könnte nur das eigene Konto
+  // versehentlich sperren.
+  if (!(await verifyPassword(input.currentPassword, currentHash))) {
+    throw new InputError("Das aktuelle Passwort ist falsch.", 401, "invalid_credentials");
+  }
+  if (await verifyPassword(input.newPassword, currentHash)) {
+    throw new InputError(
+      "Das neue Passwort muss sich vom bisherigen unterscheiden.",
+      409,
+      "password_unchanged"
+    );
+  }
+  const passwordHash = await hashPassword(input.newPassword);
+  await client.query(
+    `UPDATE users SET password_hash = $3, password_changed_at = CURRENT_TIMESTAMP
+     WHERE company_id = $1 AND id = $2`,
+    [context.companyId, context.userId, passwordHash]
+  );
+  // Die eigene Sitzung bleibt gültig - wer sein Passwort ändert, will sich
+  // nicht selbst aussperren. Alle anderen Sitzungen (ein verlorenes Gerät,
+  // ein mitgelesenes Cookie) werden beendet, genau wie bei
+  // changeInitialPassword.
+  await client.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP, revocation_reason = 'password_changed'
+     WHERE company_id = $1 AND user_id = $2 AND id <> $3 AND revoked_at IS NULL`,
+    [context.companyId, context.userId, context.sessionId]
+  );
+  return { changed: true };
 }
 
 async function insertTimeEntry(client, context, input, timeZone) {
@@ -10715,6 +10903,18 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
         return json(response, 200, { changed: true, session: view });
       }
 
+      if (request.method === "POST" && url.pathname === "/api/v1/me/password") {
+        const input = validatePasswordChange(await readJson(request));
+        // Bewusst withSessionTransaction statt withReadySession: dieser Weg
+        // muss auch funktionieren, solange must_change_password noch steht.
+        const result = await withSessionTransaction(
+          pool,
+          tokenHash,
+          (client, context) => changeOwnPassword(client, context, input)
+        );
+        return json(response, 200, result);
+      }
+
       if (request.method === "GET" && url.pathname === "/api/v1/announcements") {
         const announcements = await withReadySession(
           pool,
@@ -10826,6 +11026,19 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
             context,
             today: localDate(new Date().toISOString(), config.timeZone)
           })
+        );
+        if (handled) return json(response, handled.status, handled.body);
+      }
+
+      // DATEV-Lohnschnittstelle, Stufe 1: Stammdaten, Lohnart-Zuordnung und
+      // die reine Vorschau. Kapselt seine Fachlogik in einem eigenen Modul
+      // wie Geräte und Baustromverteiler; die Sitzung wird trotzdem hier
+      // aufgelöst, aus demselben Grund.
+      if (url.pathname.startsWith("/api/v1/admin/datev")) {
+        const handled = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => handleDatevRequest({ request, url, client, context })
         );
         if (handled) return json(response, handled.status, handled.body);
       }
@@ -11699,6 +11912,19 @@ export function createApp({ pool, config, limiter = new LoginRateLimiter(), logg
           (client, context) => reactivateEmployee(client, context, employeeId, input)
         );
         return json(response, 200, { employee });
+      }
+
+      const adminEmployeePasswordResetMatch =
+        /^\/api\/v1\/admin\/employees\/([^/]+)\/password-reset$/.exec(url.pathname);
+      if (request.method === "POST" && adminEmployeePasswordResetMatch) {
+        const employeeId = validateId(adminEmployeePasswordResetMatch[1], "Mitarbeiter-ID");
+        const input = employeePasswordResetInput(await readJson(request));
+        const reset = await withReadySession(
+          pool,
+          tokenHash,
+          (client, context) => resetEmployeePassword(client, context, employeeId, input)
+        );
+        return json(response, 200, { reset });
       }
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/customers") {

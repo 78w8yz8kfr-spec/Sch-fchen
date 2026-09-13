@@ -170,7 +170,10 @@ const VDE_VISUAL_CHECK_KEYS = [
 ];
 const TIME_CORRECTION_DECISIONS = new Set(["approved", "rejected"]);
 const WORK_DAY_DECISIONS = new Set(["approved", "locked"]);
-const ABSENCE_TYPES = new Set([
+// Exportiert, weil die DATEV-Lohnartenzuordnung (validateDatevWageTypeMapping
+// unten) genau diese neun Werte als Schlüssel kennen muss - dieselbe Liste,
+// nicht eine zweite von Hand nachgeführte Kopie.
+export const ABSENCE_TYPES = new Set([
   "vacation",
   "unpaid_vacation",
   "time_off",
@@ -275,7 +278,9 @@ function boolean(value, label, fallback = false) {
   return value;
 }
 
-function password(value) {
+// Exportiert, damit password.mjs (generateTemporaryPassword) und dessen Tests
+// exakt dieselbe Regel prüfen können, statt sie ein zweites Mal nachzubauen.
+export function password(value) {
   const normalized = text(value, "Passwort", 12, 256);
   if (!/[a-zäöü]/i.test(normalized) || !/\d/.test(normalized)) {
     throw new InputError("Das Passwort benötigt mindestens einen Buchstaben und eine Zahl.");
@@ -312,6 +317,29 @@ export function validateInitialSetup(body) {
   };
 }
 
+// Die DATEV-Personalnummer wird an zwei Stellen gepflegt: im Mitarbeiter-
+// formular (hier) und in der eigenstaendigen DATEV-Liste
+// (validateDatevPersonnelNumberAssignment weiter unten). Beide pruefen
+// dieselbe Regel aus Migration 156 (ein bis fuenf Ziffern, keine fuehrende
+// Null) - deshalb eine einzige Pruefung fuer beide, statt sie zu verdoppeln
+// und irgendwann auseinanderlaufen zu lassen.
+function datevPersonnelNumber(value) {
+  const normalized = text(value, "DATEV-Personalnummer", 1, 5);
+  if (!/^[1-9][0-9]{0,4}$/.test(normalized)) {
+    throw new InputError(
+      "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern ohne führende Null bestehen."
+    );
+  }
+  return normalized;
+}
+
+// Optionale Fassung fuer das Mitarbeiterformular: ein leeres Feld bedeutet
+// "nicht gepflegt" (null), nicht "ungueltig".
+function optionalDatevPersonnelNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return datevPersonnelNumber(value);
+}
+
 export function validateEmployee(body) {
   rejectTenantFields(body);
   const role = text(body.role, "Rolle", 2, 50).toLowerCase();
@@ -328,7 +356,10 @@ export function validateEmployee(body) {
     // Deshalb ein Schalter zusaetzlich zur Hauptrolle und kein weiterer
     // Eintrag in der Auswahlliste.
     drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
-    temporaryPassword: password(body.temporaryPassword)
+    temporaryPassword: password(body.temporaryPassword),
+    // Beim Anlegen gibt es noch keinen "unveraendert"-Fall: fehlt das Feld,
+    // ist die Nummer schlicht noch nicht gepflegt (null).
+    datevPersonnelNumber: optionalDatevPersonnelNumber(body.datevPersonnelNumber)
   };
 }
 
@@ -340,7 +371,7 @@ export function validateEmployeeUpdate(body) {
   if (!Number.isSafeInteger(rowVersion) || rowVersion < 1) {
     throw new InputError("Die Mitarbeiterversion ist ungültig.");
   }
-  return {
+  const result = {
     personnelNumber: text(body.personnelNumber, "Personalnummer", 1, 30),
     firstName: text(body.firstName, "Vorname", 1, 100),
     lastName: text(body.lastName, "Nachname", 1, 100),
@@ -358,6 +389,16 @@ export function validateEmployeeUpdate(body) {
     drivingLicenceClasses: drivingLicenceClasses(body.drivingLicenceClasses),
     rowVersion
   };
+  // Anders als beim Anlegen gibt es beim Bearbeiten einen dritten Zustand:
+  // "Feld nicht mitgeschickt" heisst "unveraendert lassen", nicht "loeschen".
+  // Ein alter Client, der das Feld gar nicht kennt, darf eine bereits
+  // gepflegte Nummer nicht versehentlich leeren. Deshalb erscheint der
+  // Schluessel im Ergebnis nur, wenn er im Request tatsaechlich vorkam;
+  // app.mjs unterscheidet danach mit Object.hasOwn.
+  if (Object.hasOwn(body, "datevPersonnelNumber")) {
+    result.datevPersonnelNumber = optionalDatevPersonnelNumber(body.datevPersonnelNumber);
+  }
+  return result;
 }
 
 // Fahrzeuge des Fuhrparks.
@@ -917,6 +958,19 @@ export function validateId(value, label = "ID") {
 export function validateInitialPasswordChange(body) {
   rejectTenantFields(body);
   return { newPassword: password(body.newPassword) };
+}
+
+// Eigenes, bekanntes Passwort ändern (POST /api/v1/me/password) - anders als
+// validateInitialPasswordChange verlangt dieser Weg das aktuelle Passwort.
+// Er ist nicht auf must_change_password beschränkt und daher jederzeit
+// aufrufbar; ohne diese Pflichtangabe reichte eine gestohlene Sitzung
+// (z. B. ein mitgelesenes Cookie) allein aus, um das Passwort zu übernehmen.
+export function validatePasswordChange(body) {
+  rejectTenantFields(body);
+  return {
+    currentPassword: text(body.currentPassword, "Aktuelles Passwort", 1, 256),
+    newPassword: password(body.newPassword)
+  };
 }
 
 export function validateDocumentUpload(body) {
@@ -2245,4 +2299,96 @@ export function validateApprenticeReview(body) {
     throw new InputError("Eine Rückgabe braucht eine Bemerkung.");
   }
   return { decision, reportIds: [...new Set(reportIds)], comment };
+}
+
+// DATEV-Lohnschnittstelle, Stufe 1: nur Stammdaten und Lohnart-Zuordnung.
+// Die Datei selbst entsteht erst in einer späteren Stufe.
+
+// Die drei Zeitarten, die work_days (Migration 011) als Minutenwerte führt.
+export const DATEV_TIME_TYPES = Object.freeze(["work", "travel", "overtime"]);
+export const DATEV_PAYROLL_PRODUCTS = Object.freeze(["lodas", "lug"]);
+
+function datevMappingKeysFor(category) {
+  return category === "time_type" ? new Set(DATEV_TIME_TYPES) : ABSENCE_TYPES;
+}
+
+export function validateDatevExportSettings(body) {
+  rejectTenantFields(body);
+  const consultantNumber = text(body.consultantNumber, "Beraternummer", 1, 7);
+  if (!/^[0-9]{1,7}$/.test(consultantNumber)) {
+    throw new InputError("Die Beraternummer darf nur aus bis zu sieben Ziffern bestehen.");
+  }
+  const clientNumber = text(body.clientNumber, "Mandantennummer", 1, 5);
+  if (!/^[0-9]{1,5}$/.test(clientNumber)) {
+    throw new InputError("Die Mandantennummer darf nur aus bis zu fünf Ziffern bestehen.");
+  }
+  const payrollProduct = text(body.payrollProduct, "Lohnprodukt", 3, 20).toLowerCase();
+  if (!DATEV_PAYROLL_PRODUCTS.includes(payrollProduct)) {
+    throw new InputError("Das Lohnprodukt muss LODAS oder Lohn und Gehalt sein.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {
+    throw new InputError("Die Version der DATEV-Stammdaten ist ungültig.");
+  }
+  return { consultantNumber, clientNumber, payrollProduct, rowVersion };
+}
+
+// Rein numerische Personalnummer für den DATEV-Export (Migration 156),
+// getrennt von personnel_number: DATEV liest das Feld als Zahl, deshalb keine
+// führende Null - sonst wären "123" und "0123" bei DATEV dieselbe Person,
+// während unsere Eindeutigkeitsprüfung (die auf Text vergleicht) das nicht
+// bemerken würde. `datevPersonnelNumber: null` löscht die Zuordnung
+// ausdrücklich wieder - das muss erlaubt sein, deshalb ist `null` kein
+// fehlendes Feld, sondern ein eigener gültiger Wert.
+export function validateDatevPersonnelNumberAssignment(body) {
+  rejectTenantFields(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {
+    throw new InputError("Die Mitarbeiterversion ist ungültig.");
+  }
+  if (body.datevPersonnelNumber === null) {
+    return { datevPersonnelNumber: null, rowVersion };
+  }
+  // Dieselbe Pruefung wie im Mitarbeiterformular - siehe datevPersonnelNumber
+  // weiter oben in dieser Datei.
+  return { datevPersonnelNumber: datevPersonnelNumber(body.datevPersonnelNumber), rowVersion };
+}
+
+// Legt eine neue gültige Zuordnung an; die bisherige wird von der Datenbank
+// automatisch abgelöst (Migration 151), nicht von hier aus überschrieben.
+export function validateDatevWageTypeMapping(body) {
+  rejectTenantFields(body);
+  const category = text(body.category, "Art der Zuordnung", 9, 13).toLowerCase();
+  if (!["time_type", "absence_type"].includes(category)) {
+    throw new InputError("Die Art der Zuordnung muss Zeitart oder Abwesenheitsart sein.");
+  }
+  const mappingKey = text(body.mappingKey, "Schlüssel", 2, 30).toLowerCase();
+  if (!datevMappingKeysFor(category).has(mappingKey)) {
+    throw new InputError("Der Schlüssel passt nicht zur gewählten Art der Zuordnung.");
+  }
+  const wageTypeNumber = optionalText(body.wageTypeNumber, "Lohnartennummer", 4);
+  if (wageTypeNumber && !/^[0-9]{1,4}$/.test(wageTypeNumber)) {
+    throw new InputError("Die Lohnartennummer darf nur aus bis zu vier Ziffern bestehen.");
+  }
+  const absenceCode = optionalText(body.absenceCode, "Ausfallschlüssel", 2);
+  if (absenceCode && !/^[0-9]{1,2}$/.test(absenceCode)) {
+    throw new InputError("Der Ausfallschlüssel darf nur aus bis zu zwei Ziffern bestehen.");
+  }
+  if (category === "time_type") {
+    if (!wageTypeNumber) {
+      throw new InputError("Eine Zeitart benötigt eine Lohnartennummer.");
+    }
+    if (absenceCode) {
+      throw new InputError("Eine Zeitart kennt keinen Ausfallschlüssel.");
+    }
+  } else if (!absenceCode) {
+    throw new InputError("Eine Abwesenheitsart benötigt einen Ausfallschlüssel.");
+  }
+  return {
+    category,
+    mappingKey,
+    wageTypeNumber: wageTypeNumber || null,
+    absenceCode: absenceCode || null,
+    changeReason: optionalText(body.changeReason, "Änderungsgrund der Zuordnung", 500)
+  };
 }

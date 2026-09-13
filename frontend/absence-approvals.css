@@ -1,4 +1,336 @@
-select{font:inherit;padding:10px;max-width:100%;min-height:44px;border:1px solid #a9a9b0;border-radius:8px;background:white}
-details{margin:20px 0;padding:16px;border:1px solid #ddd;border-radius:12px;background:white}summary{cursor:pointer;font-weight:700;min-height:44px}
-#policy-form>label{margin-top:18px}#policy-form>button{margin-top:12px}.person{display:grid;grid-template-columns:minmax(130px,1fr) 110px 110px;gap:12px;padding:12px 0;border-bottom:1px solid #eee;align-items:center}.person label{display:flex;align-items:center;gap:6px;min-height:44px}.person input{width:20px;height:20px}.person small{display:block}.request{padding:18px;background:white;border:1px solid #ddd;border-radius:12px;margin:16px 0}.request h3{margin:0}.request input{margin:12px 0}.request button{margin-right:8px;margin-bottom:8px}
-@media(max-width:520px){.person{grid-template-columns:1fr 1fr;gap:6px}.person>div{grid-column:1/-1}details{padding:12px}}
+/*
+ * Abwesenheiten freigeben - eigenständige Seite.
+ *
+ * Nutzt ausschließlich die Tokens aus design-system.css (Farbe, Radius,
+ * Abstand, Text). Keine fest verdrahteten Farben, damit ein künftiger
+ * Dunkelmodus im Designsystem hier automatisch greift.
+ */
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* design-system.css bringt fuer diese eigenstaendige Seite keine [hidden]-Regel
+   mit. Ohne sie gewinnt eine Autorenregel wie ".aa-stack { display: grid }"
+   gegen die UA-Vorgabe "[hidden] { display: none }" - #workspace bliebe dann
+   sichtbar, obwohl absence-approvals.js hidden=true gesetzt hat. */
+[hidden] {
+  display: none !important;
+}
+
+.aa-shell {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--ui-space-5) var(--ui-space-4) 60px;
+}
+
+.aa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-6);
+}
+
+.aa-back {
+  color: var(--ui-brand);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.aa-back:hover {
+  text-decoration: underline;
+}
+
+.aa-intro h1 {
+  margin: 4px 0 0;
+  font-size: var(--ui-title);
+  letter-spacing: -0.02em;
+}
+
+/* .eyebrow kommt aus design-system.css (Farbe, Größe, Gewicht). */
+
+.aa-stack {
+  display: grid;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-5);
+}
+
+.aa-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.aa-status {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.aa-hint {
+  margin: 0 0 var(--ui-space-3);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+}
+
+/* Karten --------------------------------------------------------------- */
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-xs);
+}
+
+.aa-notice {
+  display: grid;
+  gap: var(--ui-space-2);
+  padding: var(--ui-card-padding) var(--ui-space-4);
+  margin-top: var(--ui-space-5);
+}
+
+.aa-notice p {
+  margin: 0;
+}
+
+.aa-card__summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--ui-touch-height);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  color: var(--ui-text);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.aa-card[open] > .aa-card__summary {
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.aa-card__body {
+  padding: var(--ui-space-4);
+}
+
+.aa-card__body > h2 {
+  margin: 0 0 var(--ui-space-2);
+  font-size: var(--ui-title-sm);
+}
+
+/* Änderungsverlauf ------------------------------------------------------ */
+
+.aa-history {
+  border-top: 1px solid var(--ui-border);
+}
+
+.aa-history > summary {
+  min-height: var(--ui-touch-height);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.aa-history[open] > .aa-history__list {
+  display: grid;
+}
+
+.aa-history__list {
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding: 0 var(--ui-space-4) var(--ui-space-4);
+  list-style: none;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.aa-history__list li {
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+}
+
+.aa-history__list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Formulare -------------------------------------------------------------- */
+
+.aa-form {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+
+.aa-form > label {
+  margin-top: var(--ui-space-4);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+}
+
+.aa-form > label:first-child {
+  margin-top: 0;
+}
+
+.aa-form select,
+.aa-form input:not([type="checkbox"]) {
+  display: block;
+  width: 100%;
+  min-height: var(--ui-touch-height);
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-input-background);
+  font: inherit;
+}
+
+.aa-form > button {
+  margin-top: var(--ui-space-4);
+  justify-self: start;
+}
+
+.aa-search-label {
+  display: block;
+  margin: var(--ui-space-3) 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+}
+
+.aa-search-label input {
+  display: block;
+  width: 100%;
+  min-height: var(--ui-touch-height);
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  font: inherit;
+}
+
+.aa-form-message {
+  min-height: 1.3em;
+  margin: var(--ui-space-2) 0 0;
+  color: var(--ui-danger);
+  font-size: var(--ui-text-sm);
+}
+
+.aa-form-message:empty {
+  display: none;
+}
+
+/* Mitarbeiterauswahl ------------------------------------------------------ */
+
+.aa-selection {
+  padding-top: var(--ui-space-2);
+  margin-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+}
+
+.aa-people {
+  border-top: 1px solid var(--ui-border);
+}
+
+.person {
+  display: grid;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) 0;
+  border-bottom: 1px solid var(--ui-border);
+  grid-template-columns: minmax(130px, 1fr) 110px 110px;
+}
+
+.person label {
+  display: flex;
+  min-height: var(--ui-touch-height);
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+}
+
+.person input {
+  width: 20px;
+  height: 20px;
+}
+
+.person small {
+  display: block;
+  color: var(--ui-text-secondary);
+}
+
+@media (max-width: 560px) {
+  .person {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .person > div {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Offene Anträge ---------------------------------------------------------- */
+
+.aa-requests {
+  display: grid;
+  gap: var(--ui-space-3);
+}
+
+.request {
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.request h3 {
+  margin: 0;
+  font-size: var(--ui-text-lg);
+}
+
+.request p {
+  margin: var(--ui-space-1) 0 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.request input {
+  display: block;
+  width: 100%;
+  min-height: var(--ui-touch-height);
+  margin: var(--ui-space-3) 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  font: inherit;
+}
+
+.request button {
+  margin: 0 var(--ui-space-2) var(--ui-space-2) 0;
+}
+
+@media (max-width: 640px) {
+  .aa-shell {
+    padding: var(--ui-space-4) var(--ui-space-3) 48px;
+  }
+
+  .aa-card__body,
+  .aa-card__summary {
+    padding-right: var(--ui-space-3);
+    padding-left: var(--ui-space-3);
+  }
+}

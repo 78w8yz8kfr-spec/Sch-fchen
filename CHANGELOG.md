@@ -4,6 +4,47 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.46] - Freigabeseite im App-Design
+
+- **Die Seite „Abwesenheiten freigeben" passt jetzt zur App.** Sie lud
+  bisher das karge inventory.css mit fest verdrahteten Farben und wirkte wie
+  ein nacktes Formular. Jetzt bindet sie - wie platform-admin - das
+  design-system.css ein: Inhalte in Karten gegliedert (Einleitung,
+  Zuständige Mitarbeiter, direkte Eintragung, offene Anträge), Markenrot auf
+  Primäraktionen, neutrale Sekundäraktionen, einheitliche Felder und
+  Abstände über die Design-Tokens. Reine Oberfläche - Ablauf, Berechtigungen
+  und alle Element-ids (die absence-approvals.js über getElementById nutzt)
+  bleiben unverändert. Nebenbei ergänzt: eine [hidden]-Regel, die
+  design-system.css für eigenständige Seiten nicht mitbringt, sonst wäre das
+  per JavaScript versteckte Gerüst vor dem Laden sichtbar geblieben (Migration 162).
+
+
+## [0.44.45] - DATEV-Lohnschnittstelle, Passwort-Zuruecksetzen und Prozessabsicherung
+
+Diese Fassung bringt eine laengere Arbeitslinie zusammen, die zunaechst auf
+einem abgedrifteten Zweig entstanden war und nun sauber auf den aktuellen
+Stand portiert wurde (Migrationen 158-161).
+
+- **DATEV-Lohnschnittstelle in der App.** Eigener Bereich fuer Stammdaten
+  (Berater-/Mandantennummer, Lohnprodukt), Lohnartenzuordnung mit
+  Historisierung, und eine Vorschau, die je Mitarbeiter/Tag/Lohnart zeigt,
+  was uebermittelt wuerde - ohne Datei (Migration 158).
+- **DATEV-Personalnummer je Mitarbeiter.** Rein numerische Kennung, keine
+  fuehrende Null (sonst waeren 123 und 0123 bei DATEV dieselbe Person),
+  pflegbar direkt im Mitarbeiterformular und in einer eigenen Liste; die
+  Vorschau meldet fehlende Nummern (Migration 160).
+- **Passwort-Zuruecksetzen auf drei Wegen.** Eigenes bekanntes Passwort
+  aendern, Buero setzt einen Mitarbeiter zurueck (mit Aufhebung der
+  Kontosperre), und ein Plattform-Notausgang ueber den Supportzugang; dazu
+  ein Notfallskript ueber die Datenbank (Migration 159).
+- **Prozessabsicherung.** Zeitgrenze fuer haengende Datenbankabfragen,
+  Pool-Fehlerbehandlung, geordnetes Beenden bei schweren Fehlern.
+
+Das Genehmigungsverfahren fuer Abwesenheiten bleibt das einstufige Modell
+aus 0.44.44; der zweistufige Umbau des abgedrifteten Zweigs wurde bewusst
+fallengelassen.
+
+
 - **0.44.44 – Einstufige Freigabe und Büroeinträge (10.09.2026).** Firmen können zwischen einer Freigabe und zwei getrennten Prüfungen wählen; die Personen bleiben pro Stufe auswählbar. Offene Anträge verwenden die aktuelle Regel, abgeschlossene Freigaben behalten ihre Historie. Planung → Abwesenheiten ermöglicht berechtigtem Büro direkt bestätigte Einträge für aktive Mitarbeiter derselben Firma ohne Mitarbeiterantrag. Eigene Direktfreigaben bleiben ausgeschlossen. Überschneidungen und ganztägige Einsatzkonflikte werden gesperrt; Büroeinträge erhalten eine eigene Herkunft und Historie und können begründet aufgehoben werden. Migrationen 156–157.
 
 - **0.44.43 – Abwesenheitszuständigkeiten (10.09.2026).** Administration und Geschäftsführung können je Firma konkrete aktive Mitarbeiter für die erste Prüfung und die verbindliche Freigabe auswählen. Mehrere Vertreter pro Stufe sind möglich. Die bisherige Rollenregel bleibt Standard und kann wiederhergestellt werden. Ausgewählte Personen erhalten nur Abwesenheitszugriff; Änderungen gelten auch für offene Anträge. Zweipersonenprüfung, Sperre eigener Freigaben, Versionsschutz und unveränderlicher Zuständigkeitsverlauf. Neue Ansicht unter Woche → Abwesenheit → Anträge prüfen / Zuständigkeiten. Migrationen 154–155.

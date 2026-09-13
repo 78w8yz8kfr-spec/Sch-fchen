@@ -217,7 +217,7 @@ assert.match(
 // Dokumente, Baustellenfotos, VDE-Protokoll -, gibt keine Kopfzeile mit. Ohne
 // die Fassung im Adressteil kam dort waehrend eines Pflichtupdates dessen
 // Meldung als JSON an: 203 Byte, abgelegt als "SE-R-….pdf.json".
-assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.44`;/);
+assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.46`;/);
 for (const stelle of [
   /apprentice\/reports\/\$\{selectedWeekStart\}\/pdf\?preview=true/,
   /admin\/documents\/\$\{encodeURIComponent\(documentItem\.id\)\}\/content/,
@@ -240,7 +240,7 @@ assert.doesNotMatch(app, /link\.target = "_blank";\s*link\.rel = "noopener";\s*l
 // Offline gesicherte Dokumente behalten ihren Schluessel ohne die Fassung.
 assert.match(app, /function employeeSiteContentKey\(/);
 assert.match(worker, /cacheUrl\.searchParams\.delete\("appVersion"\)/);
-assert.match(vdeApp, /appVersion=0\.44\.44/);
+assert.match(vdeApp, /appVersion=0\.44\.46/);
 assert.match(app, /element === elements\.apprenticeSection[\s\S]{0,160}mayReviewApprentices\(\)/);
 // Seine bisherigen Berichte fuehren in ihre Woche zurueck und lassen sich von
 // dort drucken. Vorher war die Liste eine tote Aufzaehlung.
@@ -378,6 +378,73 @@ assert.match(html, /id="account-card"/);
 assert.match(html, /id="account-personnel-number"/);
 assert.match(html, /id="account-logout"/);
 assert.match(app, /function renderAccountCard\(\)/);
+
+// Bis heute gab es keinen Weg zurueck, wenn jemand sein Passwort vergessen
+// hatte. "Passwort aendern" im eigenen Konto braucht - anders als der
+// Zwangsdialog nach dem Startpasswort - das aktuelle Passwort und liegt im
+// eigenen Bereich, nicht in der Anmeldung.
+assert.match(html, /id="account-password-form"/);
+assert.match(html, /id="account-current-password"[^>]*autocomplete="current-password"/);
+assert.match(html, /id="account-new-password"[^>]*minlength="12"/);
+assert.match(html, /id="account-confirm-password"/);
+assert.match(html, /id="account-password-message"[^>]*aria-live="polite"/);
+// Die Regel steht vor dem Absenden, nicht erst als Fehlermeldung danach.
+assert.match(
+  html,
+  /id="account-new-password"[\s\S]{0,200}<p class="field-help">Mindestens 12 Zeichen mit mindestens einem Buchstaben und einer Ziffer\.<\/p>/
+);
+assert.match(app, /\.\/api\/v1\/me\/password/);
+assert.match(app, /currentPassword: elements\.accountCurrentPassword\.value/);
+assert.match(app, /error\.code === "invalid_credentials"/);
+// Die Folge der Aenderung wird deutlich gesagt, nicht nur im flüchtigen Toast.
+assert.match(
+  app,
+  /elements\.accountPasswordMessage\.textContent =\s*"Passwort geändert\. Du wurdest damit auf allen anderen Geräten abgemeldet\."/
+);
+
+// Das Buero kann einen Mitarbeiter zuruecksetzen: Begruendung, Rueckfrage mit
+// Namen und Personalnummer, danach das einmalig angezeigte Passwort.
+assert.match(html, /id="employee-edit-reset-password"/);
+assert.match(html, /id="employee-password-reset-dialog"/);
+assert.match(html, /id="employee-password-reset-reason"[^>]*required/);
+assert.match(html, /id="employee-password-reset-value"/);
+assert.match(html, /id="employee-password-reset-copy"/);
+assert.match(html, /id="employee-password-reset-ack"/);
+assert.match(html, /id="employee-password-reset-done"[^>]*disabled/);
+assert.match(app, /\.\/api\/v1\/admin\/employees\/\$\{encodeURIComponent\(employee\.id\)\}\/password-reset/);
+// Die Rueckfrage nennt Name und Personalnummer, nicht nur "sicher?".
+assert.match(
+  app,
+  /`\$\{employee\.firstName\} \$\{employee\.lastName\} \(Personalnummer \$\{employee\.personnelNumber\}\) `/
+);
+assert.match(app, /error\.code === "password_reset_self"/);
+// Wer das eigene Konto bearbeitet, bekommt die Schaltflaeche gar nicht erst -
+// die Schnittstelle würde ohnehin mit "password_reset_self" ablehnen.
+assert.match(app, /elements\.employeeEditResetPassword\.hidden = employee\.id === session\?\.user\?\.id;/);
+// Das Passwort darf nirgends landen ausser in der Anzeige: nicht im
+// gespeicherten Zustand, nicht in localStorage, nicht in der Konsole.
+assert.doesNotMatch(app, /state[.\[][\s\S]{0,80}temporaryPassword/);
+assert.doesNotMatch(app, /console\.(log|info|warn|debug)\([^)]*temporaryPassword/);
+// Solange das neue Passwort zu sehen ist, schliesst weder Esc noch ein Klick
+// daneben den Dialog wortlos - erst die ausdrueckliche Bestaetigung tut das.
+assert.match(
+  app,
+  /elements\.employeePasswordResetDialog\.addEventListener\("cancel", \(event\) => \{\s*if \(!elements\.employeePasswordResetResult\.hidden\) \{\s*event\.preventDefault\(\);/
+);
+assert.match(
+  app,
+  /if \(event\.target === elements\.employeePasswordResetDialog && elements\.employeePasswordResetResult\.hidden\)/
+);
+assert.match(app, /elements\.employeePasswordResetDone\.disabled = !elements\.employeePasswordResetAck\.checked;/);
+
+// Anmeldung ohne bekanntes Passwort: ein ehrlicher Hinweis statt eines
+// Selbstbedienungslinks, den es ohne Mailversand im Projekt nicht geben kann.
+assert.match(html, /class="login-help"/);
+assert.match(html, /<summary>Passwort vergessen\?<\/summary>/);
+assert.match(html, /Beim Büro melden/);
+assert.match(html, /Eine zweite Person mit Administratorrechten kann das Passwort zurücksetzen/);
+assert.doesNotMatch(html, /Link per E-Mail/);
+assert.doesNotMatch(html, /mailto:/);
 assert.match(app, /function moduleEnabled\(key\)/);
 assert.match(app, /function applyModuleVisibility\(\)/);
 // Die Bereiche tragen die Schluessel des Plattformkatalogs, nicht eigene.
@@ -688,10 +755,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.44\.44/);
-assert.match(html, /design-system\.css\?v=0\.44\.44/);
-assert.match(html, /app\.js\?v=0\.44\.44/);
-assert.match(html, /version\.js\?v=0\.44\.44/);
+assert.match(html, /styles\.css\?v=0\.44\.46/);
+assert.match(html, /design-system\.css\?v=0\.44\.46/);
+assert.match(html, /app\.js\?v=0\.44\.46/);
+assert.match(html, /version\.js\?v=0\.44\.46/);
 assert.match(html, /id="devices-section"[^>]*data-dashboard-pane="devices"/);
 assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
@@ -1496,21 +1563,21 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.44"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.44"'));
-assert.ok(worker.includes('"./app.js?v=0.44.44"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.44"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.44"'));
-assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.44"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.44"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.46"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.46"'));
+assert.ok(worker.includes('"./app.js?v=0.44.46"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.46"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.46"'));
+assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.46"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.46"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.44"'));
+assert.ok(worker.includes('"./version.js?v=0.44.46"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.44"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.44";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.46"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.46";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1545,7 +1612,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.44\.44$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.44\.46$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1553,11 +1620,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.44"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.44"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.46"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.46"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.44"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.44"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.46"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.46"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 // Gesucht wird unter der abgelegten Adresse - ohne die App-Fassung, die nur an
@@ -1655,9 +1722,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.44\.44/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.44\.44/);
-assert.match(vdeHtml, /app\.js\?v=0\.44\.44/);
+assert.match(vdeHtml, /styles\.css\?v=0\.44\.46/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.44\.46/);
+assert.match(vdeHtml, /app\.js\?v=0\.44\.46/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1673,7 +1740,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.44\.44/);
+assert.match(platformHtml, /design-system\.css\?v=0\.44\.46/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,
@@ -2013,6 +2080,36 @@ assert.deepEqual(
   befunde,
   [],
   `Kein am Telefon sichtbarer Knopf fuer diesen Bereich:\n${befunde.join("\n")}`
+);
+
+// Ein Knopf, der sich in seinem eigenen "finally" auf
+// "disabled = !navigator.onLine" zuruecksetzt, sperrt sich damit nur fuer
+// einen einzelnen gescheiterten Versuch offline - freigegeben wird er
+// ausschliesslich durch updateConnectionState(), das der "online"-Zuhoerer
+// beim Wiederverbinden aufruft. Fehlt dort die passende Zeile, bleibt der
+// Knopf bis zum Neuladen der Seite tot, obwohl das Netz laengst wieder da
+// ist. Genau das ist bei fuenf Knoepfen unbemerkt so gewesen (drei
+// DATEV-Speicherknoepfe, die DATEV-Vorschau und die Zeitkorrekturregel) -
+// eine von Hand eingetippte Liste haette den naechsten neuen Knopf derselben
+// Art wieder verschwiegen. Deshalb werden hier beide Mengen mechanisch aus
+// dem Quelltext abgeleitet und verglichen, statt sie hier erneut aufzuzaehlen.
+const updateConnectionStateBody = app.match(/function updateConnectionState\(\) \{([\s\S]*?)\n {2}\}\n/)?.[1];
+assert.ok(updateConnectionStateBody, "updateConnectionState wurde nicht gefunden.");
+const knoepfeMitOfflineSperre = new Set(
+  [...app.matchAll(/elements\.([A-Za-z0-9_]+)\.disabled = !navigator\.onLine\b/g)]
+    .map((treffer) => treffer[1])
+);
+const knoepfeMitRueckweg = new Set(
+  [...updateConnectionStateBody.matchAll(/elements\.([A-Za-z0-9_]+)\.disabled = !online\b/g)]
+    .map((treffer) => treffer[1])
+);
+const ohneRueckweg = [...knoepfeMitOfflineSperre].filter((name) => !knoepfeMitRueckweg.has(name));
+assert.deepEqual(
+  ohneRueckweg,
+  [],
+  `Diese Knoepfe sperren sich offline, kommen in updateConnectionState() aber nicht wieder frei:\n${
+    ohneRueckweg.join(", ")
+  }`
 );
 
 console.log("PWA-Smoke-Test erfolgreich.");

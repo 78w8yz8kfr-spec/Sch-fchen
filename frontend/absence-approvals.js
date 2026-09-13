@@ -6,7 +6,7 @@ const stages = {office_review:'Erste Prüfung',management_review:'Verbindliche F
 const kinds = {vacation:'Urlaub',sick:'Krankheit',sick_leave:'Krankheit',time_off:'Freizeitausgleich',unpaid_leave:'Unbezahlter Urlaub',other:'Sonstiges'};
 async function request(url=endpoint,options={}) {
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options,
-    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.44'}});
+    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.46'}});
   const data=await response.json();
   if(!response.ok) throw new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Anfrage fehlgeschlagen.');
   return data;
@@ -49,7 +49,7 @@ function renderRequests() {
     else if(first||second||cancel) {
       const comment=el('input');comment.maxLength=500;comment.placeholder='Begründung (bei Ablehnung oder Aufhebung erforderlich)';comment.setAttribute('aria-label',`Kommentar für ${item.employeeName}`);card.append(comment);
       for(const [action,label] of cancel?[['cancel','Freigabe aufheben']]:[['approve',first?'Geprüft – zur Freigabe': 'Verbindlich freigeben'],['reject','Ablehnen']]) {
-        const button=el('button',label);button.type='button';button.disabled=busy||!navigator.onLine;
+        const button=el('button',label);button.type='button';button.className=`button ${action==='approve'?'button--primary':'button--secondary'}`;button.disabled=busy||!navigator.onLine;
         button.addEventListener('click',async()=>{
           if(busy)return;
           if(action!=='approve'&&comment.value.trim().length<3){$('message').textContent='Bitte eine Begründung mit mindestens 3 Zeichen angeben.';comment.focus();return;}

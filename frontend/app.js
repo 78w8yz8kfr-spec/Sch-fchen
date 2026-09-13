@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.44";
-import { serverIsNewer } from "./core/versions.js?v=0.44.44";
+} from "./core/work-time.js?v=0.44.46";
+import { serverIsNewer } from "./core/versions.js?v=0.44.46";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.44";
+} from "./core/sync-queue.js?v=0.44.46";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.44";
+} from "./core/permissions.js?v=0.44.46";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.44";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.44";
-import { createPowerModule } from "./core/power-module.js?v=0.44.44";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.44";
+} from "./core/state-store.js?v=0.44.46";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.46";
+import { createPowerModule } from "./core/power-module.js?v=0.44.46";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.46";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.44";
+} from "./core/time-changes.js?v=0.44.46";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -279,6 +279,12 @@ import {
     accountPersonnelNumber: document.querySelector("#account-personnel-number"),
     accountCompany: document.querySelector("#account-company"),
     accountRoles: document.querySelector("#account-roles"),
+    accountPasswordForm: document.querySelector("#account-password-form"),
+    accountCurrentPassword: document.querySelector("#account-current-password"),
+    accountNewPassword: document.querySelector("#account-new-password"),
+    accountConfirmPassword: document.querySelector("#account-confirm-password"),
+    accountPasswordSubmit: document.querySelector("#account-password-submit"),
+    accountPasswordMessage: document.querySelector("#account-password-message"),
     accountLogout: document.querySelector("#account-logout"),
     weekPrevious: document.querySelector("#week-previous"),
     weekCurrent: document.querySelector("#week-current"),
@@ -374,6 +380,54 @@ import {
     holidayClosureSubmit: document.querySelector("#holiday-closure-submit"),
     holidayClosureList: document.querySelector("#holiday-closure-list"),
     holidayCalendarMessage: document.querySelector("#holiday-calendar-message"),
+    datevSettingsAdmin: document.querySelector("#datev-settings-admin"),
+    datevSettingsState: document.querySelector("#datev-settings-state"),
+    datevSettingsStatus: document.querySelector("#datev-settings-status"),
+    datevSettingsForm: document.querySelector("#datev-settings-form"),
+    datevConsultantNumber: document.querySelector("#datev-consultant-number"),
+    datevClientNumber: document.querySelector("#datev-client-number"),
+    datevPayrollProduct: document.querySelector("#datev-payroll-product"),
+    datevSettingsSave: document.querySelector("#datev-settings-save"),
+    datevSettingsMessage: document.querySelector("#datev-settings-message"),
+    datevMappingAdmin: document.querySelector("#datev-mapping-admin"),
+    datevMappingMissingCount: document.querySelector("#datev-mapping-missing-count"),
+    datevMappingList: document.querySelector("#datev-mapping-list"),
+    datevMappingForm: document.querySelector("#datev-mapping-form"),
+    datevMappingFormTitle: document.querySelector("#datev-mapping-form-title"),
+    datevMappingWageTypeField: document.querySelector("#datev-mapping-wage-type-field"),
+    datevMappingWageType: document.querySelector("#datev-mapping-wage-type"),
+    datevMappingAbsenceCodeField: document.querySelector("#datev-mapping-absence-code-field"),
+    datevMappingAbsenceCode: document.querySelector("#datev-mapping-absence-code"),
+    datevMappingAbsenceCodeNote: document.querySelector("#datev-mapping-absence-code-note"),
+    datevMappingReason: document.querySelector("#datev-mapping-reason"),
+    datevMappingSave: document.querySelector("#datev-mapping-save"),
+    datevMappingCancel: document.querySelector("#datev-mapping-cancel"),
+    datevMappingMessage: document.querySelector("#datev-mapping-message"),
+    datevMappingHistoryPanel: document.querySelector("#datev-mapping-history-panel"),
+    datevMappingHistoryStatus: document.querySelector("#datev-mapping-history-status"),
+    datevMappingHistoryList: document.querySelector("#datev-mapping-history-list"),
+    datevPersonnelNumbersAdmin: document.querySelector("#datev-personnel-numbers-admin"),
+    datevPersonnelNumbersMissingCount: document.querySelector("#datev-personnel-numbers-missing-count"),
+    datevPersonnelNumbersList: document.querySelector("#datev-personnel-numbers-list"),
+    datevPersonnelNumberForm: document.querySelector("#datev-personnel-number-form"),
+    datevPersonnelNumberFormTitle: document.querySelector("#datev-personnel-number-form-title"),
+    datevPersonnelNumberValue: document.querySelector("#datev-personnel-number-value"),
+    datevPersonnelNumberSave: document.querySelector("#datev-personnel-number-save"),
+    datevPersonnelNumberCancel: document.querySelector("#datev-personnel-number-cancel"),
+    datevPersonnelNumberMessage: document.querySelector("#datev-personnel-number-message"),
+    datevPreviewAdmin: document.querySelector("#datev-preview-admin"),
+    datevPreviewForm: document.querySelector("#datev-preview-form"),
+    datevPreviewFrom: document.querySelector("#datev-preview-from"),
+    datevPreviewTo: document.querySelector("#datev-preview-to"),
+    datevPreviewLoad: document.querySelector("#datev-preview-load"),
+    datevPreviewMessage: document.querySelector("#datev-preview-message"),
+    datevPreviewStatus: document.querySelector("#datev-preview-status"),
+    datevPreviewMissing: document.querySelector("#datev-preview-missing"),
+    datevPreviewMissingList: document.querySelector("#datev-preview-missing-list"),
+    datevPreviewMissingPersonnel: document.querySelector("#datev-preview-missing-personnel"),
+    datevPreviewMissingPersonnelList: document.querySelector("#datev-preview-missing-personnel-list"),
+    datevPreviewTable: document.querySelector("#datev-preview-table"),
+    datevPreviewBody: document.querySelector("#datev-preview-body"),
     absenceArea: document.querySelector("#absence-area"),
     absencePanel: document.querySelector("#absence-panel"),
     absenceForm: document.querySelector("#absence-form"),
@@ -844,6 +898,7 @@ import {
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
     employeePersonnelNumber: document.querySelector("#employee-personnel-number"),
+    employeeDatevPersonnelNumber: document.querySelector("#employee-datev-personnel-number"),
     employeePhone: document.querySelector("#employee-phone"),
     employeeEmail: document.querySelector("#employee-email"),
     employeeRole: document.querySelector("#employee-role"),
@@ -867,6 +922,7 @@ import {
     employeeEditFirstName: document.querySelector("#employee-edit-first-name"),
     employeeEditLastName: document.querySelector("#employee-edit-last-name"),
     employeeEditPersonnelNumber: document.querySelector("#employee-edit-personnel-number"),
+    employeeEditDatevPersonnelNumber: document.querySelector("#employee-edit-datev-personnel-number"),
     employeeEditPhone: document.querySelector("#employee-edit-phone"),
     employeeEditEmail: document.querySelector("#employee-edit-email"),
     employeeEditRole: document.querySelector("#employee-edit-role"),
@@ -874,8 +930,22 @@ import {
     employeeEditTrainer: document.querySelector("#employee-edit-trainer"),
     employeeEditSave: document.querySelector("#employee-edit-save"),
     employeeEditCancel: document.querySelector("#employee-edit-cancel"),
+    employeeEditResetPassword: document.querySelector("#employee-edit-reset-password"),
     employeeEditRemove: document.querySelector("#employee-edit-remove"),
     employeeEditMessage: document.querySelector("#employee-edit-message"),
+    employeePasswordResetDialog: document.querySelector("#employee-password-reset-dialog"),
+    employeePasswordResetForm: document.querySelector("#employee-password-reset-form"),
+    employeePasswordResetName: document.querySelector("#employee-password-reset-name"),
+    employeePasswordResetClose: document.querySelector("#employee-password-reset-close"),
+    employeePasswordResetRequest: document.querySelector("#employee-password-reset-request"),
+    employeePasswordResetReason: document.querySelector("#employee-password-reset-reason"),
+    employeePasswordResetSubmit: document.querySelector("#employee-password-reset-submit"),
+    employeePasswordResetMessage: document.querySelector("#employee-password-reset-message"),
+    employeePasswordResetResult: document.querySelector("#employee-password-reset-result"),
+    employeePasswordResetValue: document.querySelector("#employee-password-reset-value"),
+    employeePasswordResetCopy: document.querySelector("#employee-password-reset-copy"),
+    employeePasswordResetAck: document.querySelector("#employee-password-reset-ack"),
+    employeePasswordResetDone: document.querySelector("#employee-password-reset-done"),
     customerPanel: document.querySelector("#customer-panel"),
     customerForm: document.querySelector("#customer-form"),
     customerType: document.querySelector("#customer-type"),
@@ -1173,6 +1243,26 @@ import {
   let timeAccountFetchLauf = 0;
   let timeAccountsState = null;
   let timeCorrectionPolicyState = null;
+  // DATEV-Lohnschnittstelle, Stufe 1: Stammdaten, gueltige Zuordnungen, ihre
+  // Historie (erst beim Aufklappen geladen) und die zuletzt geladene
+  // Vorschau. Getrennt von timeAccountsState, weil die drei Endpunkte
+  // unabhaengig voneinander laden und scheitern koennen.
+  let datevSettingsState = null;
+  // "null" heisst bei den Stammdaten zweierlei: noch nicht geladen, oder
+  // geladen und die Firma ist schlicht noch nicht angebunden. Ohne dieses
+  // Merkmal saehe die Oberflaeche vor dem ersten Laden faelschlich schon
+  // "Nicht angebunden", statt ehrlich "wird geladen" zu zeigen.
+  let datevSettingsLoaded = false;
+  let datevMappingsState = null;
+  let datevMappingHistoryState = null;
+  let datevMappingHistoryLoaded = false;
+  let datevEditingMapping = null;
+  // Zusaetzlich zur freien Personalnummer (M-1, ADMIN-1, ...) verlangt DATEV
+  // eine rein numerische Kennung je Mitarbeiter - eigener Zustand aus einem
+  // eigenen Endpunkt, aus demselben Grund wie oben.
+  let datevPersonnelNumbersState = null;
+  let datevEditingPersonnelNumberEmployeeId = null;
+  let datevPreviewState = null;
   // Die Verwaltung wertet ein Kalenderjahr aus. Frueher folgte sie der
   // gewaehlten Woche des Monteurs; seit die Bereiche getrennt sind, waere das
   // nicht mehr nachvollziehbar.
@@ -1202,6 +1292,10 @@ import {
   let returningReportId = null;
   let deepLinkedSiteHandled = false;
   let editingEmployeeId = null;
+  // Wessen Passwort im offenen Dialog gerade zurueckgesetzt wird. Getrennt von
+  // editingEmployeeId, weil der Bearbeitungsdialog dahinter geschlossen sein
+  // kann, waehrend das neue Passwort noch angezeigt wird.
+  let passwordResetEmployeeId = null;
   let editingTimeAccountId = null;
   let speechRecognition = null;
   let cachedUserId = null;
@@ -1486,7 +1580,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.44",
+          "X-Schaefchen-Version": "0.44.46",
           ...options.headers
         }
       });
@@ -1521,7 +1615,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.44`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.46`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1543,7 +1637,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.44" }
+        headers: { "X-Schaefchen-Version": "0.44.46" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1590,7 +1684,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.44 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.46 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -1800,6 +1894,11 @@ import {
     elements.siteImportFileName.textContent = "Keine Datei ausgewählt";
     elements.siteImportSelection.hidden = true;
     resetSiteImportPreview();
+    elements.accountPasswordForm.reset();
+    elements.accountPasswordMessage.textContent = "";
+    // Ein zurueckgesetztes Startpasswort darf keine Abmeldung ueberdauern -
+    // weder in der Anzeige noch im Dialog selbst.
+    closeEmployeePasswordResetDialog();
   }
 
   function showSetup(setup) {
@@ -2996,7 +3095,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.44";
+  const EIGENE_FASSUNG = "0.44.46";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3035,7 +3134,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.44". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.46". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6613,6 +6712,10 @@ import {
     elements.employeeEditFirstName.value = employee.firstName;
     elements.employeeEditLastName.value = employee.lastName;
     elements.employeeEditPersonnelNumber.value = employee.personnelNumber;
+    // Ohne diese Zeile wuerde der erste Speichervorgang die vorhandene
+    // DATEV-Personalnummer versehentlich mit nichts ueberschreiben - das
+    // Formular schickt ja immer den aktuellen Feldinhalt, leer oder nicht.
+    elements.employeeEditDatevPersonnelNumber.value = employee.datevPersonnelNumber || "";
     elements.employeeEditPhone.value = employee.phone || "";
     elements.employeeEditEmail.value = employee.email || "";
     elements.employeeEditRole.value = editableEmployeeRole(employee.roles);
@@ -6636,9 +6739,43 @@ import {
       }
       elements.employeeEditTrainer.value = employee.trainerUserId || "";
     }
+    // Das eigene Passwort setzt niemand ueber diesen Weg zurueck - dafuer gibt
+    // es "Passwort aendern" im eigenen Konto. Die Schnittstelle wuerde das
+    // ohnehin mit "password_reset_self" ablehnen; hier faellt schon die
+    // Schaltflaeche weg, statt erst nach einer Rueckfrage einen Fehler zu zeigen.
+    elements.employeeEditResetPassword.hidden = employee.id === session?.user?.id;
     elements.employeeEditMessage.textContent = "";
     elements.employeeEditForm.hidden = false;
     elements.employeeEditForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function closeEmployeePasswordResetDialog() {
+    passwordResetEmployeeId = null;
+    elements.employeePasswordResetForm.reset();
+    // Das Passwort stand nur in dieser Anzeige - nirgends sonst. Ohne diese
+    // Zeile bliebe es im DOM stehen, auch nachdem der Dialog laengst zu ist.
+    elements.employeePasswordResetValue.textContent = "";
+    elements.employeePasswordResetMessage.textContent = "";
+    elements.employeePasswordResetRequest.hidden = false;
+    elements.employeePasswordResetResult.hidden = true;
+    elements.employeePasswordResetClose.hidden = false;
+    elements.employeePasswordResetDone.disabled = true;
+    if (elements.employeePasswordResetDialog.open) elements.employeePasswordResetDialog.close();
+  }
+
+  function openEmployeePasswordResetDialog(employee) {
+    passwordResetEmployeeId = employee.id;
+    elements.employeePasswordResetName.textContent =
+      `${employee.firstName} ${employee.lastName} · Personalnummer ${employee.personnelNumber}`;
+    elements.employeePasswordResetReason.value = "";
+    elements.employeePasswordResetMessage.textContent = "";
+    elements.employeePasswordResetRequest.hidden = false;
+    elements.employeePasswordResetResult.hidden = true;
+    elements.employeePasswordResetClose.hidden = false;
+    elements.employeePasswordResetValue.textContent = "";
+    elements.employeePasswordResetAck.checked = false;
+    elements.employeePasswordResetDone.disabled = true;
+    elements.employeePasswordResetDialog.showModal();
   }
 
   function renderDispatchSummary() {
@@ -6972,7 +7109,7 @@ import {
       adminOverviewStatus = "ready";
       elements.assignmentDate.value = adminState.date;
       renderAdmin();
-      await refreshTimeCorrectionPolicy();
+      await Promise.all([refreshTimeCorrectionPolicy(), refreshDatevAdmin()]);
     } catch (error) {
       // Auch ein Netzfehler muss sichtbar werden. Er blieb bisher stumm - und
       // die Startseite, die ohne diese Uebersicht leer ist, sah dann aus, als
@@ -7149,7 +7286,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.44" }
+        headers: { "X-Schaefchen-Version": "0.44.46" }
       });
       if (response.ok) {
         await cache.put(
@@ -8804,6 +8941,55 @@ import {
     }[type] || type;
   }
 
+  // Die drei Zeitarten, die die DATEV-Lohnschnittstelle kennt (work_days,
+  // Migration 011). Für Abwesenheitsarten wird bewusst absenceTypeLabel oben
+  // wiederverwendet, statt hier eine zweite, leicht abweichende Liste zu
+  // pflegen - sie werden an anderer Stelle bereits mit denselben Namen
+  // angezeigt.
+  const DATEV_TIME_TYPE_KEYS = ["work", "travel", "overtime"];
+  const DATEV_ABSENCE_TYPE_KEYS = [
+    "vacation", "unpaid_vacation", "time_off", "leave", "special_leave",
+    "sick", "training", "vocational_school", "other"
+  ];
+
+  function datevTimeTypeLabel(key) {
+    return {
+      work: "Arbeitszeit",
+      travel: "Fahrzeit",
+      overtime: "Überstunden"
+    }[key] || key;
+  }
+
+  function datevMappingKeyLabel(category, mappingKey) {
+    return category === "time_type" ? datevTimeTypeLabel(mappingKey) : absenceTypeLabel(mappingKey);
+  }
+
+  function datevPayrollProductLabel(product) {
+    if (product === "lodas") return "LODAS";
+    if (product === "lug") return "Lohn und Gehalt";
+    return "–";
+  }
+
+  // Alle zwoelf Zuordnungsziele in der Reihenfolge aus DATEV_EXPORT.md - die
+  // Zeile steht auch dann, wenn dafuer noch keine Zuordnung existiert, damit
+  // eine fehlende Zuordnung als Zeile auffaellt statt als leere Luecke.
+  function datevMappingDefinitions() {
+    return [
+      ...DATEV_TIME_TYPE_KEYS.map((mappingKey) => ({ category: "time_type", mappingKey })),
+      ...DATEV_ABSENCE_TYPE_KEYS.map((mappingKey) => ({ category: "absence_type", mappingKey }))
+    ];
+  }
+
+  // Fuer Zeitstempel mit Uhrzeit (updatedAt, validFrom, validUntil) - anders
+  // als shortDate() oben, das ein reines Datum ohne Uhrzeitanteil erwartet
+  // und an einem vollen ISO-Zeitstempel scheitern wuerde.
+  function shortDateTime(iso) {
+    if (!iso) return "";
+    const value = new Date(iso);
+    if (Number.isNaN(value.valueOf())) return "";
+    return new Intl.DateTimeFormat("de-DE", { dateStyle: "short" }).format(value);
+  }
+
   function absenceDayPartLabel(dayPart) {
     return {
       full_day: "ganztägig",
@@ -9168,6 +9354,473 @@ import {
       if (!error.network) timeCorrectionPolicyState = null;
     }
     renderTimeCorrectionPolicy();
+  }
+
+  // Sichtbarkeit exakt wie der API-Vertrag: dieselbe Rollengruppe, die auch
+  // sonst firmenweite Einstellungen pflegt (FULL_PLANNING_ROLES), und nicht
+  // bloss canPlan() - eine reine Projektleitung sieht die Lohnschnittstelle
+  // serverseitig ohnehin nicht (403 datev_administration_forbidden), und die
+  // Oberflaeche bietet ihr die Schaltflaeche deshalb erst gar nicht an.
+  function canManageDatev() {
+    return canPlan() && !isProjectScopedSession();
+  }
+
+  function renderDatevSettings() {
+    elements.datevSettingsAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    if (!datevSettingsLoaded) {
+      elements.datevSettingsState.textContent = navigator.onLine ? "wird geladen …" : "offline nicht verfügbar";
+      elements.datevSettingsState.className = "site-list-summary";
+      elements.datevSettingsStatus.textContent = navigator.onLine
+        ? "DATEV-Stammdaten werden geladen …"
+        : "DATEV-Stammdaten sind offline gerade nicht verfügbar.";
+    } else if (!datevSettingsState) {
+      elements.datevSettingsState.textContent = "Nicht angebunden";
+      elements.datevSettingsState.className = "site-list-summary site-list-summary--alert";
+      elements.datevSettingsStatus.textContent =
+        "Noch keine Stammdaten hinterlegt. Ohne Beraternummer, Mandantennummer und Lohnprodukt bleibt die Firma nicht angebunden.";
+      elements.datevConsultantNumber.value = "";
+      elements.datevClientNumber.value = "";
+      elements.datevPayrollProduct.value = "lodas";
+    } else {
+      elements.datevSettingsState.className = "site-list-summary";
+      elements.datevSettingsState.textContent = datevPayrollProductLabel(datevSettingsState.payrollProduct);
+      elements.datevSettingsStatus.textContent =
+        `Angebunden · Beraternummer ${datevSettingsState.consultantNumber} · ` +
+        `Mandantennummer ${datevSettingsState.clientNumber} · ` +
+        `zuletzt geändert ${shortDateTime(datevSettingsState.updatedAt)}.`;
+      if (document.activeElement !== elements.datevConsultantNumber) {
+        elements.datevConsultantNumber.value = datevSettingsState.consultantNumber;
+      }
+      if (document.activeElement !== elements.datevClientNumber) {
+        elements.datevClientNumber.value = datevSettingsState.clientNumber;
+      }
+      if (document.activeElement !== elements.datevPayrollProduct) {
+        elements.datevPayrollProduct.value = datevSettingsState.payrollProduct;
+      }
+    }
+    elements.datevSettingsSave.disabled = !navigator.onLine;
+  }
+
+  async function refreshDatevSettings() {
+    if (!canManageDatev()) {
+      datevSettingsState = null;
+      datevSettingsLoaded = false;
+      renderDatevSettings();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderDatevSettings();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/datev/settings");
+      datevSettingsState = body.settings;
+      datevSettingsLoaded = true;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) {
+        datevSettingsState = null;
+        datevSettingsLoaded = true;
+      }
+    }
+    renderDatevSettings();
+  }
+
+  // Findet die aktuell gueltige Zuordnung fuer eine Zeile der festen
+  // Schluesselliste - oder nichts, wenn diese Art noch nicht gepflegt ist.
+  function findDatevMapping(category, mappingKey) {
+    return (datevMappingsState || []).find(
+      (mapping) => mapping.category === category && mapping.mappingKey === mappingKey
+    ) || null;
+  }
+
+  function datevMappingValueText(mapping) {
+    const parts = [];
+    if (mapping.wageTypeNumber) parts.push(`Lohnart ${mapping.wageTypeNumber}`);
+    if (mapping.absenceCode) parts.push(`Ausfallschlüssel ${mapping.absenceCode}`);
+    return parts.join(" · ") || "–";
+  }
+
+  function renderDatevMappingList() {
+    elements.datevMappingList.replaceChildren();
+    if (!datevMappingsState) {
+      const empty = document.createElement("li");
+      empty.className = "absence-list__empty";
+      empty.textContent = navigator.onLine
+        ? "Lohnartenzuordnung wird geladen …"
+        : "Die Lohnartenzuordnung ist offline gerade nicht verfügbar.";
+      elements.datevMappingList.append(empty);
+      elements.datevMappingMissingCount.textContent = "";
+      return;
+    }
+    const definitions = datevMappingDefinitions();
+    let missingCount = 0;
+    definitions.forEach((definition) => {
+      const mapping = findDatevMapping(definition.category, definition.mappingKey);
+      if (!mapping) missingCount += 1;
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      const badge = document.createElement("span");
+      item.className = "time-account-admin-item";
+      title.textContent = `${definition.category === "time_type" ? "Zeitart" : "Abwesenheitsart"} · ${
+        datevMappingKeyLabel(definition.category, definition.mappingKey)
+      }`;
+      badge.className = `device-badge ${mapping ? "device-badge--ok" : "device-badge--danger"}`;
+      badge.textContent = mapping ? "Gepflegt" : "Fehlt";
+      meta.textContent = mapping
+        ? `${datevMappingValueText(mapping)} · gültig seit ${shortDateTime(mapping.validFrom)} · ` +
+          `geändert von ${mapping.changedByName}: ${mapping.changeReason}`
+        : "Noch nicht gepflegt – eine spätere Exportdatei würde hier abbrechen.";
+      actions.className = "time-account-admin-item__actions";
+      actions.append(badge);
+      if (canManageDatev()) {
+        const change = document.createElement("button");
+        change.type = "button";
+        change.className = "text-button";
+        change.textContent = mapping ? "Ändern" : "Anlegen";
+        change.disabled = !navigator.onLine;
+        change.addEventListener("click", () => openDatevMappingEditor(definition.category, definition.mappingKey));
+        actions.append(change);
+      }
+      copy.append(title, meta);
+      item.append(copy, actions);
+      elements.datevMappingList.append(item);
+    });
+    elements.datevMappingMissingCount.textContent = missingCount === 0
+      ? "Alle Zuordnungen gepflegt"
+      : `${missingCount} von ${definitions.length} fehlen`;
+    elements.datevMappingMissingCount.className = missingCount === 0
+      ? "site-list-summary"
+      : "site-list-summary site-list-summary--alert";
+  }
+
+  function renderDatevMappingHistory() {
+    elements.datevMappingHistoryList.replaceChildren();
+    if (!datevMappingHistoryLoaded) {
+      elements.datevMappingHistoryStatus.hidden = false;
+      elements.datevMappingHistoryStatus.textContent = "Wird geladen, sobald geöffnet …";
+      return;
+    }
+    // Nur abgeloeste Zeilen (validUntil gesetzt) - die gueltige Zeile steht
+    // bereits oben in der Hauptliste, sie hier zu wiederholen wuerde nur
+    // verwirren.
+    const history = (datevMappingHistoryState || []).filter((mapping) => mapping.validUntil);
+    if (history.length === 0) {
+      elements.datevMappingHistoryStatus.hidden = false;
+      elements.datevMappingHistoryStatus.textContent = "Noch keine abgelöste Zuordnung vorhanden.";
+      return;
+    }
+    elements.datevMappingHistoryStatus.hidden = true;
+    history.forEach((mapping) => {
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      title.textContent = `${
+        mapping.category === "time_type" ? "Zeitart" : "Abwesenheitsart"
+      } · ${datevMappingKeyLabel(mapping.category, mapping.mappingKey)} · ${datevMappingValueText(mapping)}`;
+      meta.textContent = `${shortDateTime(mapping.validFrom)} – ${shortDateTime(mapping.validUntil)} · ` +
+        `abgelöst durch ${mapping.changedByName}: ${mapping.changeReason}`;
+      copy.append(title, meta);
+      item.append(copy);
+      elements.datevMappingHistoryList.append(item);
+    });
+  }
+
+  async function refreshDatevMappings() {
+    if (!canManageDatev()) {
+      datevMappingsState = null;
+      renderDatevMappingList();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderDatevMappingList();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/datev/wage-type-mappings");
+      datevMappingsState = body.mappings;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) datevMappingsState = null;
+    }
+    renderDatevMappingList();
+  }
+
+  async function refreshDatevMappingHistory() {
+    if (!canManageDatev() || !navigator.onLine) return;
+    try {
+      const body = await requestJson("./api/v1/admin/datev/wage-type-mappings?includeHistory=true");
+      datevMappingHistoryState = body.mappings;
+      datevMappingHistoryLoaded = true;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+    }
+    renderDatevMappingHistory();
+  }
+
+  function closeDatevMappingEditor() {
+    datevEditingMapping = null;
+    elements.datevMappingForm.hidden = true;
+    elements.datevMappingForm.reset();
+    elements.datevMappingMessage.textContent = "";
+  }
+
+  // Oeffnet das Formular fuer genau eine der zwoelf festen Zeilen. Kategorie
+  // und Schluessel stehen damit fest - die Oberflaeche bietet hier keine
+  // freie Eingabe an, wie es der API-Vertrag verlangt.
+  function openDatevMappingEditor(category, mappingKey) {
+    if (!canManageDatev()) return;
+    const current = findDatevMapping(category, mappingKey);
+    datevEditingMapping = { category, mappingKey };
+    const isTimeType = category === "time_type";
+    elements.datevMappingFormTitle.textContent =
+      `${isTimeType ? "Zeitart" : "Abwesenheitsart"} · ${datevMappingKeyLabel(category, mappingKey)}`;
+    elements.datevMappingWageTypeField.hidden = false;
+    elements.datevMappingWageType.required = isTimeType;
+    elements.datevMappingAbsenceCodeField.hidden = isTimeType;
+    elements.datevMappingAbsenceCode.required = !isTimeType;
+    elements.datevMappingWageType.value = current?.wageTypeNumber || "";
+    elements.datevMappingAbsenceCode.value = current?.absenceCode || "";
+    elements.datevMappingReason.value = "";
+    elements.datevMappingMessage.textContent = "";
+    elements.datevMappingSave.textContent = current ? "Neuen Stand anlegen" : "Zuordnung anlegen";
+    elements.datevMappingForm.hidden = false;
+    elements.datevMappingForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    (isTimeType ? elements.datevMappingWageType : elements.datevMappingAbsenceCode).focus({ preventScroll: true });
+  }
+
+  // Ein bis fuenf Ziffern, keine fuehrende Null - DATEV liest die Nummer als
+  // Zahl, "0123" und "123" waeren dort dieselbe Person, in Schaefchen aber
+  // zwei verschiedene. Dieselbe Regel prueft der Server vorab (siehe
+  // API-Vertrag admin/datev/personnel-numbers).
+  const DATEV_PERSONNEL_NUMBER_PATTERN = /^[1-9][0-9]{0,4}$/;
+
+  // Dieselbe Regel wie beim DATEV-Reiter, jetzt auch am Mitarbeiterformular:
+  // die Nummer gehoert zum Mitarbeiter und soll dort eintragbar sein, nicht
+  // nur nachtraeglich in einer eigenen Liste. Ein leeres Feld ist erlaubt -
+  // es bedeutet null, nicht ein leerer Text.
+  function readEmployeeDatevPersonnelNumber(inputElement) {
+    const raw = inputElement.value.trim();
+    if (raw !== "" && !DATEV_PERSONNEL_NUMBER_PATTERN.test(raw)) return { ok: false };
+    return { ok: true, value: raw === "" ? null : raw };
+  }
+
+  function findDatevPersonnelNumberEntry(employeeId) {
+    return (datevPersonnelNumbersState || []).find(
+      (entry) => entry.employeeId === employeeId
+    ) || null;
+  }
+
+  function renderDatevPersonnelNumberList() {
+    elements.datevPersonnelNumbersList.replaceChildren();
+    if (!datevPersonnelNumbersState) {
+      const empty = document.createElement("li");
+      empty.className = "absence-list__empty";
+      empty.textContent = navigator.onLine
+        ? "DATEV-Personalnummern werden geladen …"
+        : "Die DATEV-Personalnummern sind offline gerade nicht verfügbar.";
+      elements.datevPersonnelNumbersList.append(empty);
+      elements.datevPersonnelNumbersMissingCount.textContent = "";
+      return;
+    }
+    let missingCount = 0;
+    datevPersonnelNumbersState.forEach((entry) => {
+      if (!entry.datevPersonnelNumber) missingCount += 1;
+      const item = document.createElement("li");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const actions = document.createElement("div");
+      const badge = document.createElement("span");
+      item.className = "time-account-admin-item";
+      title.textContent = `${entry.employeeName} (${entry.personnelNumber})`;
+      badge.className = `device-badge ${entry.datevPersonnelNumber ? "device-badge--ok" : "device-badge--danger"}`;
+      badge.textContent = entry.datevPersonnelNumber ? "Gepflegt" : "Fehlt";
+      meta.textContent = entry.datevPersonnelNumber
+        ? `DATEV-Personalnummer ${entry.datevPersonnelNumber}`
+        : "Noch nicht gepflegt – eine spätere Exportdatei würde hier abbrechen.";
+      actions.className = "time-account-admin-item__actions";
+      actions.append(badge);
+      if (canManageDatev()) {
+        const change = document.createElement("button");
+        change.type = "button";
+        change.className = "text-button";
+        change.textContent = entry.datevPersonnelNumber ? "Ändern" : "Eintragen";
+        change.disabled = !navigator.onLine;
+        change.addEventListener("click", () => openDatevPersonnelNumberEditor(entry.employeeId));
+        actions.append(change);
+      }
+      copy.append(title, meta);
+      item.append(copy, actions);
+      elements.datevPersonnelNumbersList.append(item);
+    });
+    elements.datevPersonnelNumbersMissingCount.textContent = missingCount === 0
+      ? "Alle gepflegt"
+      : `${missingCount} von ${datevPersonnelNumbersState.length} fehlen`;
+    elements.datevPersonnelNumbersMissingCount.className = missingCount === 0
+      ? "site-list-summary"
+      : "site-list-summary site-list-summary--alert";
+  }
+
+  async function refreshDatevPersonnelNumbers() {
+    if (!canManageDatev()) {
+      datevPersonnelNumbersState = null;
+      renderDatevPersonnelNumberList();
+      return;
+    }
+    if (!navigator.onLine) {
+      renderDatevPersonnelNumberList();
+      return;
+    }
+    try {
+      const body = await requestJson("./api/v1/admin/datev/personnel-numbers");
+      datevPersonnelNumbersState = body.employees;
+    } catch (error) {
+      if (error.status === 401) showLogin();
+      else if (!error.network) datevPersonnelNumbersState = null;
+    }
+    renderDatevPersonnelNumberList();
+  }
+
+  function closeDatevPersonnelNumberEditor() {
+    datevEditingPersonnelNumberEmployeeId = null;
+    elements.datevPersonnelNumberForm.hidden = true;
+    elements.datevPersonnelNumberForm.reset();
+    elements.datevPersonnelNumberMessage.textContent = "";
+  }
+
+  function openDatevPersonnelNumberEditor(employeeId) {
+    if (!canManageDatev()) return;
+    const current = findDatevPersonnelNumberEntry(employeeId);
+    if (!current) return;
+    datevEditingPersonnelNumberEmployeeId = employeeId;
+    elements.datevPersonnelNumberFormTitle.textContent =
+      `${current.employeeName} (${current.personnelNumber})`;
+    elements.datevPersonnelNumberValue.value = current.datevPersonnelNumber || "";
+    elements.datevPersonnelNumberMessage.textContent = "";
+    elements.datevPersonnelNumberSave.textContent = current.datevPersonnelNumber ? "Speichern" : "Eintragen";
+    elements.datevPersonnelNumberForm.hidden = false;
+    elements.datevPersonnelNumberForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    elements.datevPersonnelNumberValue.focus({ preventScroll: true });
+  }
+
+  function datevPreviewLineStatus(line) {
+    return line.mapped ? "Zugeordnet" : "Fehlt";
+  }
+
+  function renderDatevPreview() {
+    elements.datevPreviewMissing.hidden = true;
+    elements.datevPreviewMissingList.replaceChildren();
+    elements.datevPreviewMissingPersonnel.hidden = true;
+    elements.datevPreviewMissingPersonnelList.replaceChildren();
+    elements.datevPreviewTable.hidden = true;
+    elements.datevPreviewBody.replaceChildren();
+    if (!datevPreviewState) {
+      elements.datevPreviewStatus.textContent = "";
+      return;
+    }
+    const state = datevPreviewState;
+    const rangeText = `${shortDate(state.from)} – ${shortDate(state.to)}`;
+    elements.datevPreviewStatus.textContent = state.settingsConfigured
+      ? `${rangeText} · ${state.lineCount} Buchungszeile${state.lineCount === 1 ? "" : "n"} · ` +
+        `${datevPayrollProductLabel(state.payrollProduct)}, Beraternummer ${state.consultantNumber}, ` +
+        `Mandantennummer ${state.clientNumber}.`
+      : `${rangeText} · ${state.lineCount} Buchungszeile${state.lineCount === 1 ? "" : "n"} · ` +
+        "Noch keine DATEV-Stammdaten hinterlegt.";
+    if (state.missingMappings.length > 0) {
+      elements.datevPreviewMissing.hidden = false;
+      state.missingMappings.forEach((missing) => {
+        const item = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = `${missing.category === "time_type" ? "Zeitart" : "Abwesenheitsart"} · ${
+          datevMappingKeyLabel(missing.category, missing.mappingKey)
+        }`;
+        item.append(label);
+        if (canManageDatev()) {
+          const create = document.createElement("button");
+          create.type = "button";
+          create.className = "text-button";
+          create.textContent = "Jetzt anlegen";
+          create.addEventListener("click", () => openDatevMappingEditor(missing.category, missing.mappingKey));
+          item.append(create);
+        }
+        elements.datevPreviewMissingList.append(item);
+      });
+    }
+    // Zwei verschiedene Luecken, zwei getrennte Kaesten: eine fehlende
+    // Lohnartenzuordnung und eine fehlende DATEV-Personalnummer werden an
+    // unterschiedlichen Stellen gepflegt - wer das eine behebt, loest das
+    // andere nicht mit.
+    if ((state.missingPersonnelNumbers || []).length > 0) {
+      elements.datevPreviewMissingPersonnel.hidden = false;
+      state.missingPersonnelNumbers.forEach((missing) => {
+        const item = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = `${missing.employeeName} (${missing.personnelNumber})`;
+        item.append(label);
+        if (canManageDatev()) {
+          const create = document.createElement("button");
+          create.type = "button";
+          create.className = "text-button";
+          create.textContent = "Jetzt eintragen";
+          create.addEventListener("click", () => openDatevPersonnelNumberEditor(missing.employeeId));
+          item.append(create);
+        }
+        elements.datevPreviewMissingPersonnelList.append(item);
+      });
+    }
+    if (state.lines.length > 0) {
+      elements.datevPreviewTable.hidden = false;
+      state.lines.forEach((line) => {
+        const row = document.createElement("tr");
+        const rowClasses = [];
+        if (!line.mapped) rowClasses.push("datev-preview-row--missing");
+        if (!line.datevPersonnelNumber) rowClasses.push("datev-preview-row--missing-personnel");
+        if (rowClasses.length > 0) row.className = rowClasses.join(" ");
+        const cells = [
+          `${line.employeeName} (${line.personnelNumber})`,
+          line.datevPersonnelNumber || "Fehlt",
+          shortDate(line.workDate),
+          datevMappingKeyLabel(line.category, line.mappingKey),
+          [line.wageTypeNumber, line.absenceCode].filter(Boolean).join(" · ") || "–",
+          line.hours !== null ? `${line.hours} h` : `${line.days} Tag(e)`,
+          datevPreviewLineStatus(line)
+        ];
+        cells.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        });
+        elements.datevPreviewBody.append(row);
+      });
+    }
+  }
+
+  function renderDatevAdmin() {
+    renderDatevSettings();
+    renderDatevMappingList();
+    renderDatevMappingHistory();
+    renderDatevPersonnelNumberList();
+    elements.datevMappingAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    elements.datevPersonnelNumbersAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    elements.datevPreviewAdmin.hidden = !canManageDatev()
+      || !isOfficeAdminPane()
+      || currentSettingsSubarea !== "datev";
+    renderDatevPreview();
+  }
+
+  async function refreshDatevAdmin() {
+    await Promise.all([refreshDatevSettings(), refreshDatevMappings(), refreshDatevPersonnelNumbers()]);
   }
 
   function renderHolidayCalendarAdmin(calendar, requestedYear) {
@@ -10142,6 +10795,22 @@ import {
     elements.holidayClosureList
       .querySelectorAll("button")
       .forEach((button) => { button.disabled = !online; });
+    // Jeder Knopf unten setzt sich in seinem eigenen "finally" auf
+    // "disabled = !navigator.onLine" zurueck (Hausnorm, siehe die uebrigen
+    // Knoepfe oben) - das sperrt ihn beim Scheitern eines Versuchs offline,
+    // aber nur der Rueckweg hier gibt ihn beim Wiederverbinden wieder frei.
+    // Ohne ihn bliebe der Knopf bis zum Neuladen der Seite tot, denn weder
+    // der "online"-Zuhoerer noch ein erneutes Rendern ruehrt ihn sonst an.
+    // Genau das ist bei fuenf Knoepfen unbemerkt so gewesen (drei DATEV-
+    // Speicherknoepfe, die Vorschau und die Zeitkorrekturregel) - eine von
+    // Hand gepflegte Liste haette den naechsten Fall wieder verschwiegen,
+    // darum prueft syntax.test.mjs diese Zeile mechanisch gegen die ganze
+    // Datei, nicht gegen eine hier eingetippte Aufzaehlung.
+    elements.timeCorrectionPolicySave.disabled = !online;
+    elements.datevSettingsSave.disabled = !online;
+    elements.datevMappingSave.disabled = !online;
+    elements.datevPersonnelNumberSave.disabled = !online;
+    elements.datevPreviewLoad.disabled = !online;
     if (!elements.employeeSiteWorkspace.hidden) {
       elements.employeeSitePhotoAdd.disabled = !online;
       elements.employeeSiteNoteAdd.disabled = !online;
@@ -10281,7 +10950,7 @@ import {
   }
 
   function showSettingsSubarea(requested) {
-    const allowed = new Set(["time-accounts", "holidays", "time-rules", "account"]);
+    const allowed = new Set(["time-accounts", "holidays", "time-rules", "datev", "account"]);
     const accountOnly = !canPlan() || isProjectScopedSession();
     currentSettingsSubarea = accountOnly
       ? "account"
@@ -10300,6 +10969,7 @@ import {
     });
     renderAdminTimeAccounts();
     renderTimeCorrectionPolicy();
+    renderDatevAdmin();
     renderAccountCard();
     elements.infoCard.hidden = currentDashboardPane !== "more"
       || (!demoMode && canPlan() && currentSettingsSubarea !== "account");
@@ -11641,6 +12311,15 @@ import {
 
   elements.employeeForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    // Dasselbe Format, das der Server prueft - hier vorab, damit niemand eine
+    // Servermeldung fuer etwas kassiert, das die Oberflaeche schon wusste. Ein
+    // leeres Feld ist erlaubt: der Betrieb nutzt dann einfach kein DATEV.
+    const datevPersonnelNumber = readEmployeeDatevPersonnelNumber(elements.employeeDatevPersonnelNumber);
+    if (!datevPersonnelNumber.ok) {
+      elements.employeeMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
     const saved = await submitAdminForm(
       elements.employeeForm,
       elements.employeeMessage,
@@ -11649,6 +12328,7 @@ import {
         firstName: elements.employeeFirstName.value,
         lastName: elements.employeeLastName.value,
         personnelNumber: elements.employeePersonnelNumber.value,
+        datevPersonnelNumber: datevPersonnelNumber.value,
         phone: elements.employeePhone.value,
         email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
@@ -11691,6 +12371,15 @@ import {
       elements.employeeEditMessage.textContent = "Der Mitarbeiter wurde nicht gefunden. Bitte neu laden.";
       return;
     }
+    // Dasselbe Format, das der Server prueft - hier vorab, damit niemand eine
+    // Servermeldung fuer etwas kassiert, das die Oberflaeche schon wusste. Ein
+    // leeres Feld ist erlaubt und entfernt eine vorhandene Zuordnung wieder.
+    const datevPersonnelNumber = readEmployeeDatevPersonnelNumber(elements.employeeEditDatevPersonnelNumber);
+    if (!datevPersonnelNumber.ok) {
+      elements.employeeEditMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
     elements.employeeEditSave.disabled = true;
     elements.employeeEditCancel.disabled = true;
     elements.employeeEditMessage.textContent = "Änderungen werden sicher gespeichert …";
@@ -11701,6 +12390,7 @@ import {
           firstName: elements.employeeEditFirstName.value,
           lastName: elements.employeeEditLastName.value,
           personnelNumber: elements.employeeEditPersonnelNumber.value,
+          datevPersonnelNumber: datevPersonnelNumber.value,
           phone: elements.employeeEditPhone.value,
           email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,
@@ -11734,6 +12424,92 @@ import {
     }
   });
   elements.employeeEditCancel.addEventListener("click", closeEmployeeEditor);
+  elements.employeeEditResetPassword.addEventListener("click", () => {
+    const employee = adminState?.employees.find((item) => item.id === editingEmployeeId);
+    if (!employee) return;
+    openEmployeePasswordResetDialog(employee);
+  });
+  elements.employeePasswordResetForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const employee = adminState?.employees.find((item) => item.id === passwordResetEmployeeId);
+    if (!employee) {
+      elements.employeePasswordResetMessage.textContent = "Der Mitarbeiter wurde nicht gefunden. Bitte neu laden.";
+      return;
+    }
+    const reason = elements.employeePasswordResetReason.value.trim();
+    if (reason.length < 3) {
+      elements.employeePasswordResetMessage.textContent = "Bitte eine Begründung eintragen.";
+      return;
+    }
+    // Die Rueckfrage nennt, wen es trifft - nicht nur "sicher?". Wer sofort auf
+    // allen Geraeten abgemeldet wird, ist eine Person mit Namen, keine Nummer.
+    if (!window.confirm(
+      `${employee.firstName} ${employee.lastName} (Personalnummer ${employee.personnelNumber}) `
+      + "wird sofort auf allen Geräten abgemeldet und erhält ein neues Startpasswort. Fortfahren?"
+    )) return;
+    elements.employeePasswordResetSubmit.disabled = true;
+    elements.employeePasswordResetMessage.textContent = "Neues Startpasswort wird sicher erzeugt …";
+    try {
+      const body = await requestJson(
+        `./api/v1/admin/employees/${encodeURIComponent(employee.id)}/password-reset`,
+        { method: "POST", body: JSON.stringify({ reason }) }
+      );
+      // Das Passwort lebt ab hier ausschliesslich in dieser Anzeige - nicht im
+      // Zustand, nicht in localStorage, nicht in der Konsole. Danach ist es
+      // nirgends mehr abrufbar, auch fuer diese App nicht.
+      elements.employeePasswordResetValue.textContent = body.reset.temporaryPassword;
+      elements.employeePasswordResetRequest.hidden = true;
+      elements.employeePasswordResetResult.hidden = false;
+      // Solange das Passwort zu sehen ist, gibt es keinen stillen Ausgang: die
+      // Kreuz-Schaltflaeche verschwindet, Esc und ein Klick daneben bleiben
+      // wirkungslos (siehe die Dialog-Handler weiter unten).
+      elements.employeePasswordResetClose.hidden = true;
+    } catch (error) {
+      if (error.code === "password_reset_self") {
+        elements.employeePasswordResetMessage.textContent =
+          "Das eigene Passwort lässt sich hier nicht zurücksetzen. Nutze „Passwort ändern“ im eigenen Konto.";
+      } else if (error.status === 403) {
+        elements.employeePasswordResetMessage.textContent =
+          "Die Geschäftsführung kann nur von einer weiteren Geschäftsführung zurückgesetzt werden.";
+      } else if (error.status === 401) {
+        closeEmployeePasswordResetDialog();
+        showLogin();
+      } else {
+        elements.employeePasswordResetMessage.textContent = error.message;
+      }
+    } finally {
+      elements.employeePasswordResetSubmit.disabled = false;
+    }
+  });
+  elements.employeePasswordResetAck.addEventListener("change", () => {
+    elements.employeePasswordResetDone.disabled = !elements.employeePasswordResetAck.checked;
+  });
+  elements.employeePasswordResetDone.addEventListener("click", closeEmployeePasswordResetDialog);
+  elements.employeePasswordResetClose.addEventListener("click", closeEmployeePasswordResetDialog);
+  elements.employeePasswordResetCopy.addEventListener("click", async () => {
+    const value = elements.employeePasswordResetValue.textContent;
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast("Passwort in die Zwischenablage kopiert.");
+    } catch {
+      window.prompt("Passwort kopieren:", value);
+    }
+  });
+  elements.employeePasswordResetDialog.addEventListener("click", (event) => {
+    // Solange das neue Passwort angezeigt wird, schliesst ein Klick daneben
+    // nichts - sonst waere das einmalige Passwort durch einen Fehlklick fort.
+    if (event.target === elements.employeePasswordResetDialog && elements.employeePasswordResetResult.hidden) {
+      closeEmployeePasswordResetDialog();
+    }
+  });
+  elements.employeePasswordResetDialog.addEventListener("cancel", (event) => {
+    if (!elements.employeePasswordResetResult.hidden) {
+      event.preventDefault();
+      return;
+    }
+    closeEmployeePasswordResetDialog();
+  });
   elements.employeeEditRemove.addEventListener("click", async () => {
     const employee = adminState?.employees.find((item) => item.id === editingEmployeeId);
     if (!employee) return;
@@ -11937,6 +12713,221 @@ import {
     showAnalyticsSubarea("export");
     elements.timesheetExportPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     elements.timesheetExportFrom.focus({ preventScroll: true });
+  });
+
+  elements.datevSettingsForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const consultantNumber = elements.datevConsultantNumber.value.trim();
+    const clientNumber = elements.datevClientNumber.value.trim();
+    const payrollProduct = elements.datevPayrollProduct.value;
+    // Dieselben Regeln, die auch der Server prueft (validateDatevExportSettings)
+    // - hier vorab, damit niemand eine Servermeldung fuer etwas kassiert, das
+    // die Oberflaeche schon wusste.
+    if (!/^[0-9]{1,7}$/.test(consultantNumber)) {
+      elements.datevSettingsMessage.textContent =
+        "Die Beraternummer darf nur aus bis zu sieben Ziffern bestehen.";
+      return;
+    }
+    if (!/^[0-9]{1,5}$/.test(clientNumber)) {
+      elements.datevSettingsMessage.textContent =
+        "Die Mandantennummer darf nur aus bis zu fünf Ziffern bestehen.";
+      return;
+    }
+    elements.datevSettingsSave.disabled = true;
+    elements.datevSettingsMessage.textContent = "Stammdaten werden gespeichert …";
+    try {
+      const body = await requestJson("./api/v1/admin/datev/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          consultantNumber,
+          clientNumber,
+          payrollProduct,
+          rowVersion: datevSettingsState?.rowVersion ?? 0
+        })
+      });
+      datevSettingsState = body.settings;
+      elements.datevSettingsMessage.textContent = "";
+      showToast("DATEV-Stammdaten gespeichert.");
+      renderDatevSettings();
+    } catch (error) {
+      if (error.code === "row_version_conflict") {
+        elements.datevSettingsMessage.textContent =
+          "Die Stammdaten wurden zwischenzeitlich geändert. Werden neu geladen …";
+        await refreshDatevSettings();
+      } else {
+        elements.datevSettingsMessage.textContent = error.message;
+      }
+    } finally {
+      elements.datevSettingsSave.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.datevMappingForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!datevEditingMapping) return;
+    const { category, mappingKey } = datevEditingMapping;
+    const isTimeType = category === "time_type";
+    const wageTypeNumber = elements.datevMappingWageType.value.trim() || null;
+    const absenceCode = elements.datevMappingAbsenceCode.value.trim() || null;
+    const changeReason = elements.datevMappingReason.value.trim();
+    // Dieselben Regeln wie validateDatevWageTypeMapping auf dem Server: eine
+    // Zeitart braucht eine Lohnart und kennt keinen Ausfallschluessel, eine
+    // Abwesenheitsart braucht immer einen Ausfallschluessel.
+    if (wageTypeNumber && !/^[0-9]{1,4}$/.test(wageTypeNumber)) {
+      elements.datevMappingMessage.textContent =
+        "Die Lohnartennummer darf nur aus bis zu vier Ziffern bestehen.";
+      return;
+    }
+    if (absenceCode && !/^[0-9]{1,2}$/.test(absenceCode)) {
+      elements.datevMappingMessage.textContent =
+        "Der Ausfallschlüssel darf nur aus bis zu zwei Ziffern bestehen.";
+      return;
+    }
+    if (isTimeType && !wageTypeNumber) {
+      elements.datevMappingMessage.textContent = "Eine Zeitart benötigt eine Lohnartennummer.";
+      return;
+    }
+    if (!isTimeType && !absenceCode) {
+      elements.datevMappingMessage.textContent = "Eine Abwesenheitsart benötigt einen Ausfallschlüssel.";
+      return;
+    }
+    if (changeReason.length < 1) {
+      elements.datevMappingMessage.textContent = "Bitte kurz begründen, warum die Zuordnung geändert wird.";
+      return;
+    }
+    elements.datevMappingSave.disabled = true;
+    elements.datevMappingMessage.textContent = "Neuer Stand wird angelegt …";
+    try {
+      await requestJson("./api/v1/admin/datev/wage-type-mappings", {
+        method: "POST",
+        body: JSON.stringify({
+          category,
+          mappingKey,
+          wageTypeNumber,
+          absenceCode: isTimeType ? null : absenceCode,
+          changeReason
+        })
+      });
+      showToast(`Zuordnung angelegt · ${datevMappingKeyLabel(category, mappingKey)}`);
+      closeDatevMappingEditor();
+      datevMappingHistoryLoaded = false;
+      await refreshDatevMappings();
+      if (elements.datevMappingHistoryPanel.open) await refreshDatevMappingHistory();
+      if (datevPreviewState) {
+        // Die zuletzt geladene Vorschau ist jetzt veraltet - eine gerade erst
+        // angelegte Zuordnung soll sofort sichtbar sein, statt eine alte
+        // Luecke weiter als "fehlt" zu zeigen.
+        elements.datevPreviewForm.requestSubmit();
+      }
+    } catch (error) {
+      elements.datevMappingMessage.textContent = error.message;
+    } finally {
+      elements.datevMappingSave.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.datevMappingCancel.addEventListener("click", () => closeDatevMappingEditor());
+
+  elements.datevMappingHistoryPanel.addEventListener("toggle", () => {
+    if (elements.datevMappingHistoryPanel.open && !datevMappingHistoryLoaded) {
+      void refreshDatevMappingHistory();
+    }
+  });
+
+  elements.datevPersonnelNumberForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!datevEditingPersonnelNumberEmployeeId) return;
+    const current = findDatevPersonnelNumberEntry(datevEditingPersonnelNumberEmployeeId);
+    if (!current) return;
+    const raw = elements.datevPersonnelNumberValue.value.trim();
+    // Dieselbe Regel, die auch der Server prueft - hier vorab, damit niemand
+    // eine Servermeldung fuer etwas kassiert, das die Oberflaeche schon
+    // wusste. Ein leeres Feld ist erlaubt: es loescht die Zuordnung.
+    if (raw !== "" && !DATEV_PERSONNEL_NUMBER_PATTERN.test(raw)) {
+      elements.datevPersonnelNumberMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
+    // Ausdruecklich null, nicht ein leerer Text - der Server loescht die
+    // Zuordnung nur bei einem echten null im Anfragerumpf.
+    const datevPersonnelNumber = raw === "" ? null : raw;
+    elements.datevPersonnelNumberSave.disabled = true;
+    elements.datevPersonnelNumberMessage.textContent = "Wird gespeichert …";
+    try {
+      const body = await requestJson(
+        `./api/v1/admin/datev/personnel-numbers/${encodeURIComponent(datevEditingPersonnelNumberEmployeeId)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ datevPersonnelNumber, rowVersion: current.rowVersion })
+        }
+      );
+      const updated = body.employee;
+      datevPersonnelNumbersState = (datevPersonnelNumbersState || []).map(
+        (entry) => (entry.employeeId === updated.employeeId ? updated : entry)
+      );
+      showToast(datevPersonnelNumber === null
+        ? `DATEV-Personalnummer entfernt · ${updated.employeeName}`
+        : `DATEV-Personalnummer gespeichert · ${updated.employeeName}`);
+      closeDatevPersonnelNumberEditor();
+      renderDatevPersonnelNumberList();
+      if (datevPreviewState) {
+        // Wie bei der Lohnartenzuordnung: eine gerade erst eingetragene
+        // Nummer soll die zuletzt geladene Vorschau sofort auffrischen, statt
+        // eine veraltete Luecke weiter als "fehlt" zu zeigen.
+        elements.datevPreviewForm.requestSubmit();
+      }
+    } catch (error) {
+      if (error.code === "row_version_conflict") {
+        elements.datevPersonnelNumberMessage.textContent =
+          "Wurde zwischenzeitlich geändert. Wird neu geladen …";
+        await refreshDatevPersonnelNumbers();
+      } else {
+        // datev_personnel_number_taken nennt bereits, wer die Nummer hat -
+        // diese Meldung wird angezeigt, nicht durch einen eigenen Text ersetzt.
+        elements.datevPersonnelNumberMessage.textContent = error.message;
+      }
+    } finally {
+      elements.datevPersonnelNumberSave.disabled = !navigator.onLine;
+    }
+  });
+
+  elements.datevPersonnelNumberCancel.addEventListener("click", () => closeDatevPersonnelNumberEditor());
+
+  elements.datevPreviewForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const from = elements.datevPreviewFrom.value;
+    const to = elements.datevPreviewTo.value;
+    if (!from || !to) {
+      elements.datevPreviewMessage.textContent = "Bitte Anfangs- und Enddatum wählen.";
+      return;
+    }
+    if (to < from) {
+      elements.datevPreviewMessage.textContent = "Das Enddatum darf nicht vor dem Startdatum liegen.";
+      return;
+    }
+    const dayCount = Math.floor(
+      (new Date(`${to}T00:00:00Z`) - new Date(`${from}T00:00:00Z`)) / 86_400_000
+    ) + 1;
+    if (dayCount > 366) {
+      elements.datevPreviewMessage.textContent = "Der Vorschauzeitraum darf höchstens ein Jahr umfassen.";
+      return;
+    }
+    elements.datevPreviewLoad.disabled = true;
+    elements.datevPreviewMessage.textContent = "Vorschau wird geladen …";
+    try {
+      const body = await requestJson(
+        `./api/v1/admin/datev/export-preview?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      );
+      datevPreviewState = body;
+      elements.datevPreviewMessage.textContent = "";
+      renderDatevPreview();
+    } catch (error) {
+      datevPreviewState = null;
+      elements.datevPreviewMessage.textContent = error.message;
+      renderDatevPreview();
+    } finally {
+      elements.datevPreviewLoad.disabled = !navigator.onLine;
+    }
   });
 
   elements.holidayCalendarForm.addEventListener("submit", async (event) => {
@@ -13534,6 +14525,40 @@ import {
       .filter((bericht) => bericht.status === "submitted")
       .map((bericht) => bericht.id);
     if (offene.length) void decideApprentice(offene, "approved");
+  });
+  elements.accountPasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (elements.accountNewPassword.value !== elements.accountConfirmPassword.value) {
+      elements.accountPasswordMessage.textContent = "Die beiden neuen Passwörter stimmen nicht überein.";
+      return;
+    }
+    elements.accountPasswordSubmit.disabled = true;
+    elements.accountPasswordMessage.textContent = "Passwort wird sicher geändert …";
+    try {
+      await requestJson("./api/v1/me/password", {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: elements.accountCurrentPassword.value,
+          newPassword: elements.accountNewPassword.value
+        })
+      });
+      elements.accountPasswordForm.reset();
+      // Das gilt wirklich und ist keine Fehlermeldung: wer es nicht weiss, haelt
+      // es sonst fuer einen Fehler, wenn das andere Geraet ploetzlich abgemeldet ist.
+      elements.accountPasswordMessage.textContent =
+        "Passwort geändert. Du wurdest damit auf allen anderen Geräten abgemeldet.";
+      showToast("Passwort geändert.");
+    } catch (error) {
+      if (error.code === "invalid_credentials") {
+        elements.accountPasswordMessage.textContent = "Das aktuelle Passwort ist nicht richtig.";
+      } else if (error.status === 401) {
+        showLogin();
+      } else {
+        elements.accountPasswordMessage.textContent = error.message;
+      }
+    } finally {
+      elements.accountPasswordSubmit.disabled = false;
+    }
   });
   elements.accountLogout.addEventListener("click", () => elements.closePreview.click());
   elements.primaryAction.addEventListener("click", handlePrimaryAction);
