@@ -1,13 +1,328 @@
-:root{font-family:system-ui,-apple-system,sans-serif;color:#202026;background:#f5f5f7;line-height:1.5}
-*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;padding:24px 20px 60px}
-header,.toolbar,.location{display:flex;align-items:center;gap:12px;flex-wrap:wrap}header{justify-content:space-between;margin-bottom:32px}
-a{color:#b8000c}h1{font-size:2rem;margin:0}.eyebrow{color:#a4000b;font-weight:700;margin-bottom:4px}
-button,input{font:inherit}button{border:1px solid #d0d0d6;border-radius:10px;padding:10px 14px;background:white;cursor:pointer;min-height:44px}
-button:hover{background:#eee}button:disabled{opacity:.6;cursor:wait}#add,#save{background:#bd0712;color:white;border-color:#bd0712}
-input:not([type=checkbox]){display:block;border:1px solid #a9a9b0;border-radius:8px;padding:10px;width:100%;min-width:0}
-label{display:block}.toolbar{margin:20px 0}.check{display:flex;gap:8px;align-items:center}.check input{width:20px;height:20px}
-.location{background:white;padding:14px;border:1px solid #dedee4;border-radius:12px;margin:10px 0}.location strong{overflow-wrap:anywhere}.location-title{flex:1;min-width:150px}
-.location small{display:block;color:#555}.children{margin-left:18px;border-left:2px solid #ddd;padding-left:12px}.archived{opacity:.7}
-#message{padding:12px 0}dialog{border:1px solid #ccc;border-radius:18px;width:min(480px,calc(100% - 24px));max-height:90dvh;overflow:auto;padding:24px}dialog::backdrop{background:#0007}dialog label{margin:16px 0}
-[hidden]{display:none!important}:focus-visible{outline:3px solid #325be3;outline-offset:3px}
-@media(max-width:520px){main{padding:16px 12px 40px}.children{margin-left:7px;padding-left:6px}.location{gap:8px}.location button{padding:8px 10px}}
+/*
+ * Lagerstruktur - eigenständige Seite.
+ *
+ * Nutzt ausschließlich die Tokens aus design-system.css (Farbe, Radius,
+ * Abstand, Text). Keine fest verdrahteten Farben, damit ein künftiger
+ * Dunkelmodus im Designsystem hier automatisch greift.
+ */
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* design-system.css bringt fuer diese eigenstaendige Seite keine [hidden]-Regel
+   mit. Ohne sie gewinnt eine Autorenregel wie ".inv-stack { display: grid }"
+   gegen die UA-Vorgabe "[hidden] { display: none }" - #workspace/#history
+   blieben dann sichtbar, obwohl inventory.js hidden=true gesetzt hat. */
+[hidden] {
+  display: none !important;
+}
+
+.inv-shell {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--ui-space-5) var(--ui-space-4) 60px;
+}
+
+.inv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-6);
+}
+
+.inv-back {
+  color: var(--ui-brand);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.inv-back:hover {
+  text-decoration: underline;
+}
+
+.inv-intro h1 {
+  margin: 4px 0 0;
+  font-size: var(--ui-title);
+  letter-spacing: -0.02em;
+}
+
+.inv-hint {
+  margin: var(--ui-space-2) 0 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+}
+
+/* .eyebrow kommt aus design-system.css (Farbe, Größe, Gewicht). */
+
+/* Karten ------------------------------------------------------------ */
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-xs);
+}
+
+.inv-notice {
+  padding: var(--ui-card-padding) var(--ui-space-4);
+  margin-top: var(--ui-space-5);
+}
+
+.inv-notice p {
+  margin: 0;
+}
+
+.inv-status {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.inv-stack {
+  display: grid;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-5);
+}
+
+/* Werkzeugleiste ------------------------------------------------------- */
+
+.inv-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-subtle);
+}
+
+.inv-search-label {
+  display: block;
+  flex: 1 1 200px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+}
+
+.inv-search-label input {
+  display: block;
+  width: 100%;
+  min-height: var(--ui-touch-height);
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-input-background);
+  font: inherit;
+}
+
+.inv-check {
+  display: flex;
+  min-height: var(--ui-touch-height);
+  align-items: center;
+  gap: var(--ui-space-2);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+}
+
+.inv-check input {
+  width: 20px;
+  height: 20px;
+}
+
+.inv-toolbar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--ui-space-2);
+}
+
+/* Lagerplatzliste -------------------------------------------------------- */
+
+.inv-locations {
+  padding: var(--ui-space-3) var(--ui-space-4) var(--ui-space-4);
+  overflow-x: auto;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.location {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-3);
+  margin: var(--ui-space-2) 0;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.location.archived {
+  opacity: 0.7;
+}
+
+.location-title {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.location-title strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--ui-text);
+  font-size: var(--ui-text-md);
+  font-weight: 750;
+}
+
+.location-title small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-xs);
+}
+
+.location .button {
+  flex: 0 0 auto;
+}
+
+.children {
+  flex-basis: 100%;
+  margin-left: var(--ui-space-4);
+  padding-left: var(--ui-space-3);
+  border-left: 2px solid var(--ui-border);
+}
+
+/* Änderungshistorie ------------------------------------------------------ */
+
+.inv-history {
+  padding: var(--ui-card-padding) var(--ui-space-4);
+}
+
+.inv-history h2 {
+  margin: 0 0 var(--ui-space-1);
+  font-size: var(--ui-title-sm);
+}
+
+.inv-history__list {
+  gap: var(--ui-space-2);
+  margin: var(--ui-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.inv-history__list li {
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+}
+
+.inv-history__list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Editor-Dialog ------------------------------------------------------------ */
+
+.inv-dialog {
+  width: min(94vw, 480px);
+  max-height: min(92vh, 640px);
+  border: 0;
+  border-radius: var(--ui-radius-xl);
+  padding: 0;
+  background: transparent;
+  box-shadow: var(--ui-shadow-overlay);
+}
+
+.inv-dialog::backdrop {
+  background: rgba(15, 20, 17, 0.52);
+}
+
+.inv-form {
+  display: grid;
+  gap: var(--ui-space-1);
+  max-height: min(92vh, 640px);
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--ui-space-5);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+}
+
+.inv-form h2 {
+  margin: 0;
+  font-size: var(--ui-title-sm);
+}
+
+.inv-form label {
+  display: block;
+  margin-top: var(--ui-space-4);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 750;
+}
+
+.inv-form input {
+  display: block;
+  width: 100%;
+  min-height: var(--ui-touch-height);
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-input-background);
+  font: inherit;
+}
+
+.inv-form-message {
+  min-height: 1.3em;
+  margin: var(--ui-space-2) 0 0;
+  color: var(--ui-danger);
+  font-size: var(--ui-text-sm);
+}
+
+.inv-form-message:empty {
+  display: none;
+}
+
+.inv-form__actions {
+  display: flex;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-4);
+}
+
+@media (max-width: 640px) {
+  .inv-shell {
+    padding: var(--ui-space-4) var(--ui-space-3) 48px;
+  }
+
+  .inv-toolbar {
+    padding: var(--ui-space-3);
+  }
+
+  .inv-locations {
+    padding: var(--ui-space-2) var(--ui-space-3) var(--ui-space-3);
+  }
+
+  .inv-history {
+    padding: var(--ui-card-padding) var(--ui-space-3);
+  }
+
+  .children {
+    margin-left: var(--ui-space-3);
+    padding-left: var(--ui-space-2);
+  }
+}

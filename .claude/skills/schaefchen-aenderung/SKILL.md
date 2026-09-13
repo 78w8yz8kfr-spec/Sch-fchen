@@ -96,7 +96,7 @@ Reparatur erreicht sonst niemanden.
 Finde die Fundstellen, statt sie aus dem Gedächtnis aufzuzählen:
 
 ```sh
-ALT=0.44.46; NEU=0.44.47
+ALT=0.44.47; NEU=0.44.47
 DATEIEN=$(grep -rl "${ALT}" --include=* . | grep -v node_modules | grep -v '\.git/' \
           | grep -v "database/migrations\|database/tests\|CHANGELOG\|PROJECT_STATUS")
 for f in $DATEIEN; do
@@ -108,8 +108,8 @@ grep -rn "${ALT}" --include=* . | grep -v node_modules | grep -v '\.git/' \
 ```
 
 **Die maskierte Form ist die Falle.** In `frontend/tests/smoke.mjs` stehen
-Fassungsnummern in regulären Ausdrücken als `0\.44\.46`. Ein `sed`, das nur
-`0\.44\.46` als Muster benutzt, trifft `0.44.46` — aber nicht `0\.44\.46` im
+Fassungsnummern in regulären Ausdrücken als `0\.44\.47`. Ein `sed`, das nur
+`0\.44\.47` als Muster benutzt, trifft `0.44.47` — aber nicht `0\.44\.47` im
 Text. Beim Sprung auf 0.44.40 ist genau das passiert, und der Fehler fiel
 erst in der CI auf.
 
