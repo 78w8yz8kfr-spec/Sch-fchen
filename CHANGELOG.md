@@ -4,6 +4,32 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+- **Der Urlaubs-Genehmigungsablauf ist als sichtbare zweistufige Kette
+  dargestellt (Fassung 0.44.47).** Der Betreiber: „das sieht doof aus und es
+  kann nicht sein das jeder x beliebige monteur einstellen und genemigen
+  kann." Auf Nachfrage bestätigt: Es *sah* nur so aus — die Rechteprüfung war
+  immer dicht. Das Problem war die Darstellung: blasse Text-Links, ein nacktes
+  Eingabefeld, und nirgends stand, wer zuständig ist.
+
+  Jetzt zeigt der Ablauf zwei nummerierte Stufen — „1 Büro/Disposition",
+  „2 Geschäftsführung" — jede mit ihrer Zuständigkeit und, wenn erledigt, dem
+  Namen der Person, die sie ausgeführt hat. In der eigenen Antragsliste des
+  Mitarbeiters steht „wartet auf Büroprüfung" bzw. „wartet auf Freigabe durch
+  die Geschäftsführung" statt eines kryptischen Status. Damit ist sichtbar,
+  dass hinter jeder Stufe eine bestimmte Rolle steht und die beiden Stufen von
+  zwei verschiedenen Personen kommen — der Eindruck der Beliebigkeit
+  verschwindet.
+
+  Die Berechtigungen sind **unverändert**: `canReviewAbsenceOffice` und
+  `canApproveAbsenceManagement` steuern die Sichtbarkeit weiter, ein Monteur
+  bekommt keine Genehmigen-Steuerelemente. Ein Test hält das fest und schlägt
+  an, wenn die Bindung an diese Rollen entfernt wird. Reine
+  Oberflächenänderung, Backend nicht angefasst.
+
+  Geprüft mit gstacks `/review` auf den Diff: Rollen-Gating intakt,
+  Enum-Vollständigkeit über alle sechs Status, keine XSS (Namen über
+  `textContent`, kein `innerHTML`).
+
 - **Die DATEV-Personalnummer lässt sich jetzt direkt im Mitarbeiterformular
   pflegen, nicht mehr nur in der eigenen DATEV-Liste (Fassung 0.44.46).** Wer einen Mitarbeiter
   anlegt oder bearbeitet, trägt die Nummer dort ein, wo sie hingehört — der

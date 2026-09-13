@@ -1,11 +1,17 @@
 # Projektstatus
 
 Stand: 13.08.2026
-Technischer Stand: V0.44.46
+Technischer Stand: V0.44.47
 
 
 ## Abgeschlossen
 
+- **Urlaubs-Genehmigung als zweistufige Kette** (Fassung 0.44.47). Der Ablauf
+  zeigt jetzt sichtbar Stufe 1 (Büro/Disposition) und Stufe 2
+  (Geschäftsführung) mit Zuständigkeit und Namen; die eigene Antragsliste des
+  Mitarbeiters nennt die wartende Instanz. Nimmt den Eindruck, jeder könne
+  genehmigen. Berechtigungen unverändert (ein Monteur sieht keine
+  Steuerelemente, per Test gesichert); reine Oberfläche, Backend unberührt.
 - **DATEV-Personalnummer im Mitarbeiterformular** (Fassung 0.44.46). Anlegen und Bearbeiten
   eines Mitarbeiters (`api/src/app.mjs`, `createEmployee`/`updateEmployee`)
   tragen `users.datev_personnel_number` jetzt direkt mit ein, statt den

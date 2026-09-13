@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.46";
-import { serverIsNewer } from "./core/versions.js?v=0.44.46";
+} from "./core/work-time.js?v=0.44.47";
+import { serverIsNewer } from "./core/versions.js?v=0.44.47";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.46";
+} from "./core/sync-queue.js?v=0.44.47";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.46";
+} from "./core/permissions.js?v=0.44.47";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,20 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.46";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.46";
-import { createPowerModule } from "./core/power-module.js?v=0.44.46";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.46";
+} from "./core/state-store.js?v=0.44.47";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.47";
+import { createPowerModule } from "./core/power-module.js?v=0.44.47";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.47";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.46";
+} from "./core/time-changes.js?v=0.44.47";
+import {
+  absenceStageStates,
+  absenceStageStatusText,
+  absenceStatusLabel,
+  absenceWaitingLabel
+} from "./core/absences.js?v=0.44.47";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1579,7 +1585,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.46",
+          "X-Schaefchen-Version": "0.44.47",
           ...options.headers
         }
       });
@@ -1614,7 +1620,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.46`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.47`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1636,7 +1642,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.46" }
+        headers: { "X-Schaefchen-Version": "0.44.47" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1683,7 +1689,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.46 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.47 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3093,7 +3099,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.46";
+  const EIGENE_FASSUNG = "0.44.47";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3132,7 +3138,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.46". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.47". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6278,12 +6284,6 @@ import {
       period.textContent = absencePeriodLabel(absence);
       const details = [];
       if (absence.note) details.push(absence.note);
-      if (absence.officeReviewedByName) {
-        details.push(`Büro: ${absence.officeReviewedByName}`);
-      }
-      if (absence.managementReviewedByName) {
-        details.push(`Freigabe: ${absence.managementReviewedByName}`);
-      }
       if (absence.assignmentConflictCount > 0) {
         details.push(`${absence.assignmentConflictCount} Einsatz${
           absence.assignmentConflictCount === 1 ? "" : "e"
@@ -6292,7 +6292,11 @@ import {
       detail.textContent = details.join(" · ");
       copy.append(title, period, detail);
       heading.append(copy, status);
-      item.append(heading);
+      // Wer welche Stufe verantwortet - und, sofern erledigt, wer sie
+      // tatsächlich ausgeführt hat - steht jetzt in der Kette statt in einer
+      // knappen "Büro: Name"-Zeile. Das nimmt den Eindruck, hier könne
+      // irgendjemand genehmigen: es sind erkennbar zwei getrennte Stellen.
+      item.append(heading, renderAbsenceStageChain(absence));
 
       const canOfficeReview = absence.status === "office_review"
         && adminState.canReviewAbsenceOffice;
@@ -6302,14 +6306,18 @@ import {
         && adminState.canApproveAbsenceManagement;
       if (canOfficeReview || canManagementReview || canCancelApproval) {
         const controls = document.createElement("div");
+        const commentLabel = document.createElement("label");
         const comment = document.createElement("input");
         const actions = document.createElement("div");
         controls.className = "absence-review-controls";
-        comment.type = "text";
-        comment.maxLength = 500;
-        comment.placeholder = canCancelApproval
+        const commentId = `absence-review-comment-${absence.id}`;
+        commentLabel.textContent = canCancelApproval
           ? "Begründung zum Aufheben der Freigabe"
           : "Kommentar (bei Ablehnung erforderlich)";
+        commentLabel.setAttribute("for", commentId);
+        comment.id = commentId;
+        comment.type = "text";
+        comment.maxLength = 500;
         actions.className = "absence-review-actions";
 
         const submitDecision = async (action) => {
@@ -6363,7 +6371,7 @@ import {
         if (canCancelApproval) {
           const cancel = document.createElement("button");
           cancel.type = "button";
-          cancel.className = "text-button text-button--muted";
+          cancel.className = "text-button text-button--muted absence-review-actions__button";
           cancel.textContent = "Freigabe aufheben";
           cancel.addEventListener("click", () => void submitDecision("cancel"));
           actions.append(cancel);
@@ -6371,16 +6379,16 @@ import {
           const approve = document.createElement("button");
           const reject = document.createElement("button");
           approve.type = "button";
-          approve.className = "text-button";
-          approve.textContent = canOfficeReview ? "Bürofreigabe" : "Verbindlich freigeben";
+          approve.className = "text-button absence-review-actions__button absence-review-actions__button--approve";
+          approve.textContent = canOfficeReview ? "Bürofreigabe erteilen" : "Verbindlich freigeben";
           reject.type = "button";
-          reject.className = "text-button text-button--muted";
+          reject.className = "text-button text-button--muted absence-review-actions__button";
           reject.textContent = "Ablehnen";
           approve.addEventListener("click", () => void submitDecision("approve"));
           reject.addEventListener("click", () => void submitDecision("reject"));
           actions.append(approve, reject);
         }
-        controls.append(comment, actions);
+        controls.append(commentLabel, comment, actions);
         item.append(controls);
       }
       elements.absenceReviewList.append(item);
@@ -7283,7 +7291,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.46" }
+        headers: { "X-Schaefchen-Version": "0.44.47" }
       });
       if (response.ok) {
         await cache.put(
@@ -8995,15 +9003,37 @@ import {
     }[dayPart] || dayPart;
   }
 
-  function absenceStatusLabel(status) {
-    return {
-      office_review: "Büroprüfung",
-      management_review: "Geschäftsführung prüft",
-      approved: "Freigegeben",
-      office_rejected: "Vom Büro abgelehnt",
-      management_rejected: "Von der Geschäftsführung abgelehnt",
-      cancelled: "Zurückgezogen"
-    }[status] || status;
+  // Die Kette aus zwei getrennten Stufen (Büro/Disposition, dann
+  // Geschäftsführung) - siehe core/absences.js. Dieselbe Funktion baut die
+  // Kette sowohl für die eigene Antragsliste des Mitarbeiters als auch für
+  // die Genehmigen-Ansicht des Büros, damit beide Ansichten nie
+  // auseinanderlaufen können.
+  function renderAbsenceStageChain(absence) {
+    const chain = document.createElement("ol");
+    chain.className = "absence-chain";
+    chain.setAttribute(
+      "aria-label",
+      "Ablauf der Freigabe: zwei getrennte Stellen prüfen nacheinander"
+    );
+    absenceStageStates(absence).forEach((stage, index) => {
+      const step = document.createElement("li");
+      step.className = `absence-chain__step absence-chain__step--${stage.state}`;
+      const number = document.createElement("span");
+      number.className = "absence-chain__index";
+      number.textContent = String(index + 1);
+      number.setAttribute("aria-hidden", "true");
+      const body = document.createElement("div");
+      body.className = "absence-chain__body";
+      const role = document.createElement("strong");
+      role.textContent = stage.roleLabel;
+      const stateText = document.createElement("span");
+      stateText.className = "absence-chain__state";
+      stateText.textContent = absenceStageStatusText(stage);
+      body.append(role, stateText);
+      step.append(number, body);
+      chain.append(step);
+    });
+    return chain;
   }
 
   function absencePeriodLabel(absence) {
@@ -9057,7 +9087,10 @@ import {
       heading.className = "absence-item__heading";
       title.textContent = absenceTypeLabel(absence.absenceType);
       badge.className = `absence-status absence-status--${absence.status}`;
-      badge.textContent = absenceStatusLabel(absence.status);
+      // "Büroprüfung" allein liest sich wie eine Aufgabe des Mitarbeiters.
+      // "wartet auf ..." macht klar: der Antrag liegt gerade bei einer
+      // zuständigen Stelle, nicht beim Monteur selbst.
+      badge.textContent = absenceWaitingLabel(absence.status) || absenceStatusLabel(absence.status);
       period.textContent = absencePeriodLabel(absence);
       note.textContent = absence.note || "";
       note.hidden = !absence.note;
@@ -9068,7 +9101,7 @@ import {
         }`
         : "";
       heading.append(title, badge);
-      item.append(heading, period, note, history);
+      item.append(heading, period, renderAbsenceStageChain(absence), note, history);
 
       if (["office_review", "management_review"].includes(absence.status)) {
         const cancel = document.createElement("button");

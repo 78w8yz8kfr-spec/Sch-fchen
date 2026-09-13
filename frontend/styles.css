@@ -2387,7 +2387,8 @@ select:focus-visible {
   margin-top: 12px;
 }
 
-.absence-form label {
+.absence-form label,
+.absence-review-controls label {
   color: var(--muted);
   font-size: 0.67rem;
   font-weight: 800;
@@ -2459,6 +2460,7 @@ select:focus-visible {
 .absence-item__heading,
 .absence-review-item__heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 9px;
@@ -2511,6 +2513,95 @@ select:focus-visible {
   background: #eeeeee;
 }
 
+/* Die zwei getrennten Freigabestufen als erkennbare Kette statt loser
+   Wörter - Zustand je Stufe kommt aus core/absences.js. Farben sind
+   bewusst dieselben wie bei .absence-status, damit die Seite nicht eine
+   zweite Farbsprache für denselben Sachverhalt einführt. */
+.absence-chain {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.absence-chain__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fafafa;
+}
+
+.absence-chain__index {
+  display: grid;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e4e4e4;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+
+.absence-chain__body {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.absence-chain__body strong {
+  font-size: 0.68rem;
+}
+
+.absence-chain__state {
+  color: var(--muted);
+  font-size: 0.63rem;
+}
+
+.absence-chain__step--done {
+  border-color: #bfe6d2;
+  background: #e5f7ed;
+}
+
+.absence-chain__step--done .absence-chain__index {
+  background: #176b45;
+  color: #fff;
+}
+
+.absence-chain__step--current {
+  border-color: #f4d792;
+  background: #fff1bf;
+}
+
+.absence-chain__step--current .absence-chain__index {
+  background: #7b5700;
+  color: #fff;
+}
+
+.absence-chain__step--current .absence-chain__state {
+  color: #7b5700;
+  font-weight: 800;
+}
+
+.absence-chain__step--rejected {
+  border-color: #f1c6c8;
+  background: #fde7e9;
+}
+
+.absence-chain__step--rejected .absence-chain__index {
+  background: #a1141d;
+  color: #fff;
+}
+
+.absence-chain__step--rejected .absence-chain__state {
+  color: #a1141d;
+}
+
 .absence-item__cancel {
   justify-self: start;
   min-height: 34px;
@@ -2543,6 +2634,25 @@ select:focus-visible {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+/* Genehmigen/Ablehnen sollen wie richtige Schaltflächen aussehen, nicht wie
+   blasse Textlinks - ohne dafür ein zweites Knopf-Designsystem einzuführen:
+   die Grundfarben sind dieselben wie bei .absence-status. */
+.absence-review-actions__button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #bfe6d2;
+  border-radius: 11px;
+  color: #176b45;
+  background: #e5f7ed;
+  font-size: 0.7rem;
+}
+
+.absence-review-actions__button.text-button--muted {
+  border-color: #f1c6c8;
+  color: #a1141d;
+  background: #fde7e9;
 }
 
 .time-correction-review-list {
