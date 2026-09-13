@@ -6,15 +6,16 @@ let locations = [], canManage = false, editing = null, parent = null, busy = fal
 
 async function request(path = "", options = {}) {
   const response = await fetch(base + path, { credentials: "same-origin", cache: "no-store", ...options,
-    headers: { "Content-Type": "application/json", "X-Schaefchen-Version": "0.44.46" } });
+    headers: { "Content-Type": "application/json", "X-Schaefchen-Version": "0.44.47" } });
   const data = await response.json();
   if (!response.ok) throw new Error(response.status === 401
     ? "Bitte zuerst in der Arbeitsapp anmelden und diese Seite erneut öffnen."
     : data.error?.message || "Die Anfrage konnte nicht verarbeitet werden.");
   return data;
 }
-function button(text, action) {
+function button(text, action, variant = "secondary") {
   const node = document.createElement("button"); node.type = "button"; node.textContent = text;
+  node.className = `button button--${variant}`;
   node.addEventListener("click", action); return node;
 }
 function render() {
@@ -36,7 +37,7 @@ function render() {
       const hint = document.createElement("small"); hint.textContent = labels[row.kind] + (row.status === "archived" ? " · archiviert" : "");
       title.append(name, hint); card.append(title);
       if (canManage) {
-        if (next[row.kind] && row.status === "active") card.append(button(`+ ${labels[next[row.kind]]}`, () => openEditor(null, row)));
+        if (next[row.kind] && row.status === "active") card.append(button(`+ ${labels[next[row.kind]]}`, () => openEditor(null, row), "primary"));
         card.append(button("Bearbeiten", () => openEditor(row, null)), button(row.status === "active" ? "Archivieren" : "Reaktivieren", () => changeStatus(row)));
       }
       card.append(button("Verlauf", () => showHistory(row))); group.append(card, tree(row.id));

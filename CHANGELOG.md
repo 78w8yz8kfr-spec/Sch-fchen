@@ -4,6 +4,19 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.47] - Lagerstruktur im App-Design
+
+- **Die Seite „Lagerstruktur" passt jetzt zur App.** Sie war die letzte, die
+  noch das karge inventory.css mit fest verdrahteten Farben lud. Jetzt bindet
+  sie design-system.css ein, gliedert Werkzeugleiste, Lagerplatzliste,
+  Historie und Anlege-Dialog in Karten und nutzt ausschließlich die
+  Design-Tokens. Damit laden alle eigenständigen Seiten (Freigabe,
+  Plattformverwaltung, Lager) dasselbe Design. Reine Oberfläche - alle
+  Element-ids und der Ablauf bleiben unverändert; primäre Aktionen (Anlegen,
+  Speichern) im Markenrot, der Rest neutral. [hidden]-Regel ergänzt, die
+  design-system.css für eigenständige Seiten nicht mitbringt (Migration 163).
+
+
 ## [0.44.46] - Freigabeseite im App-Design
 
 - **Die Seite „Abwesenheiten freigeben" passt jetzt zur App.** Sie lud
