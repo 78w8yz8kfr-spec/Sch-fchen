@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.46] - Freigabeseite im App-Design
+
+- **Die Seite „Abwesenheiten freigeben" passt jetzt zur App.** Sie lud
+  bisher das karge inventory.css mit fest verdrahteten Farben und wirkte wie
+  ein nacktes Formular. Jetzt bindet sie - wie platform-admin - das
+  design-system.css ein: Inhalte in Karten gegliedert (Einleitung,
+  Zuständige Mitarbeiter, direkte Eintragung, offene Anträge), Markenrot auf
+  Primäraktionen, neutrale Sekundäraktionen, einheitliche Felder und
+  Abstände über die Design-Tokens. Reine Oberfläche - Ablauf, Berechtigungen
+  und alle Element-ids (die absence-approvals.js über getElementById nutzt)
+  bleiben unverändert. Nebenbei ergänzt: eine [hidden]-Regel, die
+  design-system.css für eigenständige Seiten nicht mitbringt, sonst wäre das
+  per JavaScript versteckte Gerüst vor dem Laden sichtbar geblieben (Migration 162).
+
+
 ## [0.44.45] - DATEV-Lohnschnittstelle, Passwort-Zuruecksetzen und Prozessabsicherung
 
 Diese Fassung bringt eine laengere Arbeitslinie zusammen, die zunaechst auf
