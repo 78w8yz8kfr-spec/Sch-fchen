@@ -2297,6 +2297,31 @@ export function validateDatevExportSettings(body) {
   return { consultantNumber, clientNumber, payrollProduct, rowVersion };
 }
 
+// Rein numerische Personalnummer für den DATEV-Export (Migration 156),
+// getrennt von personnel_number: DATEV liest das Feld als Zahl, deshalb keine
+// führende Null - sonst wären "123" und "0123" bei DATEV dieselbe Person,
+// während unsere Eindeutigkeitsprüfung (die auf Text vergleicht) das nicht
+// bemerken würde. `datevPersonnelNumber: null` löscht die Zuordnung
+// ausdrücklich wieder - das muss erlaubt sein, deshalb ist `null` kein
+// fehlendes Feld, sondern ein eigener gültiger Wert.
+export function validateDatevPersonnelNumberAssignment(body) {
+  rejectTenantFields(body);
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {
+    throw new InputError("Die Mitarbeiterversion ist ungültig.");
+  }
+  if (body.datevPersonnelNumber === null) {
+    return { datevPersonnelNumber: null, rowVersion };
+  }
+  const datevPersonnelNumber = text(body.datevPersonnelNumber, "DATEV-Personalnummer", 1, 5);
+  if (!/^[1-9][0-9]{0,4}$/.test(datevPersonnelNumber)) {
+    throw new InputError(
+      "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern ohne führende Null bestehen."
+    );
+  }
+  return { datevPersonnelNumber, rowVersion };
+}
+
 // Legt eine neue gültige Zuordnung an; die bisherige wird von der Datenbank
 // automatisch abgelöst (Migration 151), nicht von hier aus überschrieben.
 export function validateDatevWageTypeMapping(body) {

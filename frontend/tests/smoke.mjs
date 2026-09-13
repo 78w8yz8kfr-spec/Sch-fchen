@@ -2082,4 +2082,34 @@ assert.deepEqual(
   `Kein am Telefon sichtbarer Knopf fuer diesen Bereich:\n${befunde.join("\n")}`
 );
 
+// Ein Knopf, der sich in seinem eigenen "finally" auf
+// "disabled = !navigator.onLine" zuruecksetzt, sperrt sich damit nur fuer
+// einen einzelnen gescheiterten Versuch offline - freigegeben wird er
+// ausschliesslich durch updateConnectionState(), das der "online"-Zuhoerer
+// beim Wiederverbinden aufruft. Fehlt dort die passende Zeile, bleibt der
+// Knopf bis zum Neuladen der Seite tot, obwohl das Netz laengst wieder da
+// ist. Genau das ist bei fuenf Knoepfen unbemerkt so gewesen (drei
+// DATEV-Speicherknoepfe, die DATEV-Vorschau und die Zeitkorrekturregel) -
+// eine von Hand eingetippte Liste haette den naechsten neuen Knopf derselben
+// Art wieder verschwiegen. Deshalb werden hier beide Mengen mechanisch aus
+// dem Quelltext abgeleitet und verglichen, statt sie hier erneut aufzuzaehlen.
+const updateConnectionStateBody = app.match(/function updateConnectionState\(\) \{([\s\S]*?)\n {2}\}\n/)?.[1];
+assert.ok(updateConnectionStateBody, "updateConnectionState wurde nicht gefunden.");
+const knoepfeMitOfflineSperre = new Set(
+  [...app.matchAll(/elements\.([A-Za-z0-9_]+)\.disabled = !navigator\.onLine\b/g)]
+    .map((treffer) => treffer[1])
+);
+const knoepfeMitRueckweg = new Set(
+  [...updateConnectionStateBody.matchAll(/elements\.([A-Za-z0-9_]+)\.disabled = !online\b/g)]
+    .map((treffer) => treffer[1])
+);
+const ohneRueckweg = [...knoepfeMitOfflineSperre].filter((name) => !knoepfeMitRueckweg.has(name));
+assert.deepEqual(
+  ohneRueckweg,
+  [],
+  `Diese Knoepfe sperren sich offline, kommen in updateConnectionState() aber nicht wieder frei:\n${
+    ohneRueckweg.join(", ")
+  }`
+);
+
 console.log("PWA-Smoke-Test erfolgreich.");

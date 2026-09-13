@@ -1,6 +1,6 @@
 # DATEV-Lohnschnittstelle
 
-Stand: 07.09.2026
+Stand: 08.09.2026
 
 ## Ziel und Stand
 
@@ -37,7 +37,7 @@ einem Kalendertag ab:
 
 | # | Feld | Bedeutung | Woher (Stufe 1/2) |
 | --- | --- | --- | --- |
-| 1 | Personalnummer | Mitarbeiterkennung bei DATEV | `users.personnel_number` |
+| 1 | Personalnummer | Mitarbeiterkennung bei DATEV | `users.datev_personnel_number` (Migration 156) |
 | 2 | Kalendertag | Datum der Buchung | Arbeitstag bzw. Abwesenheitstag |
 | 3 | Ausfallschlüssel | DATEV-Schlüssel für den Abwesenheitsgrund | Zuordnungstabelle, je Abwesenheitsart |
 | 4 | Lohnartennummer | kanzleispezifische Lohnart | Zuordnungstabelle, je Zeit-/Abwesenheitsart |
@@ -61,10 +61,11 @@ Die Zeit- und Abwesenheitsarten, für die Stufe 1 eine Zuordnung anlegt:
   eine Lohnartennummer): Urlaub, Unbezahlter Urlaub, Überstundenabbau,
   Freistellung, Sonderurlaub, Krankheit, Lehrgang, Berufsschule, Sonstiges
 
-## Datenmodell (Migration 151)
+## Datenmodell (Migrationen 151 und 156)
 
 Zwei Tabellen, beide mit Mandantengrenze (`company_id`, Row-Level-Security)
 und `row_version` für optimistische Sperren, wie im übrigen Datenmodell.
+Dazu eine zusätzliche Spalte auf `users` für die DATEV-Personalnummer.
 
 ### `datev_export_settings`
 
@@ -96,6 +97,28 @@ ausdrücklich **„nicht gepflegt"**. Das ist beabsichtigt: eine geratene
 Lohnartennummer wäre in einer Lohnabrechnung falscher als ein Export, der
 mangels Zuordnung ausdrücklich blockiert.
 
+### `users.datev_personnel_number` (Migration 156)
+
+`users.personnel_number` ist in Schäfchen freier Text (`M-1`, `ADMIN-1`,
+`REG-0001`) und bleibt es — er ist betrieblich lesbar und steht überall in
+der App. DATEV liest die Personalnummer aber als reine Zahl, deshalb tritt
+`datev_personnel_number` als zusätzliche, eigenständige Spalte daneben.
+
+Anders als die Lohnartenzuordnung wird sie **nicht historisiert**: eine
+Personalnummer ist eine Identität, kein zeitlich veränderlicher Satz — eine
+geänderte Nummer war vorher schlicht falsch. Es ist deshalb eine gewöhnliche
+Spalte auf `users`, gegen gleichzeitiges Überschreiben durch die ohnehin
+vorhandene `row_version` der Tabelle geschützt, kein zweiter Verlauf wie bei
+`datev_wage_type_mappings`.
+
+Format: `VARCHAR(5)`, NULL erlaubt (nicht jeder Betrieb pflegt sie sofort),
+eindeutig je Firma nur unter den tatsächlich gesetzten Nummern (partieller
+Index). Erlaubt ist eine bis fünf Ziffern **ohne führende Null**
+(`^[1-9][0-9]{0,4}$`) — kein Stilzwang, sondern eine Deckungslücke, die sonst
+zwei Menschen auf ein Lohnkonto buchen würde: DATEV liest die Nummer als
+Zahl, "123" und "0123" wären dort dieselbe Person, während unsere
+Eindeutigkeitsprüfung (die auf Text vergleicht) das nicht bemerken würde.
+
 ## Endpunkte und Berechtigung
 
 Alle DATEV-Endpunkte verlangen dieselbe Rolle, die auch sonst firmenweite
@@ -111,6 +134,8 @@ nur lesende Rolle gibt.
 | GET | `/api/v1/admin/datev/wage-type-mappings` | gültige Zuordnungen lesen (`?includeHistory=true` zeigt auch abgelöste) |
 | POST | `/api/v1/admin/datev/wage-type-mappings` | neue gültige Zuordnung anlegen (löst die bisherige ab) |
 | GET | `/api/v1/admin/datev/export-preview?from=…&to=…` | Vorschau für einen Zeitraum, ohne Datei |
+| GET | `/api/v1/admin/datev/personnel-numbers` | DATEV-Personalnummern aller aktiven Mitarbeiter lesen |
+| PUT | `/api/v1/admin/datev/personnel-numbers/:employeeId` | Nummer setzen, ändern oder löschen (`datevPersonnelNumber: null`) |
 
 Die Vorschau berechnet nichts neu: Arbeits-, Fahr- und Überstundenminuten
 kommen unverändert aus `work_days` (Migration 011), demselben Bestand, den
@@ -122,11 +147,21 @@ genehmigte oder abgerechnete Tage (`work_days.status IN ('approved',
 
 Die Vorschau liefert je Zeile Mitarbeiter, Tag, Zuordnungsschlüssel, Stunden
 oder Tage, die zugeordnete Lohnart bzw. den Ausfallschlüssel (falls
-vorhanden) und ein `mapped`-Kennzeichen. Zusätzlich `missingMappings`: eine
-Liste aller im Zeitraum tatsächlich vorkommenden Zeit- oder Abwesenheitsarten
-ohne gültige Zuordnung. Genau hier prüft ein Mensch gegen, bevor Lohndaten
-das Haus verlassen — die Vorschau versteckt eine fehlende Zuordnung nicht und
-überdeckt sie nicht mit einer geratenen Nummer.
+vorhanden), die DATEV-Personalnummer des Mitarbeiters und ein
+`mapped`-Kennzeichen. Zusätzlich zwei Listen offener Punkte, nach demselben
+Gedanken:
+
+- `missingMappings`: alle im Zeitraum tatsächlich vorkommenden Zeit- oder
+  Abwesenheitsarten ohne gültige Zuordnung.
+- `missingPersonnelNumbers`: alle Mitarbeiter, die im Zeitraum tatsächlich
+  Zeilen erzeugen, aber keine DATEV-Personalnummer haben. Wer im Zeitraum
+  nicht gearbeitet hat, fehlt auch nicht in dieser Liste — eine Meldung, die
+  den ganzen Mitarbeiterbestand anmeckert statt der tatsächlich Betroffenen,
+  würde im Büro schlicht ignoriert.
+
+Genau hier prüft ein Mensch gegen, bevor Lohndaten das Haus verlassen — die
+Vorschau versteckt weder eine fehlende Zuordnung noch eine fehlende
+Personalnummer und überdeckt keine von beiden mit einer geratenen Nummer.
 
 ## Was die Steuerkanzlei liefern muss
 
@@ -167,14 +202,19 @@ gegen die tatsächliche DATEV-Formatbeschreibung („Bewegungsdaten LODAS" bzw.
 - **Feldlängen sind angenommen, nicht durch eine DATEV-Spezifikation
   belegt.** Umgesetzt sind: Beraternummer numerisch bis 7 Stellen,
   Mandantennummer numerisch bis 5 Stellen, Lohnartennummer numerisch bis 4
-  Stellen, Ausfallschlüssel numerisch bis 2 Stellen. Diese Längen stammen aus
+  Stellen, Ausfallschlüssel numerisch bis 2 Stellen, DATEV-Personalnummer
+  numerisch bis 5 Stellen (Migration 156). Diese Längen stammen aus
   allgemeiner Kenntnis der DATEV-Nummernkreise, nicht aus einem geprüften
-  Dokument.
-- **Personalnummer-Format.** `users.personnel_number` ist in Schäfchen ein
-  freier Text (z. B. `"FOREMAN-1"`), DATEV erwartet für die Personalnummer
-  üblicherweise eine rein numerische Kennung. Dieser Unterschied ist in
-  Stufe 1 nicht aufgelöst und muss vor Stufe 2 geklärt werden — vermutlich
-  über eine zusätzliche, rein numerische DATEV-Personalnummer je Mitarbeiter.
+  Dokument — insbesondere die fünf Stellen der Personalnummer sind vor
+  Stufe 2 gegen die tatsächliche DATEV-Formatbeschreibung zu prüfen.
+- ~~**Personalnummer-Format.**~~ **Gelöst (Migration 156).**
+  `users.personnel_number` bleibt freier Text (z. B. `"FOREMAN-1"`) und wird
+  dafür nicht verwendet; Feld 1 des Bewegungsdatensatzes kommt stattdessen aus
+  der neuen, rein numerischen Spalte `users.datev_personnel_number` (ein bis
+  fünf Ziffern, keine führende Null, `PUT
+  /api/v1/admin/datev/personnel-numbers/:employeeId`). Die Vorschau meldet
+  fehlende Zuordnungen über `missingPersonnelNumbers`, genau wie
+  `missingMappings` für die Lohnarten.
 - **Kostenstelle und Kostenträger (Felder 10 und 11) fehlen im Datenmodell
   vollständig.** Schäfchen führt aktuell keine Kostenstellen. Ob eine
   Kostenstelle je Mitarbeiter, je Baustelle oder je Projekt sinnvoll ist, ist

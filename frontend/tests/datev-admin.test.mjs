@@ -105,7 +105,7 @@ test("Eine geänderte Zuordnung legt einen neuen Stand an, statt zu überschreib
 test("Fehlende Zuordnungen springen ins Auge, statt zu verschwinden", () => {
   assert.match(app, /badge\.textContent = mapping \? "Gepflegt" : "Fehlt";/);
   assert.match(app, /missingCount === 0\s*\? "Alle Zuordnungen gepflegt"\s*: `\$\{missingCount\} von \$\{definitions\.length\} fehlen`/);
-  assert.match(app, /if \(!line\.mapped\) row\.className = "datev-preview-row--missing";/);
+  assert.match(app, /if \(!line\.mapped\) rowClasses\.push\("datev-preview-row--missing"\);/);
   assert.match(html, /Diese Zuordnungen fehlen im gewählten Zeitraum/);
   assert.match(app, /create\.textContent = "Jetzt anlegen";/);
 });
@@ -145,7 +145,8 @@ test("Zahlenfelder oeffnen den Ziffernblock am Telefon", () => {
     "datev-consultant-number",
     "datev-client-number",
     "datev-mapping-wage-type",
-    "datev-mapping-absence-code"
+    "datev-mapping-absence-code",
+    "datev-personnel-number-value"
   ]) {
     assert.match(html, new RegExp(`id="${id}"[\\s\\S]{0,80}inputmode="numeric"`), id);
   }
@@ -154,3 +155,128 @@ test("Zahlenfelder oeffnen den Ziffernblock am Telefon", () => {
 test("Breite Tabellen scrollen in einem eigenen Container, nie die ganze Seite", () => {
   assert.match(html, /<div class="time-account-table-wrap">\s*<table id="datev-preview-table"/);
 });
+
+// Vierter Bereich im DATEV-Reiter: die vorhandene freie Personalnummer bleibt
+// unveraendert, DATEV bekommt eine zusaetzliche rein numerische Kennung.
+
+test("DATEV-Personalnummern sind ein vierter Bereich desselben Reiters, keine eigene Ansicht", () => {
+  assert.match(html, /id="datev-personnel-numbers-admin"[^>]*class="holiday-calendar-admin"[^>]*hidden/);
+  // Derselbe Reiter, dieselbe Sichtbarkeitsregel wie die drei bestehenden
+  // Bereiche - kein fuenfter Reiter, keine eigene Rolle.
+  assert.match(
+    app,
+    /elements\.datevPersonnelNumbersAdmin\.hidden = !canManageDatev\(\)\s*\|\| !isOfficeAdminPane\(\)\s*\|\| currentSettingsSubarea !== "datev";/
+  );
+});
+
+test("Das erlaubte Format wird vorher erklaert, nicht erst als Fehlermeldung danach", () => {
+  // Das Format steht bereits im Formular, bevor irgendetwas abgeschickt wird.
+  assert.match(html, /id="datev-personnel-number-form"[\s\S]{0,900}Ein bis fünf Ziffern, nicht mit 0 beginnend/);
+  // Und die Begruendung, warum keine fuehrende Null erlaubt ist, steht einmal
+  // knapp da - sonst wirkt die Regel wie Schikane.
+  assert.match(html, /DATEV liest die Personalnummer als Zahl/);
+  assert.match(app, /const DATEV_PERSONNEL_NUMBER_PATTERN = \/\^\[1-9\]\[0-9\]\{0,4\}\$\/;/);
+});
+
+test("Ein leeres Feld loescht die Zuordnung - der Anfragerumpf traegt dann echtes null, nicht einen leeren Text", () => {
+  // Diese Zusicherung prueft den tatsaechlichen Anfragerumpf, nicht nur die
+  // vorgelagerte Formularpruefung: sonst koennte "" durchrutschen, obwohl die
+  // Praesenzpruefung schon bestanden hat.
+  const putCall = app.match(
+    /requestJson\(\s*`\.\/api\/v1\/admin\/datev\/personnel-numbers\/\$\{encodeURIComponent\(datevEditingPersonnelNumberEmployeeId\)\}`,\s*\{\s*method: "PUT",\s*body: JSON\.stringify\(\{([\s\S]*?)\}\)\s*\}\s*\);/
+  );
+  assert.ok(putCall, "Der PUT-Aufruf fuer die DATEV-Personalnummer wurde nicht gefunden.");
+  assert.match(putCall[1], /datevPersonnelNumber, rowVersion: current\.rowVersion/);
+  // datevPersonnelNumber selbst wird vorher ausdruecklich auf null gesetzt,
+  // wenn das Feld leer ist - nie auf einen leeren Text.
+  assert.match(app, /const datevPersonnelNumber = raw === "" \? null : raw;/);
+  assert.doesNotMatch(app, /datevPersonnelNumber: raw \|\| ""/);
+});
+
+test("Zeigt die Serverantwort bei einer vergebenen Nummer unveraendert, ersetzt sie nicht durch einen eigenen Text", () => {
+  const fn = app.match(
+    /elements\.datevPersonnelNumberForm\.addEventListener\("submit", async \(event\) => \{([\s\S]*?)\n {2}\}\);/
+  );
+  assert.ok(fn, "Der Speichern-Handler der DATEV-Personalnummer wurde nicht gefunden.");
+  const body = fn[1];
+  assert.match(body, /if \(error\.code === "row_version_conflict"\)/);
+  // Im else-Zweig (also auch fuer datev_personnel_number_taken) steht die
+  // Servermeldung unveraendert im Formular - error.message wird nicht durch
+  // eine eigene Zeichenkette ersetzt.
+  assert.match(body, /\} else \{\s*(?:\/\/[^\n]*\n\s*)+elements\.datevPersonnelNumberMessage\.textContent = error\.message;/);
+});
+
+test("Ein Versionskonflikt laedt neu, statt stumm zu ueberschreiben", () => {
+  assert.match(
+    app,
+    /elements\.datevPersonnelNumberMessage\.textContent =\s*"Wurde zwischenzeitlich geändert\. Wird neu geladen …";\s*await refreshDatevPersonnelNumbers\(\);/
+  );
+});
+
+test("Fehlende DATEV-Personalnummern sind eine eigene Zeile mit Badge, wie die Lohnartenzuordnung es vormacht", () => {
+  assert.match(app, /badge\.textContent = entry\.datevPersonnelNumber \? "Gepflegt" : "Fehlt";/);
+  assert.match(
+    app,
+    /elements\.datevPersonnelNumbersMissingCount\.textContent = missingCount === 0\s*\? "Alle gepflegt"\s*: `\$\{missingCount\} von \$\{datevPersonnelNumbersState\.length\} fehlen`;/
+  );
+  assert.match(app, /elements\.datevPersonnelNumbersMissingCount\.className = missingCount === 0\s*\? "site-list-summary"\s*: "site-list-summary site-list-summary--alert";/);
+});
+
+test("Der Kasten mit fehlenden DATEV-Personalnummern schaltet wirklich sichtbar, in beide Richtungen", () => {
+  // Dieselbe Falle wie beim Kasten der fehlenden Zuordnungen: ein
+  // befuellter, aber dauerhaft verborgener Kasten faellt keinem Test auf, der
+  // nur den Inhalt prueft. Beide Richtungen muessen deshalb belegt sein.
+  const fn = app.match(/function renderDatevPreview\(\) \{([\s\S]*?)\n {2}\}\n/);
+  assert.ok(fn, "renderDatevPreview wurde nicht gefunden.");
+  const body = fn[1];
+  // Richtung 1: der Rueckstellwert vor jeder Fallunterscheidung ist "verborgen".
+  assert.match(
+    body,
+    /elements\.datevPreviewMissingPersonnel\.hidden = true;[\s\S]*if \(!datevPreviewState\)/
+  );
+  // Richtung 2: genau der Zweig mit einer tatsaechlichen Luecke schaltet ihn
+  // sichtbar.
+  assert.match(
+    body,
+    /if \(\(state\.missingPersonnelNumbers \|\| \[\]\)\.length > 0\) \{\s*elements\.datevPreviewMissingPersonnel\.hidden = false;/
+  );
+});
+
+test("Fehlende Zuordnung und fehlende DATEV-Personalnummer sind zwei getrennte Luecken, kein gemeinsamer Topf", () => {
+  // Zwei eigene Kaesten mit eigenem Text und eigener Liste ...
+  assert.match(html, /id="datev-preview-missing"[^>]*class="datev-missing"/);
+  assert.match(html, /id="datev-preview-missing-personnel"[^>]*class="datev-missing"/);
+  assert.match(html, /Diesen Mitarbeitern fehlt im gewählten Zeitraum die DATEV-Personalnummer/);
+  assert.notEqual(
+    html.match(/Diese Zuordnungen fehlen im gewählten Zeitraum/)[0],
+    html.match(/Diesen Mitarbeitern fehlt im gewählten Zeitraum die DATEV-Personalnummer/)[0]
+  );
+  // ... und in der Tabelle zwei getrennte CSS-Klassen statt einer
+  // gemeinsamen, damit eine Zeile mit nur einer der beiden Luecken nicht wie
+  // eine Zeile mit beiden aussieht.
+  assert.match(app, /if \(!line\.mapped\) rowClasses\.push\("datev-preview-row--missing"\);/);
+  assert.match(app, /if \(!line\.datevPersonnelNumber\) rowClasses\.push\("datev-preview-row--missing-personnel"\);/);
+  assert.doesNotMatch(app, /datev-preview-row--missing-personnel.*datev-preview-row--missing"/);
+});
+
+test("Die Vorschautabelle zeigt die DATEV-Personalnummer als eigene Spalte", () => {
+  assert.match(html, /<th>Mitarbeiter<\/th>\s*<th>DATEV-Personalnummer<\/th>/);
+  assert.match(app, /line\.datevPersonnelNumber \|\| "Fehlt"/);
+});
+
+test("Barrierefreiheit: Eingabefeld ist per Label verknuepft, Rueckmeldung ist aria-live", () => {
+  assert.match(html, /<label for="datev-personnel-number-value">DATEV-Personalnummer<\/label>\s*<input\s+id="datev-personnel-number-value"/);
+  assert.match(html, /id="datev-personnel-number-message" class="form-message" aria-live="polite"/);
+});
+
+test("Der Vierer-Bereich wird zusammen mit den anderen drei aktualisiert, nicht separat vergessen", () => {
+  assert.match(app, /await Promise\.all\(\[refreshDatevSettings\(\), refreshDatevMappings\(\), refreshDatevPersonnelNumbers\(\)\]\);/);
+  assert.match(app, /renderDatevPersonnelNumberList\(\);/);
+});
+
+// Dass die drei DATEV-Speicherknoepfe (und die DATEV-Vorschau) beim
+// Wiederverbinden wieder freigegeben werden, prueft nicht mehr eine
+// DATEV-eigene Einzelpruefung hier, sondern die allgemeine, aus dem
+// Quelltext abgeleitete Zusicherung in smoke.mjs - die deckt diese vier mit
+// ab und noch elf weitere Knoepfe derselben Art dazu, statt dasselbe zweimal
+// zu behaupten.

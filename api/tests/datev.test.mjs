@@ -4,7 +4,11 @@ import { Readable } from "node:stream";
 
 import { createPool, withTenantTransaction } from "../src/database.mjs";
 import { handleDatevRequest } from "../src/datev.mjs";
-import { validateDatevExportSettings, validateDatevWageTypeMapping } from "../src/validation.mjs";
+import {
+  validateDatevExportSettings,
+  validateDatevPersonnelNumberAssignment,
+  validateDatevWageTypeMapping
+} from "../src/validation.mjs";
 
 // Die reine Validierung braucht keine Datenbank und läuft deshalb immer.
 
@@ -74,6 +78,39 @@ test("Eine Zeitart braucht eine Lohnart, eine Abwesenheitsart einen Ausfallschl�
       category: "absence_type", mappingKey: "sick", absenceCode: "123"
     }),
     /Ausfallschlüssel/
+  );
+});
+
+test("Die DATEV-Personalnummer erlaubt ein bis fünf Ziffern ohne führende Null, oder ausdrücklich null zum Löschen", () => {
+  assert.deepEqual(
+    validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: "1001", rowVersion: 4 }),
+    { datevPersonnelNumber: "1001", rowVersion: 4 }
+  );
+  assert.deepEqual(
+    validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: "9", rowVersion: 0 }),
+    { datevPersonnelNumber: "9", rowVersion: 0 }
+  );
+  // null ist ein eigener gültiger Wert - er löscht die Zuordnung - und kein
+  // fehlendes Feld.
+  assert.deepEqual(
+    validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: null, rowVersion: 4 }),
+    { datevPersonnelNumber: null, rowVersion: 4 }
+  );
+  assert.throws(
+    () => validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: "0123", rowVersion: 0 }),
+    /DATEV-Personalnummer/
+  );
+  assert.throws(
+    () => validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: "123456", rowVersion: 0 }),
+    /DATEV-Personalnummer/
+  );
+  assert.throws(
+    () => validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: "M-1", rowVersion: 0 }),
+    /DATEV-Personalnummer/
+  );
+  assert.throws(
+    () => validateDatevPersonnelNumberAssignment({ datevPersonnelNumber: "1001", rowVersion: -1 }),
+    /Mitarbeiterversion/
   );
 });
 
@@ -168,6 +205,23 @@ integrationTest("DATEV-Stammdaten, Lohnart-Zuordnung und Vorschau", async (t) =>
         return true;
       }
     );
+    await assert.rejects(
+      () => aufrufen(apiPool, monteurkontext, "GET", "/api/v1/admin/datev/personnel-numbers"),
+      (fehler) => {
+        assert.equal(fehler.code, "datev_administration_forbidden");
+        return true;
+      }
+    );
+    await assert.rejects(
+      () => aufrufen(
+        apiPool, monteurkontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${monteur}`,
+        { datevPersonnelNumber: "1", rowVersion: 1 }
+      ),
+      (fehler) => {
+        assert.equal(fehler.code, "datev_administration_forbidden");
+        return true;
+      }
+    );
   });
 
   await t.test("ohne Stammdaten ist die Firma erkennbar nicht angebunden", async () => {
@@ -229,6 +283,96 @@ integrationTest("DATEV-Stammdaten, Lohnart-Zuordnung und Vorschau", async (t) =>
     assert.notEqual(abgeloest.validUntil, null, "Die abgelöste Zeile trägt einen Ablösezeitpunkt");
   });
 
+  // Eine zweite Monteurin ohne jede Buchung im Vorschauzeitraum - die braucht
+  // die Vorschau unten, um zu belegen, dass eine fehlende DATEV-Personalnummer
+  // ohne Zeile im Zeitraum nicht gemeldet wird.
+  const unbeteiligt = (await ownerPool.query(
+    `INSERT INTO users (company_id, personnel_number, first_name, last_name)
+     VALUES ($1, $2, 'Unbeteiligte', 'Monteurin') RETURNING id`,
+    [firma, `DV-UNBET-${kennung}`]
+  )).rows[0].id;
+
+  let monteurRowVersion;
+  await t.test("DATEV-Personalnummern lassen sich setzen, ändern und wieder löschen", async () => {
+    const liste = await aufrufen(apiPool, buerokontext, "GET", "/api/v1/admin/datev/personnel-numbers");
+    assert.equal(liste.status, 200);
+    const monteurEintrag = liste.body.employees.find((zeile) => zeile.employeeId === monteur);
+    assert.ok(monteurEintrag, "Der aktive Monteur erscheint in der Liste");
+    assert.equal(monteurEintrag.datevPersonnelNumber, null);
+    monteurRowVersion = monteurEintrag.rowVersion;
+
+    // Setzen.
+    const gesetzt = await aufrufen(
+      apiPool, buerokontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${monteur}`,
+      { datevPersonnelNumber: "2001", rowVersion: monteurRowVersion }
+    );
+    assert.equal(gesetzt.status, 200);
+    assert.equal(gesetzt.body.employee.datevPersonnelNumber, "2001");
+    monteurRowVersion = gesetzt.body.employee.rowVersion;
+
+    // Führende Null, sechs Stellen und Buchstaben werden abgelehnt - das
+    // prüft bereits die reine Validierung oben; hier zusätzlich, dass ein
+    // solcher Versuch die Datenbank erst gar nicht erreicht (keine
+    // Zwischenänderung, rowVersion bleibt unverändert).
+    await assert.rejects(
+      () => aufrufen(
+        apiPool, buerokontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${monteur}`,
+        { datevPersonnelNumber: "0250", rowVersion: monteurRowVersion }
+      ),
+      /DATEV-Personalnummer/
+    );
+
+    // Falsche rowVersion.
+    await assert.rejects(
+      () => aufrufen(
+        apiPool, buerokontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${monteur}`,
+        { datevPersonnelNumber: "2002", rowVersion: monteurRowVersion - 1 }
+      ),
+      (fehler) => {
+        assert.equal(fehler.code, "row_version_conflict");
+        return true;
+      }
+    );
+
+    // Doppelt vergebene Nummer: die Meldung nennt, wer sie bereits hat.
+    const zweiteVersion = (await aufrufen(
+      apiPool, buerokontext, "GET", "/api/v1/admin/datev/personnel-numbers"
+    )).body.employees.find((zeile) => zeile.employeeId === unbeteiligt).rowVersion;
+    await assert.rejects(
+      () => aufrufen(
+        apiPool, buerokontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${unbeteiligt}`,
+        { datevPersonnelNumber: "2001", rowVersion: zweiteVersion }
+      ),
+      (fehler) => {
+        assert.equal(fehler.code, "datev_personnel_number_taken");
+        assert.match(fehler.message, /Mika/);
+        assert.match(fehler.message, new RegExp(`DV-MONT-${kennung}`));
+        return true;
+      }
+    );
+
+    // Löschen (auf null) - jemand hat sich vertan und macht es rückgängig.
+    const geloescht = await aufrufen(
+      apiPool, buerokontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${monteur}`,
+      { datevPersonnelNumber: null, rowVersion: monteurRowVersion }
+    );
+    assert.equal(geloescht.status, 200);
+    assert.equal(geloescht.body.employee.datevPersonnelNumber, null);
+    monteurRowVersion = geloescht.body.employee.rowVersion;
+
+    // Nicht gefunden / nicht aktiv.
+    await assert.rejects(
+      () => aufrufen(
+        apiPool, buerokontext, "PUT", "/api/v1/admin/datev/personnel-numbers/00000000-0000-4000-8000-000000000000",
+        { datevPersonnelNumber: "3001", rowVersion: 1 }
+      ),
+      (fehler) => {
+        assert.equal(fehler.code, "employee_not_found");
+        return true;
+      }
+    );
+  });
+
   const heute = "2026-09-07";
   await t.test("die Vorschau zeigt Stunden aus work_days und Tage aus genehmigten Abwesenheiten", async () => {
     await ownerPool.query(
@@ -271,6 +415,10 @@ integrationTest("DATEV-Stammdaten, Lohnart-Zuordnung und Vorschau", async (t) =>
     assert.equal(arbeit.hours, 7);
     assert.equal(arbeit.wageTypeNumber, "1100");
     assert.equal(arbeit.mapped, true);
+    assert.equal(
+      arbeit.datevPersonnelNumber, null,
+      "Die Zeile trägt die DATEV-Personalnummer des Mitarbeiters (hier: keine gepflegt)"
+    );
 
     const fahrt = body.lines.find((zeile) => zeile.mappingKey === "travel");
     assert.equal(fahrt.hours, 0.5);
@@ -287,6 +435,43 @@ integrationTest("DATEV-Stammdaten, Lohnart-Zuordnung und Vorschau", async (t) =>
     assert.ok(
       body.missingMappings.some((eintrag) => eintrag.mappingKey === "travel"),
       "Auch eine fehlende Zeitart-Zuordnung wird gemeldet"
+    );
+
+    // Der wichtigste Teil dieser Prüfung: missingPersonnelNumbers nennt genau
+    // die Mitarbeiter mit Zeilen im Zeitraum und ohne DATEV-Personalnummer -
+    // nicht mehr, nicht weniger.
+    assert.ok(
+      body.missingPersonnelNumbers.some((eintrag) => eintrag.employeeId === monteur),
+      "Der Monteur hat Zeilen im Zeitraum und keine DATEV-Personalnummer - er wird gemeldet"
+    );
+    assert.ok(
+      !body.missingPersonnelNumbers.some((eintrag) => eintrag.employeeId === unbeteiligt),
+      "Ein Mitarbeiter ohne Nummer, der im Zeitraum keine Zeile erzeugt, wird NICHT gemeldet"
+    );
+    assert.equal(
+      body.missingPersonnelNumbers.length, 1,
+      "Nur der tatsächlich betroffene Mitarbeiter erscheint, nicht der ganze Bestand"
+    );
+
+    // Wird die Nummer gepflegt, verschwindet die Meldung und die Zeilen
+    // tragen sie.
+    const aktuelleVersion = (await aufrufen(
+      apiPool, buerokontext, "GET", "/api/v1/admin/datev/personnel-numbers"
+    )).body.employees.find((zeile) => zeile.employeeId === monteur).rowVersion;
+    await aufrufen(
+      apiPool, buerokontext, "PUT", `/api/v1/admin/datev/personnel-numbers/${monteur}`,
+      { datevPersonnelNumber: "3005", rowVersion: aktuelleVersion }
+    );
+    const erneuerteVorschau = (await aufrufen(
+      apiPool, buerokontext, "GET", `/api/v1/admin/datev/export-preview?from=${heute}&to=${heute}`
+    )).body;
+    assert.ok(
+      !erneuerteVorschau.missingPersonnelNumbers.some((eintrag) => eintrag.employeeId === monteur),
+      "Nach dem Pflegen der Nummer wird der Mitarbeiter nicht mehr gemeldet"
+    );
+    assert.equal(
+      erneuerteVorschau.lines.find((zeile) => zeile.mappingKey === "work").datevPersonnelNumber,
+      "3005"
     );
   });
 });
