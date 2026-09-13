@@ -1,4 +1,4 @@
-\echo 'Teste Migration 152_allow_password_reset_lifecycle_event.sql ...'
+\echo 'Teste Migration 159_allow_password_reset_lifecycle_event.sql ...'
 
 BEGIN;
 
@@ -58,4 +58,4 @@ $$;
 
 ROLLBACK;
 
-\echo 'Migration 152_allow_password_reset_lifecycle_event.sql erfolgreich getestet.'
+\echo 'Migration 159_allow_password_reset_lifecycle_event.sql erfolgreich getestet.'
