@@ -898,6 +898,7 @@ import {
     employeeFirstName: document.querySelector("#employee-first-name"),
     employeeLastName: document.querySelector("#employee-last-name"),
     employeePersonnelNumber: document.querySelector("#employee-personnel-number"),
+    employeeDatevPersonnelNumber: document.querySelector("#employee-datev-personnel-number"),
     employeePhone: document.querySelector("#employee-phone"),
     employeeEmail: document.querySelector("#employee-email"),
     employeeRole: document.querySelector("#employee-role"),
@@ -921,6 +922,7 @@ import {
     employeeEditFirstName: document.querySelector("#employee-edit-first-name"),
     employeeEditLastName: document.querySelector("#employee-edit-last-name"),
     employeeEditPersonnelNumber: document.querySelector("#employee-edit-personnel-number"),
+    employeeEditDatevPersonnelNumber: document.querySelector("#employee-edit-datev-personnel-number"),
     employeeEditPhone: document.querySelector("#employee-edit-phone"),
     employeeEditEmail: document.querySelector("#employee-edit-email"),
     employeeEditRole: document.querySelector("#employee-edit-role"),
@@ -6710,6 +6712,10 @@ import {
     elements.employeeEditFirstName.value = employee.firstName;
     elements.employeeEditLastName.value = employee.lastName;
     elements.employeeEditPersonnelNumber.value = employee.personnelNumber;
+    // Ohne diese Zeile wuerde der erste Speichervorgang die vorhandene
+    // DATEV-Personalnummer versehentlich mit nichts ueberschreiben - das
+    // Formular schickt ja immer den aktuellen Feldinhalt, leer oder nicht.
+    elements.employeeEditDatevPersonnelNumber.value = employee.datevPersonnelNumber || "";
     elements.employeeEditPhone.value = employee.phone || "";
     elements.employeeEditEmail.value = employee.email || "";
     elements.employeeEditRole.value = editableEmployeeRole(employee.roles);
@@ -9595,6 +9601,16 @@ import {
   // API-Vertrag admin/datev/personnel-numbers).
   const DATEV_PERSONNEL_NUMBER_PATTERN = /^[1-9][0-9]{0,4}$/;
 
+  // Dieselbe Regel wie beim DATEV-Reiter, jetzt auch am Mitarbeiterformular:
+  // die Nummer gehoert zum Mitarbeiter und soll dort eintragbar sein, nicht
+  // nur nachtraeglich in einer eigenen Liste. Ein leeres Feld ist erlaubt -
+  // es bedeutet null, nicht ein leerer Text.
+  function readEmployeeDatevPersonnelNumber(inputElement) {
+    const raw = inputElement.value.trim();
+    if (raw !== "" && !DATEV_PERSONNEL_NUMBER_PATTERN.test(raw)) return { ok: false };
+    return { ok: true, value: raw === "" ? null : raw };
+  }
+
   function findDatevPersonnelNumberEntry(employeeId) {
     return (datevPersonnelNumbersState || []).find(
       (entry) => entry.employeeId === employeeId
@@ -12295,6 +12311,15 @@ import {
 
   elements.employeeForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    // Dasselbe Format, das der Server prueft - hier vorab, damit niemand eine
+    // Servermeldung fuer etwas kassiert, das die Oberflaeche schon wusste. Ein
+    // leeres Feld ist erlaubt: der Betrieb nutzt dann einfach kein DATEV.
+    const datevPersonnelNumber = readEmployeeDatevPersonnelNumber(elements.employeeDatevPersonnelNumber);
+    if (!datevPersonnelNumber.ok) {
+      elements.employeeMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
     const saved = await submitAdminForm(
       elements.employeeForm,
       elements.employeeMessage,
@@ -12303,6 +12328,7 @@ import {
         firstName: elements.employeeFirstName.value,
         lastName: elements.employeeLastName.value,
         personnelNumber: elements.employeePersonnelNumber.value,
+        datevPersonnelNumber: datevPersonnelNumber.value,
         phone: elements.employeePhone.value,
         email: elements.employeeEmail.value,
         role: elements.employeeRole.value,
@@ -12345,6 +12371,15 @@ import {
       elements.employeeEditMessage.textContent = "Der Mitarbeiter wurde nicht gefunden. Bitte neu laden.";
       return;
     }
+    // Dasselbe Format, das der Server prueft - hier vorab, damit niemand eine
+    // Servermeldung fuer etwas kassiert, das die Oberflaeche schon wusste. Ein
+    // leeres Feld ist erlaubt und entfernt eine vorhandene Zuordnung wieder.
+    const datevPersonnelNumber = readEmployeeDatevPersonnelNumber(elements.employeeEditDatevPersonnelNumber);
+    if (!datevPersonnelNumber.ok) {
+      elements.employeeEditMessage.textContent =
+        "Die DATEV-Personalnummer darf nur aus ein bis fünf Ziffern bestehen und nicht mit 0 beginnen.";
+      return;
+    }
     elements.employeeEditSave.disabled = true;
     elements.employeeEditCancel.disabled = true;
     elements.employeeEditMessage.textContent = "Änderungen werden sicher gespeichert …";
@@ -12355,6 +12390,7 @@ import {
           firstName: elements.employeeEditFirstName.value,
           lastName: elements.employeeEditLastName.value,
           personnelNumber: elements.employeeEditPersonnelNumber.value,
+          datevPersonnelNumber: datevPersonnelNumber.value,
           phone: elements.employeeEditPhone.value,
           email: elements.employeeEditEmail.value,
           role: elements.employeeEditRole.value,
