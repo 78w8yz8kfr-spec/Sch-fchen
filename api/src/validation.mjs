@@ -170,7 +170,10 @@ const VDE_VISUAL_CHECK_KEYS = [
 ];
 const TIME_CORRECTION_DECISIONS = new Set(["approved", "rejected"]);
 const WORK_DAY_DECISIONS = new Set(["approved", "locked"]);
-const ABSENCE_TYPES = new Set([
+// Exportiert, weil die DATEV-Lohnartenzuordnung (validateDatevWageTypeMapping
+// unten) genau diese neun Werte als Schlüssel kennen muss - dieselbe Liste,
+// nicht eine zweite von Hand nachgeführte Kopie.
+export const ABSENCE_TYPES = new Set([
   "vacation",
   "unpaid_vacation",
   "time_off",
@@ -2245,4 +2248,75 @@ export function validateApprenticeReview(body) {
     throw new InputError("Eine Rückgabe braucht eine Bemerkung.");
   }
   return { decision, reportIds: [...new Set(reportIds)], comment };
+}
+
+// DATEV-Lohnschnittstelle, Stufe 1: nur Stammdaten und Lohnart-Zuordnung.
+// Die Datei selbst entsteht erst in einer späteren Stufe.
+
+// Die drei Zeitarten, die work_days (Migration 011) als Minutenwerte führt.
+export const DATEV_TIME_TYPES = Object.freeze(["work", "travel", "overtime"]);
+export const DATEV_PAYROLL_PRODUCTS = Object.freeze(["lodas", "lug"]);
+
+function datevMappingKeysFor(category) {
+  return category === "time_type" ? new Set(DATEV_TIME_TYPES) : ABSENCE_TYPES;
+}
+
+export function validateDatevExportSettings(body) {
+  rejectTenantFields(body);
+  const consultantNumber = text(body.consultantNumber, "Beraternummer", 1, 7);
+  if (!/^[0-9]{1,7}$/.test(consultantNumber)) {
+    throw new InputError("Die Beraternummer darf nur aus bis zu sieben Ziffern bestehen.");
+  }
+  const clientNumber = text(body.clientNumber, "Mandantennummer", 1, 5);
+  if (!/^[0-9]{1,5}$/.test(clientNumber)) {
+    throw new InputError("Die Mandantennummer darf nur aus bis zu fünf Ziffern bestehen.");
+  }
+  const payrollProduct = text(body.payrollProduct, "Lohnprodukt", 3, 20).toLowerCase();
+  if (!DATEV_PAYROLL_PRODUCTS.includes(payrollProduct)) {
+    throw new InputError("Das Lohnprodukt muss LODAS oder Lohn und Gehalt sein.");
+  }
+  const rowVersion = Number(body.rowVersion);
+  if (!Number.isSafeInteger(rowVersion) || rowVersion < 0) {
+    throw new InputError("Die Version der DATEV-Stammdaten ist ungültig.");
+  }
+  return { consultantNumber, clientNumber, payrollProduct, rowVersion };
+}
+
+// Legt eine neue gültige Zuordnung an; die bisherige wird von der Datenbank
+// automatisch abgelöst (Migration 151), nicht von hier aus überschrieben.
+export function validateDatevWageTypeMapping(body) {
+  rejectTenantFields(body);
+  const category = text(body.category, "Art der Zuordnung", 9, 13).toLowerCase();
+  if (!["time_type", "absence_type"].includes(category)) {
+    throw new InputError("Die Art der Zuordnung muss Zeitart oder Abwesenheitsart sein.");
+  }
+  const mappingKey = text(body.mappingKey, "Schlüssel", 2, 30).toLowerCase();
+  if (!datevMappingKeysFor(category).has(mappingKey)) {
+    throw new InputError("Der Schlüssel passt nicht zur gewählten Art der Zuordnung.");
+  }
+  const wageTypeNumber = optionalText(body.wageTypeNumber, "Lohnartennummer", 4);
+  if (wageTypeNumber && !/^[0-9]{1,4}$/.test(wageTypeNumber)) {
+    throw new InputError("Die Lohnartennummer darf nur aus bis zu vier Ziffern bestehen.");
+  }
+  const absenceCode = optionalText(body.absenceCode, "Ausfallschlüssel", 2);
+  if (absenceCode && !/^[0-9]{1,2}$/.test(absenceCode)) {
+    throw new InputError("Der Ausfallschlüssel darf nur aus bis zu zwei Ziffern bestehen.");
+  }
+  if (category === "time_type") {
+    if (!wageTypeNumber) {
+      throw new InputError("Eine Zeitart benötigt eine Lohnartennummer.");
+    }
+    if (absenceCode) {
+      throw new InputError("Eine Zeitart kennt keinen Ausfallschlüssel.");
+    }
+  } else if (!absenceCode) {
+    throw new InputError("Eine Abwesenheitsart benötigt einen Ausfallschlüssel.");
+  }
+  return {
+    category,
+    mappingKey,
+    wageTypeNumber: wageTypeNumber || null,
+    absenceCode: absenceCode || null,
+    changeReason: optionalText(body.changeReason, "Änderungsgrund der Zuordnung", 500)
+  };
 }
