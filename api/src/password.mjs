@@ -1,9 +1,42 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
 const DEFAULTS = Object.freeze({ N: 16384, r: 8, p: 1, keyLength: 32 });
 const FORMAT = /^scrypt\$(\d+)\$(\d+)\$(\d+)\$([A-Za-z0-9_-]+)\$([A-Za-z0-9_-]+)$/;
+
+// Zeichen, die am Telefon leicht verwechselt werden, bleiben aussen vor:
+// 0/O, 1/l/I. Der Betrieb gibt Startpasswoerter oft muendlich durch, wenn
+// jemand ausgesperrt ist - ein Passwort mit "O" oder "0" kostet dann einen
+// zweiten Anruf.
+const READABLE_LETTERS = "abcdefghjkmnpqrstuvwxyz";
+const READABLE_DIGITS = "23456789";
+
+// randomInt(max) statt Math.random(): kryptographisch sicher und ohne die
+// leichte Verzerrung, die ein Modulo auf Math.random() erzeugen würde.
+function randomChar(alphabet) {
+  return alphabet[randomInt(alphabet.length)];
+}
+
+function randomGroup(alphabet, length) {
+  let group = "";
+  for (let i = 0; i < length; i += 1) group += randomChar(alphabet);
+  return group;
+}
+
+// Erzeugt ein Startpasswort fuer eine erzwungene Passwortvergabe (Zurücksetzen
+// durch Büro oder Plattform-Notausgang). password() aus validation.mjs
+// verlangt mindestens einen Buchstaben UND eine Ziffer - das wird hier fest
+// eingebaut statt dem Zufall überlassen: zwei Gruppen bestehen nur aus
+// Buchstaben, eine Gruppe nur aus Ziffern. Die Bindestrich-Gruppierung
+// (z. B. "xkrm-pfug-4823") macht das Passwort am Telefon vorlesbar.
+export function generateTemporaryPassword() {
+  return [
+    randomGroup(READABLE_LETTERS, 4),
+    randomGroup(READABLE_LETTERS, 4),
+    randomGroup(READABLE_DIGITS, 4)
+  ].join("-");
+}
 
 function options(N, r, p) {
   return { N, r, p, maxmem: Math.max(32 * 1024 * 1024, 128 * N * r + 1024 * 1024) };
