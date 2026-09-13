@@ -2191,6 +2191,44 @@ select:focus-visible {
   margin-top: 6px;
 }
 
+/* DATEV-Lohnschnittstelle: eine fehlende Zuordnung soll ins Auge springen,
+   nicht als leere Zelle oder stille Null durchgehen (siehe DATEV_EXPORT.md). */
+.datev-missing {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--brand-dark);
+  border-radius: 14px;
+  background: var(--brand-soft);
+}
+
+.datev-missing strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--brand-dark);
+  font-size: 0.7rem;
+}
+
+.datev-missing ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.datev-missing li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.68rem;
+}
+
+.datev-preview-row--missing td {
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
 .holiday-list,
 .holiday-closure-list {
   display: grid;
