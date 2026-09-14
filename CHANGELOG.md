@@ -4,6 +4,32 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.52] - Migration 032 ist wieder wiederholbar
+
+- **Ein Deploy hätte abbrechen können, sobald ein Betrieb eine ungeprüft
+  wirksame Zeitkorrektur hat.** Die Migrationen werden bei jedem Deploy
+  vollständig neu eingespielt. Migration 032 setzt die Formprüfung für
+  Zeitkorrekturen in einer strengen Fassung: jede freigegebene Korrektur
+  braucht einen Prüfer. Migration 045 hat das später **bewusst gelockert** -
+  eine ohne Büro wirksame Korrektur gilt als freigegeben und hat trotzdem
+  keinen Prüfer (`applied_without_review`). Beim erneuten Lauf schrieb 032 die
+  strenge Fassung zurück und scheiterte an genau den Zeilen, die 045 erlaubt;
+  der ganze Lauf brach ab. Genau so ist hier schon einmal ein Deploy zerbrochen
+  (Migration 141, siehe Projektstatus) - der Betrieb stand danach vier
+  Fassungen hinterher.
+- Ein Wächter in 032 überspringt die Formprüfung, sobald die Spalte aus 045
+  vorhanden ist. Auf einer frischen Installation ändert sich dadurch nichts:
+  dort läuft 032 vor 045, die Spalte fehlt noch, und die Regel wird wie bisher
+  verschärft, bevor 045 sie lockert.
+- Nachgewiesen mit dem echten Fehlerfall: zehn ungeprüft wirksame Korrekturen
+  in der Datenbank, erzeugt über die regulären Code-Pfade. Ohne Wächter bricht
+  der Lauf ab, mit Wächter läuft er durch und die gelockerte Regel bleibt
+  stehen. Ein neuer Test in `045_unreviewed_corrections_test.sql` schlägt an,
+  falls je wieder die strengere Fassung zurückkehrt.
+- Gefunden wurde das nicht durch eine Meldung, sondern beim wiederholten
+  Einspielen der Migrationen während anderer Arbeiten.
+
+
 ## [0.44.51] - Zähltexte treffen den Numerus
 
 - **„1 sichtbare Einsätze" ist weg.** Beim Durchspielen der Büro-Abläufe mit

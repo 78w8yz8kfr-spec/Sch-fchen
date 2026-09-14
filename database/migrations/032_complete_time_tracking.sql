@@ -85,50 +85,76 @@ WHERE original_entry_id IS NOT NULL
   AND correction_kind IS NULL;
 
 ALTER TABLE time_entries
-    DROP CONSTRAINT IF EXISTS time_entries_correction_kind_check,
-    DROP CONSTRAINT IF EXISTS time_entries_correction_shape_check;
+    DROP CONSTRAINT IF EXISTS time_entries_correction_kind_check;
 
 ALTER TABLE time_entries
     ADD CONSTRAINT time_entries_correction_kind_check CHECK (
         correction_kind IS NULL
         OR correction_kind IN ('replacement', 'addition', 'invalidation')
-    ),
-    ADD CONSTRAINT time_entries_correction_shape_check CHECK (
-        (
-            correction_kind IS NULL
-            AND original_entry_id IS NULL
-            AND correction_status IS NULL
-            AND correction_reason IS NULL
-            AND reviewed_by_user_id IS NULL
-            AND reviewed_at IS NULL
-        )
-        OR
-        (
-            correction_kind IN ('replacement', 'invalidation')
-            AND original_entry_id IS NOT NULL
-            AND correction_status IS NOT NULL
-            AND correction_reason IS NOT NULL
-            AND BTRIM(correction_reason) <> ''
-            AND (
-                (correction_status = 'pending' AND reviewed_by_user_id IS NULL AND reviewed_at IS NULL)
-                OR
-                (correction_status IN ('approved', 'rejected') AND reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)
-            )
-        )
-        OR
-        (
-            correction_kind = 'addition'
-            AND original_entry_id IS NULL
-            AND correction_status IS NOT NULL
-            AND correction_reason IS NOT NULL
-            AND BTRIM(correction_reason) <> ''
-            AND (
-                (correction_status = 'pending' AND reviewed_by_user_id IS NULL AND reviewed_at IS NULL)
-                OR
-                (correction_status IN ('approved', 'rejected') AND reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)
-            )
-        )
     );
+
+-- Die Formpruefung wird hier verschaerft - aber Migration 045 lockert sie
+-- spaeter bewusst: eine ohne Buero wirksame Korrektur gilt als freigegeben und
+-- hat trotzdem keinen Pruefer (applied_without_review). Beim Deploy werden alle
+-- Migrationen erneut eingespielt. Ohne diesen Waechter schriebe 032 dabei die
+-- strengere Fassung zurueck und scheiterte an genau den Zeilen, die 045
+-- erlaubt - der ganze Deploy braeche ab, so wie er es bei Migration 141 schon
+-- einmal getan hat. Erkennungsmerkmal ist die Spalte, die 045 mitbringt: ist
+-- sie da, gehoert die Regel bereits einer spaeteren Migration.
+DO $waechter$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'time_entries'
+          AND column_name = 'applied_without_review'
+    ) THEN
+        RETURN;
+    END IF;
+
+    ALTER TABLE time_entries
+        DROP CONSTRAINT IF EXISTS time_entries_correction_shape_check;
+
+    ALTER TABLE time_entries
+        ADD CONSTRAINT time_entries_correction_shape_check CHECK (
+
+            (
+                correction_kind IS NULL
+                AND original_entry_id IS NULL
+                AND correction_status IS NULL
+                AND correction_reason IS NULL
+                AND reviewed_by_user_id IS NULL
+                AND reviewed_at IS NULL
+            )
+            OR
+            (
+                correction_kind IN ('replacement', 'invalidation')
+                AND original_entry_id IS NOT NULL
+                AND correction_status IS NOT NULL
+                AND correction_reason IS NOT NULL
+                AND BTRIM(correction_reason) <> ''
+                AND (
+                    (correction_status = 'pending' AND reviewed_by_user_id IS NULL AND reviewed_at IS NULL)
+                    OR
+                    (correction_status IN ('approved', 'rejected') AND reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)
+                )
+            )
+            OR
+            (
+                correction_kind = 'addition'
+                AND original_entry_id IS NULL
+                AND correction_status IS NOT NULL
+                AND correction_reason IS NOT NULL
+                AND BTRIM(correction_reason) <> ''
+                AND (
+                    (correction_status = 'pending' AND reviewed_by_user_id IS NULL AND reviewed_at IS NULL)
+                    OR
+                    (correction_status IN ('approved', 'rejected') AND reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)
+                )
+            )
+        );
+END
+$waechter$;
 
 CREATE OR REPLACE FUNCTION time_entries_before_write()
 RETURNS TRIGGER

@@ -6,7 +6,7 @@ let locations = [], canManage = false, editing = null, parent = null, busy = fal
 
 async function request(path = "", options = {}) {
   const response = await fetch(base + path, { credentials: "same-origin", cache: "no-store", ...options,
-    headers: { "Content-Type": "application/json", "X-Schaefchen-Version": "0.44.51" } });
+    headers: { "Content-Type": "application/json", "X-Schaefchen-Version": "0.44.52" } });
   // Eine Fehlerseite des Servers (etwa 404 oder 502) kommt als HTML, nicht als
   // JSON. Ohne diesen Fang landete die rohe Meldung "Unexpected token '<' ..."
   // vor den Augen des Nutzers. Bei unlesbarer Antwort bleibt data leer, und die

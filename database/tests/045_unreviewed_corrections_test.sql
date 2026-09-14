@@ -136,4 +136,28 @@ $$;
 
 ROLLBACK;
 
+
+-- Die Formpruefung muss nach ALLEN Migrationen die gelockerte Fassung aus 045
+-- tragen. Migration 032 setzt dieselbe Regel in einer strengeren Fassung und
+-- laeuft beim Deploy erneut mit; ohne ihren Waechter schriebe sie die strenge
+-- Fassung zurueck und der Lauf braeche an genau den Zeilen ab, die 045
+-- erlaubt. Diese Pruefung faengt eine solche Rueckkehr.
+DO $$
+DECLARE regel TEXT;
+BEGIN
+    SELECT pg_get_constraintdef(oid) INTO regel
+    FROM pg_constraint
+    WHERE conname = 'time_entries_correction_shape_check'
+      AND conrelid = 'time_entries'::REGCLASS;
+
+    IF regel IS NULL THEN
+        RAISE EXCEPTION 'Die Formpruefung time_entries_correction_shape_check fehlt';
+    END IF;
+
+    IF regel NOT LIKE '%applied_without_review%' THEN
+        RAISE EXCEPTION 'Die Formpruefung kennt applied_without_review nicht - eine aeltere Migration hat die strengere Fassung zurueckgeschrieben: %', regel;
+    END IF;
+END;
+$$;
+
 \echo 'Migration 045_record_unreviewed_corrections.sql erfolgreich getestet.'
