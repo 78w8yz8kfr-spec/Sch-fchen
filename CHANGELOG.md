@@ -4,6 +4,23 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.50] - Knöpfe in Überschriftenzeilen wieder normal breit
+
+- **Der rote Balken quer durch die Karte ist weg.** Bei der Prüfung der
+  Büro-Masken am echten Server fiel auf, dass „Excel Export" in der
+  Arbeitszeit-Auswertung **951 Pixel** breit war und „＋ Hochladen" in der
+  Dokumentablage **868** - beide quetschten dabei Überschrift und Zähler in je
+  zwei Zeilen („0 von" / „0"). Ursache: `styles.css` setzt
+  `.button--primary { width: 100% }` - am Telefon richtig, am Rechner schlägt
+  es in Zeilen-Layouts durch. Bezeichnend war, dass design-system.css für die
+  Stundenübersicht bereits eine 620px-Regel mit voller Breite hatte, also von
+  schmalen Knöpfen am Rechner ausging. Knöpfe in Überschriftenzeilen haben
+  jetzt ihre natürliche Breite (102 bzw. 106 Pixel); am Telefon darf die Zeile
+  umbrechen, statt jedes Element zu stauchen. Die bewusst vollbreiten Knöpfe
+  („Arbeitstag starten", Formular-Absender, Exportleiste) bleiben unverändert.
+  Reine Oberfläche, keine Änderung an Ablauf oder Daten (Migration 166).
+
+
 ## [0.44.49] - Verständliche Fehlermeldung statt Entwicklertext
 
 - **Kein „Unexpected token" mehr für den Nutzer.** Bei der Geräteprüfung fiel

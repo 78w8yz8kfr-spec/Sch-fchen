@@ -1120,6 +1120,16 @@ textarea {
   font-size: var(--ui-title-sm);
 }
 
+/* In einer Ueberschriftenzeile steht der Knopf rechts in seiner natuerlichen
+   Breite. Die Handy-Regel .button--primary { width: 100% } zog ihn sonst ueber
+   die halbe Karte: "Excel Export" wurde 951 Pixel breit, "+ Hochladen" 868 -
+   und quetschte dabei Ueberschrift und Zaehler in je zwei Zeilen. Am Telefon
+   gilt fuer die Stundenuebersicht weiter die volle Breite (620px-Abfrage). */
+.hours-overview-heading .button,
+.site-management-panel__heading .button {
+  width: auto;
+}
+
 .hours-overview-toolbar {
   display: grid;
   align-items: end;
@@ -1932,6 +1942,13 @@ body:has(#vde-app) main {
 
   .hours-overview-heading .button {
     width: 100%;
+  }
+
+  /* Am Telefon stehen Ueberschrift, Knopf und Zaehler sonst zu dritt in einer
+     390px-Zeile: "+ Hochladen" brach auf zwei Zeilen um, der Zaehler "0 von 0"
+     sogar auf drei. Umbruch erlaubt, statt jedes Element zu quetschen. */
+  .site-management-panel__heading {
+    flex-wrap: wrap;
   }
 
   .hours-overview-toolbar {
