@@ -4,6 +4,34 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.53] - Diktat für Baustellenberichte lässt sich beenden und überlebt Pausen
+
+- **Zwei Fehler, die das Diktat unbrauchbar machten.** Der Knopf trug den
+  Hinweis „zum Beenden erneut antippen" - aber der zweite Tipp legte über
+  `openSiteReportForm()` das Formular neu an und startete eine **zweite**
+  Erkennung, statt zu beenden. Das Diktat ließ sich gar nicht stoppen, außer
+  durch Speichern oder Abbrechen. Dazu blieb die Meldung „Ich höre zu" für
+  immer stehen: die Abschlussmeldung hing an `if (!textContent)`, und der Text
+  war nie leer.
+- **Sprechpausen beendeten das Diktat heimlich.** Chrome hört nach einer Pause
+  von selbst auf. Auf dem Bildschirm stand weiter „Ich höre zu", der Monteur
+  sprach weiter, und alles Gesagte war verloren. Jetzt wird nach einer Pause
+  weitergehört, bis er selbst beendet.
+- **Der Zustand steht jetzt am Knopf**, nicht nur in einer Textzeile: „Diktat
+  beenden" mit Aufnahmepunkt und Markenrot. Auf der Baustelle liest niemand
+  eine Statuszeile.
+- **Zwischenergebnisse geben Rückmeldung**, dass wirklich etwas ankommt - sie
+  stehen in der Meldung, landen aber nie im Bericht; sonst bliebe halb
+  erkannter Text stehen, wenn das Diktat abbricht.
+- **Jeder Abbruchgrund bekommt einen eigenen Satz.** Vorher bekam gesperrtes
+  Mikrofon, fehlendes Mikrofon und fehlendes Netz denselben Hinweis, aus dem
+  niemand ablesen konnte, was zu tun ist.
+- Geprüft mit einer nachgebauten Spracherkennung im Browser über sechs Fälle:
+  Starten, erkannter Satz, Zwischenergebnis, Ende nach Sprechpause, zweiter
+  Tipp und gesperrtes Mikrofon. Reine Oberfläche, keine Änderung an Daten
+  (Migration 169).
+
+
 ## [0.44.52] - Migration 032 ist wieder wiederholbar
 
 - **Ein Deploy hätte abbrechen können, sobald ein Betrieb eine ungeprüft
