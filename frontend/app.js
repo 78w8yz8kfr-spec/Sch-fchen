@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.53";
-import { serverIsNewer } from "./core/versions.js?v=0.44.53";
+} from "./core/work-time.js?v=0.44.54";
+import { serverIsNewer } from "./core/versions.js?v=0.44.54";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.53";
+} from "./core/sync-queue.js?v=0.44.54";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.53";
+} from "./core/permissions.js?v=0.44.54";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.53";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.53";
-import { createPowerModule } from "./core/power-module.js?v=0.44.53";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.53";
+} from "./core/state-store.js?v=0.44.54";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.54";
+import { createPowerModule } from "./core/power-module.js?v=0.44.54";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.54";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.53";
+} from "./core/time-changes.js?v=0.44.54";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -200,6 +200,12 @@ import {
     employeeSitePhotoInput: document.querySelector("#employee-site-photo-input"),
     employeeSitePhotoMessage: document.querySelector("#employee-site-photo-message"),
     employeeSitePhotos: document.querySelector("#employee-site-photos"),
+    fileViewerDialog: document.querySelector("#file-viewer-dialog"),
+    fileViewerTitle: document.querySelector("#file-viewer-title"),
+    fileViewerNote: document.querySelector("#file-viewer-note"),
+    fileViewerBody: document.querySelector("#file-viewer-body"),
+    fileViewerSave: document.querySelector("#file-viewer-save"),
+    fileViewerClose: document.querySelector("#file-viewer-close"),
     employeeSitePhotoSearch: document.querySelector("#employee-site-photo-search"),
     employeeSiteMaterialCount: document.querySelector("#employee-site-material-count"),
     employeeSiteMaterials: document.querySelector("#employee-site-materials"),
@@ -1585,7 +1591,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.53",
+          "X-Schaefchen-Version": "0.44.54",
           ...options.headers
         }
       });
@@ -1620,7 +1626,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.53`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.54`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1629,20 +1635,79 @@ import {
   // eingerichteten App ersetzt der Browser damit die ganze Ansicht, und dort
   // gibt es kein Zurueck - die App musste beendet werden. Geholt wird die
   // Datei deshalb hier, und weitergereicht wird sie als fertiger Inhalt.
+  // Der Betrachter haelt genau eine Datei offen. Ihre Adresse wird beim
+  // Schliessen wieder freigegeben - sonst behaelt der Browser jedes je
+  // geoeffnete Foto im Speicher, und auf einem Telefon mit vielen
+  // Baustellenfotos ist das der Unterschied zwischen fluessig und zaeh.
+  let betrachterAdresse = null;
+  let betrachterDatei = null;
+
+  function schliesseBetrachter() {
+    if (betrachterAdresse) {
+      URL.revokeObjectURL(betrachterAdresse);
+      betrachterAdresse = null;
+    }
+    betrachterDatei = null;
+    elements.fileViewerBody.replaceChildren();
+    if (elements.fileViewerDialog.open) elements.fileViewerDialog.close();
+  }
+
+  function zeigeImBetrachter(blob, fileName) {
+    schliesseBetrachter();
+    betrachterAdresse = URL.createObjectURL(blob);
+    betrachterDatei = { blob, fileName };
+    elements.fileViewerTitle.textContent = fileName;
+
+    const typ = blob.type || "";
+    if (typ.startsWith("image/")) {
+      const bild = document.createElement("img");
+      bild.className = "file-viewer__image";
+      bild.src = betrachterAdresse;
+      bild.alt = fileName;
+      elements.fileViewerBody.append(bild);
+      elements.fileViewerNote.textContent = `${formatFileSize(blob.size)} · zum Vergrößern auf dem Gerät speichern`;
+    } else if (typ === "application/pdf") {
+      // Ein Rahmen statt eines neuen Fensters. Manche Telefone zeigen darin
+      // nur die erste Seite oder gar nichts - deshalb steht der Weg zum
+      // Speichern immer daneben und wird hier ausdruecklich genannt.
+      const rahmen = document.createElement("iframe");
+      rahmen.className = "file-viewer__frame";
+      rahmen.src = betrachterAdresse;
+      rahmen.title = fileName;
+      elements.fileViewerBody.append(rahmen);
+      elements.fileViewerNote.textContent = `${formatFileSize(blob.size)} · zeigt das Telefon die Seiten nicht, hilft „Auf dem Gerät speichern“`;
+    } else {
+      const hinweis = document.createElement("p");
+      hinweis.className = "time-correction-note";
+      hinweis.textContent = "Diese Dateiart lässt sich hier nicht anzeigen. Zum Ansehen bitte auf dem Gerät speichern.";
+      elements.fileViewerBody.append(hinweis);
+      elements.fileViewerNote.textContent = formatFileSize(blob.size);
+    }
+    if (!elements.fileViewerDialog.open) elements.fileViewerDialog.showModal();
+  }
+
+  // Fruher hing an jedem "Oeffnen" ein Download: die Datei ging an Galerie
+  // oder PDF-Anzeige des Geraets, und aus einer eingerichteten App gab es von
+  // dort keinen Weg zurueck. Jetzt bleibt sie hier; Speichern ist eine eigene,
+  // ausdrueckliche Handlung im Betrachter.
   async function openDocumentFile(path, fileName) {
     try {
-      await downloadFile(path, fileName);
+      const geholt = await fetchFileBlob(path, fileName);
+      zeigeImBetrachter(geholt.blob, geholt.fileName);
     } catch (error) {
       showErrorToast(error.message);
     }
   }
 
-  async function downloadFile(path, fallbackName) {
+  // Holen und Speichern waren bisher eins. Der Betrachter braucht nur den
+  // Inhalt - deshalb liefert diese Haelfte Blob und Namen, ohne etwas an das
+  // Geraet weiterzureichen.
+  async function fetchFileBlob(path, fallbackName) {
     let response;
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.53" }
+        headers: { "X-Schaefchen-Version": "0.44.54" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1665,7 +1730,17 @@ import {
     const fileName = encodedName
       ? decodeURIComponent(encodedName)
       : plainName || fallbackName;
-    const objectUrl = URL.createObjectURL(await response.blob());
+    return { blob: await response.blob(), fileName };
+  }
+
+  async function downloadFile(path, fallbackName) {
+    const { blob, fileName } = await fetchFileBlob(path, fallbackName);
+    speichereBlob(blob, fileName);
+    return fileName;
+  }
+
+  function speichereBlob(blob, fileName) {
+    const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = objectUrl;
     link.download = fileName;
@@ -1673,7 +1748,6 @@ import {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    return fileName;
   }
 
   function configureModeCopy() {
@@ -1689,7 +1763,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.53 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.54 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3110,7 +3184,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.53";
+  const EIGENE_FASSUNG = "0.44.54";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3149,7 +3223,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.53". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.54". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -4092,8 +4166,13 @@ import {
       : vdeEditorUrl(siteId, inspection.id, date);
     action.textContent = inspection.status === "completed" ? "PDF" : "Weiter";
     if (inspection.status === "completed") {
-      action.target = "_blank";
-      action.rel = "noopener";
+      // Das fertige Protokoll bleibt in der App - ein neuer Reiter ersetzte in
+      // einer eingerichteten App die ganze Ansicht.
+      const pdfAdresse = action.href;
+      action.addEventListener("click", (event) => {
+        event.preventDefault();
+        void openDocumentFile(pdfAdresse, `${inspection.name || "Pruefprotokoll"}.pdf`);
+      });
     }
     item.className = "site-module-item";
     item.append(content, action);
@@ -4830,8 +4909,11 @@ import {
         : vdeEditorUrl(inspection.constructionSiteId, inspection.id, adminState.date);
       ziel.textContent = inspection.status === "completed" ? "PDF" : "Weiter";
       if (inspection.status === "completed") {
-        ziel.target = "_blank";
-        ziel.rel = "noopener";
+        const pdfAdresse = ziel.href;
+        ziel.addEventListener("click", (event) => {
+          event.preventDefault();
+          void openDocumentFile(pdfAdresse, `${inspection.name || "Pruefprotokoll"}.pdf`);
+        });
       }
       zeile.append(
         name,
@@ -7302,7 +7384,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.53" }
+        headers: { "X-Schaefchen-Version": "0.44.54" }
       });
       if (response.ok) {
         await cache.put(
@@ -14583,6 +14665,12 @@ import {
   elements.employeeEditRole.addEventListener("change", applyApprenticeFieldVisibility);
   elements.apprenticeSave.addEventListener("click", () => saveApprenticeReport(false));
   elements.apprenticeWithdraw.addEventListener("click", () => withdrawApprenticeReport());
+  elements.fileViewerClose.addEventListener("click", schliesseBetrachter);
+  // Auch Esc und der Klick daneben geben die Adresse frei.
+  elements.fileViewerDialog.addEventListener("close", schliesseBetrachter);
+  elements.fileViewerSave.addEventListener("click", () => {
+    if (betrachterDatei) speichereBlob(betrachterDatei.blob, betrachterDatei.fileName);
+  });
   elements.apprenticeWeekRemark.addEventListener("input", renderApprenticeRemarkCount);
   // Die Vorschau in einem eigenen Fenster - am Handy gibt es keinen Platz
   // daneben, und manche wollen sie auch am Rechner gross sehen.
