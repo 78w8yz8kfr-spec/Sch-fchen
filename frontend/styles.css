@@ -4869,6 +4869,20 @@ select:focus-visible {
   text-align: left;
 }
 
+/* Waehrend des Diktats muss auf einen Blick erkennbar sein, dass aufgenommen
+   wird. Auf der Baustelle liest niemand eine Textzeile - der Knopf selbst
+   traegt den Zustand, samt Aufnahmepunkt vor der Beschriftung. */
+.module-action--recording {
+  border-color: var(--brand);
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+}
+
+.module-action--recording strong::before {
+  content: "\25CF ";
+  color: var(--brand);
+}
+
 .module-action strong {
   font-size: 0.74rem;
 }

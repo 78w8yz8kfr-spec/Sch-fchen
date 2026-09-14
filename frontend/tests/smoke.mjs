@@ -166,6 +166,26 @@ assert.doesNotMatch(app, /canPlan\(\) \|\| Boolean\(session\?\.user\.isTrainer\)
 assert.match(app, /moduleEnabled\("apprentice_reports"\)/);
 assert.match(styles, /\.apprentice-review-list/);
 
+// Das Diktat fuer Baustellenberichte. Vorher legte der zweite Tipp auf den
+// Knopf ueber openSiteReportForm() das Formular neu an und startete eine
+// zweite Erkennung - beenden liess es sich gar nicht -, und nach einer
+// Sprechpause beendete Chrome von selbst, waehrend "Ich hoere zu" stehen
+// blieb und der weitergesprochene Text verloren ging.
+assert.match(app, /if \(diktatLaeuft\) \{\s*\n\s*beendeDiktat\(/);
+// Nach einer Sprechpause wird weitergehoert, bis der Monteur selbst beendet.
+assert.match(app, /if \(diktatFortsetzungen < 20\) \{/);
+// Zwischenergebnisse geben Rueckmeldung, landen aber nie im Bericht.
+assert.match(app, /erkennung\.interimResults = true;/);
+assert.match(app, /Ich höre zu … „\$\{vorlaeufig\.trim\(\)\}“/);
+// Jeder Abbruchgrund bekommt einen eigenen, handlungsfaehigen Satz.
+assert.match(app, /"not-allowed": "Das Mikrofon ist gesperrt/);
+assert.match(app, /"audio-capture": "Kein Mikrofon gefunden/);
+// Der Zustand steht am Knopf, nicht nur in einer Textzeile.
+assert.match(app, /classList\.toggle\("module-action--recording", aktiv\)/);
+assert.match(styles, /\.module-action--recording \{/);
+// Speichern und Zuruecksetzen beenden das Diktat mit.
+assert.doesNotMatch(app, /speechRecognition\.stop\(\)/);
+
 // Zaehltexte muessen den Numerus treffen. Bei einem einzelnen Eintrag stand
 // vorher "1 sichtbare Einsaetze", "1 gelesene Zeilen" und "1 Mitglieder"; bei
 // mehreren umgekehrt "3 vorhandene Baustelle wird nicht doppelt angelegt".
@@ -263,7 +283,7 @@ assert.match(
 // Dokumente, Baustellenfotos, VDE-Protokoll -, gibt keine Kopfzeile mit. Ohne
 // die Fassung im Adressteil kam dort waehrend eines Pflichtupdates dessen
 // Meldung als JSON an: 203 Byte, abgelegt als "SE-R-….pdf.json".
-assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.52`;/);
+assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.53`;/);
 for (const stelle of [
   /apprentice\/reports\/\$\{selectedWeekStart\}\/pdf\?preview=true/,
   /admin\/documents\/\$\{encodeURIComponent\(documentItem\.id\)\}\/content/,
@@ -286,7 +306,7 @@ assert.doesNotMatch(app, /link\.target = "_blank";\s*link\.rel = "noopener";\s*l
 // Offline gesicherte Dokumente behalten ihren Schluessel ohne die Fassung.
 assert.match(app, /function employeeSiteContentKey\(/);
 assert.match(worker, /cacheUrl\.searchParams\.delete\("appVersion"\)/);
-assert.match(vdeApp, /appVersion=0\.44\.52/);
+assert.match(vdeApp, /appVersion=0\.44\.53/);
 assert.match(app, /element === elements\.apprenticeSection[\s\S]{0,160}mayReviewApprentices\(\)/);
 // Seine bisherigen Berichte fuehren in ihre Woche zurueck und lassen sich von
 // dort drucken. Vorher war die Liste eine tote Aufzaehlung.
@@ -801,10 +821,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.44\.52/);
-assert.match(html, /design-system\.css\?v=0\.44\.52/);
-assert.match(html, /app\.js\?v=0\.44\.52/);
-assert.match(html, /version\.js\?v=0\.44\.52/);
+assert.match(html, /styles\.css\?v=0\.44\.53/);
+assert.match(html, /design-system\.css\?v=0\.44\.53/);
+assert.match(html, /app\.js\?v=0\.44\.53/);
+assert.match(html, /version\.js\?v=0\.44\.53/);
 assert.match(html, /id="devices-section"[^>]*data-dashboard-pane="devices"/);
 assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
@@ -1609,21 +1629,21 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.52"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.52"'));
-assert.ok(worker.includes('"./app.js?v=0.44.52"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.52"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.52"'));
-assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.52"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.52"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.53"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.53"'));
+assert.ok(worker.includes('"./app.js?v=0.44.53"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.53"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.53"'));
+assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.53"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.53"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.52"'));
+assert.ok(worker.includes('"./version.js?v=0.44.53"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.52"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.52";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.53"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.53";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1658,7 +1678,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.44\.52$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.44\.53$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1666,11 +1686,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.52"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.52"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.53"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.53"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.52"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.52"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.53"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.53"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 // Gesucht wird unter der abgelegten Adresse - ohne die App-Fassung, die nur an
@@ -1768,9 +1788,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.44\.52/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.44\.52/);
-assert.match(vdeHtml, /app\.js\?v=0\.44\.52/);
+assert.match(vdeHtml, /styles\.css\?v=0\.44\.53/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.44\.53/);
+assert.match(vdeHtml, /app\.js\?v=0\.44\.53/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1786,7 +1806,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.44\.52/);
+assert.match(platformHtml, /design-system\.css\?v=0\.44\.53/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,

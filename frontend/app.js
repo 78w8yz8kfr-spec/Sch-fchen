@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.52";
-import { serverIsNewer } from "./core/versions.js?v=0.44.52";
+} from "./core/work-time.js?v=0.44.53";
+import { serverIsNewer } from "./core/versions.js?v=0.44.53";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.52";
+} from "./core/sync-queue.js?v=0.44.53";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.52";
+} from "./core/permissions.js?v=0.44.53";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.52";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.52";
-import { createPowerModule } from "./core/power-module.js?v=0.44.52";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.52";
+} from "./core/state-store.js?v=0.44.53";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.53";
+import { createPowerModule } from "./core/power-module.js?v=0.44.53";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.53";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.52";
+} from "./core/time-changes.js?v=0.44.53";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1298,6 +1298,11 @@ import {
   let passwordResetEmployeeId = null;
   let editingTimeAccountId = null;
   let speechRecognition = null;
+  // Laeuft gerade ein Diktat, und wie oft wurde es nach einer Sprechpause
+  // schon von selbst fortgesetzt. Beides steuert Knopfbeschriftung und
+  // Fortsetzung - siehe starteDiktat().
+  let diktatLaeuft = false;
+  let diktatFortsetzungen = 0;
   let cachedUserId = null;
   // Hinweis auf Arbeit, die aus einem frueheren Tag mitgenommen wurde. Er wird
   // erst gezeigt, wenn die Oberflaeche steht.
@@ -1580,7 +1585,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.52",
+          "X-Schaefchen-Version": "0.44.53",
           ...options.headers
         }
       });
@@ -1615,7 +1620,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.52`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.53`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1637,7 +1642,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.52" }
+        headers: { "X-Schaefchen-Version": "0.44.53" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1684,7 +1689,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.52 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.53 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3105,7 +3110,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.52";
+  const EIGENE_FASSUNG = "0.44.53";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3144,7 +3149,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.52". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.53". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -4369,10 +4374,7 @@ import {
     if (clearDraft) {
       clearSiteReportDraft(openedSiteId, elements.siteReportSourceMode.value);
     }
-    if (speechRecognition) {
-      speechRecognition.stop();
-      speechRecognition = null;
-    }
+    beendeDiktat();
     reportPhotoFile = null;
     elements.siteReportPhotoInput.value = "";
     elements.siteReportForm.reset();
@@ -7300,7 +7302,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.52" }
+        headers: { "X-Schaefchen-Version": "0.44.53" }
       });
       if (response.ok) {
         await cache.put(
@@ -13560,47 +13562,131 @@ import {
     elements.siteReportSummary.value = `Papierbericht · ${site?.name || "Baustelle"} · ${new Intl.DateTimeFormat("de-DE").format(new Date())}`;
     elements.siteReportSourceNote.textContent = `${file.name} · ${formatFileSize(file.size)} · Das Originalfoto bleibt unverändert erhalten.`;
   });
+  // Das Diktat ist fuer den Monteur auf der Baustelle gedacht: Laerm ringsum,
+  // eine Hand am Geraet. Es muss sichtbar sein, dass zugehoert wird, derselbe
+  // Knopf muss es wieder beenden, und eine Sprechpause darf es nicht heimlich
+  // abwuergen.
+  function zeigeDiktatZustand(aktiv) {
+    diktatLaeuft = aktiv;
+    const titel = elements.siteReportSpeech.querySelector("strong");
+    const hinweis = elements.siteReportSpeech.querySelector("span");
+    if (titel) titel.textContent = aktiv ? "Diktat beenden" : "Bericht diktieren";
+    if (hinweis) hinweis.textContent = aktiv ? "Ich höre zu – zum Beenden antippen" : "Sprache wird als Text übernommen";
+    elements.siteReportSpeech.classList.toggle("module-action--recording", aktiv);
+    elements.siteReportSpeech.setAttribute("aria-pressed", aktiv ? "true" : "false");
+  }
+
+  function beendeDiktat(meldung) {
+    const laufend = speechRecognition;
+    // Zuerst leeren: onend darf danach nicht mehr fortsetzen.
+    speechRecognition = null;
+    diktatFortsetzungen = 0;
+    zeigeDiktatZustand(false);
+    if (laufend) {
+      try { laufend.stop(); } catch { /* war schon beendet */ }
+    }
+    if (meldung) elements.siteReportMessage.textContent = meldung;
+  }
+
+  function starteDiktat(Erkennung) {
+    const erkennung = new Erkennung();
+    speechRecognition = erkennung;
+    erkennung.lang = "de-DE";
+    // Zwischenergebnisse zeigen dem Monteur, dass wirklich etwas ankommt. Sie
+    // landen nur in der Meldung, nie im Bericht: sonst bliebe halb erkannter
+    // Text stehen, wenn das Diktat abbricht.
+    erkennung.interimResults = true;
+    erkennung.continuous = true;
+
+    erkennung.onresult = (ereignis) => {
+      let fertig = "";
+      let vorlaeufig = "";
+      for (let i = ereignis.resultIndex; i < ereignis.results.length; i += 1) {
+        const text = ereignis.results[i][0]?.transcript || "";
+        if (ereignis.results[i].isFinal) fertig += ` ${text}`;
+        else vorlaeufig += ` ${text}`;
+      }
+      fertig = fertig.trim();
+      if (fertig) {
+        // Es kommt etwas an: der Zaehler fuer stille Fortsetzungen faengt neu an.
+        diktatFortsetzungen = 0;
+        elements.siteReportDetails.value = `${elements.siteReportDetails.value.trim()} ${fertig}`.trim();
+        saveSiteReportDraft();
+      }
+      elements.siteReportMessage.textContent = vorlaeufig.trim()
+        ? `Ich höre zu … „${vorlaeufig.trim()}“`
+        : "Ich höre zu … zum Beenden „Diktat beenden“ antippen.";
+    };
+
+    erkennung.onerror = (ereignis) => {
+      // Frueher bekam jeder Fehler denselben Satz. Wer das Mikrofon gesperrt
+      // hat, liest daraus nicht, was zu tun ist.
+      const grund = {
+        "not-allowed": "Das Mikrofon ist gesperrt. Bitte in den Browser-Einstellungen für diese Seite erlauben.",
+        "service-not-allowed": "Das Mikrofon ist gesperrt. Bitte in den Browser-Einstellungen für diese Seite erlauben.",
+        "audio-capture": "Kein Mikrofon gefunden. Der Bericht kann direkt eingetippt werden.",
+        "no-speech": "Nichts gehört. Bitte näher ans Mikrofon sprechen.",
+        network: "Das Diktat braucht eine Internetverbindung. Ohne Netz bitte eintippen."
+      }[ereignis.error];
+      // Eine Sprechpause ist kein Grund aufzuhoeren - onend setzt gleich fort.
+      if (ereignis.error === "no-speech") {
+        elements.siteReportMessage.textContent = grund;
+        return;
+      }
+      // Vom Beenden selbst ausgeloest.
+      if (ereignis.error === "aborted") return;
+      beendeDiktat(grund || "Das Diktat wurde unterbrochen. Der bisherige Text kann geprüft und ergänzt werden.");
+    };
+
+    erkennung.onend = () => {
+      // Sauber beendet - beendeDiktat() hat die Ablage schon geleert.
+      if (speechRecognition !== erkennung) return;
+      // Chrome beendet nach einer Sprechpause von selbst. Frueher blieb dann
+      // "Ich hoere zu" stehen, waehrend nichts mehr aufgenommen wurde: der
+      // Monteur sprach weiter und der Text war verloren. Jetzt wird
+      // weitergehoert, bis er selbst beendet.
+      if (diktatFortsetzungen < 20) {
+        diktatFortsetzungen += 1;
+        try {
+          erkennung.start();
+          return;
+        } catch { /* faellt unten durch */ }
+      }
+      beendeDiktat("Diktat beendet. Bitte den Text vor dem Speichern prüfen.");
+    };
+
+    zeigeDiktatZustand(true);
+    elements.siteReportMessage.textContent = "Ich höre zu … zum Beenden „Diktat beenden“ antippen.";
+    try {
+      erkennung.start();
+    } catch {
+      beendeDiktat("Das Diktat konnte nicht gestartet werden. Der Bericht kann direkt eingetippt werden.");
+    }
+  }
+
   elements.siteReportSpeech.addEventListener("click", () => {
-    openSiteReportForm("speech");
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
+    // Der zweite Tipp beendet. Vorher legte er ueber openSiteReportForm() das
+    // Formular neu an und startete eine zweite Erkennung, waehrend die Meldung
+    // weiter "Ich hoere zu" zeigte - das Diktat liess sich gar nicht beenden.
+    if (diktatLaeuft) {
+      beendeDiktat("Diktat beendet. Bitte den Text vor dem Speichern prüfen.");
+      return;
+    }
+    // Ein bereits offenes Diktat-Formular nicht zuruecksetzen: der bisherige
+    // Text bleibt stehen.
+    if (elements.siteReportForm.hidden || elements.siteReportSourceMode.value !== "speech") {
+      openSiteReportForm("speech");
+    }
+    const Erkennung = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Erkennung) {
       elements.siteReportMessage.textContent = "Dieser Browser unterstützt kein Diktat. Der Bericht kann hier trotzdem direkt eingetippt werden.";
       elements.siteReportDetails.focus({ preventScroll: true });
       return;
     }
-    const recognition = new Recognition();
-    speechRecognition = recognition;
-    recognition.lang = "de-DE";
-    recognition.interimResults = false;
-    recognition.continuous = true;
-    recognition.onresult = (event) => {
-      const transcript = [...event.results]
-        .slice(event.resultIndex)
-        .map((result) => result[0]?.transcript || "")
-        .join(" ")
-        .trim();
-      if (transcript) {
-        elements.siteReportDetails.value = `${elements.siteReportDetails.value.trim()} ${transcript}`.trim();
-        saveSiteReportDraft();
-      }
-    };
-    recognition.onerror = () => {
-      elements.siteReportMessage.textContent = "Das Diktat wurde unterbrochen. Der bisherige Text kann geprüft und ergänzt werden.";
-    };
-    recognition.onend = () => {
-      if (speechRecognition === recognition) {
-        speechRecognition = null;
-        if (!elements.siteReportMessage.textContent) elements.siteReportMessage.textContent = "Diktat beendet. Bitte den Text vor dem Speichern prüfen.";
-      }
-    };
-    elements.siteReportMessage.textContent = "Ich höre zu … zum Beenden erneut „Bericht diktieren“ antippen oder den Bericht speichern.";
-    try {
-      recognition.start();
-    } catch {
-      speechRecognition = null;
-      elements.siteReportMessage.textContent = "Das Diktat konnte nicht gestartet werden. Der Bericht kann direkt eingetippt werden.";
-    }
+    diktatFortsetzungen = 0;
+    starteDiktat(Erkennung);
   });
+
   elements.siteReportCancel.addEventListener("click", () => {
     resetSiteReportForm({ clearDraft: true });
   });
@@ -13613,10 +13699,9 @@ import {
       elements.siteReportMessage.textContent = "Bitte zuerst ein gültiges Originalfoto auswählen.";
       return;
     }
-    if (speechRecognition) {
-      speechRecognition.stop();
-      speechRecognition = null;
-    }
+    // Beim Speichern endet das Diktat mit - sonst bliebe der Knopf auf
+    // "Diktat beenden" stehen und die Erkennung liefe ins Leere weiter.
+    beendeDiktat();
     elements.siteReportSubmit.disabled = true;
     elements.siteReportMessage.textContent = sourceMode === "photo"
       ? "Originalfoto und Bericht werden gespeichert …"
