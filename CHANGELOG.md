@@ -4,6 +4,20 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.49] - Verständliche Fehlermeldung statt Entwicklertext
+
+- **Kein „Unexpected token" mehr für den Nutzer.** Bei der Geräteprüfung fiel
+  auf, dass die eigenständigen Seiten „Abwesenheiten freigeben" und
+  „Lagerstruktur" bei einem Serverfehler die rohe Entwicklermeldung
+  „Unexpected token '<', "<!DOCTYPE"... is not valid JSON" anzeigten. Ursache:
+  Beide lasen die Antwort als JSON, **bevor** sie den Erfolg prüften - eine
+  HTML-Fehlerseite (etwa 404 oder 502, oder eine abgelaufene Sitzung) lief so
+  ungefiltert bis vor die Augen des Nutzers. Der JSON-Zugriff ist jetzt
+  abgesichert (`response.json().catch(() => ({}))`, wie im Hauptprogramm längst
+  üblich); stattdessen erscheint eine verständliche deutsche Meldung. Reine
+  Oberfläche, keine Änderung an Ablauf oder Daten (Migration 165).
+
+
 ## [0.44.48] - Verweise in der Markenfarbe
 
 - **Blau unterstrichene Links verschwinden.** Bei einer echten Geräteprüfung
