@@ -28,6 +28,17 @@
   box-sizing: border-box;
 }
 
+/* Verweise tragen die Markenfarbe statt des blauen Browser-Standards und keine
+   Unterstreichung - so wie alle anderen Bedienelemente der App. Ohne diese
+   Grundregel fielen klassenlose Links (etwa "Anträge prüfen / Zuständigkeiten")
+   auf das voreingestellte Blau mit Unterstreichung zurück und wirkten wie ein
+   Fremdkörper. Klassen mit eigener Farbe - Knöpfe, Reiter, Seitenleiste,
+   Download-Verweise - überschreiben das weiterhin. */
+a {
+  color: var(--brand-dark);
+  text-decoration: none;
+}
+
 html {
   min-width: 320px;
   min-height: 100%;

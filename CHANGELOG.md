@@ -4,6 +4,20 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.48] - Verweise in der Markenfarbe
+
+- **Blau unterstrichene Links verschwinden.** Bei einer echten Geräteprüfung
+  fielen zwei Verweise auf der Seite „Meine Anträge" auf: „Anträge prüfen /
+  Zuständigkeiten" und „Zuständigkeiten für Abwesenheitsanträge" erschienen im
+  blau unterstrichenen Browser-Standard und wirkten wie ein Fremdkörper. Ursache
+  war, dass styles.css nie eine Grundregel für `<a>` besaß; klassenlose Links
+  fielen deshalb auf das Voreingestellte zurück. Eine einzige Grundregel gibt
+  allen Verweisen jetzt die Markenfarbe und entfernt die Unterstreichung - so
+  wie alle anderen Bedienelemente. Knöpfe, Reiter, Seitenleiste und
+  Download-Verweise behalten über ihre Klassen ihre eigene Farbe. Reine
+  Oberfläche, keine Änderung an Ablauf oder Daten (Migration 164).
+
+
 ## [0.44.47] - Lagerstruktur im App-Design
 
 - **Die Seite „Lagerstruktur" passt jetzt zur App.** Sie war die letzte, die

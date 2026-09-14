@@ -6,7 +6,7 @@ const stages = {office_review:'Erste Prüfung',management_review:'Verbindliche F
 const kinds = {vacation:'Urlaub',sick:'Krankheit',sick_leave:'Krankheit',time_off:'Freizeitausgleich',unpaid_leave:'Unbezahlter Urlaub',other:'Sonstiges'};
 async function request(url=endpoint,options={}) {
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options,
-    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.47'}});
+    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.48'}});
   const data=await response.json();
   if(!response.ok) throw new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Anfrage fehlgeschlagen.');
   return data;
