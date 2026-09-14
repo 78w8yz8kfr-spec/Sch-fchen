@@ -6,9 +6,13 @@ const stages = {office_review:'Erste Prüfung',management_review:'Verbindliche F
 const kinds = {vacation:'Urlaub',sick:'Krankheit',sick_leave:'Krankheit',time_off:'Freizeitausgleich',unpaid_leave:'Unbezahlter Urlaub',other:'Sonstiges'};
 async function request(url=endpoint,options={}) {
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options,
-    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.47'}});
-  const data=await response.json();
-  if(!response.ok) throw new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Anfrage fehlgeschlagen.');
+    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.49'}});
+  // Eine Fehlerseite des Servers (etwa 404 oder 502) kommt als HTML, nicht als
+  // JSON. Ohne diesen Fang landete die rohe Meldung "Unexpected token '<' ..."
+  // vor den Augen des Nutzers. Bei unlesbarer Antwort bleibt data leer, und die
+  // verstaendliche Meldung unten greift.
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Die Anfrage ist fehlgeschlagen. Bitte später erneut versuchen.');
   return data;
 }
 function el(tag,text) {const node=document.createElement(tag);if(text!==undefined) node.textContent=text;return node;}
