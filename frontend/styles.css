@@ -1616,6 +1616,42 @@ select:focus-visible {
   backdrop-filter: blur(3px);
 }
 
+/* Der Dateibetrachter darf mehr Platz nehmen als ein Formulardialog: ein Foto
+   oder eine PDF-Seite soll erkennbar sein, ohne die App zu verlassen. */
+.file-viewer-dialog {
+  width: min(100% - 16px, 900px);
+  max-height: calc(100dvh - 16px);
+}
+
+.file-viewer__body {
+  display: grid;
+  min-height: 220px;
+  max-height: min(70dvh, 620px);
+  place-items: center;
+  overflow: auto;
+  padding: 0 16px;
+  background: var(--canvas);
+}
+
+.file-viewer__image {
+  max-width: 100%;
+  max-height: min(70dvh, 620px);
+  object-fit: contain;
+}
+
+.file-viewer__frame {
+  width: 100%;
+  height: min(70dvh, 620px);
+  border: 0;
+  background: var(--surface);
+}
+
+.file-viewer__actions {
+  display: grid;
+  padding: 12px 16px 16px;
+}
+
+
 .time-correction-form {
   display: grid;
   gap: 11px;
@@ -6779,7 +6815,11 @@ select:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboard-view > .dashboard-content > * {
+  /* Dialoge sind Ueberlagerungen, kein Inhalt im Raster. Ohne diese Ausnahme
+     nahm ihnen das margin: 0 die Zentrierung durch margin: auto - und jeder
+     Dialog der App klebte am Rechner in der linken oberen Ecke statt mittig
+     zu stehen: Zeitkorrektur, QR-Code, Passwort zuruecksetzen, Vorschau. */
+  .dashboard-view > .dashboard-content > *:not(dialog) {
     margin: 0;
     grid-column: 1 / -1;
   }

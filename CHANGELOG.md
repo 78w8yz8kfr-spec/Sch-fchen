@@ -4,6 +4,33 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.54] - Fotos und Dokumente öffnen in der App
+
+- **„Öffnen" war in Wahrheit ein Download.** Jedes Foto und jedes Dokument
+  wurde als Datei an das Gerät weitergereicht - Galerie, PDF-Anzeige, Dateien.
+  Aus einer eingerichteten App gibt es von dort keinen Weg zurück. Jetzt zeigt
+  ein Betrachter Bilder und PDF an Ort und Stelle; **Speichern** bleibt als
+  eigene, ausdrückliche Handlung daneben erhalten.
+- Auch die fertigen **VDE-Prüfprotokolle** öffneten in einem neuen Reiter
+  (`target="_blank"`), was in einer eingerichteten App die ganze Ansicht
+  ersetzt. Sie laufen jetzt durch denselben Betrachter. Im Programm setzt
+  nichts mehr `_blank`.
+- Holen und Speichern waren eine einzige Funktion; sie sind jetzt getrennt,
+  damit der Betrachter den Inhalt bekommen kann, ohne etwas an das Gerät
+  weiterzureichen. Die Blob-Adresse wird beim Schließen freigegeben - sonst
+  hielte der Browser jedes je geöffnete Foto im Speicher.
+- **Dabei aufgefallen und mitbehoben:** Ein Raster-Reset des
+  Schreibtisch-Layouts (`.dashboard-view > .dashboard-content > *`) traf auch
+  die `<dialog>`-Elemente und nahm ihnen mit `margin: 0` die Zentrierung. Am
+  Rechner klebte dadurch **jeder** Dialog der App in der linken oberen Ecke -
+  Zeitkorrektur, QR-Code, Passwort zurücksetzen. Dialoge sind jetzt
+  ausgenommen und stehen wieder mittig.
+- Nachgewiesen von Ende zu Ende: Foto und PDF über die Oberfläche hochgeladen
+  und angetippt. Der Betrachter öffnet, das Bild ist wirklich gerendert, und
+  es werden **null Downloads** und **null neue Reiter** ausgelöst. Reine
+  Oberfläche, keine Änderung an Daten (Migration 170).
+
+
 ## [0.44.53] - Diktat für Baustellenberichte lässt sich beenden und überlebt Pausen
 
 - **Zwei Fehler, die das Diktat unbrauchbar machten.** Der Knopf trug den
