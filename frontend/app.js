@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.50";
-import { serverIsNewer } from "./core/versions.js?v=0.44.50";
+} from "./core/work-time.js?v=0.44.51";
+import { serverIsNewer } from "./core/versions.js?v=0.44.51";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.50";
+} from "./core/sync-queue.js?v=0.44.51";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.50";
+} from "./core/permissions.js?v=0.44.51";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.50";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.50";
-import { createPowerModule } from "./core/power-module.js?v=0.44.50";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.50";
+} from "./core/state-store.js?v=0.44.51";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.51";
+import { createPowerModule } from "./core/power-module.js?v=0.44.51";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.51";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.50";
+} from "./core/time-changes.js?v=0.44.51";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1580,7 +1580,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.50",
+          "X-Schaefchen-Version": "0.44.51",
           ...options.headers
         }
       });
@@ -1615,7 +1615,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.50`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.51`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1637,7 +1637,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.50" }
+        headers: { "X-Schaefchen-Version": "0.44.51" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1684,7 +1684,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.50 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.51 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2074,10 +2074,14 @@ import {
       const examples = preview.conflicts.slice(0, 5)
         .map((conflict) => `${conflict.employeeName} am ${shortDate(conflict.workDate)}`)
         .join(", ");
-      addImportWarning(`${preview.conflicts.length} bereits anders geplanter Tag wird geschützt: ${examples}.`);
+      addImportWarning(preview.conflicts.length === 1
+        ? `1 bereits anders geplanter Tag wird geschützt: ${examples}.`
+        : `${preview.conflicts.length} bereits anders geplante Tage werden geschützt: ${examples}.`);
     }
     if (preview.duplicateCount) {
-      addImportWarning(`${preview.duplicateCount} bereits identische oder doppelte Zuweisung wird nicht erneut angelegt.`);
+      addImportWarning(preview.duplicateCount === 1
+        ? "1 bereits identische oder doppelte Zuweisung wird nicht erneut angelegt."
+        : `${preview.duplicateCount} bereits identische oder doppelte Zuweisungen werden nicht erneut angelegt.`);
     }
     if (preview.ignoredStatusCount) {
       const status = Object.entries(preview.statusCounts)
@@ -2140,7 +2144,9 @@ import {
   function renderSiteImportPreview(preview) {
     siteImportState = preview;
     elements.siteImportPreview.hidden = false;
-    elements.siteImportTitle.textContent = `${preview.sourceRowCount} gelesene Zeilen`;
+    elements.siteImportTitle.textContent = preview.sourceRowCount === 1
+      ? "1 gelesene Zeile"
+      : `${preview.sourceRowCount} gelesene Zeilen`;
     elements.siteImportStats.replaceChildren();
     addImportStat(elements.siteImportStats, preview.sourceRowCount, "gelesen");
     addImportStat(elements.siteImportStats, preview.readyCount, "bereit");
@@ -2149,13 +2155,17 @@ import {
     if (preview.duplicates.length) {
       addImportWarningTo(
         elements.siteImportWarnings,
-        `${preview.duplicates.length} vorhandene Baustelle wird nicht doppelt angelegt: ${preview.duplicates.slice(0, 5).map((item) => item.siteName).join(", ")}.`
+        preview.duplicates.length === 1
+          ? `1 vorhandene Baustelle wird nicht doppelt angelegt: ${preview.duplicates.slice(0, 5).map((item) => item.siteName).join(", ")}.`
+          : `${preview.duplicates.length} vorhandene Baustellen werden nicht doppelt angelegt: ${preview.duplicates.slice(0, 5).map((item) => item.siteName).join(", ")}.`
       );
     }
     if (preview.conflicts.length) {
       addImportWarningTo(
         elements.siteImportWarnings,
-        `${preview.conflicts.length} fehlerhafte oder nicht eindeutige Zeile: ${preview.conflicts.slice(0, 5).map((item) => `Zeile ${item.sourceRow}: ${item.message}`).join(" · ")}.`
+        preview.conflicts.length === 1
+          ? `1 fehlerhafte oder nicht eindeutige Zeile: ${preview.conflicts.slice(0, 5).map((item) => `Zeile ${item.sourceRow}: ${item.message}`).join(" · ")}.`
+          : `${preview.conflicts.length} fehlerhafte oder nicht eindeutige Zeilen: ${preview.conflicts.slice(0, 5).map((item) => `Zeile ${item.sourceRow}: ${item.message}`).join(" · ")}.`
       );
     }
     elements.siteImportList.replaceChildren();
@@ -3095,7 +3105,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.50";
+  const EIGENE_FASSUNG = "0.44.51";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3134,7 +3144,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.50". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.51". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -5468,7 +5478,7 @@ import {
     teams.forEach((team) => {
       const option = document.createElement("option");
       option.value = team.id;
-      option.textContent = `${team.name} · ${team.members.length} Mitglieder`;
+      option.textContent = `${team.name} · ${team.members.length} ${team.members.length === 1 ? "Mitglied" : "Mitglieder"}`;
       elements.assignmentTeam.append(option);
     });
     if (teams.some((team) => team.id === selectedTeam)) {
@@ -5791,7 +5801,9 @@ import {
         elements.adminWeekBoard.append(day);
       }
       elements.planningBoardSummary.textContent =
-        `${visibleCount} sichtbare Einsätze im Monat · zum Ändern Karte öffnen`;
+        visibleCount === 1
+          ? "1 sichtbarer Einsatz im Monat · zum Ändern Karte öffnen"
+          : `${visibleCount} sichtbare Einsätze im Monat · zum Ändern Karte öffnen`;
       return;
     }
 
@@ -5942,7 +5954,9 @@ import {
     });
     applyPlanningBoardWidths();
     elements.planningBoardSummary.textContent =
-      `${visibleAssignments} sichtbare Einsätze · ${unassignedEmployees} nicht eingeplante Mitarbeiter · Karten lassen sich per Drag-and-drop verschieben`;
+      `${visibleAssignments === 1 ? "1 sichtbarer Einsatz" : `${visibleAssignments} sichtbare Einsätze`}`
+      + ` · ${unassignedEmployees === 1 ? "1 nicht eingeplanter Mitarbeiter" : `${unassignedEmployees} nicht eingeplante Mitarbeiter`}`
+      + " · Karten lassen sich per Drag-and-drop verschieben";
   }
 
   /**
@@ -7286,7 +7300,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.50" }
+        headers: { "X-Schaefchen-Version": "0.44.51" }
       });
       if (response.ok) {
         await cache.put(

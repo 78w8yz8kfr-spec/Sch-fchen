@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.51] - Zähltexte treffen den Numerus
+
+- **„1 sichtbare Einsätze" ist weg.** Beim Durchspielen der Büro-Abläufe mit
+  echten Daten - Kunde, Baustelle, Mitarbeiter und Einsatz wirklich angelegt -
+  stand in der Plantafel „1 sichtbare Einsätze". Die Suche nach dem Muster fand
+  acht Stellen, an denen der Zähltext den Numerus verfehlt: in Plantafel und
+  Monatsplan („1 sichtbarer Einsatz"), bei Teamvorlagen („1 Mitglied" statt
+  „1 Mitglieder") und an fünf Stellen im Excel-Import, dort teils andersherum
+  („3 vorhandene Baustelle wird nicht doppelt angelegt" statt „3 vorhandene
+  Baustellen werden nicht doppelt angelegt"). Das Projekt löst solche
+  Phrasenwechsel längst mit einem vollen Ternär - diese acht Stellen waren aus
+  der eigenen Konvention herausgefallen. Zwei weitere Verdachtsfälle im Import
+  erwiesen sich bei der Prüfung als bereits korrekt und blieben unangetastet.
+  Reine Oberfläche, keine Änderung an Ablauf oder Daten (Migration 167).
+
+
 ## [0.44.50] - Knöpfe in Überschriftenzeilen wieder normal breit
 
 - **Der rote Balken quer durch die Karte ist weg.** Bei der Prüfung der
