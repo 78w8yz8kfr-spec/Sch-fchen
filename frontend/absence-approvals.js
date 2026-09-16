@@ -6,7 +6,7 @@ const stages = {office_review:'Erste Prüfung',management_review:'Verbindliche F
 const kinds = {vacation:'Urlaub',sick:'Krankheit',sick_leave:'Krankheit',time_off:'Freizeitausgleich',unpaid_leave:'Unbezahlter Urlaub',other:'Sonstiges'};
 async function request(url=endpoint,options={}) {
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options,
-    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.53'}});
+    headers:{'Content-Type':'application/json','X-Schaefchen-Version':'0.44.54'}});
   // Eine Fehlerseite des Servers (etwa 404 oder 502) kommt als HTML, nicht als
   // JSON. Ohne diesen Fang landete die rohe Meldung "Unexpected token '<' ..."
   // vor den Augen des Nutzers. Bei unlesbarer Antwort bleibt data leer, und die
