@@ -424,6 +424,37 @@ select:focus-visible {
   opacity: 0.62;
 }
 
+/* Sichtbares Speichern: ein reines disabled sieht wie "geht nicht" aus, nicht
+   wie "läuft gerade". Der Knopf bekommt zusätzlich einen kleinen drehenden
+   Ring vor dem (per JS ausgetauschten) Text. */
+.button--saving {
+  position: relative;
+  padding-left: 40px;
+}
+
+.button--saving::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.85;
+  animation: button-saving-spin 700ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button--saving::before {
+    animation-duration: 1400ms;
+  }
+}
+
+@keyframes button-saving-spin {
+  to { transform: rotate(360deg); }
+}
+
 .button--secondary {
   margin-top: 8px;
   color: var(--brand);

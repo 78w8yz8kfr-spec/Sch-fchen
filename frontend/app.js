@@ -836,12 +836,17 @@ import {
     siteEditNumber: document.querySelector("#site-edit-number"),
     siteEditProject: document.querySelector("#site-edit-project"),
     siteEditName: document.querySelector("#site-edit-name"),
+    siteEditNameError: document.querySelector("#site-edit-name-error"),
     siteEditShortText: document.querySelector("#site-edit-short-text"),
     siteEditProjectManager: document.querySelector("#site-edit-project-manager"),
     siteEditStreet: document.querySelector("#site-edit-street"),
+    siteEditStreetError: document.querySelector("#site-edit-street-error"),
     siteEditHouseNumber: document.querySelector("#site-edit-house-number"),
+    siteEditHouseNumberError: document.querySelector("#site-edit-house-number-error"),
     siteEditPostalCode: document.querySelector("#site-edit-postal-code"),
+    siteEditPostalCodeError: document.querySelector("#site-edit-postal-code-error"),
     siteEditCity: document.querySelector("#site-edit-city"),
+    siteEditCityError: document.querySelector("#site-edit-city-error"),
     siteEditStatus: document.querySelector("#site-edit-status"),
     siteEditCancel: document.querySelector("#site-edit-cancel"),
     siteEditMessage: document.querySelector("#site-edit-message"),
@@ -963,8 +968,11 @@ import {
     customerCompanyFields: document.querySelector("#customer-company-fields"),
     customerPrivateFields: document.querySelector("#customer-private-fields"),
     customerCompanyName: document.querySelector("#customer-company-name"),
+    customerCompanyNameError: document.querySelector("#customer-company-name-error"),
     customerFirstName: document.querySelector("#customer-first-name"),
+    customerFirstNameError: document.querySelector("#customer-first-name-error"),
     customerLastName: document.querySelector("#customer-last-name"),
+    customerLastNameError: document.querySelector("#customer-last-name-error"),
     customerEmail: document.querySelector("#customer-email"),
     customerPhone: document.querySelector("#customer-phone"),
     customerStreet: document.querySelector("#customer-street"),
@@ -981,8 +989,11 @@ import {
     customerEditCompanyFields: document.querySelector("#customer-edit-company-fields"),
     customerEditPrivateFields: document.querySelector("#customer-edit-private-fields"),
     customerEditCompanyName: document.querySelector("#customer-edit-company-name"),
+    customerEditCompanyNameError: document.querySelector("#customer-edit-company-name-error"),
     customerEditFirstName: document.querySelector("#customer-edit-first-name"),
+    customerEditFirstNameError: document.querySelector("#customer-edit-first-name-error"),
     customerEditLastName: document.querySelector("#customer-edit-last-name"),
+    customerEditLastNameError: document.querySelector("#customer-edit-last-name-error"),
     customerEditEmail: document.querySelector("#customer-edit-email"),
     customerEditPhone: document.querySelector("#customer-edit-phone"),
     customerEditStreet: document.querySelector("#customer-edit-street"),
@@ -1012,17 +1023,25 @@ import {
     siteFormPanel: document.querySelector("#site-form-panel"),
     siteForm: document.querySelector("#site-form"),
     siteCustomer: document.querySelector("#site-customer"),
+    siteCustomerError: document.querySelector("#site-customer-error"),
     siteNewCustomer: document.querySelector("#site-new-customer"),
     siteCustomerName: document.querySelector("#site-customer-name"),
+    siteCustomerNameError: document.querySelector("#site-customer-name-error"),
     siteProjectField: document.querySelector("#site-project-field"),
     siteProject: document.querySelector("#site-project"),
+    siteProjectError: document.querySelector("#site-project-error"),
     siteName: document.querySelector("#site-name"),
+    siteNameError: document.querySelector("#site-name-error"),
     siteShortText: document.querySelector("#site-short-text"),
     siteProjectManager: document.querySelector("#site-project-manager"),
     siteStreet: document.querySelector("#site-street"),
+    siteStreetError: document.querySelector("#site-street-error"),
     siteHouseNumber: document.querySelector("#site-house-number"),
+    siteHouseNumberError: document.querySelector("#site-house-number-error"),
     sitePostalCode: document.querySelector("#site-postal-code"),
+    sitePostalCodeError: document.querySelector("#site-postal-code-error"),
     siteCity: document.querySelector("#site-city"),
+    siteCityError: document.querySelector("#site-city-error"),
     siteMessage: document.querySelector("#site-message"),
     documentManagementPanel: document.querySelector("#document-management-panel"),
     documentForm: document.querySelector("#document-form"),
@@ -4964,6 +4983,9 @@ import {
     updateCustomerEditTypeFields();
     elements.customerEditForm.hidden = false;
     elements.customerEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Ab hier zählt jede Abweichung von diesem geladenen Stand als
+    // "ungespeicherte Änderung" - siehe formularIstGeaendert().
+    formularBasisSetzen(elements.customerEditForm);
   }
 
   function openProjectEditor(project) {
@@ -5250,6 +5272,7 @@ import {
     elements.siteEditForm.hidden = false;
     elements.siteDashboardEdit.hidden = true;
     elements.siteEditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    formularBasisSetzen(elements.siteEditForm);
   }
 
   function renderAdminSelect(select, items, placeholder, label) {
@@ -7283,7 +7306,7 @@ import {
 
   async function submitAdminForm(form, messageElement, requestPath, payload, successMessage) {
     const submit = form.querySelector('button[type="submit"]');
-    submit.disabled = true;
+    setzeSpeichertZustand(submit, "Wird gespeichert …");
     messageElement.textContent = "Wird sicher gespeichert …";
     try {
       await requestJson(requestPath, { method: "POST", body: JSON.stringify(payload) });
@@ -7294,7 +7317,7 @@ import {
       messageElement.textContent = error.message;
       return false;
     } finally {
-      submit.disabled = false;
+      raeumeSpeichertZustandAuf(submit);
     }
   }
 
@@ -11223,7 +11246,38 @@ import {
     event.returnValue = "";
   });
 
+  // Sichtbares Speichern: disabled allein (siehe .button:disabled) wirkt wie
+  // "geht gerade nicht", nicht wie "läuft gerade". Der Knopftext wird
+  // getauscht und ein kleiner drehender Ring erscheint (.button--saving in
+  // styles.css) - danach kommt über raeumeSpeichertZustandAuf() exakt der
+  // ursprüngliche Text zurück, ganz gleich wie oft verschachtelt aufgerufen.
+  function setzeSpeichertZustand(button, speichertText) {
+    if (!button) return;
+    if (button.dataset.originalLabel === undefined) {
+      button.dataset.originalLabel = button.textContent;
+    }
+    button.disabled = true;
+    button.classList.add("button--saving");
+    button.textContent = speichertText;
+  }
+
+  function raeumeSpeichertZustandAuf(button) {
+    if (!button) return;
+    button.disabled = false;
+    button.classList.remove("button--saving");
+    if (button.dataset.originalLabel !== undefined) {
+      button.textContent = button.dataset.originalLabel;
+      delete button.dataset.originalLabel;
+    }
+  }
+
   function showDashboardPane(pane, smooth = true) {
+    // Bereichswechsel ist "Wegnavigieren innerhalb der App" im Sinn des
+    // Schutzes vor Verlust ungespeicherter Eingaben. Bleibt der Bereich
+    // gleich (z. B. ein interner Refresh nach dem Speichern), wird nicht
+    // gefragt - die Baseline ist dann ohnehin schon geloescht oder passt
+    // wieder zum aktuellen Inhalt.
+    if (pane !== currentDashboardPane && !verlassenTrotzAenderungBestaetigt()) return;
     currentDashboardPane = pane;
     if (pane !== "start") closeMobileReportForm();
     if (pane !== "week") closeTimeCorrectionForm();
@@ -13271,8 +13325,60 @@ import {
   updateCustomerTypeFields();
   updateCustomerEditTypeFields();
 
+  // Firmenname bzw. Vor-/Nachname sind nur Pflicht, je nachdem welche
+  // Kundenart oben gewählt ist - siehe updateCustomerTypeFields(). Die
+  // istRelevant-Funktion liest den aktuellen Stand bei jeder Prüfung frisch,
+  // statt ihn einzufrieren.
+  const customerValidation = [
+    [
+      elements.customerCompanyName,
+      elements.customerCompanyNameError,
+      "Bitte den Firmennamen eingeben.",
+      () => elements.customerType.value !== "private"
+    ],
+    [
+      elements.customerFirstName,
+      elements.customerFirstNameError,
+      "Bitte den Vornamen eingeben.",
+      () => elements.customerType.value === "private"
+    ],
+    [
+      elements.customerLastName,
+      elements.customerLastNameError,
+      "Bitte den Nachnamen eingeben.",
+      () => elements.customerType.value === "private"
+    ]
+  ];
+  bindeFeldFehlerAufraeumen(customerValidation);
+
+  const customerEditValidation = [
+    [
+      elements.customerEditCompanyName,
+      elements.customerEditCompanyNameError,
+      "Bitte den Firmennamen eingeben.",
+      () => elements.customerEditType.value !== "private"
+    ],
+    [
+      elements.customerEditFirstName,
+      elements.customerEditFirstNameError,
+      "Bitte den Vornamen eingeben.",
+      () => elements.customerEditType.value === "private"
+    ],
+    [
+      elements.customerEditLastName,
+      elements.customerEditLastNameError,
+      "Bitte den Nachnamen eingeben.",
+      () => elements.customerEditType.value === "private"
+    ]
+  ];
+  bindeFeldFehlerAufraeumen(customerEditValidation);
+
   elements.customerForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!pruefeFormularFelder(customerValidation)) {
+      elements.customerMessage.textContent = "Bitte die markierten Felder prüfen.";
+      return;
+    }
     const saved = await submitAdminForm(
       elements.customerForm,
       elements.customerMessage,
@@ -13297,14 +13403,22 @@ import {
     await refreshAdmin();
   });
 
-  elements.customerEditCancel.addEventListener("click", () => {
+  // Schliesst die Bearbeitung. Bei ungespeicherten Aenderungen fragt
+  // verlassenTrotzAenderungBestaetigt() nach, bevor irgendetwas passiert -
+  // bricht der Nutzer ab, bleibt das Formular unveraendert offen.
+  function closeCustomerEditorWithGuard() {
+    if (!verlassenTrotzAenderungBestaetigt()) return;
+    formularBasisLoeschen(elements.customerEditForm);
     openedCustomerId = null;
     elements.customerEditForm.hidden = true;
     elements.customerManagementPanel.hidden = true;
     elements.customerEditMessage.textContent = "";
-  });
+  }
+  elements.customerEditCancel.addEventListener("click", closeCustomerEditorWithGuard);
   // Der Brotkrumen loest denselben Klick aus wie "Abbrechen" - ein zweiter
-  // Weg zurueck zur Liste, keine zweite Aktion mit eigener Logik.
+  // Weg zurueck zur Liste, keine zweite Aktion mit eigener Logik. Die
+  // Rueckfrage bei ungespeicherten Aenderungen sitzt in
+  // closeCustomerEditorWithGuard() und greift damit auch hier.
   elements.customerEditBreadcrumb.addEventListener("click", () => {
     elements.customerEditCancel.click();
   });
@@ -13313,6 +13427,10 @@ import {
     event.preventDefault();
     const customer = adminState?.customers.find((candidate) => candidate.id === openedCustomerId);
     if (!customer) return;
+    if (!pruefeFormularFelder(customerEditValidation)) {
+      elements.customerEditMessage.textContent = "Bitte die markierten Felder prüfen.";
+      return;
+    }
     const nextStatus = elements.customerEditStatus.value;
     if (
       customerStatusGroup(customer.status) === "active"
@@ -13321,7 +13439,7 @@ import {
     ) return;
 
     const submit = elements.customerEditForm.querySelector('button[type="submit"]');
-    submit.disabled = true;
+    setzeSpeichertZustand(submit, "Wird gespeichert …");
     elements.customerEditMessage.textContent = "Änderungen werden sicher gespeichert …";
     try {
       await requestJson(`./api/v1/admin/customers/${encodeURIComponent(customer.id)}`, {
@@ -13341,6 +13459,7 @@ import {
           rowVersion: customer.rowVersion
         })
       });
+      formularBasisLoeschen(elements.customerEditForm);
       openedCustomerId = null;
       elements.customerEditForm.hidden = true;
       elements.customerManagementPanel.hidden = true;
@@ -13349,7 +13468,7 @@ import {
     } catch (error) {
       elements.customerEditMessage.textContent = error.message;
     } finally {
-      submit.disabled = false;
+      raeumeSpeichertZustandAuf(submit);
     }
   });
 
@@ -13422,8 +13541,50 @@ import {
 
   elements.siteCustomer.addEventListener("change", updateSiteCustomerMode);
   elements.siteProject.addEventListener("change", syncSiteProjectManager);
+  // Dieselbe Verzweigung wie im Absenden unten (projectScoped/createsCustomer):
+  // je nach Sitzungsart ist entweder der Kunde oder das Projekt das Pflichtfeld.
+  const siteValidation = [
+    [
+      elements.siteCustomer,
+      elements.siteCustomerError,
+      "Bitte einen Kunden auswählen.",
+      () => !adminState?.projectScopeRestricted
+    ],
+    [
+      elements.siteCustomerName,
+      elements.siteCustomerNameError,
+      "Bitte den Namen des neuen Kunden eingeben.",
+      () => !adminState?.projectScopeRestricted && elements.siteCustomer.value === "__new__"
+    ],
+    [
+      elements.siteProject,
+      elements.siteProjectError,
+      "Bitte ein Projekt auswählen.",
+      () => Boolean(adminState?.projectScopeRestricted)
+    ],
+    [elements.siteName, elements.siteNameError, "Bitte einen Baustellennamen eingeben."],
+    [elements.siteStreet, elements.siteStreetError, "Bitte die Straße eingeben."],
+    [elements.siteHouseNumber, elements.siteHouseNumberError, "Bitte die Hausnummer eingeben."],
+    [elements.sitePostalCode, elements.sitePostalCodeError, "Bitte die Postleitzahl eingeben."],
+    [elements.siteCity, elements.siteCityError, "Bitte den Ort eingeben."]
+  ];
+  bindeFeldFehlerAufraeumen(siteValidation);
+
+  const siteEditValidation = [
+    [elements.siteEditName, elements.siteEditNameError, "Bitte einen Baustellennamen eingeben."],
+    [elements.siteEditStreet, elements.siteEditStreetError, "Bitte die Straße eingeben."],
+    [elements.siteEditHouseNumber, elements.siteEditHouseNumberError, "Bitte die Hausnummer eingeben."],
+    [elements.siteEditPostalCode, elements.siteEditPostalCodeError, "Bitte die Postleitzahl eingeben."],
+    [elements.siteEditCity, elements.siteEditCityError, "Bitte den Ort eingeben."]
+  ];
+  bindeFeldFehlerAufraeumen(siteEditValidation);
+
   elements.siteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!pruefeFormularFelder(siteValidation)) {
+      elements.siteMessage.textContent = "Bitte die markierten Felder prüfen.";
+      return;
+    }
     const projectScoped = Boolean(adminState?.projectScopeRestricted);
     const createsCustomer = !projectScoped && elements.siteCustomer.value === "__new__";
     const saved = await submitAdminForm(
@@ -13458,6 +13619,10 @@ import {
     event.preventDefault();
     const site = adminState?.sites.find((candidate) => candidate.id === openedSiteId);
     if (!site) return;
+    if (!pruefeFormularFelder(siteEditValidation)) {
+      elements.siteEditMessage.textContent = "Bitte die markierten Felder prüfen.";
+      return;
+    }
     const nextStatus = elements.siteEditStatus.value;
     if (
       nextStatus !== "active"
@@ -13470,7 +13635,7 @@ import {
     ) return;
 
     const submit = elements.siteEditForm.querySelector('button[type="submit"]');
-    submit.disabled = true;
+    setzeSpeichertZustand(submit, "Wird gespeichert …");
     elements.siteEditMessage.textContent = "Änderungen werden sicher gespeichert …";
     try {
       await requestJson(`./api/v1/admin/construction-sites/${encodeURIComponent(site.id)}`, {
@@ -13489,6 +13654,7 @@ import {
           rowVersion: site.rowVersion
         })
       });
+      formularBasisLoeschen(elements.siteEditForm);
       await refreshAdmin();
       const updated = adminState.sites.find((candidate) => candidate.id === site.id);
       if (updated) openSiteDashboard(updated);
@@ -13496,7 +13662,7 @@ import {
     } catch (error) {
       elements.siteEditMessage.textContent = error.message;
     } finally {
-      submit.disabled = false;
+      raeumeSpeichertZustandAuf(submit);
     }
   });
 
@@ -15580,6 +15746,8 @@ import {
   });
   elements.siteDashboardEdit.addEventListener("click", openSiteEditor);
   elements.siteEditCancel.addEventListener("click", () => {
+    if (!verlassenTrotzAenderungBestaetigt()) return;
+    formularBasisLoeschen(elements.siteEditForm);
     elements.siteEditForm.hidden = true;
     elements.siteDashboardEdit.hidden = false;
     elements.siteEditMessage.textContent = "";

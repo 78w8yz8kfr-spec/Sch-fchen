@@ -1812,6 +1812,7 @@
                 </div>
                 <label for="site-edit-name">Baustellenname</label>
                 <input id="site-edit-name" maxlength="200" required>
+                <small id="site-edit-name-error" class="field-error" aria-live="polite"></small>
                 <label for="site-edit-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
                 <input id="site-edit-short-text" maxlength="300">
                 <label for="site-edit-project-manager">Projektleiter <span>(optional)</span></label>
@@ -1820,20 +1821,24 @@
                   <div>
                     <label for="site-edit-street">Straße</label>
                     <input id="site-edit-street" maxlength="150" autocomplete="street-address" required>
+                    <small id="site-edit-street-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div>
                     <label for="site-edit-house-number">Nr.</label>
                     <input id="site-edit-house-number" maxlength="20" required>
+                    <small id="site-edit-house-number-error" class="field-error" aria-live="polite"></small>
                   </div>
                 </div>
                 <div class="setup-grid">
                   <div>
                     <label for="site-edit-postal-code">PLZ</label>
                     <input id="site-edit-postal-code" maxlength="12" inputmode="numeric" autocomplete="postal-code" required>
+                    <small id="site-edit-postal-code-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div>
                     <label for="site-edit-city">Ort</label>
                     <input id="site-edit-city" maxlength="100" autocomplete="address-level2" required>
+                    <small id="site-edit-city-error" class="field-error" aria-live="polite"></small>
                   </div>
                 </div>
                 <label for="site-edit-status">Status</label>
@@ -2514,15 +2519,18 @@
                 <div id="customer-company-fields">
                   <label for="customer-company-name">Firmenname</label>
                   <input id="customer-company-name" maxlength="200" autocomplete="organization" required>
+                  <small id="customer-company-name-error" class="field-error" aria-live="polite"></small>
                 </div>
                 <div id="customer-private-fields" class="setup-grid" hidden>
                   <div>
                     <label for="customer-first-name">Vorname</label>
                     <input id="customer-first-name" maxlength="100" autocomplete="given-name">
+                    <small id="customer-first-name-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div>
                     <label for="customer-last-name">Nachname</label>
                     <input id="customer-last-name" maxlength="100" autocomplete="family-name">
+                    <small id="customer-last-name-error" class="field-error" aria-live="polite"></small>
                   </div>
                 </div>
                 <div class="setup-grid">
@@ -2586,15 +2594,18 @@
                 <div id="customer-edit-company-fields">
                   <label for="customer-edit-company-name">Firmenname</label>
                   <input id="customer-edit-company-name" maxlength="200" autocomplete="organization">
+                  <small id="customer-edit-company-name-error" class="field-error" aria-live="polite"></small>
                 </div>
                 <div id="customer-edit-private-fields" class="setup-grid" hidden>
                   <div>
                     <label for="customer-edit-first-name">Vorname</label>
                     <input id="customer-edit-first-name" maxlength="100" autocomplete="given-name">
+                    <small id="customer-edit-first-name-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div>
                     <label for="customer-edit-last-name">Nachname</label>
                     <input id="customer-edit-last-name" maxlength="100" autocomplete="family-name">
+                    <small id="customer-edit-last-name-error" class="field-error" aria-live="polite"></small>
                   </div>
                 </div>
                 <div class="setup-grid">
@@ -2693,16 +2704,20 @@
               <form id="site-form" class="admin-form" novalidate>
                 <label for="site-customer">Kunde</label>
                 <select id="site-customer" required></select>
+                <small id="site-customer-error" class="field-error" aria-live="polite"></small>
                 <div id="site-new-customer" class="site-choice-dependent-field" hidden>
                   <label for="site-customer-name">Neuer Kunde</label>
                   <input id="site-customer-name" maxlength="200" placeholder="Firmen- oder Kundenname">
+                  <small id="site-customer-name-error" class="field-error" aria-live="polite"></small>
                 </div>
                 <div id="site-project-field" hidden>
                   <label for="site-project">Zugeordnetes Projekt</label>
                   <select id="site-project"><option value="">Projekt auswählen</option></select>
+                  <small id="site-project-error" class="field-error" aria-live="polite"></small>
                 </div>
                 <label for="site-name">Baustellenname</label>
                 <input id="site-name" maxlength="200" required>
+                <small id="site-name-error" class="field-error" aria-live="polite"></small>
                 <label for="site-short-text">Aufgabe für den Monteur <span>(optional)</span></label>
                 <input id="site-short-text" maxlength="300" placeholder="z. B. Verteilung erneuern">
                 <label for="site-project-manager">Projektleiter <span>(optional)</span></label>
@@ -2711,20 +2726,24 @@
                   <div>
                     <label for="site-street">Straße</label>
                     <input id="site-street" maxlength="150" autocomplete="street-address" required>
+                    <small id="site-street-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div>
                     <label for="site-house-number">Nr.</label>
                     <input id="site-house-number" maxlength="20" required>
+                    <small id="site-house-number-error" class="field-error" aria-live="polite"></small>
                   </div>
                 </div>
                 <div class="setup-grid">
                   <div>
                     <label for="site-postal-code">PLZ</label>
                     <input id="site-postal-code" maxlength="12" inputmode="numeric" autocomplete="postal-code" required>
+                    <small id="site-postal-code-error" class="field-error" aria-live="polite"></small>
                   </div>
                   <div>
                     <label for="site-city">Ort</label>
                     <input id="site-city" maxlength="100" autocomplete="address-level2" required>
+                    <small id="site-city-error" class="field-error" aria-live="polite"></small>
                   </div>
                 </div>
                 <button class="button button--primary" type="submit">Baustelle anlegen</button>
