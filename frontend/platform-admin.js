@@ -4,8 +4,8 @@
   const $ = (selector) => document.querySelector(selector);
   const elements = {
     auth: $("#platform-auth"), shell: $("#platform-shell"), authMessage: $("#platform-auth-message"),
-    loginForm: $("#platform-login-form"), loginEmail: $("#platform-login-email"), loginPassword: $("#platform-login-password"),
-    setupForm: $("#platform-setup-form"), setupFirstName: $("#platform-setup-first-name"), setupLastName: $("#platform-setup-last-name"),
+    loginForm: $("#platform-login-form"), loginEmail: $("#platform-login-email"), loginPassword: $("#platform-login-password"), loginSubmit: $("#platform-login-submit"),
+    setupForm: $("#platform-setup-form"), setupSubmit: $("#platform-setup-submit"), setupFirstName: $("#platform-setup-first-name"), setupLastName: $("#platform-setup-last-name"),
     setupEmail: $("#platform-setup-email"), setupPassword: $("#platform-setup-password"), setupToken: $("#platform-setup-token"),
     navigation: $("#platform-navigation"), userName: $("#platform-user-name"), userRoles: $("#platform-user-roles"), logout: $("#platform-logout"),
     menuToggle: $("#platform-menu-toggle"), title: $("#platform-view-title"), refresh: $("#platform-refresh"),
@@ -962,14 +962,24 @@
   elements.supportAccessReason.replaceChildren(...supportReasons.map(([value, label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; return option; }));
 
   elements.loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault(); elements.authMessage.textContent = "Anmeldung wird geprüft …";
+    event.preventDefault();
+    // Schutz gegen doppeltes Absenden: fehlte hier bisher, obwohl die
+    // Hauptanwendung ihren Anmeldeknopf waehrend der Anfrage sperrt (siehe
+    // app.js, elements.loginSubmit.disabled). Ein zweiter Klick waehrend der
+    // ersten Anfrage schickte sonst eine zweite Anmeldung los.
+    if (elements.loginSubmit.disabled) return;
+    elements.loginSubmit.disabled = true; elements.authMessage.textContent = "Anmeldung wird geprüft …";
     try { const body = await request("session", { method: "POST", body: JSON.stringify({ email: elements.loginEmail.value, password: elements.loginPassword.value }) }); elements.loginPassword.value = ""; await enterPlatform(body.session); }
     catch (error) { elements.authMessage.textContent = error.message; }
+    finally { elements.loginSubmit.disabled = false; }
   });
   elements.setupForm.addEventListener("submit", async (event) => {
-    event.preventDefault(); elements.authMessage.textContent = "Plattformkonto wird angelegt …";
+    event.preventDefault();
+    if (elements.setupSubmit.disabled) return;
+    elements.setupSubmit.disabled = true; elements.authMessage.textContent = "Plattformkonto wird angelegt …";
     try { await request("setup", { method: "POST", body: JSON.stringify({ firstName: elements.setupFirstName.value, lastName: elements.setupLastName.value, email: elements.setupEmail.value, password: elements.setupPassword.value, setupToken: elements.setupToken.value }) }); elements.setupForm.hidden = true; elements.loginForm.hidden = false; elements.loginEmail.value = elements.setupEmail.value; elements.authMessage.textContent = "Superadministrator angelegt. Jetzt sicher anmelden."; }
     catch (error) { elements.authMessage.textContent = error.message; }
+    finally { elements.setupSubmit.disabled = false; }
   });
   elements.navigation.addEventListener("click", (event) => { const button = event.target.closest("[data-platform-view]"); if (button) void selectView(button.dataset.platformView); });
   elements.menuToggle.addEventListener("click", () => elements.shell.classList.toggle("is-menu-open"));

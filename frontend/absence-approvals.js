@@ -12,8 +12,20 @@ async function request(url=endpoint,options={}) {
   // vor den Augen des Nutzers. Bei unlesbarer Antwort bleibt data leer, und die
   // verstaendliche Meldung unten greift.
   const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Die Anfrage ist fehlgeschlagen. Bitte später erneut versuchen.');
+  if(!response.ok) {
+    const error=new Error(response.status===401?'Bitte zuerst in der Arbeitsapp anmelden.':data.error?.message||'Die Anfrage ist fehlgeschlagen. Bitte später erneut versuchen.');
+    error.code=data.error?.code;
+    throw error;
+  }
   return data;
+}
+// Alle Aktionsknoepfe der offenen Antraege sperren/entsperren: "busy" blockt
+// bereits jede zweite Anfrage zuverlaessig ab (siehe Pruefungen unten), aber
+// ohne dies hier blieben die Knoepfe der UEBRIGEN, gerade nicht angeklickten
+// Antraege waehrenddessen anklickbar und reagierten dann kommentarlos nicht -
+// gerade bei vielen offenen Antraegen der haeufigste Fall im Buero.
+function setRequestsBusy(locked) {
+  for (const button of document.querySelectorAll('#requests button')) button.disabled = locked || !navigator.onLine;
 }
 function el(tag,text) {const node=document.createElement(tag);if(text!==undefined) node.textContent=text;return node;}
 function renderPeople() {
@@ -39,7 +51,7 @@ function renderRequests() {
   $('requests').replaceChildren();
   if(!state.absences.length) {$('requests').textContent='Keine Anträge zur Prüfung vorhanden.';return;}
   for(const item of state.absences) {
-    const card=el('article');card.className='request';
+    const card=el('article');card.className='request field';
     card.append(el('h3',`${item.employeeName} · ${kinds[item.absenceType]||item.absenceType}`),el('p',`${item.startDate} bis ${item.endDate} · ${state.approvalSteps===1&&item.status==='office_review'?'Wartet auf Freigabe':stages[item.status]}`));
     if(item.entrySource==='office_direct')card.append(el('p',`Direkt vom Büro eingetragen · ${item.managementReviewedByName||''}`));
     if(item.note)card.append(el('p',item.note));
@@ -51,16 +63,25 @@ function renderRequests() {
     if(own)card.append(el('p','Eigener Antrag – eine andere Person übernimmt die Prüfung.'));
     else if(second&&state.approvalSteps===2&&item.officeReviewerId===state.userId)card.append(el('p','Du hast bereits die erste Prüfung vorgenommen. Eine andere Person übernimmt die Freigabe.'));
     else if(first||second||cancel) {
-      const comment=el('input');comment.maxLength=500;comment.placeholder='Begründung (bei Ablehnung oder Aufhebung erforderlich)';comment.setAttribute('aria-label',`Kommentar für ${item.employeeName}`);card.append(comment);
+      const comment=el('input');comment.maxLength=500;comment.placeholder='Begründung (bei Ablehnung oder Aufhebung erforderlich)';comment.setAttribute('aria-label',`Kommentar für ${item.employeeName}`);
+      const commentErrorId=`comment-error-${item.id}`;comment.setAttribute('aria-describedby',commentErrorId);
+      const commentError=el('p');commentError.id=commentErrorId;commentError.className='aa-field-error';commentError.setAttribute('aria-live','polite');
+      card.append(comment,commentError);
+      const period=`${item.startDate} bis ${item.endDate}`;
+      const kindLabel=kinds[item.absenceType]||item.absenceType;
       for(const [action,label] of cancel?[['cancel','Freigabe aufheben']]:[['approve',first?'Geprüft – zur Freigabe': 'Verbindlich freigeben'],['reject','Ablehnen']]) {
         const button=el('button',label);button.type='button';button.className=`button ${action==='approve'?'button--primary':'button--secondary'}`;button.disabled=busy||!navigator.onLine;
         button.addEventListener('click',async()=>{
           if(busy)return;
-          if(action!=='approve'&&comment.value.trim().length<3){$('message').textContent='Bitte eine Begründung mit mindestens 3 Zeichen angeben.';comment.focus();return;}
-          if(!window.confirm(`${label}: Antrag von ${item.employeeName}?`))return;
-          busy=true;button.disabled=true;
-          try {await request(`./api/v1/admin/absence-requests/${item.id}`,{method:'PATCH',body:JSON.stringify({action,comment:comment.value.trim(),rowVersion:item.rowVersion})});busy=false;await reload();}
-          catch(error){$('message').textContent=error.message;button.disabled=false;}
+          commentError.textContent='';comment.setAttribute('aria-invalid','false');
+          if(action!=='approve'&&comment.value.trim().length<3){commentError.textContent='Bitte eine Begründung mit mindestens 3 Zeichen angeben.';comment.setAttribute('aria-invalid','true');comment.focus();return;}
+          // Zeitraum und Art gehoeren in die Bestaetigung: "Freigabe aufheben:
+          // Antrag von ..." allein sagte nicht, welcher Zeitraum und welche
+          // Abwesenheitsart betroffen sind.
+          if(!window.confirm(`${label}: ${item.employeeName} · ${kindLabel} · ${period}?`))return;
+          busy=true;setRequestsBusy(true);
+          try {await request(`./api/v1/admin/absence-requests/${item.id}`,{method:'PATCH',body:JSON.stringify({action,comment:comment.value.trim(),rowVersion:item.rowVersion})});await reload();}
+          catch(error){$('message').textContent=error.message;setRequestsBusy(false);}
           finally{busy=false;}
         });card.append(button);
       }
@@ -92,29 +113,63 @@ async function reload() {
     renderRequests();
   } catch(error){$('workspace').hidden=true;$('message').textContent=error.message;}
 }
+// Konkrete Fehlermeldung direkt am Feld statt nur in der Sammelzeile oben -
+// die Formulare tragen deshalb novalidate; die Grenzen (min. 3 Zeichen)
+// entsprechen validateApprovalPolicy() in api/src/absence-approval-policy.mjs.
+function validateReason() {
+  const reason=$('reason'),ok=reason.value.trim().length>=3;
+  $('reason-error').textContent=ok?'':'Bitte eine Begründung mit mindestens 3 Zeichen angeben.';
+  reason.setAttribute('aria-invalid',String(!ok));
+  if(!ok)reason.focus();
+  return ok;
+}
 $('policy-form').addEventListener('submit',async event=>{
   event.preventDefault();if(busy||!state?.canManage)return;
-  busy=true;$('save').disabled=true;$('form-message').textContent='';
+  $('form-message').textContent='';
+  if(!validateReason())return;
+  busy=true;$('save').disabled=true;
   try {
     await request(endpoint,{method:'PUT',body:JSON.stringify({mode:$('mode').value,approvalSteps:Number($('steps').value),
       reviewerIds:$('mode').value==='selected'&&$('steps').value==='2'?[...selected.reviewerIds]:[],approverIds:$('mode').value==='selected'?[...selected.approverIds]:[],
       rowVersion:state.policy.rowVersion,reason:$('reason').value.trim()})});
-    $('reason').value='';busy=false;await reload();$('message').textContent='Zuständigkeiten gespeichert. Sie gelten ab sofort.';
+    $('reason').value='';await reload();$('message').textContent='Zuständigkeiten gespeichert. Sie gelten ab sofort.';
   } catch(error){$('form-message').textContent=error.message;}
   finally{busy=false;$('save').disabled=false;}
 });
 $('steps').addEventListener('change',()=>{modeChanged();renderPeople();});
 $('mode').addEventListener('change',modeChanged);$('search').addEventListener('input',renderPeople);$('reload').addEventListener('click',()=>{if(!busy)void reload();});
+// Grenzen entsprechen validateAbsenceRequest() in api/src/validation.mjs
+// (Start-/Enddatum erforderlich, Ende darf nicht vor Beginn liegen). Der
+// direkte Eintrag verlangt zusaetzlich immer einen Hinweis (siehe HTML
+// "required") - strenger als der Server, der ihn nur bei "Sonstiges" fordert,
+// damit im Buero jede verbindliche Direkteintragung dokumentiert ist.
+function validateDirectEntry() {
+  const employee=$('direct-employee'),start=$('direct-start'),end=$('direct-end'),note=$('direct-note');
+  const noteOk=note.value.trim().length>=3;
+  $('direct-note-error').textContent=noteOk?'':'Bitte eine Begründung oder einen Hinweis mit mindestens 3 Zeichen angeben.';
+  note.setAttribute('aria-invalid',String(!noteOk));
+  if(!employee.value){$('direct-message').textContent='Bitte einen Mitarbeiter auswählen.';employee.focus();return false;}
+  if(!start.value||!end.value){$('direct-message').textContent='Bitte Von- und Bis-Datum angeben.';(start.value?end:start).focus();return false;}
+  if(end.value<start.value){$('direct-message').textContent='Das Enddatum darf nicht vor dem Startdatum liegen.';end.focus();return false;}
+  if(!noteOk){note.focus();return false;}
+  return true;
+}
 $('direct-form').addEventListener('submit',async event=>{
   event.preventDefault();if(busy||!state?.canRecordDirect)return;
-  if(!window.confirm('Abwesenheit ohne Antrag verbindlich in die Planung eintragen?'))return;
-  busy=true;$('direct-save').disabled=true;$('direct-message').textContent='';
+  $('direct-message').textContent='';
+  if(!validateDirectEntry())return;
+  if(!window.confirm(`Abwesenheit ohne Antrag verbindlich in die Planung eintragen? ${$('direct-employee').selectedOptions[0]?.textContent||''} · ${kinds[$('direct-type').value]} · ${$('direct-start').value} bis ${$('direct-end').value}`))return;
+  busy=true;$('direct-save').disabled=true;
   try {
     await request('./api/v1/admin/absences',{method:'POST',body:JSON.stringify({employeeId:$('direct-employee').value,
       absenceType:$('direct-type').value,startDate:$('direct-start').value,endDate:$('direct-end').value,
       dayPart:$('direct-part').value,note:$('direct-note').value.trim()})});
-    $('direct-form').reset();busy=false;await reload();$('direct-message').textContent='Abwesenheit eingetragen und in der Planung berücksichtigt.';
+    $('direct-form').reset();await reload();$('direct-message').textContent='Abwesenheit eingetragen und in der Planung berücksichtigt.';
   } catch(error){$('direct-message').textContent=error.message;}
   finally{busy=false;$('direct-save').disabled=false;}
 });
+// Fehlermeldung am Feld verschwindet, sobald sie behoben ist, statt erst beim
+// naechsten Absenden.
+$('reason').addEventListener('input',()=>{if($('reason-error').textContent)validateReason();});
+$('direct-note').addEventListener('input',()=>{if($('direct-note-error').textContent&&$('direct-note').value.trim().length>=3)$('direct-note-error').textContent='';});
 void reload();

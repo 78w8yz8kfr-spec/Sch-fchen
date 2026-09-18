@@ -26,35 +26,49 @@ body {
   display: none !important;
 }
 
+/* Wie im Rest der Anwendung: eine mittig gefuehrte, lesefreundliche Spalte
+   statt einer ueber breite Bildschirme gestreckten Tabelle - dasselbe Mass,
+   das schon die Anmeldekarte in design-system.css nutzt (min(...,410px)).
+   Auf 2560px bleiben so ruhige, aber keine unnoetig grossen Leerflaechen:
+   die Karten selbst duerfen atmen (siehe Breakpoint unten), der Lesefluss
+   bleibt aber einspaltig, weil die Lagerstruktur ein Baum ist, kein Raster. */
 .inv-shell {
-  max-width: 760px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: var(--ui-space-5) var(--ui-space-4) 60px;
+  padding: var(--ui-space-5) var(--ui-content-gutter) 60px;
 }
 
 .inv-header {
   display: flex;
+  min-height: var(--ui-header-height);
   align-items: center;
   justify-content: space-between;
   gap: var(--ui-space-3);
-  margin-bottom: var(--ui-space-6);
+  margin-bottom: var(--ui-space-5);
+  border-bottom: 1px solid var(--ui-border);
 }
 
-.inv-back {
-  color: var(--ui-brand);
-  font-size: var(--ui-text-sm);
+.inv-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  color: var(--ui-text);
   font-weight: 750;
   text-decoration: none;
 }
 
-.inv-back:hover {
-  text-decoration: underline;
+/* .text-button (Rueckweg "Zur Arbeitsapp") und .eyebrow kommen unveraendert
+   aus design-system.css - keine eigene Farbe/Groesse mehr doppeln. */
+
+.inv-page-heading {
+  margin-top: var(--ui-space-2);
 }
 
-.inv-intro h1 {
-  margin: 4px 0 0;
-  font-size: var(--ui-title);
-  letter-spacing: -0.02em;
+.inv-page-heading__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
 }
 
 .inv-hint {
@@ -63,8 +77,6 @@ body {
   font-size: var(--ui-text-sm);
   line-height: 1.5;
 }
-
-/* .eyebrow kommt aus design-system.css (Farbe, Größe, Gewicht). */
 
 /* Karten ------------------------------------------------------------ */
 
@@ -115,16 +127,15 @@ body {
   font-weight: 750;
 }
 
+/* Rahmen, Radius, Hintergrund und Fokusring des Suchfelds kommen automatisch
+   aus design-system.css ueber die Klasse .entity-search (siehe HTML) - hier
+   bleibt nur, was das Designsystem fuer diese Klasse nicht mitbringt. */
 .inv-search-label input {
   display: block;
   width: 100%;
   min-height: var(--ui-touch-height);
   margin-top: 4px;
   padding: 10px 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text);
-  background: var(--ui-input-background);
   font: inherit;
 }
 
@@ -140,12 +151,6 @@ body {
 .inv-check input {
   width: 20px;
   height: 20px;
-}
-
-.inv-toolbar__actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: var(--ui-space-2);
 }
 
 /* Lagerplatzliste -------------------------------------------------------- */
@@ -274,17 +279,35 @@ body {
   font-weight: 750;
 }
 
+.inv-required {
+  color: var(--ui-danger);
+}
+
+/* Rahmen, Radius, Hintergrund und Fokusring kommen automatisch aus
+   design-system.css, weil das Formular die Klasse .field traegt (siehe
+   HTML). Hier bleibt nur die Groesse, die dieses Formular zusaetzlich zum
+   Designsystem braucht: 44px statt der dort vorgesehenen 38px, damit der
+   Dialog auch am Telefon mit dem Daumen bedienbar bleibt (vgl. die
+   TIPPZIELE-Begruendung in design-system.css). */
 .inv-form input {
   display: block;
   width: 100%;
   min-height: var(--ui-touch-height);
   margin-top: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text);
-  background: var(--ui-input-background);
   font: inherit;
+}
+
+/* Konkrete Fehlermeldung direkt am Feld statt nur in einer Sammelzeile oben -
+   per aria-describedby mit dem jeweiligen Eingabefeld verknuepft. */
+.inv-field-error {
+  min-height: 1.1em;
+  margin: 3px 0 0;
+  color: var(--ui-danger);
+  font-size: var(--ui-text-xs);
+}
+
+.inv-field-error:empty {
+  display: none;
 }
 
 .inv-form-message {
@@ -292,10 +315,6 @@ body {
   margin: var(--ui-space-2) 0 0;
   color: var(--ui-danger);
   font-size: var(--ui-text-sm);
-}
-
-.inv-form-message:empty {
-  display: none;
 }
 
 .inv-form__actions {

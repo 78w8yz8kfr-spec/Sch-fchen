@@ -4585,6 +4585,16 @@ select:focus-visible {
   scroll-margin-top: 112px;
 }
 
+/* "scroll-margin-top" muss am Element selbst stehen, das scrollIntoView()
+   ansteuert - das ist das Formular, nicht die umschliessende Kachel mit der
+   Klasse oben. Ohne diesen Abstand landete der neue Brotkrumen (und mit ihm
+   die Ueberschrift) beim Oeffnen unter der klebenden Kopfzeile: sichtbar in
+   den Randdaten, aber vom Kopf ueberdeckt. */
+#employee-edit-form,
+#customer-edit-form {
+  scroll-margin-top: 112px;
+}
+
 .site-management-panel__heading {
   display: flex;
   align-items: flex-end;

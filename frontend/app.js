@@ -96,6 +96,7 @@ import {
     loginView: document.querySelector("#login-view"),
     passwordChangeView: document.querySelector("#password-change-view"),
     dashboardView: document.querySelector("#dashboard-view"),
+    dashboardContent: document.querySelector("#dashboard-view > .dashboard-content"),
     loginForm: document.querySelector("#login-form"),
     loginMessage: document.querySelector("#login-message"),
     loginSubmit: document.querySelector("#login-submit"),
@@ -718,6 +719,8 @@ import {
     hierarchyNewSite: document.querySelector("#hierarchy-new-site"),
     siteMasterDataTools: document.querySelector("#site-master-data-tools"),
     siteDashboard: document.querySelector("#site-dashboard"),
+    siteDashboardBreadcrumb: document.querySelector("#site-dashboard-breadcrumb"),
+    siteDashboardBreadcrumbCurrent: document.querySelector("#site-dashboard-breadcrumb-current"),
     siteDashboardTitle: document.querySelector("#site-dashboard-title"),
     siteDashboardMeta: document.querySelector("#site-dashboard-meta"),
     siteDashboardStatus: document.querySelector("#site-dashboard-status"),
@@ -924,6 +927,8 @@ import {
     archivedEmployeeList: document.querySelector("#archived-employee-list"),
     employeePanel: document.querySelector("#employee-panel"),
     employeeEditForm: document.querySelector("#employee-edit-form"),
+    employeeEditBreadcrumb: document.querySelector("#employee-edit-breadcrumb"),
+    employeeEditBreadcrumbCurrent: document.querySelector("#employee-edit-breadcrumb-current"),
     employeeEditTitle: document.querySelector("#employee-edit-title"),
     employeeEditFirstName: document.querySelector("#employee-edit-first-name"),
     employeeEditLastName: document.querySelector("#employee-edit-last-name"),
@@ -969,6 +974,8 @@ import {
     customerMessage: document.querySelector("#customer-message"),
     customerManagementPanel: document.querySelector("#customer-management-panel"),
     customerEditForm: document.querySelector("#customer-edit-form"),
+    customerEditBreadcrumb: document.querySelector("#customer-edit-breadcrumb"),
+    customerEditBreadcrumbCurrent: document.querySelector("#customer-edit-breadcrumb-current"),
     customerEditNumber: document.querySelector("#customer-edit-number"),
     customerEditType: document.querySelector("#customer-edit-type"),
     customerEditCompanyFields: document.querySelector("#customer-edit-company-fields"),
@@ -1932,7 +1939,7 @@ import {
     document.title = "Übersicht · Schäfchen";
     render();
     showDashboardPane("start", false);
-    window.scrollTo({ top: 0, behavior: "instant" });
+    nachObenSpringen(false);
   }
 
   function showLogin() {
@@ -4932,6 +4939,7 @@ import {
 
   function openCustomerEditor(customer) {
     openedCustomerId = customer.id;
+    elements.customerEditBreadcrumbCurrent.textContent = customer.displayName;
     // Kunde und Projekt haben einen eigenen Bereich; das Baustellenformular
     // ist dort nicht mehr in Reichweite und wird deshalb auch nicht mehr
     // zugeklappt.
@@ -5111,6 +5119,7 @@ import {
     resetSiteMaterialForm();
     resetSiteReportForm();
     elements.siteDashboardTitle.textContent = site.name;
+    elements.siteDashboardBreadcrumbCurrent.textContent = site.name;
     elements.siteDashboardMeta.textContent = [site.number, address].filter(Boolean).join(" · ");
     elements.siteDashboardStatus.textContent = siteStatusLabel(site.status);
     elements.siteDashboardStatus.className = `site-status site-status--${siteStatusGroup(site.status)}`;
@@ -6807,6 +6816,7 @@ import {
     editingEmployeeId = employee.id;
     fillLicenceField(elements.employeeEditLicences, employee.drivingLicenceClasses);
     elements.employeeEditTitle.textContent = `${employee.firstName} ${employee.lastName}`;
+    elements.employeeEditBreadcrumbCurrent.textContent = `${employee.firstName} ${employee.lastName}`;
     elements.employeeEditFirstName.value = employee.firstName;
     elements.employeeEditLastName.value = employee.lastName;
     elements.employeeEditPersonnelNumber.value = employee.personnelNumber;
@@ -11090,6 +11100,16 @@ import {
     return currentDashboardPane === "more";
   }
 
+  // Ab 1080px steht die Schale und nur .dashboard-content scrollt (siehe
+  // design-system.css). Ein window.scrollTo() bewegt dort nichts mehr - das
+  // Fenster selbst hat keinen Scrollweg. Deshalb fragt diese Funktion, wer
+  // gerade tatsaechlich scrollt, statt die Breite ein zweites Mal zu raten.
+  function nachObenSpringen(smooth) {
+    const inhalt = elements.dashboardContent;
+    const ziel = inhalt && inhalt.scrollHeight > inhalt.clientHeight ? inhalt : window;
+    ziel.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
+  }
+
   function showDashboardPane(pane, smooth = true) {
     currentDashboardPane = pane;
     if (pane !== "start") closeMobileReportForm();
@@ -11239,7 +11259,7 @@ import {
     renderOverviewCards();
     renderTopbarUser();
     const title = {
-      week: "Woche",
+      week: "Meine Woche",
       time: "Zeiterfassung",
       apprentice: "Berichtsheft",
       reports: "Berichte",
@@ -11257,7 +11277,7 @@ import {
       more: "Einstellungen"
     }[pane] || "Übersicht";
     document.title = `${title} · Schäfchen`;
-    window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
+    nachObenSpringen(smooth);
   }
 
   function serverEntries(workDay) {
@@ -12522,6 +12542,9 @@ import {
     }
   });
   elements.employeeEditCancel.addEventListener("click", closeEmployeeEditor);
+  // Der Brotkrumen tut genau das, was "Abbrechen" auch tut - er ist ein
+  // zweiter Weg zum selben Ziel, keine zweite Aktion.
+  elements.employeeEditBreadcrumb.addEventListener("click", closeEmployeeEditor);
   elements.employeeEditResetPassword.addEventListener("click", () => {
     const employee = adminState?.employees.find((item) => item.id === editingEmployeeId);
     if (!employee) return;
@@ -13166,6 +13189,11 @@ import {
     elements.customerEditForm.hidden = true;
     elements.customerManagementPanel.hidden = true;
     elements.customerEditMessage.textContent = "";
+  });
+  // Der Brotkrumen loest denselben Klick aus wie "Abbrechen" - ein zweiter
+  // Weg zurueck zur Liste, keine zweite Aktion mit eigener Logik.
+  elements.customerEditBreadcrumb.addEventListener("click", () => {
+    elements.customerEditCancel.click();
   });
 
   elements.customerEditForm.addEventListener("submit", async (event) => {
@@ -15400,6 +15428,11 @@ import {
     openedSiteId = null;
     elements.siteEditForm.hidden = true;
     elements.siteDashboard.hidden = true;
+  });
+  // Der Brotkrumen loest denselben Klick aus wie "Schliessen" - ein zweiter
+  // Weg zurueck zur Liste, keine zweite Aktion mit eigener Logik.
+  elements.siteDashboardBreadcrumb.addEventListener("click", () => {
+    elements.siteDashboardClose.click();
   });
   elements.siteDashboardSectionButtons.forEach((button) => {
     button.addEventListener("click", () => {

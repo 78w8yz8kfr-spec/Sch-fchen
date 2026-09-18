@@ -26,48 +26,51 @@ body {
   display: none !important;
 }
 
+/* Dieselbe lesefreundliche, mittig gefuehrte Spalte wie in inventory.css
+   begruendet - siehe dort. */
 .aa-shell {
-  max-width: 760px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: var(--ui-space-5) var(--ui-space-4) 60px;
+  padding: var(--ui-space-5) var(--ui-content-gutter) 60px;
 }
 
 .aa-header {
   display: flex;
+  min-height: var(--ui-header-height);
   align-items: center;
   justify-content: space-between;
   gap: var(--ui-space-3);
-  margin-bottom: var(--ui-space-6);
+  margin-bottom: var(--ui-space-5);
+  border-bottom: 1px solid var(--ui-border);
 }
 
-.aa-back {
-  color: var(--ui-brand);
-  font-size: var(--ui-text-sm);
+.aa-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  color: var(--ui-text);
   font-weight: 750;
   text-decoration: none;
 }
 
-.aa-back:hover {
-  text-decoration: underline;
+/* .text-button (Rueckweg "Zur Arbeitsapp") und .eyebrow kommen unveraendert
+   aus design-system.css - keine eigene Farbe/Groesse mehr doppeln. */
+
+.aa-page-heading {
+  margin-top: var(--ui-space-2);
 }
 
-.aa-intro h1 {
-  margin: 4px 0 0;
-  font-size: var(--ui-title);
-  letter-spacing: -0.02em;
+.aa-page-heading__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
 }
-
-/* .eyebrow kommt aus design-system.css (Farbe, Größe, Gewicht). */
 
 .aa-stack {
   display: grid;
   gap: var(--ui-space-4);
   margin-top: var(--ui-space-5);
-}
-
-.aa-toolbar {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .aa-status {
@@ -184,16 +187,20 @@ body {
   margin-top: 0;
 }
 
+.aa-required {
+  color: var(--ui-danger);
+}
+
+/* Rahmen, Radius, Hintergrund und Fokusring kommen automatisch aus
+   design-system.css, weil das Formular die Klasse .field traegt (siehe
+   HTML) - hier bleibt nur die Groesse, die dieses Formular zusaetzlich zum
+   Designsystem braucht (44px statt 38px, siehe inventory.css). */
 .aa-form select,
 .aa-form input:not([type="checkbox"]) {
   display: block;
   width: 100%;
   min-height: var(--ui-touch-height);
   padding: 10px 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text);
-  background: var(--ui-input-background);
   font: inherit;
 }
 
@@ -210,15 +217,28 @@ body {
   font-weight: 750;
 }
 
+/* Rahmen/Radius/Hintergrund des Suchfelds kommen aus design-system.css ueber
+   .entity-search (siehe HTML). */
 .aa-search-label input {
   display: block;
   width: 100%;
   min-height: var(--ui-touch-height);
   margin-top: 4px;
   padding: 10px 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
   font: inherit;
+}
+
+/* Konkrete Fehlermeldung direkt am Feld statt nur in einer Sammelzeile oben -
+   per aria-describedby mit dem jeweiligen Eingabefeld verknuepft. */
+.aa-field-error {
+  min-height: 1.1em;
+  margin: 3px 0 0;
+  color: var(--ui-danger);
+  font-size: var(--ui-text-xs);
+}
+
+.aa-field-error:empty {
+  display: none;
 }
 
 .aa-form-message {
@@ -226,10 +246,6 @@ body {
   margin: var(--ui-space-2) 0 0;
   color: var(--ui-danger);
   font-size: var(--ui-text-sm);
-}
-
-.aa-form-message:empty {
-  display: none;
 }
 
 /* Mitarbeiterauswahl ------------------------------------------------------ */
@@ -308,15 +324,19 @@ body {
   font-size: var(--ui-text-sm);
 }
 
+/* Rahmen/Radius/Hintergrund kommen aus design-system.css, weil jede Karte
+   die Klasse .field traegt (siehe absence-approvals.js). */
 .request input {
   display: block;
   width: 100%;
   min-height: var(--ui-touch-height);
-  margin: var(--ui-space-3) 0;
+  margin: var(--ui-space-3) 0 0;
   padding: 10px 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
   font: inherit;
+}
+
+.request .aa-field-error {
+  margin-bottom: var(--ui-space-2);
 }
 
 .request button {

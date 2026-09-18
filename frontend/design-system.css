@@ -249,6 +249,51 @@ textarea {
   letter-spacing: 0.045em;
 }
 
+/* Brotkrumen ------------------------------------------------------------
+   Steht ueber dem Kopf einer geoeffneten Akte (Baustelle, Kunde,
+   Mitarbeiter) - all jene Formulare scrollen beim Oeffnen an ihren eigenen
+   Anfang, und die Liste darueber gerät dabei ausser Sicht. Der Link fuehrt
+   mit demselben Klick zurueck, den die vorhandene "Schliessen"/"Abbrechen"-
+   Schaltflaeche ohnehin ausloest - siehe app.js. */
+.workspace-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 5px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-xs);
+}
+
+.workspace-breadcrumb__link {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--ui-brand);
+  background: none;
+  font: inherit;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.workspace-breadcrumb__link:hover {
+  color: var(--ui-brand-hover);
+}
+
+.workspace-breadcrumb__sep {
+  color: var(--ui-text-tertiary);
+}
+
+.workspace-breadcrumb__current {
+  overflow: hidden;
+  max-width: 32ch;
+  color: var(--ui-text-secondary);
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Anmelden --------------------------------------------------------------- */
 
 .login-heading {
@@ -1470,9 +1515,50 @@ body:has(#vde-app) main {
     left: 40px;
   }
 
+  /* Die Schale steht, nur der Inhalt scrollt - so arbeitet eine
+     Schreibtischanwendung: Seitenleiste und Kopfzeile bleiben immer
+     erreichbar, egal wie lang die Liste darunter ist.
+
+     Der Fehler, den das behebt: Die Leiste trug `position: sticky; top: 0`
+     zusammen mit `height: 100vh`. Gemessen bei 1920x1080 auf der Kundenseite
+     (Seite 1167px hoch): beim Scrollen ans Seitenende rutschte die Leiste auf
+     `top: -86px` heraus statt zu kleben, und unter ihr klaffte ein 86 Pixel
+     hoher weisser Streifen. Bei einer langen Baustellen- oder Mitarbeiterliste
+     waere die Navigation vollstaendig aus dem Bild gescrollt.
+
+     `min-height` wird hier bewusst zu `height`: nur eine feste Hoehe macht aus
+     dem Inhaltsbereich einen eigenen Scrollbehaelter. `min-height: 0` am
+     Inhalt ist dabei Pflicht - ohne die Angabe waechst ein Rasterkind mit
+     seinem Inhalt statt zu scrollen. Unterhalb von 1080px bleibt alles beim
+     Alten: dort scrollt die Seite als Ganzes, und die Leiste sitzt unten. */
   .dashboard-view {
+    height: 100vh;
+    min-height: 0;
+    /* Die 86 Pixel unten (styles.css) halten am Telefon den Platz fuer die
+       feste untere Navigationsleiste frei. Am Rechner steht dieselbe Leiste
+       links - der Abstand war dort nie noetig und blieb als weisser Streifen
+       unter der Seitenleiste stehen: gemessen 86px bei jeder der vier
+       geprueften Bildschirmgroessen. Zusammen mit `height: 100vh` und
+       `box-sizing: border-box` verkuerzte er ausserdem die Rasterflaeche,
+       weshalb die Leiste ihre volle Hoehe gar nicht erreichen konnte. */
+    padding-bottom: 0;
+    overflow: hidden;
     grid-template-columns: var(--ui-sidebar-width) minmax(0, 1fr);
     transition: grid-template-columns 180ms ease;
+  }
+
+  .dashboard-view > .dashboard-content {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Die Leiste fuellt jetzt ihre Rasterflaeche und braucht das Kleben nicht
+     mehr. Laenger als der Bildschirm wird sie nur, wenn sehr viele Bereiche
+     freigeschaltet sind - dann scrollt sie in sich selbst (overflow-y: auto
+     weiter unten). */
+  .dashboard-view > .bottom-nav {
+    position: static;
+    height: 100%;
   }
 
   .dashboard-view > .topbar {
@@ -1571,6 +1657,18 @@ body:has(#vde-app) main {
     justify-content: flex-end;
   }
 
+  /* Gemessen bei 1280x720: "Historie" (zehnter Reiter der
+     Betriebsmittelverwaltung) lag 58px hinter dem rechten Rand, weil
+     ".device-tabs" wie am Telefon waagerecht schiebt statt umzubrechen -
+     der Reiter war nur per Wischgeste zu erreichen, ohne sichtbaren
+     Hinweis darauf. Am Schreibtisch gibt es dafuer keinen Grund: Platz nach
+     unten ist reichlich vorhanden, und Umbruch macht jeden Reiter auf einen
+     Blick sichtbar statt ihn zu verstecken. */
+  .device-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
   #week-section > .page-tabs {
     margin-top: -5px;
   }
@@ -1660,6 +1758,45 @@ body:has(#vde-app) main {
 @media (min-width: 1440px) {
   #week-overview-subarea > #week-overview-table-card {
     grid-column: span 9;
+  }
+}
+
+/* Sehr breite Bildschirme ------------------------------------------------
+   Gemessen: --ui-content-max-width deckelte den Inhalt hart bei 1320px. Bei
+   1920x1080 blieben dadurch rechts 192px ungenutzt, bei 2560x1440 sogar
+   512px - eine Buerosoftware, die dort nur eine breite Handy-Spalte zeigt.
+   Bei 1280 und 1440 passt die Seite schon genau (min(verfuegbarer Platz,
+   1320px) faellt dort ohnehin kleiner aus als die Grenze).
+
+   Die Grenze waechst deshalb in zwei Stufen mit dem Bildschirm mit, statt
+   ganz zu verschwinden: Fliesstext und Formulare (`.admin-form`, Eingaben
+   ohne eigene Breitenangabe) wuerden bei ungebremster voller Breite
+   unlesbar breit - siehe die Kommentare an den 1080px-Regeln weiter oben,
+   die genau deshalb ein zweispaltiges statt ein automatisches Raster
+   verwenden. Die Karten selbst bleiben Karten und werden nur geraeumiger.
+
+   1600px: ab hier zeigt die Seitenleiste plus zwei Kartenspalten schon so
+   viel eigenen Inhalt, dass 1320px spuerbar eng wird - die Grenze waechst
+   auf 1600px. Bei genau 1600px Bildschirmbreite ist das ohnehin nur die
+   volle verfuegbare Breite (216px Seitenleiste abgezogen), es entsteht also
+   keine neue Deckelung, nur weniger verschenkter Platz danach.
+
+   2100px: Full-HD (1920) und breiter braucht mehr als 1600px, sonst bleibt
+   dort wieder eine Luecke. Die Grenze waechst auf 1920px - bei 2560px
+   Breite bleiben dann rund 210px statt 512px ungenutzt, ohne dass eine
+   Tabellenzeile oder ein Formularfeld auf 2000+ Pixel auseinandergezogen
+   wird. */
+@media (min-width: 1600px) {
+  :root {
+    --ui-content-max-width: 1600px;
+    --ui-content-gutter: 28px;
+  }
+}
+
+@media (min-width: 2100px) {
+  :root {
+    --ui-content-max-width: 1920px;
+    --ui-content-gutter: 36px;
   }
 }
 

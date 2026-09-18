@@ -26,7 +26,7 @@
         <form id="platform-login-form" class="platform-form" novalidate>
           <label>E-Mail-Adresse<input id="platform-login-email" type="email" autocomplete="username" required></label>
           <label>Passwort<input id="platform-login-password" type="password" autocomplete="current-password" required></label>
-          <button class="platform-button platform-button--primary" type="submit">Sicher anmelden</button>
+          <button id="platform-login-submit" class="platform-button platform-button--primary" type="submit">Sicher anmelden</button>
         </form>
         <form id="platform-setup-form" class="platform-form" novalidate hidden>
           <p class="platform-notice">Einmalige Einrichtung des ersten Superadministrators</p>
@@ -37,7 +37,7 @@
           <label>E-Mail-Adresse<input id="platform-setup-email" type="email" autocomplete="username" required></label>
           <label>Passwort<input id="platform-setup-password" type="password" autocomplete="new-password" minlength="12" required></label>
           <label>Einrichtungsschlüssel<input id="platform-setup-token" type="password" autocomplete="off" minlength="24" required></label>
-          <button class="platform-button platform-button--primary" type="submit">Superadministrator anlegen</button>
+          <button id="platform-setup-submit" class="platform-button platform-button--primary" type="submit">Superadministrator anlegen</button>
         </form>
         <p id="platform-auth-message" class="platform-message" aria-live="polite"></p>
         <a class="platform-back" href="./">Zur Firmenanmeldung</a>

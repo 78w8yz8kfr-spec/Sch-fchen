@@ -779,7 +779,10 @@
             <div class="section-heading week-heading">
               <div>
                 <p class="eyebrow">Persönliche Übersicht</p>
-                <h2 id="week-title">Woche</h2>
+                <!-- Die Leiste nennt den Bereich "Meine Woche" (nav-week);
+                     die Ueberschrift sagte nur "Woche" - dieselbe Seite unter
+                     zwei Namen. -->
+                <h2 id="week-title">Meine Woche</h2>
               </div>
               <div class="week-heading__controls">
                 <!-- Kalenderwoche mit Pfeilen, daneben der Zeitraum und der
@@ -1750,6 +1753,16 @@
             <section id="site-dashboard" class="site-dashboard" aria-labelledby="site-dashboard-title" hidden>
               <div class="site-dashboard__header">
                 <div>
+                  <!-- Die Akte oeffnet unterhalb der Liste und scrollt dorthin -
+                       die Liste selbst ruckt dabei aus dem Blickfeld. Der
+                       Brotkrumen fuehrt mit demselben Klick zurueck, den auch
+                       "Schliessen" ausloest; er verdoppelt keine Aktion,
+                       sondern nennt nur den Weg dorthin. -->
+                  <nav class="workspace-breadcrumb" aria-label="Position in der Baustellenverwaltung">
+                    <button id="site-dashboard-breadcrumb" type="button" class="workspace-breadcrumb__link">Baustellen</button>
+                    <span class="workspace-breadcrumb__sep" aria-hidden="true">›</span>
+                    <span id="site-dashboard-breadcrumb-current" class="workspace-breadcrumb__current" aria-current="page"></span>
+                  </nav>
                   <p class="eyebrow">Baustelle ausgewählt</p>
                   <h3 id="site-dashboard-title">Baustelle</h3>
                   <p id="site-dashboard-meta"></p>
@@ -2396,6 +2409,15 @@
               <form id="employee-edit-form" class="admin-form admin-edit-form" novalidate hidden>
                 <div class="admin-edit-heading">
                   <div>
+                    <!-- Wie bei Kunde und Baustelle: das Formular scrollt beim
+                         Oeffnen dorthin, die Liste darueber verschwindet aus
+                         dem Blick. Der Brotkrumen fuehrt mit demselben Klick
+                         zurueck wie "Abbrechen". -->
+                    <nav class="workspace-breadcrumb" aria-label="Position in der Mitarbeiterverwaltung">
+                      <button id="employee-edit-breadcrumb" type="button" class="workspace-breadcrumb__link">Mitarbeiter</button>
+                      <span class="workspace-breadcrumb__sep" aria-hidden="true">›</span>
+                      <span id="employee-edit-breadcrumb-current" class="workspace-breadcrumb__current" aria-current="page"></span>
+                    </nav>
                     <p class="eyebrow">Mitarbeiter bearbeiten</p>
                     <strong id="employee-edit-title">Mitarbeiter</strong>
                   </div>
@@ -2543,6 +2565,15 @@
               <form id="customer-edit-form" class="admin-form entity-edit-form" novalidate hidden>
                 <div class="site-edit-form__heading">
                   <div>
+                    <!-- Das Formular scrollt beim Oeffnen an den Seitenanfang -
+                         die Kundenliste darueber ist dann ausser Sicht. Der
+                         Brotkrumen fuehrt mit demselben Klick zurueck wie
+                         "Abbrechen". -->
+                    <nav class="workspace-breadcrumb" aria-label="Position in der Kundenverwaltung">
+                      <button id="customer-edit-breadcrumb" type="button" class="workspace-breadcrumb__link">Kunden</button>
+                      <span class="workspace-breadcrumb__sep" aria-hidden="true">›</span>
+                      <span id="customer-edit-breadcrumb-current" class="workspace-breadcrumb__current" aria-current="page"></span>
+                    </nav>
                     <p class="eyebrow">Kunde bearbeiten</p>
                     <strong id="customer-edit-number">Kundennummer</strong>
                   </div>
