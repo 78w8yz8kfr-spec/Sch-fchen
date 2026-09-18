@@ -58,13 +58,27 @@ test("Jedes Pflichtfeld mit eigener Formatprüfung zeigt seine Meldung am Feld, 
   // Eingabefeld mit "aria-describedby" muss auf ein tatsächlich vorhandenes
   // Element verweisen, und dieses Element muss eine Feld-Fehlerklasse tragen
   // (".inv-field-error"/".aa-field-error"), keine allgemeine Sammelzeile.
-  for (const datei of ["inventory.html", "absence-approvals.html"]) {
-    const html = await lies(datei);
-    const verweise = [...html.matchAll(/aria-describedby="([a-z0-9-]+)"/g)].map((m) => m[1]);
-    assert.ok(verweise.length > 0, `${datei}: keine Feld-Verknüpfung über aria-describedby gefunden`);
+  //
+  // Geprueft wird jetzt in index.html: Lagerstruktur und Abwesenheitsfreigabe
+  // sind Bereiche der Arbeitsapp geworden, die alten Dateien nur noch
+  // Weiterleitungen fuer gesetzte Lesezeichen. Die Regel bleibt dieselbe, sie
+  // steht nur an einem anderen Ort - deshalb wird auf die beiden
+  // Bereichsabschnitte eingegrenzt: index.html verweist anderswo auch auf
+  // reine Hinweistexte, die keine Fehlermeldungen sind und es nicht werden
+  // sollen.
+  const html = await lies("index.html");
+  for (const bereich of ["inventory", "absences"]) {
+    const start = html.indexOf(`data-dashboard-pane="${bereich}"`);
+    assert.ok(start >= 0, `index.html: kein Bereich data-dashboard-pane="${bereich}"`);
+    const ende = html.indexOf("</section>", html.indexOf("</dialog>", start) >= 0
+      ? html.indexOf("</dialog>", start)
+      : start);
+    const block = html.slice(start, ende > start ? ende : html.length);
+    const verweise = [...block.matchAll(/aria-describedby="([a-z0-9-]+)"/g)].map((m) => m[1]);
+    assert.ok(verweise.length > 0, `Bereich ${bereich}: keine Feld-Verknüpfung über aria-describedby gefunden`);
     for (const id of verweise) {
       const ziel = new RegExp(`id="${id}"[^>]*class="[^"]*field-error[^"]*"|class="[^"]*field-error[^"]*"[^>]*id="${id}"`);
-      assert.match(html, ziel, `${datei}: #${id} (per aria-describedby verlinkt) ist keine Feld-Fehlermeldung`);
+      assert.match(html, ziel, `Bereich ${bereich}: #${id} (per aria-describedby verlinkt) ist keine Feld-Fehlermeldung`);
     }
   }
 });
@@ -107,7 +121,11 @@ test("Während eine Antragsentscheidung läuft, sperrt busy auch die Knöpfe der
   // sichtbar deaktiviert - alle anderen Knöpfe blieben anklickbar und
   // reagierten dann kommentarlos nicht.
   const js = await lies("absence-approvals.js");
-  assert.match(js, /function setRequestsBusy\(locked\)\s*\{\s*for \(const button of document\.querySelectorAll\('#requests button'\)\) button\.disabled = locked/);
+  // Die Kennung selbst ist bewusst offen ("#...requests"): der Bereich wurde
+  // beim Einfalten in die Arbeitsapp auf das Praefix "aa-" umbenannt, weil
+  // inventory.js in derselben Seite dieselben kurzen Namen benutzt. Der Test
+  // soll die Sperre pruefen, nicht den Namen festnageln.
+  assert.match(js, /function setRequestsBusy\(locked\)\s*\{\s*for \(const button of document\.querySelectorAll\('#[a-z-]*requests button'\)\) button\.disabled = locked/);
   const handler = /button\.addEventListener\('click',async\(\)=>\{[\s\S]*?\}\);card\.append\(button\);/.exec(js)[0];
   assert.match(handler, /busy=true;setRequestsBusy\(true\);/, "Beim Start der Entscheidung werden nicht alle Antragsknöpfe gesperrt");
   assert.match(handler, /catch\(error\)\{[^}]*setRequestsBusy\(false\)/, "Nach einem Fehler werden die übrigen Antragsknöpfe nicht wieder freigegeben");

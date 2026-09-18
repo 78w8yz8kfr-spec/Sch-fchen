@@ -1,4 +1,24 @@
-const $ = id => document.getElementById(id);
+// Die Abwesenheitsfreigabe ist ein Bereich der Arbeitsapp (data-dashboard-pane
+// "absences" in index.html), kein eigenstaendiger Bildschirm mehr - der
+// Nutzer hat zu Recht bemaengelt, dass die eigenstaendige Seite ohne
+// Seitenleiste und Kopfzeile "wie eine Handy-App" wirkte. Dieselbe Datei
+// bedient trotzdem weiter die schlanke Weiterleitungsseite
+// absence-approvals.html fuer alte Lesezeichen (siehe unten,
+// embedded === false): ohne die Huelle "#absence-section", die es nur in
+// index.html gibt, verdrahtet sie die Freigabelogik gar nicht erst und
+// springt stattdessen in die App.
+//
+// Anders als inventory.js bekommen die Kennungen hier bewusst KEIN Praefix:
+// keine von ihnen kollidiert mit etwas in index.html, und so bleiben die
+// zahlreichen wörtlichen Kennungs-Bezüge in dieser Datei unveraendert (siehe
+// frontend/tests/standalone-pages.test.mjs).
+// Alle Kennungen tragen hier das Praefix "aa-": inventory.js nutzt in
+// derselben Seite dieselben kurzen Namen (u. a. search, message, history,
+// reload, save, workspace, form-message) - in einem gemeinsamen Dokument
+// muessen Kennungen eindeutig sein. Die Aufrufe unten bleiben unveraendert
+// kurz ($('search') usw.); nur diese eine Stelle haengt das Praefix an.
+const $ = id => document.getElementById(`aa-${id}`);
+const embedded = Boolean(document.getElementById("absence-section"));
 const endpoint = './api/v1/absence-approvals';
 let state = null, busy = false;
 const selected = {reviewerIds:new Set(),approverIds:new Set()};
@@ -25,7 +45,7 @@ async function request(url=endpoint,options={}) {
 // Antraege waehrenddessen anklickbar und reagierten dann kommentarlos nicht -
 // gerade bei vielen offenen Antraegen der haeufigste Fall im Buero.
 function setRequestsBusy(locked) {
-  for (const button of document.querySelectorAll('#requests button')) button.disabled = locked || !navigator.onLine;
+  for (const button of document.querySelectorAll('#aa-requests button')) button.disabled = locked || !navigator.onLine;
 }
 function el(tag,text) {const node=document.createElement(tag);if(text!==undefined) node.textContent=text;return node;}
 function renderPeople() {
@@ -123,21 +143,6 @@ function validateReason() {
   if(!ok)reason.focus();
   return ok;
 }
-$('policy-form').addEventListener('submit',async event=>{
-  event.preventDefault();if(busy||!state?.canManage)return;
-  $('form-message').textContent='';
-  if(!validateReason())return;
-  busy=true;$('save').disabled=true;
-  try {
-    await request(endpoint,{method:'PUT',body:JSON.stringify({mode:$('mode').value,approvalSteps:Number($('steps').value),
-      reviewerIds:$('mode').value==='selected'&&$('steps').value==='2'?[...selected.reviewerIds]:[],approverIds:$('mode').value==='selected'?[...selected.approverIds]:[],
-      rowVersion:state.policy.rowVersion,reason:$('reason').value.trim()})});
-    $('reason').value='';await reload();$('message').textContent='Zuständigkeiten gespeichert. Sie gelten ab sofort.';
-  } catch(error){$('form-message').textContent=error.message;}
-  finally{busy=false;$('save').disabled=false;}
-});
-$('steps').addEventListener('change',()=>{modeChanged();renderPeople();});
-$('mode').addEventListener('change',modeChanged);$('search').addEventListener('input',renderPeople);$('reload').addEventListener('click',()=>{if(!busy)void reload();});
 // Grenzen entsprechen validateAbsenceRequest() in api/src/validation.mjs
 // (Start-/Enddatum erforderlich, Ende darf nicht vor Beginn liegen). Der
 // direkte Eintrag verlangt zusaetzlich immer einen Hinweis (siehe HTML
@@ -154,22 +159,67 @@ function validateDirectEntry() {
   if(!noteOk){note.focus();return false;}
   return true;
 }
-$('direct-form').addEventListener('submit',async event=>{
-  event.preventDefault();if(busy||!state?.canRecordDirect)return;
-  $('direct-message').textContent='';
-  if(!validateDirectEntry())return;
-  if(!window.confirm(`Abwesenheit ohne Antrag verbindlich in die Planung eintragen? ${$('direct-employee').selectedOptions[0]?.textContent||''} · ${kinds[$('direct-type').value]} · ${$('direct-start').value} bis ${$('direct-end').value}`))return;
-  busy=true;$('direct-save').disabled=true;
-  try {
-    await request('./api/v1/admin/absences',{method:'POST',body:JSON.stringify({employeeId:$('direct-employee').value,
-      absenceType:$('direct-type').value,startDate:$('direct-start').value,endDate:$('direct-end').value,
-      dayPart:$('direct-part').value,note:$('direct-note').value.trim()})});
-    $('direct-form').reset();await reload();$('direct-message').textContent='Abwesenheit eingetragen und in der Planung berücksichtigt.';
-  } catch(error){$('direct-message').textContent=error.message;}
-  finally{busy=false;$('direct-save').disabled=false;}
-});
-// Fehlermeldung am Feld verschwindet, sobald sie behoben ist, statt erst beim
-// naechsten Absenden.
-$('reason').addEventListener('input',()=>{if($('reason-error').textContent)validateReason();});
-$('direct-note').addEventListener('input',()=>{if($('direct-note-error').textContent&&$('direct-note').value.trim().length>=3)$('direct-note-error').textContent='';});
-void reload();
+// Der Rest dieser Datei verdrahtet echte Bedienelemente - die gibt es nur,
+// wenn diese Datei innerhalb von index.html laeuft (siehe "embedded" oben).
+// Auf der schlanken Weiterleitungsseite absence-approvals.html existieren sie
+// nicht; dort springt die Datei stattdessen sofort in die App.
+if (embedded) {
+  $('policy-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(busy||!state?.canManage)return;
+    $('form-message').textContent='';
+    if(!validateReason())return;
+    busy=true;$('save').disabled=true;
+    try {
+      await request(endpoint,{method:'PUT',body:JSON.stringify({mode:$('mode').value,approvalSteps:Number($('steps').value),
+        reviewerIds:$('mode').value==='selected'&&$('steps').value==='2'?[...selected.reviewerIds]:[],approverIds:$('mode').value==='selected'?[...selected.approverIds]:[],
+        rowVersion:state.policy.rowVersion,reason:$('reason').value.trim()})});
+      $('reason').value='';await reload();$('message').textContent='Zuständigkeiten gespeichert. Sie gelten ab sofort.';
+    } catch(error){$('form-message').textContent=error.message;}
+    finally{busy=false;$('save').disabled=false;}
+  });
+  $('steps').addEventListener('change',()=>{modeChanged();renderPeople();});
+  $('mode').addEventListener('change',modeChanged);$('search').addEventListener('input',renderPeople);$('reload').addEventListener('click',()=>{if(!busy)void reload();});
+  $('direct-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(busy||!state?.canRecordDirect)return;
+    $('direct-message').textContent='';
+    if(!validateDirectEntry())return;
+    if(!window.confirm(`Abwesenheit ohne Antrag verbindlich in die Planung eintragen? ${$('direct-employee').selectedOptions[0]?.textContent||''} · ${kinds[$('direct-type').value]} · ${$('direct-start').value} bis ${$('direct-end').value}`))return;
+    busy=true;$('direct-save').disabled=true;
+    try {
+      await request('./api/v1/admin/absences',{method:'POST',body:JSON.stringify({employeeId:$('direct-employee').value,
+        absenceType:$('direct-type').value,startDate:$('direct-start').value,endDate:$('direct-end').value,
+        dayPart:$('direct-part').value,note:$('direct-note').value.trim()})});
+      $('direct-form').reset();await reload();$('direct-message').textContent='Abwesenheit eingetragen und in der Planung berücksichtigt.';
+    } catch(error){$('direct-message').textContent=error.message;}
+    finally{busy=false;$('direct-save').disabled=false;}
+  });
+  // Fehlermeldung am Feld verschwindet, sobald sie behoben ist, statt erst beim
+  // naechsten Absenden.
+  $('reason').addEventListener('input',()=>{if($('reason-error').textContent)validateReason();});
+  $('direct-note').addEventListener('input',()=>{if($('direct-note-error').textContent&&$('direct-note').value.trim().length>=3)$('direct-note-error').textContent='';});
+} else {
+  // Altes Lesezeichen auf die eigenstaendige Seite (auch mit "#direct-entry",
+  // siehe frontend/absence-approvals.html): die Abwesenheitsfreigabe lebt
+  // jetzt in der Arbeitsapp, sofort dorthin springen statt eine zweite,
+  // abweichend gestaltete Oberflaeche zu zeigen. Der Bereich in index.html
+  // nutzt dieselbe (unveraenderte) ID "direct-entry" - der alte Anker
+  // funktioniert damit unveraendert weiter.
+  const sub = window.location.hash === '#direct-entry' ? '&sub=direct-entry' : '';
+  const ziel = `./?pane=absences${sub}`;
+  // Der Knopf "Jetzt öffnen" auf derselben Seite bietet denselben Sprung von
+  // Hand an, falls die automatische Weiterleitung ausbleibt.
+  $('absence-open')?.addEventListener('click', () => window.location.replace(ziel));
+  window.location.replace(ziel);
+}
+
+let started = false, ladevorgang = null;
+// Von app.js aufgerufen, wenn der Bereich zum ersten Mal geoeffnet wird - erst
+// dann lohnt sich der Netzwerkabruf. Ein sofortiger Abruf beim Import haette
+// bei JEDEM App-Start eine Anfrage ausgeloest. Der zurueckgegebene Ladevorgang
+// laesst app.js beim Sprung auf "#direct-entry" gezielt warten, bis der
+// Abschnitt tatsaechlich sichtbar sein kann.
+export function initAbsencesPane() {
+  if (!embedded) return Promise.resolve();
+  if (!started) { started = true; ladevorgang = reload(); }
+  return ladevorgang;
+}

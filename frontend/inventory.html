@@ -4,46 +4,43 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#e30613"><title>Lagerstruktur · Schäfchen</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+  <!--
+    Diese Seite war frueher die vollstaendige Lagerstruktur-Oberflaeche - ohne
+    Seitenleiste, Kopfzeile oder Suche der Arbeitsapp. Genau das hat der
+    Nutzer zu Recht bemaengelt ("sieht aus wie eine Handy-App"). Die
+    Lagerstruktur lebt jetzt als Bereich in index.html (data-dashboard-pane
+    "inventory") und erbt dort Seitenleiste, Kopfzeile und Rollensteuerung.
+    Diese Datei bleibt nur als schlanke Weiterleitung fuer bereits gesetzte
+    Lesezeichen bestehen - nach dem Vorbild von frontend/refresh.html braucht
+    sie deshalb weder inventory.css noch die volle Lagerlogik, nur
+    styles.css/design-system.css fuer den kurzen Hinweis unten.
+  -->
+  <link rel="stylesheet" href="./styles.css?v=0.44.54">
   <link rel="stylesheet" href="./design-system.css?v=0.44.54">
-  <link rel="stylesheet" href="./inventory.css?v=0.44.54">
   <script type="module" src="./inventory.js?v=0.44.54"></script>
 </head>
-<body><main class="inv-shell">
-<header class="inv-header">
-  <a class="inv-brand" href="./"><img src="./assets/mark.svg" alt="" width="32" height="32"><span>Schäfchen</span></a>
-  <a class="text-button" href="./">← Zur Arbeitsapp</a>
-</header>
-<div class="page-heading inv-page-heading">
-  <div>
-    <p class="eyebrow">Betrieb</p>
-    <h1>Lagerstruktur</h1>
-    <p class="inv-hint">Lager → Bereich → Regal → Fach. Hier organisierst du Lagerplätze; Artikel und Bestandsbuchungen folgen getrennt.</p>
-  </div>
-  <div class="inv-page-heading__actions">
-    <button id="add" type="button" class="button button--primary" hidden>+ Lager anlegen</button>
-    <button id="reload" type="button" class="button button--secondary">Neu laden</button>
-  </div>
-</div>
-<div class="card inv-notice"><p id="message" role="status" aria-live="polite" class="inv-status">Lagerstruktur wird geladen …</p></div>
-<div id="workspace" class="inv-stack" hidden>
-  <div class="card inv-toolbar">
-    <label class="inv-search-label entity-search">Suchen <input id="search" type="search" placeholder="Name oder Code"></label>
-    <label class="inv-check"><input id="archived" type="checkbox"> Archivierte anzeigen</label>
-  </div>
-  <div id="locations" aria-label="Lagerplätze" class="card inv-locations"></div>
-  <section id="history" class="card inv-history" hidden><h2>Änderungshistorie</h2><p class="inv-hint">Die letzten 100 Änderungen dieses Lagerplatzes.</p><ol id="events" class="inv-history__list"></ol></section>
-</div>
-<dialog id="editor" class="inv-dialog"><form id="form" class="inv-form field" novalidate>
-  <h2 id="editor-title">Lagerplatz anlegen</h2>
-  <p id="parent-label" class="inv-hint"></p>
-  <label for="code">Code <span class="inv-required" aria-hidden="true">*</span></label>
-  <input id="code" required maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,29}" autocomplete="off"
-         placeholder="z. B. L1, R01, F01" aria-describedby="code-error" aria-required="true">
-  <p id="code-error" class="inv-field-error" aria-live="polite"></p>
-  <label for="name">Name <span class="inv-required" aria-hidden="true">*</span></label>
-  <input id="name" required maxlength="120" autocomplete="off" aria-describedby="name-error" aria-required="true">
-  <p id="name-error" class="inv-field-error" aria-live="polite"></p>
-  <p id="form-message" role="alert" class="inv-form-message form-message"></p>
-  <div class="inv-form__actions"><button id="save" type="submit" class="button button--primary">Speichern</button><button id="cancel" type="button" class="button button--secondary">Abbrechen</button></div>
-</form></dialog>
-</main></body></html>
+<body>
+<main class="view login-view">
+  <section class="login-card">
+    <div class="brand brand--large">
+      <img src="./assets/mark.svg" alt="" width="56" height="56">
+      <div>
+        <p class="eyebrow">Betrieb</p>
+      </div>
+    </div>
+    <div class="page-heading">
+      <div>
+        <h1>Lagerstruktur</h1>
+        <p>Dieser Bereich ist jetzt Teil der Arbeitsapp. Du wirst automatisch dorthin weitergeleitet.</p>
+      </div>
+      <div class="page-heading__actions">
+        <button id="inventory-open" type="button" class="button button--primary">Jetzt öffnen</button>
+      </div>
+    </div>
+    <div class="card">
+      <p><a class="text-button" href="./">← Zur Arbeitsapp</a></p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

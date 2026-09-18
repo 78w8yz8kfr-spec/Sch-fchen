@@ -1,72 +1,20 @@
 /*
- * Lagerstruktur - eigenständige Seite.
+ * Lagerstruktur - Bereich der Arbeitsapp (data-dashboard-pane "inventory" in
+ * index.html, siehe #inventory-section). Nutzt ausschliesslich die Tokens aus
+ * design-system.css (Farbe, Radius, Abstand, Text) - keine fest verdrahteten
+ * Farben.
  *
- * Nutzt ausschließlich die Tokens aus design-system.css (Farbe, Radius,
- * Abstand, Text). Keine fest verdrahteten Farben, damit ein künftiger
- * Dunkelmodus im Designsystem hier automatisch greift.
+ * Frueher war dies eine eigenstaendige Seite mit eigener Kopfzeile, eigenem
+ * Seitenrahmen und eigener ".card"-Regel. Beides uebernehmen jetzt
+ * styles.css/design-system.css fuer die ganze App (unter anderem [hidden],
+ * Grundschrift, ".card") - hier bleibt nur, was die Lagerstruktur zusaetzlich
+ * dazu braucht. ".planning-group" (siehe styles.css) liefert bereits den
+ * Aussenabstand zwischen den Bloecken unten (Werkzeugzeile, Hinweis, Liste),
+ * darum tragen sie hier keine eigenen oberen Randmasse mehr.
  */
 
-:root {
-  color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-/* design-system.css bringt fuer diese eigenstaendige Seite keine [hidden]-Regel
-   mit. Ohne sie gewinnt eine Autorenregel wie ".inv-stack { display: grid }"
-   gegen die UA-Vorgabe "[hidden] { display: none }" - #workspace/#history
-   blieben dann sichtbar, obwohl inventory.js hidden=true gesetzt hat. */
-[hidden] {
-  display: none !important;
-}
-
-/* Wie im Rest der Anwendung: eine mittig gefuehrte, lesefreundliche Spalte
-   statt einer ueber breite Bildschirme gestreckten Tabelle - dasselbe Mass,
-   das schon die Anmeldekarte in design-system.css nutzt (min(...,410px)).
-   Auf 2560px bleiben so ruhige, aber keine unnoetig grossen Leerflaechen:
-   die Karten selbst duerfen atmen (siehe Breakpoint unten), der Lesefluss
-   bleibt aber einspaltig, weil die Lagerstruktur ein Baum ist, kein Raster. */
-.inv-shell {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: var(--ui-space-5) var(--ui-content-gutter) 60px;
-}
-
-.inv-header {
+.inv-actions {
   display: flex;
-  min-height: var(--ui-header-height);
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-3);
-  margin-bottom: var(--ui-space-5);
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.inv-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2);
-  color: var(--ui-text);
-  font-weight: 750;
-  text-decoration: none;
-}
-
-/* .text-button (Rueckweg "Zur Arbeitsapp") und .eyebrow kommen unveraendert
-   aus design-system.css - keine eigene Farbe/Groesse mehr doppeln. */
-
-.inv-page-heading {
-  margin-top: var(--ui-space-2);
-}
-
-.inv-page-heading__actions {
-  display: flex;
-  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
 }
@@ -78,19 +26,8 @@ body {
   line-height: 1.5;
 }
 
-/* Karten ------------------------------------------------------------ */
-
-.card {
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-xs);
-}
-
 .inv-notice {
   padding: var(--ui-card-padding) var(--ui-space-4);
-  margin-top: var(--ui-space-5);
 }
 
 .inv-notice p {
@@ -105,7 +42,6 @@ body {
 .inv-stack {
   display: grid;
   gap: var(--ui-space-4);
-  margin-top: var(--ui-space-5);
 }
 
 /* Werkzeugleiste ------------------------------------------------------- */
@@ -324,10 +260,6 @@ body {
 }
 
 @media (max-width: 640px) {
-  .inv-shell {
-    padding: var(--ui-space-4) var(--ui-space-3) 48px;
-  }
-
   .inv-toolbar {
     padding: var(--ui-space-3);
   }

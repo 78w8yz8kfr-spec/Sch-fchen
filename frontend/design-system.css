@@ -179,6 +179,18 @@ textarea {
   font-weight: 750;
 }
 
+/* Einfache Karte mit Rahmen, Radius und dezentem Schatten - bislang identisch
+   in inventory.css und absence-approvals.css definiert. Beide Bereiche sitzen
+   inzwischen als data-dashboard-pane in derselben Seite (index.html); eine
+   gemeinsame Stelle im Designsystem erspart die doppelte Regel. */
+.card {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-xs);
+}
+
 :where(
   .login-form,
   .admin-form,

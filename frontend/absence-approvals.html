@@ -1,57 +1,47 @@
 <!DOCTYPE html>
-<html lang="de"><head>
+<html lang="de">
+<head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#e30613"><title>Abwesenheiten freigeben · Schäfchen</title>
 <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+<!--
+  Diese Seite war frueher die vollstaendige Oberflaeche der Abwesenheits-
+  freigabe - ohne Seitenleiste, Kopfzeile oder Suche der Arbeitsapp. Genau das
+  hat der Nutzer zu Recht bemaengelt ("sieht aus wie eine Handy-App"). Die
+  Abwesenheitsfreigabe lebt jetzt als Bereich in index.html
+  (data-dashboard-pane "absences") und erbt dort Seitenleiste, Kopfzeile und
+  Rollensteuerung. Diese Datei bleibt nur als schlanke Weiterleitung fuer
+  bereits gesetzte Lesezeichen bestehen (auch mit dem Anker "#direct-entry")
+  - nach dem Vorbild von frontend/refresh.html braucht sie deshalb weder
+  absence-approvals.css noch die volle Freigabelogik, nur
+  styles.css/design-system.css fuer den kurzen Hinweis unten.
+-->
+<link rel="stylesheet" href="./styles.css?v=0.44.54">
 <link rel="stylesheet" href="./design-system.css?v=0.44.54">
-<link rel="stylesheet" href="./absence-approvals.css?v=0.44.54">
 <script type="module" src="./absence-approvals.js?v=0.44.54"></script>
-</head><body><main class="aa-shell">
-<header class="aa-header">
-  <a class="aa-brand" href="./"><img src="./assets/mark.svg" alt="" width="32" height="32"><span>Schäfchen</span></a>
-  <a class="text-button" href="./#week">← Zur Arbeitsapp</a>
-</header>
-<div class="page-heading aa-page-heading">
-  <div>
-    <p class="eyebrow">Urlaub und Abwesenheit</p>
-    <h1>Abwesenheiten freigeben</h1>
-    <p class="aa-hint">Eigene Anträge prüft jemand anderes. Das Genehmigungsverfahren legt die Firma fest.</p>
-  </div>
-  <div class="aa-page-heading__actions"><button id="reload" type="button" class="button button--secondary">Neu laden</button></div>
-</div>
-<div class="card aa-notice">
-<p id="procedure-note">Das Genehmigungsverfahren legt die Firma fest und wird gleich geladen.</p>
-<p id="message" role="status" aria-live="polite" class="aa-status">Zuständigkeiten werden geladen …</p>
-</div>
-<div id="workspace" class="aa-stack" hidden>
-<details id="settings" class="card aa-card" hidden><summary class="aa-card__summary">Zuständige Mitarbeiter auswählen</summary>
-<div class="aa-card__body">
-<form id="policy-form" class="aa-form field" novalidate>
-<label for="steps">Genehmigungsverfahren</label><select id="steps"><option value="2">Zweistufig: erste Prüfung und verbindliche Freigabe</option><option value="1">Einstufig: eine Freigabe genügt</option></select>
-<label for="mode">Zuständigkeit</label><select id="mode"><option value="default">Standardrollen verwenden</option><option value="selected">Mitarbeiter selbst auswählen</option></select>
-<p id="default-note" class="aa-hint"></p>
-<div id="selection" class="aa-selection" hidden><p class="aa-hint">Pro Stufe sind mehrere Personen möglich. Ausgewählte Mitarbeiter erhalten ausschließlich das Recht zur Abwesenheitsprüfung, keine weiteren Verwaltungsrechte. Für eigene Anträge ist mindestens eine andere Freigabeperson nötig; bei zwei Stufen sind es zwei verschiedene Personen.</p>
-<label class="aa-search-label entity-search">Suchen <input id="search" type="search" placeholder="Name oder Personalnummer"></label>
-<div id="employees" class="aa-people"></div></div>
-<label for="reason">Begründung der Änderung <span class="aa-required" aria-hidden="true">*</span></label>
-<input id="reason" required minlength="3" maxlength="500" placeholder="z. B. Vertretung während des Urlaubs" aria-describedby="reason-error" aria-required="true">
-<p id="reason-error" class="aa-field-error" aria-live="polite"></p>
-<p id="form-message" role="alert" class="aa-form-message form-message"></p><button id="save" type="submit" class="button button--primary">Zuständigkeiten speichern</button>
-</form><details class="aa-history"><summary>Änderungsverlauf (letzte 20 Änderungen)</summary><ol id="history" class="aa-history__list"></ol></details>
-</div>
-</details>
-<section id="direct-entry" class="card aa-card" hidden><div class="aa-card__body"><h2>Abwesenheit direkt eintragen</h2>
-<p class="aa-hint">Für das Büro: sofort bestätigte Abwesenheit ohne Antrag des Mitarbeiters. Der Eintrag erscheint in der Planung und in der Historie.</p>
-<form id="direct-form" class="aa-form field" novalidate>
-<label for="direct-employee">Mitarbeiter <span class="aa-required" aria-hidden="true">*</span></label><select id="direct-employee" required></select>
-<label for="direct-type">Abwesenheitsart</label><select id="direct-type"><option value="vacation">Urlaub</option><option value="sick">Krankheit</option><option value="time_off">Freizeitausgleich</option><option value="other">Sonstiges</option></select>
-<label for="direct-start">Von <span class="aa-required" aria-hidden="true">*</span></label><input id="direct-start" type="date" required>
-<label for="direct-end">Bis <span class="aa-required" aria-hidden="true">*</span></label><input id="direct-end" type="date" required>
-<label for="direct-part">Umfang</label><select id="direct-part"><option value="full_day">Ganzer Tag</option><option value="first_half">Vormittag</option><option value="second_half">Nachmittag</option></select>
-<label for="direct-note">Begründung / Hinweis <span class="aa-required" aria-hidden="true">*</span></label>
-<input id="direct-note" required minlength="3" maxlength="500" placeholder="z. B. telefonisch gemeldete Abwesenheit" aria-describedby="direct-note-error" aria-required="true">
-<p id="direct-note-error" class="aa-field-error" aria-live="polite"></p>
-<p id="direct-message" role="alert" class="aa-form-message form-message"></p><button id="direct-save" type="submit" class="button button--primary">Abwesenheit verbindlich eintragen</button>
-</form></div></section>
-<section class="card aa-card"><div class="aa-card__body"><h2>Offene Anträge und Freigaben</h2><p class="aa-hint">Die neuesten 500 offenen oder genehmigten Anträge. Änderungen gelten sofort, auch für bereits eingereichte Anträge.</p><div id="requests" class="aa-requests"></div></div></section>
-</div></main></body></html>
+</head>
+<body>
+<main class="view login-view">
+  <section class="login-card">
+    <div class="brand brand--large">
+      <img src="./assets/mark.svg" alt="" width="56" height="56">
+      <div>
+        <p class="eyebrow">Urlaub und Abwesenheit</p>
+      </div>
+    </div>
+    <div class="page-heading">
+      <div>
+        <h1>Abwesenheiten freigeben</h1>
+        <p>Dieser Bereich ist jetzt Teil der Arbeitsapp. Du wirst automatisch dorthin weitergeleitet.</p>
+      </div>
+      <div class="page-heading__actions">
+        <button id="aa-absence-open" type="button" class="button button--primary">Jetzt öffnen</button>
+      </div>
+    </div>
+    <div class="card">
+      <p><a class="text-button" href="./#week">← Zur Arbeitsapp</a></p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

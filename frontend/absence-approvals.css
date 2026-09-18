@@ -1,76 +1,22 @@
 /*
- * Abwesenheiten freigeben - eigenständige Seite.
+ * Abwesenheiten freigeben - Bereich der Arbeitsapp (data-dashboard-pane
+ * "absences" in index.html, siehe #absence-section). Nutzt ausschliesslich die
+ * Tokens aus design-system.css (Farbe, Radius, Abstand, Text) - keine fest
+ * verdrahteten Farben.
  *
- * Nutzt ausschließlich die Tokens aus design-system.css (Farbe, Radius,
- * Abstand, Text). Keine fest verdrahteten Farben, damit ein künftiger
- * Dunkelmodus im Designsystem hier automatisch greift.
+ * Frueher war dies eine eigenstaendige Seite mit eigener Kopfzeile, eigenem
+ * Seitenrahmen und eigener ".card"-Regel. Beides uebernehmen jetzt
+ * styles.css/design-system.css fuer die ganze App (unter anderem [hidden],
+ * Grundschrift, ".card") - hier bleibt nur, was dieser Bereich zusaetzlich
+ * dazu braucht. ".planning-group" (siehe styles.css) liefert bereits den
+ * Aussenabstand zwischen den Bloecken unten, darum tragen sie hier keine
+ * eigenen oberen Randmasse mehr.
  */
 
-:root {
-  color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-/* design-system.css bringt fuer diese eigenstaendige Seite keine [hidden]-Regel
-   mit. Ohne sie gewinnt eine Autorenregel wie ".aa-stack { display: grid }"
-   gegen die UA-Vorgabe "[hidden] { display: none }" - #workspace bliebe dann
-   sichtbar, obwohl absence-approvals.js hidden=true gesetzt hat. */
-[hidden] {
-  display: none !important;
-}
-
-/* Dieselbe lesefreundliche, mittig gefuehrte Spalte wie in inventory.css
-   begruendet - siehe dort. */
-.aa-shell {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: var(--ui-space-5) var(--ui-content-gutter) 60px;
-}
-
-.aa-header {
+.aa-actions {
   display: flex;
-  min-height: var(--ui-header-height);
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-3);
-  margin-bottom: var(--ui-space-5);
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.aa-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2);
-  color: var(--ui-text);
-  font-weight: 750;
-  text-decoration: none;
-}
-
-/* .text-button (Rueckweg "Zur Arbeitsapp") und .eyebrow kommen unveraendert
-   aus design-system.css - keine eigene Farbe/Groesse mehr doppeln. */
-
-.aa-page-heading {
-  margin-top: var(--ui-space-2);
-}
-
-.aa-page-heading__actions {
-  display: flex;
-  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
-}
-
-.aa-stack {
-  display: grid;
-  gap: var(--ui-space-4);
-  margin-top: var(--ui-space-5);
 }
 
 .aa-status {
@@ -88,23 +34,19 @@ body {
 
 /* Karten --------------------------------------------------------------- */
 
-.card {
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-xs);
-}
-
 .aa-notice {
   display: grid;
   gap: var(--ui-space-2);
   padding: var(--ui-card-padding) var(--ui-space-4);
-  margin-top: var(--ui-space-5);
 }
 
 .aa-notice p {
   margin: 0;
+}
+
+.aa-stack {
+  display: grid;
+  gap: var(--ui-space-4);
 }
 
 .aa-card__summary {
@@ -341,16 +283,4 @@ body {
 
 .request button {
   margin: 0 var(--ui-space-2) var(--ui-space-2) 0;
-}
-
-@media (max-width: 640px) {
-  .aa-shell {
-    padding: var(--ui-space-4) var(--ui-space-3) 48px;
-  }
-
-  .aa-card__body,
-  .aa-card__summary {
-    padding-right: var(--ui-space-3);
-    padding-left: var(--ui-space-3);
-  }
 }

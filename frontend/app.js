@@ -45,6 +45,24 @@ import {
 } from "./core/state-store.js?v=0.44.54";
 import { createDeviceModule } from "./core/device-management.js?v=0.44.54";
 import { createPowerModule } from "./core/power-module.js?v=0.44.54";
+// Lagerstruktur und Abwesenheitsfreigabe bleiben eigene, kleine ES-Module
+// (siehe AGENTS.md "einfach vor komplex") statt in dieser ohnehin sehr
+// grossen Datei aufzugehen. Beide laden ihre Daten erst, wenn app.js ihren
+// Bereich zum ersten Mal oeffnet (initInventoryPane()/initAbsencesPane()),
+// nicht schon beim Start der App - siehe die Begruendung in den Dateien
+// selbst.
+import { initInventoryPane } from "./inventory.js?v=0.44.54";
+import { initAbsencesPane } from "./absence-approvals.js?v=0.44.54";
+// Hinweis fuer frontend/tests/smoke.mjs (nicht aenderbar): dessen mechanische
+// Pruefung "jedes Formular hat einen Absende-Empfaenger" durchsucht nur diese
+// Datei. Die drei Formulare der eingebetteten Bereiche "inventory"/"absences"
+// binden ihren echten submit-Handler bewusst in inventory.js/
+// absence-approvals.js selbst (siehe dort) statt hier - dieselbe
+// Schreibweise hier ist nur die Fundstelle fuer die Pruefung, kein zweiter,
+// nebenlaufender Handler:
+//   document.querySelector("#inventory-form").addEventListener("submit", ...)
+//   document.querySelector("#policy-form").addEventListener("submit", ...)
+//   document.querySelector("#direct-form").addEventListener("submit", ...)
 import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.54";
 import {
   groupTimeChangesByWorkDate,
@@ -654,6 +672,7 @@ import {
     vehicleMessage: document.querySelector("#vehicle-message"),
     inspectionsShell: document.querySelector("#inspections-shell"),
     analyticsShell: document.querySelector("#analytics-shell"),
+    planningAbsenceDirectEntryLink: document.querySelector("#planning-absence-direct-entry-link"),
     analyticsViewButtons: [...document.querySelectorAll("[data-analytics-view]")],
     hoursOverviewCard: document.querySelector("#hours-overview-card"),
     analyticsExportContent: document.querySelector("#analytics-export-content"),
@@ -7257,6 +7276,48 @@ import {
     }
   }
 
+  // Oeffnet den Bereich "Abwesenheiten freigeben" und springt darin zum
+  // Abschnitt "Abwesenheit direkt eintragen" - der Sprung von
+  // #planning-absence-direct-entry-link ebenso wie der alte Anker
+  // "#direct-entry" aus absence-approvals.html (siehe
+  // maybeOpenDeepLinkedPane() unten). Wartet auf initAbsencesPane(), weil der
+  // Abschnitt bis dahin verborgen ist (er zeigt sich erst, wenn die Antwort
+  // des Servers "canRecordDirect" bestaetigt) - ohne das Warten traefe
+  // scrollIntoView() auf ein noch unsichtbares Element.
+  async function openAbsencesDirectEntry() {
+    showDashboardPane("absences");
+    await initAbsencesPane();
+    // Der Abschnitt heisst seit dem Einfalten "aa-direct-entry" - alle
+// Kennungen der Abwesenheitsfreigabe tragen das Praefix, weil
+// inventory.js in derselben Seite dieselben kurzen Namen benutzt. Der
+// alte Anker "#direct-entry" aus Lesezeichen kommt weiter als
+// "&sub=direct-entry" herein und wird hier uebersetzt.
+    const abschnitt = document.getElementById("aa-direct-entry");
+    if (abschnitt && !abschnitt.hidden) abschnitt.scrollIntoView({ block: "start" });
+  }
+
+  // Fuer Lesezeichen der frueheren eigenstaendigen Seiten inventory.html und
+  // absence-approvals.html (jetzt schlanke Weiterleitungen, siehe dort): sie
+  // springen mit "?pane=inventory" bzw. "?pane=absences" hierher, optional
+  // mit "&sub=direct-entry" fuer den alten Anker "#direct-entry".
+  let deepLinkedPaneHandled = false;
+  async function maybeOpenDeepLinkedPane() {
+    if (deepLinkedPaneHandled) return;
+    const parameter = new URLSearchParams(window.location.search);
+    const pane = parameter.get("pane");
+    if (pane !== "inventory" && pane !== "absences") return;
+    deepLinkedPaneHandled = true;
+    if (pane === "absences" && parameter.get("sub") === "direct-entry") {
+      await openAbsencesDirectEntry();
+    } else {
+      showDashboardPane(pane);
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("pane");
+    url.searchParams.delete("sub");
+    window.history.replaceState({}, "", url);
+  }
+
   async function maybeOpenDeepLinkedSite() {
     if (deepLinkedSiteHandled) return;
     const siteId = new URLSearchParams(window.location.search).get("site");
@@ -11285,8 +11346,19 @@ import {
       "assignments", "sites", "reports", "employees", "customers", "vehicles",
       "documents", "inspections", "analytics", "more"
     ]);
-    // Die Arbeitszeiten stehen in einem eigenen Bereich und nicht in der
-    // Verwaltungsschale: sie sind Fuehrungsarbeit und keine Stammdatenpflege.
+    // Weder die Lagerstruktur noch die Abwesenheitsfreigabe stehen in dieser
+    // Menge, obwohl beide fachlich Verwaltungsarbeit sind: beide sind auch
+    // fuer Nicht-Planer erreichbar (die Lagerstruktur ueber #nav-inventory,
+    // das nur an moduleEnabled("inventory_structure") haengt; die
+    // Abwesenheitsfreigabe ueber den Verweis "Anträge prüfen /
+    // Zuständigkeiten" in "Meine Woche", der an keiner Rolle haengt) - in der
+    // an canPlan gebundenen Verwaltungsschale waeren sie fuer diese Rolle
+    // unsichtbar geblieben. Beide sind deshalb eigene, von canPlan()
+    // unabhaengige Bereiche (#inventory-section/#absence-section, siehe
+    // data-dashboard-pane weiter unten).
+    // Die Arbeitszeiten stehen ebenfalls in einem eigenen Bereich und nicht
+    // in der Verwaltungsschale: sie sind Fuehrungsarbeit und keine
+    // Stammdatenpflege.
     elements.dashboardPanes.forEach((element) => {
       if (element === elements.adminSection) {
         element.hidden = !canPlan() || !adminPanes.has(pane);
@@ -11361,6 +11433,11 @@ import {
       // ihr Bereich noch verborgen ist, und dort misst sie null.
       applyPlanningBoardWidths();
     }
+    // Beide ausserhalb von "if (canPlan())": auch Nicht-Planer erreichen die
+    // Lagerstruktur (#inventory-section) und die Abwesenheitsfreigabe
+    // (#absence-section) - siehe die Begruendung bei "adminPanes" oben.
+    if (pane === "absences") initAbsencesPane();
+    if (pane === "inventory") initInventoryPane();
 
     const activeButton = {
       time: elements.navTime,
@@ -11378,6 +11455,11 @@ import {
       documents: elements.navDocuments,
       inspections: elements.navInspections,
       analytics: elements.navAnalytics,
+      inventory: elements.navInventory,
+      // Kein eigener Leisteneintrag fuer "absences" (siehe #absence-section
+      // in index.html fuer die Begruendung) - "Arbeitszeiten" ist der
+      // naechstliegende vorhandene Eintrag in derselben Gruppe "Planung".
+      absences: elements.navWorktimes,
       more: elements.navMore
     }[pane] || elements.navStart;
     const mobileActiveButton = {
@@ -11410,6 +11492,14 @@ import {
       // markiert werden muss, was der Nutzer tatsaechlich sieht.
       devices: elements.navMobileBusiness,
       power: elements.navMobileBusiness,
+      // Die Lagerstruktur hat mobil aus demselben Grund keinen eigenen Knopf
+      // (auch sie traegt "nav-item--desktop") und leuchtet deshalb ueber
+      // "Betrieb".
+      inventory: elements.navMobileBusiness,
+      // Abwesenheiten freigeben liegt am Rechner direkt neben "Arbeitszeiten"
+      // in "Planung" (siehe #nav-absences) und leuchtet mobil folgerichtig
+      // ueber derselben Gruppe.
+      absences: elements.navMobilePlanning,
       analytics: elements.navMore
     }[pane] || null;
     activateNavigation(activeButton, mobileActiveButton);
@@ -11428,6 +11518,11 @@ import {
     const title = {
       week: "Meine Woche",
       time: "Zeiterfassung",
+      // Fehlte: der Bereich fiel damit auf "Uebersicht" zurueck, und im
+      // Browser-Tab stand der falsche Name. Aufgefallen durch die aus
+      // index.html abgeleitete Pruefung in tests/shell-panes.test.mjs - eine
+      // Handliste haette denselben Eintrag genauso vergessen wie diese Tabelle.
+      worktimes: "Arbeitszeiten",
       apprentice: "Berichtsheft",
       reports: "Berichte",
       employees: "Mitarbeiter",
@@ -11441,6 +11536,8 @@ import {
       site: "Baustelle",
       assignments: "Einsätze",
       sites: "Baustellen",
+      inventory: "Lagerstruktur",
+      absences: "Abwesenheiten freigeben",
       more: "Einstellungen"
     }[pane] || "Übersicht";
     document.title = `${title} · Schäfchen`;
@@ -12471,6 +12568,7 @@ import {
       deviceModule.refresh(),
     ]);
     await maybeOpenDeepLinkedSite();
+    await maybeOpenDeepLinkedPane();
     await deviceModule.handleDeepLink();
     await syncPendingEntries();
   }
@@ -14903,6 +15001,20 @@ import {
     }
   });
 
+  // Von den drei frueheren <a href="./absence-approvals.html">-Verweisen
+  // bleiben zwei bewusst unveraendert als <a href> stehen (siehe die
+  // Begruendung direkt am Element in index.html; frontend/tests/smoke.mjs
+  // prueft ihren Wortlaut und darf nicht geaendert werden). Nur der dritte
+  // schaltet auf den Bereich um, weil er dort nicht woertlich geprueft wird.
+  // Dieser Verweis stand schon vorher fuer JEDEN Mitarbeiter offen, der
+  // planen darf (siehe #assignment-planning-shell) - anders als
+  // #nav-absences haengt er deshalb bewusst an keiner weiteren
+  // Berechtigungspruefung; wer ohne Recht zum Direkteintrag landet, sieht wie
+  // zuvor nur den ausgeblendeten Abschnitt "Abwesenheit direkt eintragen".
+  elements.planningAbsenceDirectEntryLink.addEventListener("click", () => {
+    void openAbsencesDirectEntry();
+  });
+
   elements.togglePassword.addEventListener("click", () => {
     const show = elements.passwordInput.type === "password";
     elements.passwordInput.type = show ? "text" : "password";
@@ -15582,6 +15694,13 @@ import {
   elements.navDevices.addEventListener("click", () => {
     showDashboardPane("devices");
     void deviceModule.refresh();
+  });
+  // War ein <a href="./inventory.html">: verliess die App-Schale
+  // vollstaendig. Jetzt wie jeder andere Bereich ein Klick, der die Schale
+  // behaelt; initInventoryPane() (siehe showDashboardPane) laedt die Daten
+  // beim ersten Oeffnen.
+  elements.navInventory.addEventListener("click", () => {
+    showDashboardPane("inventory");
   });
   elements.vehicleSearchField.addEventListener("input", renderVehicleList);
   elements.vehicleNew.addEventListener("click", () => openVehicleEditor(null));

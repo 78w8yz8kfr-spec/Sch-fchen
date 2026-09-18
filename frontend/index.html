@@ -10,6 +10,12 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="stylesheet" href="./styles.css?v=0.44.54">
     <link rel="stylesheet" href="./design-system.css?v=0.44.54">
+    <!-- Lagerstruktur und Abwesenheitsfreigabe sitzen als eigene Bereiche
+         (data-dashboard-pane "inventory"/"absences") in dieser Seite statt in
+         eigenstaendigen HTML-Dateien - ihre bisherigen Stylesheets kommen
+         deshalb jetzt hierher statt in eine eigene Kopfzeile. -->
+    <link rel="stylesheet" href="./inventory.css?v=0.44.54">
+    <link rel="stylesheet" href="./absence-approvals.css?v=0.44.54">
     <script type="module" src="./app.js?v=0.44.54"></script>
     <script src="./version.js?v=0.44.54" defer></script>
   </head>
@@ -902,6 +908,17 @@
                 <div>
                   <p class="eyebrow">Urlaub und Abwesenheit</p>
                   <h3 id="absence-title">Abwesenheit beantragen</h3>
+                  <!--
+                    Bleibt bewusst ein <a href> statt eines Bereichswechsel-
+                    Knopfs wie die anderen beiden Verweise (siehe
+                    frontend/tests/smoke.mjs, das genau diese Zeile woertlich
+                    prueft und nicht geaendert werden darf). Die Zielseite
+                    absence-approvals.html ist nur noch eine schlanke
+                    Weiterleitung (siehe dort) und landet automatisch auf
+                    demselben Bereich - ein zusaetzlicher, kurzer Seitenwechsel
+                    statt eines nahtlosen Umschaltens, aber kein Sackgassen-
+                    Link.
+                  -->
                   <a href="./absence-approvals.html">Anträge prüfen / Zuständigkeiten</a>
                 </div>
                 <span id="absence-open-count" class="site-list-summary" aria-live="polite">0 offen</span>
@@ -1385,6 +1402,130 @@
             <div id="power-module"></div>
           </section>
 
+          <!--
+            Lagerstruktur: frueher die eigenstaendige Seite inventory.html,
+            die weder Seitenleiste noch Kopfzeile der Arbeitsapp zeigte -
+            genau das hat der Nutzer zu Recht bemaengelt. Wie Geraete/Baustrom
+            daneben ein eigener Bereich AUSSERHALB der Verwaltungsschale
+            (#admin-section): die sieht per canPlan() nur, wer planen darf,
+            die Lagerstruktur aber ausdruecklich auch, wer es nicht darf
+            (siehe applyNavigationAccess(): #nav-inventory haengt nur an
+            moduleEnabled("inventory_structure"), nicht an canPlan) - in der
+            Verwaltungsschale waere sie fuer diese Rolle unsichtbar geblieben.
+            Kennungen tragen das Praefix "inventory-", weil absence-approvals.js
+            in derselben Seite dieselben kurzen Namen verwendet (u. a. search,
+            message, history, reload, save, workspace, form-message) - in
+            einem gemeinsamen Dokument muessen IDs eindeutig sein.
+          -->
+          <section id="inventory-section" class="section" data-dashboard-pane="inventory" aria-labelledby="inventory-title" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Betrieb</p>
+                <h2 id="inventory-title">Lagerstruktur</h2>
+                <p class="section-intro">Lager → Bereich → Regal → Fach. Hier organisierst du Lagerplätze; Artikel und Bestandsbuchungen folgen getrennt.</p>
+              </div>
+              <div class="inv-actions">
+                <button id="inventory-add" type="button" class="button button--primary" hidden>+ Lager anlegen</button>
+                <button id="inventory-reload" type="button" class="button button--secondary">Neu laden</button>
+              </div>
+            </div>
+            <div id="inventory-content" class="planning-group">
+              <div class="card inv-notice"><p id="inventory-message" role="status" aria-live="polite" class="inv-status">Lagerstruktur wird geladen …</p></div>
+              <div id="inventory-workspace" class="inv-stack" hidden>
+                <div class="card inv-toolbar">
+                  <label class="inv-search-label entity-search">Suchen <input id="inventory-search" type="search" placeholder="Name oder Code"></label>
+                  <label class="inv-check"><input id="inventory-archived" type="checkbox"> Archivierte anzeigen</label>
+                </div>
+                <div id="inventory-locations" aria-label="Lagerplätze" class="card inv-locations"></div>
+                <section id="inventory-history" class="card inv-history" hidden><h2>Änderungshistorie</h2><p class="inv-hint">Die letzten 100 Änderungen dieses Lagerplatzes.</p><ol id="inventory-events" class="inv-history__list"></ol></section>
+              </div>
+              <dialog id="inventory-editor" class="inv-dialog"><form id="inventory-form" class="inv-form field" novalidate>
+                <h2 id="inventory-editor-title">Lagerplatz anlegen</h2>
+                <p id="inventory-parent-label" class="inv-hint"></p>
+                <label for="inventory-code">Code <span class="inv-required" aria-hidden="true">*</span></label>
+                <input id="inventory-code" required maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,29}" autocomplete="off"
+                       placeholder="z. B. L1, R01, F01" aria-describedby="inventory-code-error" aria-required="true">
+                <p id="inventory-code-error" class="inv-field-error" aria-live="polite"></p>
+                <label for="inventory-name">Name <span class="inv-required" aria-hidden="true">*</span></label>
+                <input id="inventory-name" required maxlength="120" autocomplete="off" aria-describedby="inventory-name-error" aria-required="true">
+                <p id="inventory-name-error" class="inv-field-error" aria-live="polite"></p>
+                <p id="inventory-form-message" role="alert" class="inv-form-message form-message"></p>
+                <div class="inv-form__actions"><button id="inventory-save" type="submit" class="button button--primary">Speichern</button><button id="inventory-cancel" type="button" class="button button--secondary">Abbrechen</button></div>
+              </form></dialog>
+            </div>
+          </section>
+
+          <!--
+            Abwesenheiten freigeben: frueher die eigenstaendige Seite
+            absence-approvals.html, aus denselben Gruenden jetzt ein eigener
+            Bereich wie die Lagerstruktur oben. Auch dieser Bereich liegt
+            AUSSERHALB von #admin-section: der Verweis "Anträge prüfen /
+            Zuständigkeiten" in "Meine Woche" (siehe #absence-panel) steht
+            dort fuer JEDEN Mitarbeiter, nicht nur Planer - in der an canPlan
+            gebundenen Verwaltungsschale waere der Bereich fuer sie unsichtbar
+            geblieben, obwohl die Seite vorher genau das zeigte, was ihre
+            Rolle erlaubt (bis hin zur verstaendlichen Absage, wenn niemand
+            von ihnen etwas zu tun hat). Die Kennungen hier tragen bewusst
+            KEIN Praefix: keines kollidiert mit etwas in dieser Seite (die
+            Lagerstruktur ist praefixiert, siehe oben), und so bleiben die
+            zahlreichen woertlichen Kennungs-Bezuege in absence-approvals.js
+            unveraendert (siehe frontend/tests/standalone-pages.test.mjs). Der
+            Anker "#direct-entry" alter Lesezeichen zeigt aus demselben Grund
+            weiterhin auf genau dieses Element. Fuer die Seitenleiste gibt es
+            bewusst KEINEN eigenen Eintrag (frontend/tests/smoke.mjs prueft
+            deren Reihenfolge/Beschriftung woertlich und vollstaendig) -
+            showDashboardPane() markiert beim Oeffnen stattdessen
+            "Arbeitszeiten" als naechstliegenden vorhandenen Eintrag.
+          -->
+          <section id="absence-section" class="section" data-dashboard-pane="absences" aria-labelledby="absence-section-title" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Urlaub und Abwesenheit</p>
+                <h2 id="absence-section-title">Abwesenheiten freigeben</h2>
+                <p class="section-intro">Eigene Anträge prüft jemand anderes. Das Genehmigungsverfahren legt die Firma fest.</p>
+              </div>
+              <div class="aa-actions"><button id="aa-reload" type="button" class="button button--secondary">Neu laden</button></div>
+            </div>
+            <div id="absence-content" class="planning-group">
+              <div class="card aa-notice">
+                <p id="aa-procedure-note">Das Genehmigungsverfahren legt die Firma fest und wird gleich geladen.</p>
+                <p id="aa-message" role="status" aria-live="polite" class="aa-status">Zuständigkeiten werden geladen …</p>
+              </div>
+              <div id="aa-workspace" class="aa-stack" hidden>
+                <details id="aa-settings" class="card aa-card" hidden><summary class="aa-card__summary">Zuständige Mitarbeiter auswählen</summary>
+                <div class="aa-card__body">
+                <form id="aa-policy-form" class="aa-form field" novalidate>
+                <label for="aa-steps">Genehmigungsverfahren</label><select id="aa-steps"><option value="2">Zweistufig: erste Prüfung und verbindliche Freigabe</option><option value="1">Einstufig: eine Freigabe genügt</option></select>
+                <label for="aa-mode">Zuständigkeit</label><select id="aa-mode"><option value="default">Standardrollen verwenden</option><option value="selected">Mitarbeiter selbst auswählen</option></select>
+                <p id="aa-default-note" class="aa-hint"></p>
+                <div id="aa-selection" class="aa-selection" hidden><p class="aa-hint">Pro Stufe sind mehrere Personen möglich. Ausgewählte Mitarbeiter erhalten ausschließlich das Recht zur Abwesenheitsprüfung, keine weiteren Verwaltungsrechte. Für eigene Anträge ist mindestens eine andere Freigabeperson nötig; bei zwei Stufen sind es zwei verschiedene Personen.</p>
+                <label class="aa-search-label entity-search">Suchen <input id="aa-search" type="search" placeholder="Name oder Personalnummer"></label>
+                <div id="aa-employees" class="aa-people"></div></div>
+                <label for="aa-reason">Begründung der Änderung <span class="aa-required" aria-hidden="true">*</span></label>
+                <input id="aa-reason" required minlength="3" maxlength="500" placeholder="z. B. Vertretung während des Urlaubs" aria-describedby="aa-reason-error" aria-required="true">
+                <p id="aa-reason-error" class="aa-field-error" aria-live="polite"></p>
+                <p id="aa-form-message" role="alert" class="aa-form-message form-message"></p><button id="aa-save" type="submit" class="button button--primary">Zuständigkeiten speichern</button>
+                </form><details class="aa-history"><summary>Änderungsverlauf (letzte 20 Änderungen)</summary><ol id="aa-history" class="aa-history__list"></ol></details>
+                </div>
+                </details>
+                <section id="aa-direct-entry" class="card aa-card" hidden><div class="aa-card__body"><h2>Abwesenheit direkt eintragen</h2>
+                <p class="aa-hint">Für das Büro: sofort bestätigte Abwesenheit ohne Antrag des Mitarbeiters. Der Eintrag erscheint in der Planung und in der Historie.</p>
+                <form id="aa-direct-form" class="aa-form field" novalidate>
+                <label for="aa-direct-employee">Mitarbeiter <span class="aa-required" aria-hidden="true">*</span></label><select id="aa-direct-employee" required></select>
+                <label for="aa-direct-type">Abwesenheitsart</label><select id="aa-direct-type"><option value="vacation">Urlaub</option><option value="sick">Krankheit</option><option value="time_off">Freizeitausgleich</option><option value="other">Sonstiges</option></select>
+                <label for="aa-direct-start">Von <span class="aa-required" aria-hidden="true">*</span></label><input id="aa-direct-start" type="date" required>
+                <label for="aa-direct-end">Bis <span class="aa-required" aria-hidden="true">*</span></label><input id="aa-direct-end" type="date" required>
+                <label for="aa-direct-part">Umfang</label><select id="aa-direct-part"><option value="full_day">Ganzer Tag</option><option value="first_half">Vormittag</option><option value="second_half">Nachmittag</option></select>
+                <label for="aa-direct-note">Begründung / Hinweis <span class="aa-required" aria-hidden="true">*</span></label>
+                <input id="aa-direct-note" required minlength="3" maxlength="500" placeholder="z. B. telefonisch gemeldete Abwesenheit" aria-describedby="aa-direct-note-error" aria-required="true">
+                <p id="aa-direct-note-error" class="aa-field-error" aria-live="polite"></p>
+                <p id="aa-direct-message" role="alert" class="aa-form-message form-message"></p><button id="aa-direct-save" type="submit" class="button button--primary">Abwesenheit verbindlich eintragen</button>
+                </form></div></section>
+                <section class="card aa-card"><div class="aa-card__body"><h2>Offene Anträge und Freigaben</h2><p class="aa-hint">Die neuesten 500 offenen oder genehmigten Anträge. Änderungen gelten sofort, auch für bereits eingereichte Anträge.</p><div id="aa-requests" class="aa-requests"></div></div></section>
+              </div>
+            </div>
+          </section>
+
           <section id="admin-section" class="section admin-section" data-dashboard-pane="more" aria-labelledby="admin-title" hidden>
             <div class="section-heading">
               <div>
@@ -1516,7 +1657,7 @@
             <section id="assignment-planning-shell" class="planning-shell-direct">
               <section class="planning-group" aria-label="Abwesenheiten in der Planung">
                 <h3>Abwesenheiten</h3><p>Urlaub, Krankheit oder Freizeitausgleich für Mitarbeiter direkt in die Planung eintragen.</p>
-                <a class="button button--secondary" href="./absence-approvals.html#direct-entry">Abwesenheit eintragen / verwalten</a>
+                <button id="planning-absence-direct-entry-link" class="button button--secondary" type="button">Abwesenheit eintragen / verwalten</button>
               </section>
               <!-- Ohne zweite Unterzeile: über der Seite steht schon
                    „Einsätze manuell oder aus Excel planen." Zweimal fast
@@ -3048,6 +3189,9 @@
               <div class="site-management-panel__heading">
                 <div>
                   <p class="eyebrow">Regel des Betriebs</p>
+                  <!-- Bleibt bewusst ein <a href>, siehe Begruendung beim
+                       gleichartigen Verweis in "Meine Woche" oben
+                       (frontend/tests/smoke.mjs prueft diese Zeile woertlich). -->
                   <a href="./absence-approvals.html">Zuständigkeiten für Abwesenheitsanträge</a>
                   <h4 id="time-correction-policy-title">Eigene Zeitkorrekturen</h4>
                 </div>
@@ -3531,6 +3675,17 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M3 5h4"/></svg>
             <span>Arbeitszeiten</span>
           </button>
+          <!-- Fuer die Abwesenheitsfreigabe gibt es bewusst KEINEN eigenen
+               Leisteneintrag: frontend/tests/smoke.mjs prueft die Beschriftung
+               und Reihenfolge JEDES Eintrags der Seitenleiste woertlich und
+               vollstaendig (Zeile "leisteReihenfolge") und darf nicht
+               geaendert werden - ein 22. Eintrag liesse diese Pruefung
+               scheitern. Sie bleibt stattdessen ueber ihre drei Verweise im
+               Inhalt erreichbar (Woche, Planung, Einstellungen) und markiert
+               beim Oeffnen "Arbeitszeiten" als naechstliegenden, bereits
+               vorhandenen Eintrag in derselben Gruppe "Planung" (siehe
+               activeButton-Tabelle in showDashboardPane()) statt faelschlich
+               "Start". -->
 
           <p class="nav-group-label" data-nav-group-label="documentation">Dokumentation</p>
           <button id="nav-mobile-documentation" class="nav-item nav-item--mobile" type="button" hidden data-kurz="Doku" aria-label="Dokumentation öffnen" data-mobile-nav-group="documentation">
@@ -3571,10 +3726,14 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10v5H7V4Z"/><path d="M5 9h14v11H5V9Z"/><path d="M9 13h6m-6 3h4"/><path d="M18 5h2v4"/></svg>
             <span>Maschinen &amp; Geräte</span>
           </button>
-          <a id="nav-inventory" class="nav-item nav-item--desktop" href="./inventory.html" hidden data-kurz="Lager" data-nav-group="business">
+          <!-- War ein <a href="./inventory.html"> und verliess damit die
+               App-Schale vollstaendig: keine Seitenleiste, keine Kopfzeile,
+               keine Suche - siehe AGENTS.md-Auftrag "wie aus einem Guss". Die
+               Lagerstruktur ist jetzt ein Bereich wie jeder andere. -->
+          <button id="nav-inventory" class="nav-item nav-item--desktop" type="button" hidden data-kurz="Lager" data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
             <span>Lagerstruktur</span>
-          </a>
+          </button>
           <button id="nav-power" class="nav-item nav-item--desktop" type="button" hidden data-kurz="Baustrom" data-nav-group="business">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
             <span>Baustrom</span>

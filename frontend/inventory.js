@@ -1,4 +1,19 @@
-const $ = (id) => document.getElementById(id);
+// Die Lagerstruktur ist ein Bereich der Arbeitsapp (data-dashboard-pane
+// "inventory" in index.html), kein eigenstaendiger Bildschirm mehr - der
+// Nutzer hat zu Recht bemaengelt, dass die eigenstaendige Seite ohne
+// Seitenleiste und Kopfzeile "wie eine Handy-App" wirkte. Dieselbe Datei
+// bedient trotzdem weiter die schlanke Weiterleitungsseite inventory.html
+// fuer alte Lesezeichen (siehe unten, embedded === false): ohne die Huelle
+// "#inventory-section", die es nur in index.html gibt, verdrahtet sie die
+// Lagerlogik gar nicht erst und springt stattdessen in die App.
+//
+// Alle Kennungen tragen hier das Praefix "inventory-": absence-approvals.js
+// nutzt in derselben Seite dieselben kurzen Namen (u. a. search, message,
+// history, reload, save, workspace, form-message) - in einem gemeinsamen
+// Dokument muessen IDs eindeutig sein. Die Aufrufe unten bleiben unveraendert
+// kurz ($("search") usw.); nur diese eine Stelle haengt das Praefix an.
+const $ = (id) => document.getElementById(`inventory-${id}`);
+const embedded = Boolean(document.getElementById("inventory-section"));
 const labels = { depot: "Lager", area: "Bereich", rack: "Regal", bin: "Fach" };
 const next = { depot: "area", area: "rack", rack: "bin" };
 const base = "./api/v1/inventory/locations";
@@ -129,6 +144,17 @@ async function showHistory(row) {
     $("history").hidden = false; $("history").scrollIntoView({ block: "nearest" });
   } catch (error) { $("message").textContent = error.message; }
 }
+// Der Rest dieser Datei verdrahtet echte Bedienelemente - die gibt es nur,
+// wenn diese Datei innerhalb von index.html laeuft (siehe "embedded" oben).
+// Auf der schlanken Weiterleitungsseite inventory.html existieren sie nicht;
+// dort springt die Datei stattdessen sofort in die App.
+//
+// Der Formular-Lauscher stand frueher VOR dieser Schranke. Auf der
+// Weiterleitungsseite lief er deshalb gegen ein nicht vorhandenes
+// "#inventory-form", warf "Cannot read properties of null" - und die
+// Sprung-Anweisung darunter wurde nie mehr erreicht: das alte Lesezeichen
+// blieb auf einer leeren Seite stehen, statt in die App zu springen.
+if (embedded) {
 $("form").addEventListener("submit", async (event) => {
   event.preventDefault(); if (busy) return;
   $("form-message").textContent = "";
@@ -149,19 +175,39 @@ $("form").addEventListener("submit", async (event) => {
   }
   finally { busy = false; $("save").disabled = false; }
 });
-$("cancel").addEventListener("click", () => $("editor").close());
-$("add").addEventListener("click", () => openEditor(null, null));
-$("reload").addEventListener("click", () => { if (!busy) void reload(); });
-$("search").addEventListener("input", render); $("archived").addEventListener("change", render);
-// Fehlermeldung am Feld verschwindet, sobald sie behoben ist, statt erst beim
-// naechsten Absenden. Bewusst kein erneuter Aufruf von validateForm(): der
-// wuerde bei weiterhin ungueltigem Namensfeld den Fokus mitten im Tippen dort
-// hinschieben.
-$("code").addEventListener("input", () => {
-  const code = $("code");
-  if ($("code-error").textContent && code.value.trim() !== "" && new RegExp(`^${code.pattern}$`).test(code.value.trim())) {
-    $("code-error").textContent = ""; code.setAttribute("aria-invalid", "false");
-  }
-});
-$("name").addEventListener("input", () => { if ($("name-error").textContent && $("name").value.trim() !== "") { $("name-error").textContent = ""; $("name").setAttribute("aria-invalid", "false"); } });
-void reload();
+  $("cancel").addEventListener("click", () => $("editor").close());
+  $("add").addEventListener("click", () => openEditor(null, null));
+  $("reload").addEventListener("click", () => { if (!busy) void reload(); });
+  $("search").addEventListener("input", render); $("archived").addEventListener("change", render);
+  // Fehlermeldung am Feld verschwindet, sobald sie behoben ist, statt erst beim
+  // naechsten Absenden. Bewusst kein erneuter Aufruf von validateForm(): der
+  // wuerde bei weiterhin ungueltigem Namensfeld den Fokus mitten im Tippen dort
+  // hinschieben.
+  $("code").addEventListener("input", () => {
+    const code = $("code");
+    if ($("code-error").textContent && code.value.trim() !== "" && new RegExp(`^${code.pattern}$`).test(code.value.trim())) {
+      $("code-error").textContent = ""; code.setAttribute("aria-invalid", "false");
+    }
+  });
+  $("name").addEventListener("input", () => { if ($("name-error").textContent && $("name").value.trim() !== "") { $("name-error").textContent = ""; $("name").setAttribute("aria-invalid", "false"); } });
+} else {
+  // Altes Lesezeichen auf die eigenstaendige Seite: die Lagerstruktur lebt
+  // jetzt in der Arbeitsapp, sofort dorthin springen statt eine zweite,
+  // abweichend gestaltete Oberflaeche zu zeigen. Der Knopf "Jetzt öffnen" auf
+  // derselben Seite bietet denselben Sprung von Hand an, falls die
+  // automatische Weiterleitung ausbleibt (z. B. bei blockierten Modulen).
+  const ziel = "./?pane=inventory";
+  $("open")?.addEventListener("click", () => window.location.replace(ziel));
+  window.location.replace(ziel);
+}
+
+let started = false;
+// Von app.js aufgerufen, wenn der Bereich zum ersten Mal geoeffnet wird - erst
+// dann lohnt sich der Netzwerkabruf. Ein sofortiger Abruf beim Import haette
+// bei JEDEM App-Start eine Anfrage ausgeloest, bei abgeschaltetem Lagermodul
+// sogar eine, die serverseitig mit 403 endet.
+export function initInventoryPane() {
+  if (!embedded || started) return;
+  started = true;
+  void reload();
+}
