@@ -11110,6 +11110,119 @@ import {
     ziel.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
   }
 
+  // Wiederverwendbare Feldprüfung fürs Vorbild-Formular (Baustellenwahl) und
+  // alle Bürobearbeitungsformulare. Statt einer Sammelmeldung am Formularende
+  // bekommt jedes Pflichtfeld eine eigene, konkrete Meldung direkt daneben,
+  // aria-invalid und beim ersten Fehler den Fokus samt Sprung ins Bild -
+  // scrollIntoView statt window.scrollTo, weil ab 1080px nur .dashboard-content
+  // scrollt (siehe nachObenSpringen oben).
+  //
+  // Tabelle: [Feld, Fehler-Element, Meldung, istRelevant?]. Meldung darf eine
+  // Funktion sein, wenn der Text vom Formularzustand abhängt. istRelevant ist
+  // optional und blendet ein Feld aus der Prüfung aus (z. B. ein Namensfeld,
+  // das nur beim Anlegen eines neuen Kunden nötig ist).
+  function pruefeFormularFelder(validierungsTabelle) {
+    let firstInvalid = null;
+    validierungsTabelle.forEach(([feld, fehlerElement, meldung, istRelevant]) => {
+      if (!feld) return;
+      const relevant = typeof istRelevant === "function" ? istRelevant() : true;
+      const ungueltig = relevant && !feld.checkValidity();
+      if (fehlerElement) {
+        fehlerElement.textContent = ungueltig
+          ? (typeof meldung === "function" ? meldung() : meldung)
+          : "";
+      }
+      feld.setAttribute("aria-invalid", ungueltig ? "true" : "false");
+      if (ungueltig && !firstInvalid) firstInvalid = feld;
+    });
+    if (firstInvalid) {
+      firstInvalid.focus({ preventScroll: true });
+      firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    return true;
+  }
+
+  // Räumt die Feldmeldung wieder weg, sobald jemand zu tippen anfängt - eine
+  // stehen gebliebene Fehlermeldung neben einem gerade korrigierten Feld wirkt
+  // wie ein Fehler, der nicht behoben wurde.
+  function bindeFeldFehlerAufraeumen(validierungsTabelle) {
+    validierungsTabelle.forEach(([feld, fehlerElement]) => {
+      if (!feld) return;
+      feld.addEventListener("input", () => {
+        if (fehlerElement) fehlerElement.textContent = "";
+        feld.setAttribute("aria-invalid", "false");
+      });
+    });
+  }
+
+  // Schutz vor Verlust ungespeicherter Eingaben: Jedes hier registrierte
+  // Formular bekommt beim Öffnen/Befüllen einen Stand seiner Feldwerte
+  // gemerkt (formularBasisSetzen). "Geändert" ist ein Formular erst, wenn der
+  // aktuelle Inhalt von diesem geladenen Stand abweicht - nicht schon beim
+  // Hineinklicken. Damit lässt sich sowohl beforeunload (Fenster schließen)
+  // als auch das Wegnavigieren innerhalb der App (Bereichswechsel, Brotkrume,
+  // Abbrechen) an derselben Stelle prüfen.
+  const formularBasisWerte = new Map();
+
+  function feldwerteErfassen(form) {
+    const werte = {};
+    form.querySelectorAll("input, select, textarea").forEach((feld) => {
+      if (!feld.id) return;
+      werte[feld.id] = feld.type === "checkbox" || feld.type === "radio"
+        ? feld.checked
+        : feld.value;
+    });
+    return werte;
+  }
+
+  function formularBasisSetzen(form) {
+    formularBasisWerte.set(form, feldwerteErfassen(form));
+  }
+
+  function formularBasisLoeschen(form) {
+    formularBasisWerte.delete(form);
+  }
+
+  function formularIstGeaendert(form) {
+    const basis = formularBasisWerte.get(form);
+    if (!basis) return false;
+    const aktuell = feldwerteErfassen(form);
+    const schluessel = new Set([...Object.keys(basis), ...Object.keys(aktuell)]);
+    for (const key of schluessel) {
+      if (basis[key] !== aktuell[key]) return true;
+    }
+    return false;
+  }
+
+  function irgendeinFormularGeaendert() {
+    for (const form of formularBasisWerte.keys()) {
+      if (formularIstGeaendert(form)) return true;
+    }
+    return false;
+  }
+
+  const UNGESICHERTE_AENDERUNGEN_HINWEIS =
+    "Es gibt ungespeicherte Änderungen. Sie gehen verloren, wenn du jetzt fortfährst. Trotzdem fortfahren?";
+
+  // Fragt nach, wenn ein registriertes Formular geänderte, nicht gespeicherte
+  // Werte enthält. Rückgabe true heißt: Verlassen ist erlaubt (nichts
+  // geändert oder Nutzer hat die Rückfrage bestätigt).
+  function verlassenTrotzAenderungBestaetigt() {
+    if (!irgendeinFormularGeaendert()) return true;
+    return window.confirm(UNGESICHERTE_AENDERUNGEN_HINWEIS);
+  }
+
+  // Schliessen des Browserfensters/-tabs bzw. Neuladen: Der Browser zeigt bei
+  // gesetztem preventDefault einen eigenen, nicht anpassbaren Hinweis - der
+  // Text in returnValue wird von aktuellen Browsern ignoriert, ist hier aber
+  // aus Kompatibilitätsgründen trotzdem gesetzt.
+  window.addEventListener("beforeunload", (event) => {
+    if (!irgendeinFormularGeaendert()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
   function showDashboardPane(pane, smooth = true) {
     currentDashboardPane = pane;
     if (pane !== "start") closeMobileReportForm();
@@ -14818,37 +14931,26 @@ import {
   elements.fieldSiteProject.addEventListener("change", updateFieldSiteProjectMode);
   const fieldSiteValidation = [
     [elements.fieldSiteCustomer, elements.fieldSiteCustomerError, "Bitte einen Kunden auswählen."],
-    [elements.fieldSiteCustomerName, elements.fieldSiteCustomerNameError, "Bitte den Namen des neuen Kunden eingeben."],
+    [
+      elements.fieldSiteCustomerName,
+      elements.fieldSiteCustomerNameError,
+      "Bitte den Namen des neuen Kunden eingeben.",
+      () => elements.fieldSiteCustomer.value === "__new__"
+    ],
     [elements.fieldSiteName, elements.fieldSiteNameError, "Bitte einen Baustellennamen eingeben."],
     [elements.fieldSiteStreet, elements.fieldSiteStreetError, "Bitte die Straße eingeben."],
     [elements.fieldSiteHouseNumber, elements.fieldSiteHouseNumberError, "Bitte die Hausnummer eingeben."],
     [elements.fieldSitePostalCode, elements.fieldSitePostalCodeError, "Bitte die Postleitzahl eingeben."],
     [elements.fieldSiteCity, elements.fieldSiteCityError, "Bitte den Ort eingeben."]
   ];
+  // Diese Funktion war das Vorbild für pruefeFormularFelder() - jetzt nutzt
+  // sie die gemeinsame Hilfsfunktion selbst, statt eine zweite Fassung
+  // derselben Logik zu pflegen.
   function validateFieldSiteForm() {
-    const createsCustomer = elements.fieldSiteCustomer.value === "__new__";
-    elements.fieldSiteCustomerName.required = createsCustomer;
-    let firstInvalid = null;
-    fieldSiteValidation.forEach(([control, error, message]) => {
-      const isRelevant = control !== elements.fieldSiteCustomerName || createsCustomer;
-      const invalid = isRelevant && !control.checkValidity();
-      error.textContent = invalid ? message : "";
-      control.setAttribute("aria-invalid", invalid ? "true" : "false");
-      if (invalid && !firstInvalid) firstInvalid = control;
-    });
-    if (firstInvalid) {
-      firstInvalid.focus({ preventScroll: true });
-      firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
-      return false;
-    }
-    return true;
+    elements.fieldSiteCustomerName.required = elements.fieldSiteCustomer.value === "__new__";
+    return pruefeFormularFelder(fieldSiteValidation);
   }
-  fieldSiteValidation.forEach(([control, error]) => {
-    control.addEventListener("input", () => {
-      error.textContent = "";
-      control.setAttribute("aria-invalid", "false");
-    });
-  });
+  bindeFeldFehlerAufraeumen(fieldSiteValidation);
   elements.siteChoiceDialog.addEventListener("focusin", (event) => {
     if (!event.target.matches("input, select, textarea")) return;
     window.setTimeout(() => event.target.scrollIntoView({
