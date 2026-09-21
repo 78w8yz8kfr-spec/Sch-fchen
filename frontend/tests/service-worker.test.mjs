@@ -162,9 +162,9 @@ test("Installation legt genau die App-Shell im Versionscache ab", async () => {
   const shell = await worker.caches.open(CACHE_NAME);
   const cachedPaths = [...shell.entries.keys()];
   for (const required of [
-    "./", "./index.html", "./design-system.css?v=0.44.55", "./app.js?v=0.44.55",
-    "./core/device-management.js?v=0.44.55", "./core/apprentice-view.js?v=0.44.55",
-    "./vendor/qr-scanner.min.js?v=0.44.55",
+    "./", "./index.html", "./design-system.css?v=0.44.56", "./app.js?v=0.44.56",
+    "./core/device-management.js?v=0.44.56", "./core/apprentice-view.js?v=0.44.56",
+    "./vendor/qr-scanner.min.js?v=0.44.56",
     "./vendor/qr-scanner-worker.min.js",
     "./platform-admin.html", "./vde/index.html", "./manifest.webmanifest", "./assets/mark.svg"
   ]) {
