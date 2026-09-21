@@ -55,13 +55,13 @@ test("Das gemeinsame Designsystem hält die Proportionen der Desktop-Referenz fe
 
   const erwartet = new Map([
     ["--ui-brand", "#e30613"],
-    ["--ui-sidebar", "#17191d"],
-    ["--ui-sidebar-width", "216px"],
+    ["--ui-sidebar", "#11151c"],
+    ["--ui-sidebar-width", "232px"],
     ["--ui-sidebar-collapsed-width", "72px"],
-    ["--ui-header-height", "58px"],
-    ["--ui-content-max-width", "1320px"],
-    ["--ui-control-height", "38px"],
-    ["--ui-table-row-height", "44px"]
+    ["--ui-header-height", "64px"],
+    ["--ui-content-max-width", "1440px"],
+    ["--ui-control-height", "40px"],
+    ["--ui-table-row-height", "48px"]
   ]);
   for (const [name, wert] of erwartet) {
     assert.equal(wurzel.eigenschaften.get(name), wert, `${name} weicht von der Referenz ab`);

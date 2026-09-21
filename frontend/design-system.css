@@ -11,18 +11,18 @@
   --ui-brand: #e30613;
   --ui-brand-hover: #c9000c;
   --ui-brand-soft: #fff0f1;
-  --ui-canvas: #f5f6f7;
+  --ui-canvas: #f2f4f8;
   --ui-surface: #ffffff;
-  --ui-surface-subtle: #fafafa;
-  --ui-surface-muted: #f1f2f3;
-  --ui-text: #1c1e21;
-  --ui-text-secondary: #6c727a;
-  --ui-text-tertiary: #8a9097;
-  --ui-border: #e1e4e8;
-  --ui-border-strong: #cdd2d8;
-  --ui-sidebar: #17191d;
-  --ui-sidebar-hover: #24272c;
-  --ui-sidebar-text: #d9dce1;
+  --ui-surface-subtle: #f7f8fc;
+  --ui-surface-muted: #edf0f6;
+  --ui-text: #171d2d;
+  --ui-text-secondary: #606b80;
+  --ui-text-tertiary: #748096;
+  --ui-border: #e3e7ef;
+  --ui-border-strong: #ccd3e0;
+  --ui-sidebar: #11151c;
+  --ui-sidebar-hover: #222934;
+  --ui-sidebar-text: #dce1ea;
   --ui-sidebar-muted: #9298a1;
   /* #2f855a/#a46910 erreichten gegen ihren -soft-Hintergrund nur 4,11:1 bzw.
      4,21:1 (nötig: 4,5:1) - bei Text in --ui-text-xs (~10,9px) unterschreitet
@@ -38,18 +38,18 @@
   --ui-info: #376d9c;
   --ui-info-soft: #eef5fb;
 
-  --ui-text-xs: 0.68rem;
-  --ui-text-sm: 0.76rem;
-  --ui-text-md: 0.86rem;
+  --ui-text-xs: 0.75rem;
+  --ui-text-sm: 0.875rem;
+  --ui-text-md: 0.9375rem;
   --ui-text-lg: 1rem;
-  --ui-title-sm: 0.95rem;
-  --ui-title: 1.45rem;
+  --ui-title-sm: 1rem;
+  --ui-title: 1.625rem;
 
   --ui-radius-xs: 4px;
-  --ui-radius-sm: 6px;
-  --ui-radius-md: 8px;
-  --ui-radius-lg: 10px;
-  --ui-radius-xl: 12px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 14px;
+  --ui-radius-xl: 16px;
   --ui-space-1: 4px;
   --ui-space-2: 8px;
   --ui-space-3: 12px;
@@ -57,22 +57,22 @@
   --ui-space-5: 20px;
   --ui-space-6: 24px;
 
-  --ui-sidebar-width: 216px;
+  --ui-sidebar-width: 232px;
   --ui-sidebar-collapsed-width: 72px;
-  --ui-header-height: 58px;
-  --ui-content-max-width: 1320px;
-  --ui-content-gutter: 24px;
-  --ui-card-padding: 15px;
-  --ui-control-height: 38px;
+  --ui-header-height: 64px;
+  --ui-content-max-width: 1440px;
+  --ui-content-gutter: 28px;
+  --ui-card-padding: 20px;
+  --ui-control-height: 40px;
   --ui-touch-height: 44px;
   --ui-tab-height: 38px;
-  --ui-table-row-height: 44px;
+  --ui-table-row-height: 48px;
   --ui-table-header: var(--ui-surface-subtle);
   --ui-input-background: var(--ui-surface);
   --ui-badge-height: 22px;
 
-  --ui-shadow-xs: 0 1px 2px rgba(18, 24, 32, 0.04);
-  --ui-shadow-sm: 0 3px 12px rgba(18, 24, 32, 0.055);
+  --ui-shadow-xs: 0 2px 5px rgba(24, 35, 59, 0.035), 0 8px 24px rgba(24, 35, 59, 0.025);
+  --ui-shadow-sm: 0 6px 20px rgba(24, 35, 59, 0.07);
   --ui-shadow-overlay: 0 16px 38px rgba(18, 24, 32, 0.14);
 
   /* Kompatible Namen der drei bestehenden Frontends. */
@@ -961,7 +961,7 @@ textarea {
 
 .admin-list--table > .admin-list__row,
 .platform-table td {
-  min-height: 44px;
+  min-height: var(--ui-table-row-height);
 }
 
 .admin-list--table > .admin-list__row:hover,
@@ -1438,6 +1438,192 @@ body:has(#vde-app) main {
   box-shadow: 0 -4px 14px rgba(18, 24, 32, 0.05);
 }
 
+/* Freigegebene Modulübersicht: kühle Karten auf einem ruhigen Arbeitsbereich.
+   Gemeinsame Regeln gelten auch für Berichte, Geräte und optionale Module;
+   Daten, Navigation und Berechtigungen bleiben in ihren Fachkomponenten. */
+.metric-card {
+  position: relative;
+  min-width: 0;
+  gap: 9px;
+  padding: var(--ui-card-padding);
+}
+
+.metric-card__label {
+  min-height: 2.6em;
+  max-width: calc(100% - 34px);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 550;
+}
+
+.metric-card__symbol {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--ui-text-tertiary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.metric-card__value {
+  font-size: 2rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.metric-card__note,
+.today-list__text small,
+.today-list__aside {
+  font-size: var(--ui-text-xs);
+}
+
+.today-overview > h2 {
+  margin-bottom: 16px;
+  font-size: var(--ui-title-sm);
+  letter-spacing: -0.015em;
+}
+
+.today-panel__head {
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+  font-size: var(--ui-text-sm);
+}
+
+.today-list {
+  padding: 4px 12px;
+}
+
+.today-list__item {
+  min-height: 70px;
+  padding: 12px 8px;
+  color: var(--ui-text);
+}
+
+.today-list__text strong {
+  font-size: var(--ui-text-sm);
+  font-weight: 650;
+}
+
+.today-list__item:hover {
+  background: var(--ui-surface-subtle);
+}
+
+.today-list__more {
+  min-height: 48px;
+  font-size: var(--ui-text-sm);
+}
+
+.entity-toolbar,
+.employee-toolbar,
+.report-center__filters,
+.hierarchy-toolbar {
+  gap: 12px;
+  padding: 16px;
+  background: var(--ui-surface);
+}
+
+.entity-search > span,
+.employee-role-filter > span {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  text-transform: none;
+}
+
+.admin-list__row,
+.admin-list__row strong,
+.hierarchy-table td,
+.platform-table td {
+  font-size: var(--ui-text-sm);
+}
+
+.admin-list__row small,
+.admin-table-heading,
+.hierarchy-table th,
+.platform-table th {
+  font-size: var(--ui-text-xs);
+}
+
+.planning-board-shell,
+.admin-week,
+.site-dashboard,
+.report-center {
+  border-radius: var(--ui-radius-md);
+}
+
+.planning-board-row {
+  min-height: 76px;
+}
+
+.week-assignment,
+.week-absence {
+  border-radius: var(--ui-radius-sm);
+}
+
+.site-overview-cards {
+  gap: 12px;
+}
+
+.site-overview-card {
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.site-overview-card__label {
+  font-size: var(--ui-text-xs);
+}
+
+.site-overview-card__value {
+  font-size: var(--ui-text-sm);
+}
+
+.device-card,
+.device-metric,
+.device-detail__facts,
+.device-editor-section,
+.device-battery-fields,
+.pane-menu__item {
+  border-color: var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-xs);
+}
+
+.device-dialog,
+.device-dialog__frame,
+.notification-bell__panel {
+  border-radius: var(--ui-radius-lg);
+}
+
+.device-detail__facts dt,
+.device-detail__facts dd,
+.device-dialog label,
+.device-settings__form label {
+  font-size: var(--ui-text-sm);
+}
+
+/* Native Eingaben bleiben auch in kompakten Tabellen gut lesbar. */
+.admin-form :where(input, select, textarea),
+.site-module-form :where(input, select, textarea),
+.device-dialog :where(input, select, textarea),
+.field :where(input, select, textarea) {
+  font-size: var(--ui-text-sm);
+}
+
+:where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ui-brand-hover);
+  outline-offset: 3px;
+}
+
 /* Breite Bildschirme ---------------------------------------------------- */
 
 @media (min-width: 1080px) {
@@ -1494,8 +1680,8 @@ body:has(#vde-app) main {
 
   .dashboard-view > .dashboard-content {
     max-width: var(--ui-content-max-width);
-    gap: 14px;
-    padding: 22px var(--ui-content-gutter) 40px;
+    gap: 22px;
+    padding: 28px var(--ui-content-gutter) 40px;
   }
 
   .dashboard-view > .platform-announcements {
@@ -1505,27 +1691,60 @@ body:has(#vde-app) main {
 
   .dashboard-view > .bottom-nav {
     overflow-y: auto;
-    gap: 2px;
-    padding: 14px 10px;
+    gap: 3px;
+    padding: 18px 12px;
   }
 
   .dashboard-view > .bottom-nav > .nav-brand {
-    margin: 1px 8px 14px;
-    font-size: 0.86rem;
+    min-height: 38px;
+    margin: 0 9px 22px;
+    font-size: 1rem;
   }
 
   .dashboard-view > .bottom-nav .nav-item {
-    min-height: 36px;
+    min-height: 40px;
+    flex-shrink: 0;
     gap: 10px;
     border-radius: var(--ui-radius-sm);
     padding: 0 11px;
     grid-template-columns: 18px minmax(0, 1fr);
-    font-size: 0.76rem;
+    font-size: var(--ui-text-sm);
   }
 
   .dashboard-view > .bottom-nav .nav-item svg {
     width: 17px;
     height: 17px;
+  }
+
+  .dashboard-view > .bottom-nav > .nav-group-label {
+    margin: 14px 11px 5px;
+    color: #a3adbd;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .dashboard-view > .bottom-nav .nav-item--active {
+    box-shadow: 0 4px 12px rgba(227, 6, 19, 0.18);
+  }
+
+  .dashboard-view > .topbar .topbar-search {
+    width: min(460px, 38vw);
+    margin-right: auto;
+    margin-left: 12px;
+    background: var(--ui-surface-subtle);
+  }
+
+  .topbar-search input {
+    font-size: var(--ui-text-sm);
+  }
+
+  .topbar-user strong {
+    font-size: var(--ui-text-sm);
+  }
+
+  .topbar-user span {
+    font-size: var(--ui-text-xs);
   }
 
   .sidebar-toggle {
@@ -1613,16 +1832,16 @@ body:has(#vde-app) main {
   }
 
   .metric-card {
-    padding: 13px 15px;
+    padding: 20px;
   }
 
   .metric-card__value {
-    font-size: 1.65rem;
+    font-size: 2rem;
   }
 
   .today-overview__panels,
   .overview-cards {
-    gap: 12px;
+    gap: 20px;
   }
 
   .workspace {
@@ -1822,6 +2041,37 @@ body:has(#vde-app) main {
    naechsten Schritt konzentriert. Das kompakte Desktop-Design darf die
    persoenliche Startseite dort nicht in eine zweite Buerotabelle verwandeln. */
 @media (max-width: 759px) {
+  .metric-card {
+    padding: 16px;
+  }
+
+  .metric-card__symbol {
+    top: 14px;
+    right: 12px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .metric-card__value {
+    font-size: 1.65rem;
+  }
+
+  .today-list__item {
+    min-height: 64px;
+  }
+
+  .today-list__text strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-form :where(input, select, textarea),
+  .site-module-form :where(input, select, textarea),
+  .device-dialog :where(input, select, textarea),
+  .field :where(input, select, textarea) {
+    font-size: 1rem;
+  }
+
   .dashboard-view > .topbar .connection-state {
     order: -1;
   }
