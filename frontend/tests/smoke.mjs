@@ -104,9 +104,9 @@ assert.match(html, /class="page-tabs report-editor-tabs"/);
 assert.match(html, /href="#site-report-personnel-list">Mitarbeiter/);
 assert.match(html, /id="site-report-finalize-submit"[^>]*>Bericht abschließen</);
 assert.match(designSystem, /--ui-brand: #e30613/);
-assert.match(designSystem, /--ui-sidebar: #17191d/);
-assert.match(designSystem, /--ui-sidebar-width: 216px/);
-assert.match(designSystem, /--ui-header-height: 58px/);
+assert.match(designSystem, /--ui-sidebar: #11151c/);
+assert.match(designSystem, /--ui-sidebar-width: 212px/);
+assert.match(designSystem, /--ui-header-height: 64px/);
 assert.match(designSystem, /\.week-overview-table/);
 assert.match(designSystem, /\.platform-sidebar/);
 // Der Wochenwechsel nutzt dieselbe Schaltflaeche wie die Plantafel. Vorher war
@@ -306,7 +306,7 @@ assert.match(
 // Dokumente, Baustellenfotos, VDE-Protokoll -, gibt keine Kopfzeile mit. Ohne
 // die Fassung im Adressteil kam dort waehrend eines Pflichtupdates dessen
 // Meldung als JSON an: 203 Byte, abgelegt als "SE-R-….pdf.json".
-assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.54`;/);
+assert.match(app, /function browserFileUrl\(path\) \{\s*return `\$\{path\}\$\{path\.includes\("\?"\) \? "&" : "\?"\}appVersion=0\.44\.55`;/);
 for (const stelle of [
   /apprentice\/reports\/\$\{selectedWeekStart\}\/pdf\?preview=true/,
   /admin\/documents\/\$\{encodeURIComponent\(documentItem\.id\)\}\/content/,
@@ -329,7 +329,7 @@ assert.doesNotMatch(app, /link\.target = "_blank";\s*link\.rel = "noopener";\s*l
 // Offline gesicherte Dokumente behalten ihren Schluessel ohne die Fassung.
 assert.match(app, /function employeeSiteContentKey\(/);
 assert.match(worker, /cacheUrl\.searchParams\.delete\("appVersion"\)/);
-assert.match(vdeApp, /appVersion=0\.44\.54/);
+assert.match(vdeApp, /appVersion=0\.44\.55/);
 assert.match(app, /element === elements\.apprenticeSection[\s\S]{0,160}mayReviewApprentices\(\)/);
 // Seine bisherigen Berichte fuehren in ihre Woche zurueck und lassen sich von
 // dort drucken. Vorher war die Liste eine tote Aufzaehlung.
@@ -844,10 +844,10 @@ assert.doesNotMatch(html, /<section id="assignment-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /<section id="site-import-panel"[^>]*hidden>/);
 assert.doesNotMatch(html, /id="assignment-import-body" class="inline-import__body" hidden/);
 assert.doesNotMatch(html, /id="site-import-body" class="inline-import__body" hidden/);
-assert.match(html, /styles\.css\?v=0\.44\.54/);
-assert.match(html, /design-system\.css\?v=0\.44\.54/);
-assert.match(html, /app\.js\?v=0\.44\.54/);
-assert.match(html, /version\.js\?v=0\.44\.54/);
+assert.match(html, /styles\.css\?v=0\.44\.55/);
+assert.match(html, /design-system\.css\?v=0\.44\.55/);
+assert.match(html, /app\.js\?v=0\.44\.55/);
+assert.match(html, /version\.js\?v=0\.44\.55/);
 assert.match(html, /id="devices-section"[^>]*data-dashboard-pane="devices"/);
 assert.match(html, /id="device-module"/);
 assert.match(html, /id="nav-devices"/);
@@ -1096,7 +1096,7 @@ assert.match(styles, /\.nav-brand \{[\s\S]{0,260}text-transform: uppercase;/);
 // waere sie in Zeilen ohne Schaltflaeche null Pixel breit.
 assert.match(app, /function appendAdminListHead\(/);
 assert.match(app, /function adminListCells\(/);
-assert.match(app, /\["Name", "E-Mail", "Rolle", "Telefon", "Status"\]/);
+assert.match(app, /\["Mitarbeiter", "Rolle", "Status"\]/);
 assert.match(app, /appendAdminListHead\(list, \["Baustelle", "Aufgabe", "Kunde", "Adresse", "Dokumente", "Status"\]\)/);
 assert.match(app, /\["Nr\.", "Baustelle", "Prüfungsart", "Datum", "Status", "Prüfer"\]/);
 assert.match(styles, /grid-template-columns: var\(--tabellen-spalten/);
@@ -1323,7 +1323,7 @@ assert.match(app, /elements\.overviewCards\.hidden = currentDashboardPane !== "s
 assert.match(app, /dashboardTitle\.textContent = `\$\{greetingForHour\(\)\}, \$\{session\.user\.firstName\} \\u\{1F44B\}`;/);
 assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.status-card \{[\s\S]*?border-radius: 23px;[\s\S]*?--mobile-status-card-background/);
 assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-subtitle \{\s*display: none;/);
-assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-badges \.welcome-date \{[\s\S]*?position: absolute;/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-date \{[\s\S]*?position: absolute;/);
 // Der Kopf der Zeiterfassung und die drei vorhandenen Funktionsbereiche stehen
 // als gemeinsamer Block direkt hinter der Woche.
 assert.match(app, /elements\.weekSection\.after\(\s*\n\s*elements\.timePageHeading,\s*\n\s*elements\.workdayCard,/);
@@ -1652,21 +1652,21 @@ for (const asset of [
 ]) {
   assert.ok(worker.includes(`"${asset}"`), `${asset} fehlt im App-Shell-Cache`);
 }
-assert.ok(worker.includes('"./styles.css?v=0.44.54"'));
-assert.ok(worker.includes('"./design-system.css?v=0.44.54"'));
-assert.ok(worker.includes('"./app.js?v=0.44.54"'));
-assert.ok(worker.includes('"./core/work-time.js?v=0.44.54"'));
-assert.ok(worker.includes('"./core/device-management.js?v=0.44.54"'));
-assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.54"'));
-assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.54"'));
+assert.ok(worker.includes('"./styles.css?v=0.44.55"'));
+assert.ok(worker.includes('"./design-system.css?v=0.44.55"'));
+assert.ok(worker.includes('"./app.js?v=0.44.55"'));
+assert.ok(worker.includes('"./core/work-time.js?v=0.44.55"'));
+assert.ok(worker.includes('"./core/device-management.js?v=0.44.55"'));
+assert.ok(worker.includes('"./core/apprentice-view.js?v=0.44.55"'));
+assert.ok(worker.includes('"./vendor/qr-scanner.min.js?v=0.44.55"'));
 assert.ok(worker.includes('"./vendor/qr-scanner-worker.min.js"'));
-assert.ok(worker.includes('"./version.js?v=0.44.54"'));
+assert.ok(worker.includes('"./version.js?v=0.44.55"'));
 
 // app.js wird als Modul geladen und holt sich die Zeitberechnung aus dem
 // gemeinsamen Kern. Beide Angaben müssen zusammenpassen, sonst fehlt der
 // Import im App-Shell-Cache und die PWA bricht offline.
-assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.54"><\/script>/);
-assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.54";/);
+assert.match(html, /<script type="module" src="\.\/app\.js\?v=0\.44\.55"><\/script>/);
+assert.match(app, /import \{[\s\S]*?\} from "\.\/core\/work-time\.js\?v=0\.44\.55";/);
 assert.match(workTimeCore, /export function calculateTimes\(events, now = new Date\(\)\)/);
 // Jedes Kernmodul, das app.js einbindet, muss der Service Worker vorhalten.
 // Fehlt eines, laedt die App offline gar nicht mehr, weil der Import ins Leere
@@ -1701,7 +1701,7 @@ for (const modul of eingebundeneKerne) {
     worker.includes(`"${modul}"`),
     `${modul} fehlt im App-Shell-Cache des Service Workers`
   );
-  assert.match(modul, /\?v=0\.44\.54$/, `${modul} braucht dieselbe Fassungsnummer`);
+  assert.match(modul, /\?v=0\.44\.55$/, `${modul} braucht dieselbe Fassungsnummer`);
 }
 assert.doesNotMatch(
   app,
@@ -1709,11 +1709,11 @@ assert.doesNotMatch(
   "Die Zeitberechnung darf nur im gemeinsamen Kern stehen"
 );
 assert.ok(worker.includes('"./platform-admin.html"'));
-assert.ok(worker.includes('"./platform-admin.css?v=0.44.54"'));
-assert.ok(worker.includes('"./platform-admin.js?v=0.44.54"'));
+assert.ok(worker.includes('"./platform-admin.css?v=0.44.55"'));
+assert.ok(worker.includes('"./platform-admin.js?v=0.44.55"'));
 assert.ok(worker.includes('"./vde/index.html"'));
-assert.ok(worker.includes('"./vde/styles.css?v=0.44.54"'));
-assert.ok(worker.includes('"./vde/app.js?v=0.44.54"'));
+assert.ok(worker.includes('"./vde/styles.css?v=0.44.55"'));
+assert.ok(worker.includes('"./vde/app.js?v=0.44.55"'));
 assert.match(worker, /DOCUMENT_CACHE_PREFIX/);
 assert.match(worker, /siteDocumentContent/);
 // Gesucht wird unter der abgelegten Adresse - ohne die App-Fassung, die nur an
@@ -1811,9 +1811,9 @@ for (const [datei, quelle] of [["app.js", app], ["vde/app.js", vdeApp], ["platfo
     `${datei} nennt dem Server seine Fassung nicht`
   );
 }
-assert.match(vdeHtml, /styles\.css\?v=0\.44\.54/);
-assert.match(vdeHtml, /design-system\.css\?v=0\.44\.54/);
-assert.match(vdeHtml, /app\.js\?v=0\.44\.54/);
+assert.match(vdeHtml, /styles\.css\?v=0\.44\.55/);
+assert.match(vdeHtml, /design-system\.css\?v=0\.44\.55/);
+assert.match(vdeHtml, /app\.js\?v=0\.44\.55/);
 assert.match(vdeStyles, /\.distribution-card/);
 assert.match(vdeStyles, /\.circuit-evaluation--bad/);
 assert.match(vdeApp, /fuse_nh/);
@@ -1829,7 +1829,7 @@ assert.match(vdeApp, /mapLegacyV15/);
 assert.match(vdeApp, /vde-protokoll-v15-sichtbarkeit-reihenfolge/);
 assert.match(vdeApp, /originalPdf/);
 assert.match(platformHtml, /id="platform-navigation"/);
-assert.match(platformHtml, /design-system\.css\?v=0\.44\.54/);
+assert.match(platformHtml, /design-system\.css\?v=0\.44\.55/);
 assert.equal(
   [...platformHtml.matchAll(/data-platform-view=/g)].length,
   14,

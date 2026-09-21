@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.54";
-import { serverIsNewer } from "./core/versions.js?v=0.44.54";
+} from "./core/work-time.js?v=0.44.55";
+import { serverIsNewer } from "./core/versions.js?v=0.44.55";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.54";
+} from "./core/sync-queue.js?v=0.44.55";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.54";
+} from "./core/permissions.js?v=0.44.55";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.54";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.54";
-import { createPowerModule } from "./core/power-module.js?v=0.44.54";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.54";
+} from "./core/state-store.js?v=0.44.55";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.55";
+import { createPowerModule } from "./core/power-module.js?v=0.44.55";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.55";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.54";
+} from "./core/time-changes.js?v=0.44.55";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1120,14 +1120,15 @@ import {
   // noch zu ueberblicken. Dieselben Karten leben jetzt in vier eindeutigen
   // Unterbereichen; sie werden nur umsortiert, nicht kopiert.
   elements.weekOverviewSubarea.append(
-    elements.weekOverviewTableCard,
+    elements.weekDaysSection,
+    elements.timeAccountPanel,
     elements.weekNextAssignment
   );
   elements.weekDaysSubarea.append(
-    elements.weekDaysSection,
+    elements.weekOverviewTableCard,
     elements.employeeTimesheetExportPanel
   );
-  elements.weekAccountSubarea.append(elements.timeAccountPanel);
+
   // Im Wochenreiter bleibt, was mir gehoert: meine eigenen Antraege. Die
   // Pruefung der Mitarbeiterzeiten zieht in ihren eigenen Bereich - sie ist
   // Arbeit an fremden Zeiten und hat in "Meine Woche" nie hingehoert.
@@ -1177,6 +1178,8 @@ import {
   let loginSetup = null;
   let currentDashboardPane = "start";
   let currentWeekSubarea = "overview";
+  let selectedWeekDate = null;
+  let selectedDocumentCategory = "all";
   let currentSettingsSubarea = "time-accounts";
   let currentAnalyticsSubarea = "hours";
   // Zu welchem Tag gehoeren die geladenen Einsaetze? Die Schnittstelle liefert
@@ -1591,7 +1594,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.54",
+          "X-Schaefchen-Version": "0.44.55",
           ...options.headers
         }
       });
@@ -1626,7 +1629,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.54`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.55`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1707,7 +1710,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.54" }
+        headers: { "X-Schaefchen-Version": "0.44.55" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1763,7 +1766,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.54 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.55 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -2546,9 +2549,19 @@ import {
     }
     const query = elements.documentSearch.value.trim().toLocaleLowerCase("de-DE");
     const status = elements.documentStatusFilter.value;
-    const documents = adminState.documents.filter((document) => (
+    const matchingDocuments = adminState.documents.filter((document) => (
       (status === "all" || document.status === status)
       && (!query || documentSearchText(document).includes(query))
+    ));
+    document.querySelectorAll("[data-document-category]").forEach((button) => {
+      const category = button.dataset.documentCategory;
+      button.setAttribute("aria-pressed", String(category === selectedDocumentCategory));
+      button.querySelector("[data-document-category-count]").textContent = String(
+        matchingDocuments.filter((item) => category === "all" || item.category === category).length
+      );
+    });
+    const documents = matchingDocuments.filter((item) => (
+      selectedDocumentCategory === "all" || item.category === selectedDocumentCategory
     ));
     elements.documentListSummary.textContent = `${documents.length} von ${adminState.documents.length}`;
     elements.documentList.replaceChildren();
@@ -2558,7 +2571,7 @@ import {
       empty.className = "admin-list__empty";
       empty.textContent = query
         ? "Kein Dokument passt zur Suche."
-        : "Noch kein Dokument in diesem Status.";
+        : "Keine Dokumente in diesem Ordner und Status.";
       elements.documentList.append(empty);
       return;
     }
@@ -2665,7 +2678,20 @@ import {
         offlineButton,
         statusButton
       );
-      item.append(content, actions);
+      item.className = "document-row";
+      const fileType = document.createElement("span");
+      fileType.className = "document-row__type";
+      fileType.textContent = documentItem.fileName?.split(".").pop()?.toUpperCase() || "Datei";
+      const size = document.createElement("span");
+      size.className = "document-row__size";
+      size.textContent = formatFileSize(documentItem.sizeBytes);
+      const menu = document.createElement("details");
+      menu.className = "document-row-menu";
+      const summary = document.createElement("summary");
+      summary.textContent = "Aktionen";
+      summary.setAttribute("aria-label", `Aktionen für ${documentItem.title}`);
+      menu.append(summary, actions);
+      item.append(content, fileType, size, menu);
       elements.documentList.append(item);
     });
   }
@@ -3184,7 +3210,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.54";
+  const EIGENE_FASSUNG = "0.44.55";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3223,7 +3249,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.54". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.55". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -6488,9 +6514,8 @@ import {
     });
   }
 
-  // Die Mitarbeiterliste zeigt die Angaben, nach denen das Büro tatsächlich
-  // sucht. Personalnummer und Arbeitskonto bleiben in der rechten Detailakte;
-  // E-Mail und Telefon müssen dagegen schon beim Überfliegen erreichbar sein.
+  // Die kompakte Liste öffnet die Kontakt- und Kontodaten in der Detailspalte.
+  // E-Mail und Telefon bleiben über die Suche auffindbar.
   function renderEmployeeList() {
     if (!adminState) {
       return renderAdminListPlaceholder(
@@ -6514,11 +6539,14 @@ import {
       ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
       return matchesRole && (!search || searchText.includes(search));
     });
+    if (!activeEmployees.some((employee) => employee.id === selectedEmployeeId)) {
+      selectedEmployeeId = activeEmployees[0]?.id || null;
+    }
     elements.employeeList.replaceChildren();
     if (activeEmployees.length > 0) {
       appendAdminListHead(
         elements.employeeList,
-        ["Name", "E-Mail", "Rolle", "Telefon", "Status"]
+        ["Mitarbeiter", "Rolle", "Status"]
       );
     }
     elements.archivedEmployeeList.replaceChildren();
@@ -6552,13 +6580,18 @@ import {
       zeichen.setAttribute("aria-hidden", "true");
       zeichen.textContent = initialen(`${employee.firstName} ${employee.lastName}`);
       name.className = "employee-name";
-      name.append(zeichen, document.createTextNode(`${employee.firstName} ${employee.lastName}`));
+      const select = document.createElement("button");
+      select.type = "button";
+      select.className = "employee-select";
+      select.textContent = `${employee.firstName} ${employee.lastName}`;
+      select.setAttribute("aria-controls", "employee-detail");
+      select.addEventListener("click", () => selectEmployee(employee));
+      zeile.dataset.employeeId = employee.id;
+      name.append(zeichen, select);
       zeile.append(
         name,
         adminListCells([
-          employee.email,
           employee.roles.map((role) => roleLabels[role] || role).join(", "),
-          employee.phone,
           marke
         ])
       );
@@ -6670,6 +6703,11 @@ import {
       (eintrag) => eintrag.id === selectedEmployeeId
     );
     elements.employeeDetail.hidden = !employee;
+    elements.employeeList.querySelectorAll("[data-employee-id]").forEach((row) => {
+      const selected = row.dataset.employeeId === selectedEmployeeId;
+      row.classList.toggle("is-selected", selected);
+      row.querySelector(".employee-select")?.setAttribute("aria-pressed", String(selected));
+    });
     if (!employee) return;
     elements.employeeDetailName.textContent = `${employee.firstName} ${employee.lastName}`;
     elements.employeeDetailRole.textContent = employeeRoleLabel(employee.roles);
@@ -7384,7 +7422,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.54" }
+        headers: { "X-Schaefchen-Version": "0.44.55" }
       });
       if (response.ok) {
         await cache.put(
@@ -10360,6 +10398,10 @@ import {
     // Zuordnung, und keine Tageskarte bekommt einen Änderungshinweis.
     const timeChangesByDay = groupTimeChangesByWorkDate(timeChangesState?.operations);
 
+    if (!visibleWeek.days.some((day) => day.workDate === selectedWeekDate)) {
+      selectedWeekDate = visibleWeek.days.find((day) => day.workDate === localDateKey(today))?.workDate
+        || visibleWeek.days[0]?.workDate || null;
+    }
     visibleWeek.days.forEach(({ workDate, workDay }) => {
       const date = dateFromIso(workDate);
       const approvedAbsence = approvedAbsenceForDate(workDate);
@@ -10428,6 +10470,7 @@ import {
         approvedAbsence ? " day-pill--absent" : ""
       }`;
       item.type = "button";
+      item.dataset.workDate = workDate;
       // Der Tag traegt seine Zahlen selbst, wie im Entwurf: Wochentag, Datum,
       // Haken, Kommen, Gehen und die Stunden. Wer den Streifen ueberfliegt,
       // sieht damit ohne Klick, wo etwas fehlt.
@@ -10472,10 +10515,8 @@ import {
       ].filter(Boolean).join(", "));
       item.append(name, number, status, kommenZeile, gehenZeile, stunden);
       item.addEventListener("click", () => {
-        document.querySelector(`#week-day-${workDate}`)?.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
-        });
+        selectedWeekDate = workDate;
+        showWeekSubarea("overview");
       });
       elements.weekStrip.append(item);
 
@@ -10493,6 +10534,7 @@ import {
       const dayStatus = document.createElement("span");
       const total = document.createElement("strong");
       dayCard.id = `week-day-${workDate}`;
+      dayCard.dataset.workDate = workDate;
       dayCard.className = `week-timesheet-day${isToday ? " week-timesheet-day--today" : ""}`;
       heading.className = "week-timesheet-day__heading";
       dateLabel.textContent = date.toLocaleDateString("de-DE", {
@@ -10690,6 +10732,7 @@ import {
       empty.textContent = "In dieser Woche sind noch keine Arbeitstage erfasst.";
       elements.weekTimesheetList.append(empty);
     }
+    updateSelectedWeekDay();
   }
 
   function renderEmployeeTimesheetExport(visibleWeek) {
@@ -11023,9 +11066,39 @@ import {
     });
   }
 
+  function updateSelectedWeekDay() {
+    const overview = currentWeekSubarea === "overview";
+    elements.weekStrip.querySelectorAll("button[data-work-date]").forEach((button) => {
+      const selected = button.dataset.workDate === selectedWeekDate;
+      button.classList.toggle("day-pill--selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    elements.weekTimesheetList.querySelector(".week-selected-empty")?.remove();
+    let visibleCards = 0;
+    [...elements.weekTimesheetList.children].forEach((card) => {
+      card.hidden = overview && card.dataset.workDate !== selectedWeekDate;
+      if (!card.hidden) visibleCards += 1;
+    });
+    if (overview && !visibleCards) {
+      const empty = document.createElement("p");
+      empty.className = "week-selected-empty week-timesheet-day__empty";
+      empty.textContent = selectedWeekDate
+        ? `${shortDate(selectedWeekDate)} · Für diesen Tag sind noch keine Buchungen vorhanden.`
+        : "Noch keine Woche geladen.";
+      elements.weekTimesheetList.append(empty);
+    }
+  }
+
   function showWeekSubarea(requested) {
     const allowed = new Set(["overview", "days", "account", "requests"]);
     currentWeekSubarea = allowed.has(requested) ? requested : "overview";
+    if (currentWeekSubarea === "overview") {
+      elements.weekOverviewSubarea.prepend(elements.weekDaysSection, elements.timeAccountPanel);
+    } else {
+      elements.weekDaysSubarea.insertBefore(elements.weekDaysSection, elements.employeeTimesheetExportPanel);
+      elements.weekAccountSubarea.append(elements.timeAccountPanel);
+    }
+    updateSelectedWeekDay();
     elements.weekViewButtons.forEach((button) => {
       const active = button.dataset.weekViewButton === currentWeekSubarea;
       button.classList.toggle("page-tab--active", active);
@@ -13359,6 +13432,12 @@ import {
     }
   });
 
+  document.querySelectorAll("[data-document-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedDocumentCategory = button.dataset.documentCategory;
+      renderDocumentList();
+    });
+  });
   elements.documentSearch.addEventListener("input", renderDocumentList);
   elements.documentStatusFilter.addEventListener("change", renderDocumentList);
   elements.documentNew.addEventListener("click", () => {

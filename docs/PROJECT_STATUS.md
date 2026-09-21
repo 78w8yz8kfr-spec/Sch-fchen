@@ -3,7 +3,18 @@
 **0.44.44 – Einstufige Freigabe und Büroeinträge (10.09.2026).** Firmen können zwischen einer Freigabe und zwei getrennten Prüfungen wählen; die Personen bleiben pro Stufe auswählbar. Offene Anträge verwenden die aktuelle Regel, abgeschlossene Freigaben behalten ihre Historie. Planung → Abwesenheiten ermöglicht berechtigtem Büro direkt bestätigte Einträge für aktive Mitarbeiter derselben Firma ohne Mitarbeiterantrag. Eigene Direktfreigaben bleiben ausgeschlossen. Überschneidungen und ganztägige Einsatzkonflikte werden gesperrt; Büroeinträge erhalten eine eigene Herkunft und Historie und können begründet aufgehoben werden. Migrationen 156–157.
 
 Stand: 10.09.2026
-Technischer Stand: V0.44.54
+Technischer Stand: V0.44.55
+
+## Oberfläche 21.09.2026
+
+Fassung 0.44.55 übernimmt die vom Nutzer gewählte Modulübersicht als visuelle
+Referenz. Das gemeinsame Designsystem gestaltet die vorhandenen Bereiche mit
+dunkler Navigation, kühlen hellen Flächen, roten Aktionen und einheitlichen
+Karten. Die fachlichen Abläufe, Rollen und API-Verträge sind unverändert.
+Die Wochenübersicht zeigt den ausgewählten Tag neben dem Arbeitskonto.
+Dokumentordner filtern den vorhandenen Bestand; die Mitarbeiterliste öffnet
+Kontakt- und Kontodaten in einer rechten Detailspalte.
+Die mobile Monteuransicht behält ihre großen Schaltflächen. Keine Migration.
 
 ## Abwesenheitszuständigkeiten
 
