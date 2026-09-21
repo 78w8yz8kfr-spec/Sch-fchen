@@ -3,7 +3,13 @@
 **0.44.44 – Einstufige Freigabe und Büroeinträge (10.09.2026).** Firmen können zwischen einer Freigabe und zwei getrennten Prüfungen wählen; die Personen bleiben pro Stufe auswählbar. Offene Anträge verwenden die aktuelle Regel, abgeschlossene Freigaben behalten ihre Historie. Planung → Abwesenheiten ermöglicht berechtigtem Büro direkt bestätigte Einträge für aktive Mitarbeiter derselben Firma ohne Mitarbeiterantrag. Eigene Direktfreigaben bleiben ausgeschlossen. Überschneidungen und ganztägige Einsatzkonflikte werden gesperrt; Büroeinträge erhalten eine eigene Herkunft und Historie und können begründet aufgehoben werden. Migrationen 156–157.
 
 Stand: 10.09.2026
-Technischer Stand: V0.44.55
+Technischer Stand: V0.44.56
+
+## Berichtsentwürfe 21.09.2026
+
+Fassung 0.44.56 behebt den fehlenden Datumsformatierer für lokal gespeicherte
+Berichtsentwürfe. Ein Laufzeittest rendert den vollständigen Berichtseintrag
+mit gültigem, fehlendem und ungültigem Zeitstempel. Keine Migration.
 
 ## Oberfläche 21.09.2026
 

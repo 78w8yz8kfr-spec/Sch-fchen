@@ -11,8 +11,8 @@ import {
   formatSignedMinutes,
   greetingForHour,
   localDateKey
-} from "./core/work-time.js?v=0.44.55";
-import { serverIsNewer } from "./core/versions.js?v=0.44.55";
+} from "./core/work-time.js?v=0.44.56";
+import { serverIsNewer } from "./core/versions.js?v=0.44.56";
 import {
   buildReportPayload,
   buildTimeEntryPayload,
@@ -20,7 +20,7 @@ import {
   selectPendingWork,
   syncErrorMessage,
   timeEntriesMayFollow
-} from "./core/sync-queue.js?v=0.44.55";
+} from "./core/sync-queue.js?v=0.44.56";
 import {
   canPlan as canPlanFor,
   editableEmployeeRole,
@@ -29,7 +29,7 @@ import {
   plannableEmployees,
   sessionAccessSignature,
   sessionRoles
-} from "./core/permissions.js?v=0.44.55";
+} from "./core/permissions.js?v=0.44.56";
 import {
   COMPANY_STORAGE_KEY,
   ONLINE_STORAGE_KEY,
@@ -42,14 +42,14 @@ import {
   serializeState,
   storageKey,
   withoutReplaceableCache
-} from "./core/state-store.js?v=0.44.55";
-import { createDeviceModule } from "./core/device-management.js?v=0.44.55";
-import { createPowerModule } from "./core/power-module.js?v=0.44.55";
-import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.55";
+} from "./core/state-store.js?v=0.44.56";
+import { createDeviceModule } from "./core/device-management.js?v=0.44.56";
+import { createPowerModule } from "./core/power-module.js?v=0.44.56";
+import { apprenticeTodayPrompt } from "./core/apprentice-view.js?v=0.44.56";
 import {
   groupTimeChangesByWorkDate,
   operationDisplayStatus
-} from "./core/time-changes.js?v=0.44.55";
+} from "./core/time-changes.js?v=0.44.56";
 
 (() => {
   const DOCUMENT_CACHE_VERSION = "v42";
@@ -1594,7 +1594,7 @@ import {
         ...options,
         headers: {
           ...(options.body ? { "Content-Type": "application/json" } : {}),
-          "X-Schaefchen-Version": "0.44.55",
+          "X-Schaefchen-Version": "0.44.56",
           ...options.headers
         }
       });
@@ -1629,7 +1629,7 @@ import {
   // des Dokuments ab: "SE-R-2026-00001-2026-07-27.pdf.json". Deshalb darf die
   // Fassung ersatzweise im Adressteil stehen.
   function browserFileUrl(path) {
-    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.55`;
+    return `${path}${path.includes("?") ? "&" : "?"}appVersion=0.44.56`;
   }
 
   // Eine Datei holen, ohne die App zu verlassen.
@@ -1710,7 +1710,7 @@ import {
     try {
       response = await fetch(path, {
         credentials: "include",
-        headers: { "X-Schaefchen-Version": "0.44.55" }
+        headers: { "X-Schaefchen-Version": "0.44.56" }
       });
     } catch {
       const error = new Error("Der Server ist momentan nicht erreichbar.");
@@ -1766,7 +1766,7 @@ import {
     elements.passwordState.textContent = demoMode ? "In der Demo inaktiv" : "Sicher verschlüsselt";
     elements.loginSubmit.classList.toggle("button--secondary", demoMode);
     elements.loginSubmit.classList.toggle("button--primary", !demoMode);
-    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.55 ${demoMode ? "Demo" : "Online"}`;
+    elements.loginFooter.textContent = `Einfach vor komplex · Version 0.44.56 ${demoMode ? "Demo" : "Online"}`;
 
     if (demoMode) {
       elements.modeNoteText.replaceChildren();
@@ -3210,7 +3210,7 @@ import {
   // Die Fassung dieser Seite. Sie steht auch an den Dateinamen und im Fusstext
   // der Anmeldung; hier ist sie das, womit die Antwort des Servers verglichen
   // wird.
-  const EIGENE_FASSUNG = "0.44.55";
+  const EIGENE_FASSUNG = "0.44.56";
 
   // Haengt diese Seite hinter dem Server her? Dann sagen wir es - und zwingen
   // niemanden: mitten in einer Eingabe neu zu laden waere schlimmer als eine
@@ -3249,7 +3249,7 @@ import {
 
   // Laeuft hier die Datei, die die Seite angefordert hat?
   //
-  // Das Dokument laedt "app.js?v=0.44.55". Der Dienst-Worker darf im Notfall
+  // Das Dokument laedt "app.js?v=0.44.56". Der Dienst-Worker darf im Notfall
   // eine aeltere Fassung derselben Datei zurueckgeben - waehrend einer
   // Veroeffentlichung ist eine Fassung zu alt besser als eine weisse Seite.
   // Nur geht dieser Notfall vorbei, ohne dass es jemand merkt: dann laeuft
@@ -3810,6 +3810,16 @@ import {
     list.append(zeile);
   }
 
+  function formatDateTime(iso) {
+    if (!iso) return "";
+    const value = new Date(iso);
+    if (Number.isNaN(value.valueOf())) return "";
+    return new Intl.DateTimeFormat("de-DE", {
+      dateStyle: "short",
+      timeStyle: "short"
+    }).format(value);
+  }
+
   function renderReportCenter() {
     if (!adminState) {
       elements.reportCenterMissingList.replaceChildren();
@@ -3927,14 +3937,13 @@ import {
       status.className = `module-chip module-chip--${report.status}`;
       status.textContent = reportStatusLabel(report.status);
       heading.append(title, type, status);
+      const savedAt = report.localDraft ? formatDateTime(report.updatedAt) : "";
       meta.textContent = [
         report.number,
         report.workDate,
         site?.name,
         report.authorName,
-        report.localDraft && report.updatedAt
-          ? `gesichert ${formatDateTime(report.updatedAt)}`
-          : null
+        savedAt ? `gesichert ${savedAt}` : null
       ].filter(Boolean).join(" · ");
       detail.textContent = report.status === "returned"
         ? `Überarbeitung: ${report.returnComment}`
@@ -7422,7 +7431,7 @@ import {
       // und das zuvor gesicherte waere fort.
       const response = await fetch(employeeSiteContentUrl(documentItem), {
         credentials: "same-origin",
-        headers: { "X-Schaefchen-Version": "0.44.55" }
+        headers: { "X-Schaefchen-Version": "0.44.56" }
       });
       if (response.ok) {
         await cache.put(

@@ -4,6 +4,14 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [Unreleased]
 
+## [0.44.56] - Gespeicherte Berichtsentwürfe wieder anzeigen
+
+- Fehlende Datumsformatierung für lokale Berichtsentwürfe ergänzt. Der Fehler
+  „Can't find variable: formatDateTime“ unterbricht die Betriebsübersicht nicht mehr.
+- Speicherzeit erscheint als deutsches Datum mit Uhrzeit; fehlende oder ungültige
+  Zeitstempel lassen den Entwurf weiterhin öffnen und weiterbearbeiten.
+- PWA-Version und Cache erneuert, damit installierte Apps den Fehlerbehebungsstand laden.
+
 ## [0.44.55] - Oberfläche nach der freigegebenen Modulübersicht
 
 - Dunkle, 212 Pixel breite Desktop-Navigation, rote Hauptaktionen und helle
