@@ -105,7 +105,7 @@ assert.match(html, /href="#site-report-personnel-list">Mitarbeiter/);
 assert.match(html, /id="site-report-finalize-submit"[^>]*>Bericht abschließen</);
 assert.match(designSystem, /--ui-brand: #e30613/);
 assert.match(designSystem, /--ui-sidebar: #11151c/);
-assert.match(designSystem, /--ui-sidebar-width: 232px/);
+assert.match(designSystem, /--ui-sidebar-width: 212px/);
 assert.match(designSystem, /--ui-header-height: 64px/);
 assert.match(designSystem, /\.week-overview-table/);
 assert.match(designSystem, /\.platform-sidebar/);
@@ -1096,7 +1096,7 @@ assert.match(styles, /\.nav-brand \{[\s\S]{0,260}text-transform: uppercase;/);
 // waere sie in Zeilen ohne Schaltflaeche null Pixel breit.
 assert.match(app, /function appendAdminListHead\(/);
 assert.match(app, /function adminListCells\(/);
-assert.match(app, /\["Name", "E-Mail", "Rolle", "Telefon", "Status"\]/);
+assert.match(app, /\["Mitarbeiter", "Rolle", "Status"\]/);
 assert.match(app, /appendAdminListHead\(list, \["Baustelle", "Aufgabe", "Kunde", "Adresse", "Dokumente", "Status"\]\)/);
 assert.match(app, /\["Nr\.", "Baustelle", "Prüfungsart", "Datum", "Status", "Prüfer"\]/);
 assert.match(styles, /grid-template-columns: var\(--tabellen-spalten/);
@@ -1323,7 +1323,7 @@ assert.match(app, /elements\.overviewCards\.hidden = currentDashboardPane !== "s
 assert.match(app, /dashboardTitle\.textContent = `\$\{greetingForHour\(\)\}, \$\{session\.user\.firstName\} \\u\{1F44B\}`;/);
 assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.status-card \{[\s\S]*?border-radius: 23px;[\s\S]*?--mobile-status-card-background/);
 assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-subtitle \{\s*display: none;/);
-assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-badges \.welcome-date \{[\s\S]*?position: absolute;/);
+assert.match(designSystem, /@media \(max-width: 759px\)[\s\S]*?\.welcome-date \{[\s\S]*?position: absolute;/);
 // Der Kopf der Zeiterfassung und die drei vorhandenen Funktionsbereiche stehen
 // als gemeinsamer Block direkt hinter der Woche.
 assert.match(app, /elements\.weekSection\.after\(\s*\n\s*elements\.timePageHeading,\s*\n\s*elements\.workdayCard,/);

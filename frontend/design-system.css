@@ -11,7 +11,7 @@
   --ui-brand: #e30613;
   --ui-brand-hover: #c9000c;
   --ui-brand-soft: #fff0f1;
-  --ui-canvas: #f2f4f8;
+  --ui-canvas: #f5f5fb;
   --ui-surface: #ffffff;
   --ui-surface-subtle: #f7f8fc;
   --ui-surface-muted: #edf0f6;
@@ -57,7 +57,7 @@
   --ui-space-5: 20px;
   --ui-space-6: 24px;
 
-  --ui-sidebar-width: 232px;
+  --ui-sidebar-width: 212px;
   --ui-sidebar-collapsed-width: 72px;
   --ui-header-height: 64px;
   --ui-content-max-width: 1440px;
@@ -493,7 +493,7 @@ textarea {
   font-size: var(--ui-text-sm);
 }
 
-.welcome-badges .welcome-date {
+.welcome-date {
   margin: 0;
   color: var(--ui-text-secondary);
   font-size: var(--ui-text-sm);
@@ -1079,7 +1079,7 @@ textarea {
   }
 
   #employee-list {
-    --tabellen-spalten: minmax(0, 1.25fr) minmax(0, 1.35fr) minmax(0, 1.15fr) minmax(0, 0.92fr) minmax(0, 0.62fr) 92px;
+    --tabellen-spalten: minmax(0, 1.5fr) minmax(0, 1fr) 70px 92px;
   }
 
   #inspection-overview-list {
@@ -1450,24 +1450,12 @@ body:has(#vde-app) main {
 
 .metric-card__label {
   min-height: 2.6em;
-  max-width: calc(100% - 34px);
+  max-width: 100%;
   color: var(--ui-text-secondary);
   font-size: var(--ui-text-sm);
   font-weight: 550;
 }
 
-.metric-card__symbol {
-  position: absolute;
-  top: 18px;
-  right: 16px;
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: var(--ui-text-tertiary);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 
 .metric-card__value {
   font-size: 2rem;
@@ -1624,6 +1612,238 @@ body:has(#vde-app) main {
   outline-offset: 3px;
 }
 
+/* Aufbau der freigegebenen Vorlage: Tagesauswahl, Ordner und Detailakte. */
+.welcome-row > div:first-child > .welcome-date {
+  display: block;
+  margin-top: 7px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+
+.today-panel {
+  background: var(--ui-surface-subtle);
+}
+
+.day-pill--today:not(.day-pill--selected) {
+  border-color: var(--ui-border);
+}
+
+.day-pill--selected {
+  border-color: var(--ui-brand);
+  box-shadow: 0 0 0 1px var(--ui-brand);
+  background: var(--ui-surface);
+}
+
+#week-overview-subarea #week-days-section > .week-section-title {
+  display: none;
+}
+
+#week-overview-subarea .week-timesheet-day {
+  border-color: var(--ui-border);
+  box-shadow: none;
+  background: var(--ui-surface-subtle);
+}
+
+#week-overview-subarea .week-time-entry {
+  position: relative;
+  padding-left: 32px;
+  min-height: 58px;
+}
+
+#week-overview-subarea .week-time-entry::before {
+  position: absolute;
+  left: 14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ui-text-tertiary);
+  content: "";
+}
+
+#week-overview-subarea .time-account-panel {
+  background: var(--ui-surface-subtle);
+}
+
+#week-overview-subarea .week-totals--primary {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+#week-overview-subarea .week-totals--primary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
+}
+
+#week-overview-subarea .time-account-panel .eyebrow {
+  display: none;
+}
+
+#document-management-panel {
+  overflow: visible;
+}
+
+.document-cabinet {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.document-folders {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.document-folder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.document-folder[aria-pressed="true"] {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  font-weight: 700;
+}
+
+.document-list-heading {
+  display: none;
+}
+
+.document-cabinet__content {
+  min-width: 0;
+}
+
+.document-cabinet__content > .site-list-toolbar {
+  margin-top: 0;
+  padding: 0 0 12px;
+}
+
+.document-cabinet .document-list {
+  padding: 0;
+}
+
+.document-list .document-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 8px;
+}
+
+.document-row > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.document-row__type,
+.document-row__size {
+  font-variant-numeric: tabular-nums;
+}
+
+.document-row-menu {
+  position: relative;
+}
+
+.document-row-menu > summary {
+  padding: 10px 5px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-sm);
+  cursor: pointer;
+}
+
+.document-row-menu .document-actions {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  display: grid;
+  min-width: 220px;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.employee-select {
+  border: 0;
+  padding: 8px 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.employee-detail {
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+#employee-list > .is-selected {
+  background: var(--ui-surface-subtle);
+  box-shadow: inset 2px 0 0 var(--ui-brand);
+}
+
+@media (min-width: 1080px) {
+  .document-cabinet {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .document-folders {
+    display: grid;
+  }
+
+  .document-list-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 52px 78px 82px;
+    gap: 12px;
+    padding: 12px 8px;
+    border-radius: 5px;
+    background: var(--ui-surface-muted);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-text-xs);
+    font-weight: 600;
+  }
+
+  .document-list .document-row {
+    grid-template-columns: minmax(0, 1fr) 52px 78px 82px;
+  }
+
+  .employee-split {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 12px;
+  }
+
+  .employee-split:not(:has(.employee-detail:not([hidden]))) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Breite Bildschirme ---------------------------------------------------- */
 
 @media (min-width: 1080px) {
@@ -1697,7 +1917,7 @@ body:has(#vde-app) main {
 
   .dashboard-view > .bottom-nav > .nav-brand {
     min-height: 38px;
-    margin: 0 9px 22px;
+    margin: 0 9px 18px;
     font-size: 1rem;
   }
 
@@ -1717,7 +1937,8 @@ body:has(#vde-app) main {
   }
 
   .dashboard-view > .bottom-nav > .nav-group-label {
-    margin: 14px 11px 5px;
+    display: none;
+    margin: 0;
     color: #a3adbd;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -1795,7 +2016,9 @@ body:has(#vde-app) main {
   }
 
   #week-section > #week-strip {
-    display: none;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   #week-section {
@@ -1807,19 +2030,20 @@ body:has(#vde-app) main {
   }
 
   #week-overview-subarea {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) 280px;
+    align-items: start;
   }
 
-  #week-overview-subarea > #week-overview-table-card {
-    grid-column: span 9;
+  #week-overview-subarea > #week-days-section {
+    min-width: 0;
   }
 
   #week-overview-subarea > #week-next-assignment {
-    grid-column: span 3;
+    grid-column: 1 / -1;
   }
 
-  #week-overview-subarea:not(:has(#week-next-assignment:not([hidden]))) > #week-overview-table-card {
-    grid-column: 1 / -1;
+  #week-overview-subarea:not(:has(#time-account-panel:not([hidden]))) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   #week-requests-subarea {
@@ -1876,11 +2100,7 @@ body:has(#vde-app) main {
   }
 }
 
-@media (min-width: 1440px) {
-  #week-overview-subarea > #week-overview-table-card {
-    grid-column: span 9;
-  }
-}
+
 
 /* Tablet und Mobil ------------------------------------------------------ */
 
@@ -2045,12 +2265,6 @@ body:has(#vde-app) main {
     padding: 16px;
   }
 
-  .metric-card__symbol {
-    top: 14px;
-    right: 12px;
-    width: 18px;
-    height: 18px;
-  }
 
   .metric-card__value {
     font-size: 1.65rem;
@@ -2106,7 +2320,7 @@ body:has(#vde-app) main {
     text-transform: uppercase;
   }
 
-  .welcome-badges .welcome-date {
+  .welcome-date {
     position: absolute;
     bottom: 0;
     left: 0;

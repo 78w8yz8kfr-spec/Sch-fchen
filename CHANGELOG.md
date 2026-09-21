@@ -6,14 +6,18 @@ Alle wesentlichen Änderungen an Schäfchen werden in dieser Datei dokumentiert.
 
 ## [0.44.55] - Oberfläche nach der freigegebenen Modulübersicht
 
-- Dunkle, 232 Pixel breite Desktop-Navigation, rote Hauptaktionen und helle
+- Dunkle, 212 Pixel breite Desktop-Navigation, rote Hauptaktionen und helle
   Karten auf kühlem graublauem Hintergrund nach der ausgewählten Designskizze.
 - Einheitliche Kartenradien, feine Rahmen und dezente Schatten für Dashboard,
   Planung, Baustellen, Berichte, Geräte, Plattformverwaltung und VDE-Editor.
-- Vier klar gegliederte Kennzahlen mit zurückhaltenden Symbolen; luftigere
+- Vier klar gegliederte Kennzahlen ohne zusätzliche Dekoration; luftigere
   Tagesübersicht und besser lesbare Tabellen, Formularfelder und Navigation.
 - Mobile Kennzahlen passen sich der schmalen Ansicht an. Große Touch-Ziele,
   einfache Monteuransicht und die rollenabhängige Navigation bleiben erhalten.
+- Wochenübersicht mit auswählbaren Tageskarten, Buchungen und Arbeitskonto
+  nebeneinander; vollständige Wochentabelle bleibt im Reiter „Arbeitstage“.
+- Dokumentordner filtern den Bestand nach Kategorie; Dateiaktionen bleiben
+  im Zeilenmenü erreichbar. Kompakte Mitarbeiterliste mit Detailakte rechts.
 - Gemeinsamer Versionswechsel und neuer App-Shell-Cache liefern die Gestaltung
   auch an installierte PWAs aus. Gespeicherte Fachdaten werden nicht gelöscht.
 

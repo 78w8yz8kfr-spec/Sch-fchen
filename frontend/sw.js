@@ -1,4 +1,4 @@
-const CACHE_NAME = "schaefchen-online-v137";
+const CACHE_NAME = "schaefchen-online-v138";
 const DOCUMENT_CACHE_VERSION = "v42";
 const DOCUMENT_CACHE_PREFIX = `schaefchen-documents-${DOCUMENT_CACHE_VERSION}-`;
 const APP_SHELL = [

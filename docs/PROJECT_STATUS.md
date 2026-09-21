@@ -11,6 +11,9 @@ Fassung 0.44.55 übernimmt die vom Nutzer gewählte Modulübersicht als visuelle
 Referenz. Das gemeinsame Designsystem gestaltet die vorhandenen Bereiche mit
 dunkler Navigation, kühlen hellen Flächen, roten Aktionen und einheitlichen
 Karten. Die fachlichen Abläufe, Rollen und API-Verträge sind unverändert.
+Die Wochenübersicht zeigt den ausgewählten Tag neben dem Arbeitskonto.
+Dokumentordner filtern den vorhandenen Bestand; die Mitarbeiterliste öffnet
+Kontakt- und Kontodaten in einer rechten Detailspalte.
 Die mobile Monteuransicht behält ihre großen Schaltflächen. Keine Migration.
 
 ## Abwesenheitszuständigkeiten
