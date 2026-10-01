@@ -50,3 +50,10 @@ Die GitHub-Prüfung erzwingt zusätzlich eine Mindestabdeckung von `api/src`
 Funktionen). Die Schwelle ist ein Boden gegen grobe Rückschritte, vor allem
 gegen stillschweigend nicht mehr laufende Integrationstests. Sie ersetzt keine
 Prüfung im Einzelfall: neuer Code ohne eigenen Test kann die Schwelle halten.
+
+## Projektwissen (Second Brain)
+
+`brain/` enthält ein von Agenten gepflegtes Wiki über das Projekt. Vor einer
+Frage zum Projekt zuerst `brain/index.md` lesen. Zum Aufnehmen, Abfragen und
+Prüfen gelten die Regeln in `brain/SCHEMA.md`. Verbindlich bleiben dieses
+Dokument und `docs/`. Weicht das Wiki ab, gilt die Rohquelle.
